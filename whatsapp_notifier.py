@@ -11,25 +11,34 @@ class WhatsAppNotifier:
     """
     Sends breaking news and market catalyst alerts to WhatsApp Channels / Groups.
     Supports:
-    1. Generic Webhook (Zapier, Make, Green API, Evolution API, Wabox, etc.)
-    2. Meta Cloud API (Official WhatsApp Business API)
-    3. CallMeBot API (Free single-endpoint personal/group gateway)
+    1. Green API (Fastest QR-code based gateway for groups & channels)
+    2. Generic Webhook (Zapier, Make.com, Evolution API, Custom Gateway)
+    3. Meta Cloud API (Official WhatsApp Business API)
+    4. CallMeBot API (Fallback gateway)
     """
     def __init__(self):
         self.enabled = os.getenv("ENABLE_WHATSAPP_ALERTS", "false").lower() == "true"
+        
+        # 1. Green API Config (Recommended & Instant)
+        self.green_instance_id = os.getenv("GREEN_API_INSTANCE_ID", "").strip()
+        self.green_api_token = os.getenv("GREEN_API_TOKEN", "").strip()
+        self.green_chat_id = os.getenv("GREEN_API_CHAT_ID", "").strip() # e.g. 120363...g.us for groups, or 9198...@c.us
+        
+        # 2. Generic Webhook
         self.webhook_url = os.getenv("WHATSAPP_WEBHOOK_URL", "").strip()
         
-        # Meta Cloud API Config
+        # 3. Meta Cloud API Config
         self.meta_token = os.getenv("WHATSAPP_META_TOKEN", "").strip()
         self.phone_number_id = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "").strip()
-        self.recipient_id = os.getenv("WHATSAPP_RECIPIENT_ID", "").strip() # Channel ID / Group JID / Phone Number
+        self.recipient_id = os.getenv("WHATSAPP_RECIPIENT_ID", "").strip()
         
-        # CallMeBot Free API Config
+        # 4. CallMeBot Config
         self.callmebot_phone = os.getenv("CALLMEBOT_PHONE", "").strip()
         self.callmebot_apikey = os.getenv("CALLMEBOT_APIKEY", "").strip()
 
     def is_configured(self) -> bool:
         return bool(
+            (self.green_instance_id and self.green_api_token and self.green_chat_id) or
             self.webhook_url or 
             (self.meta_token and self.phone_number_id and self.recipient_id) or
             (self.callmebot_phone and self.callmebot_apikey)
@@ -78,7 +87,30 @@ class WhatsAppNotifier:
 
         message = self.format_whatsapp_message(news)
 
-        # 1. Custom Webhook (Green API / Zapier / Make / Evolution API / Custom Bot Gateway)
+        # 1. Green API Dispatch (Instant & Stable)
+        if self.green_instance_id and self.green_api_token and self.green_chat_id:
+            try:
+                # Format chatId properly (e.g., if just digits passed for individual, append @c.us)
+                target_chat = self.green_chat_id
+                if not target_chat.endswith("@g.us") and not target_chat.endswith("@c.us"):
+                    target_chat = f"{target_chat.replace('+', '').replace(' ', '')}@c.us"
+
+                url = f"https://api.green-api.com/waInstance{self.green_instance_id}/sendMessage/{self.green_api_token}"
+                payload = {
+                    "chatId": target_chat,
+                    "message": message,
+                    "linkPreview": True
+                }
+                resp = requests.post(url, json=payload, timeout=6)
+                if resp.status_code == 200:
+                    logger.info(f"[GREEN-API] Dispatched to {target_chat}: {news.get('title', '')[:30]}...")
+                    return True
+                else:
+                    logger.warning(f"Green API failed ({resp.status_code}): {resp.text[:120]}")
+            except Exception as e:
+                logger.error(f"Green API error: {e}")
+
+        # 2. Custom Webhook
         if self.webhook_url:
             try:
                 payload = {
@@ -94,12 +126,10 @@ class WhatsAppNotifier:
                 if resp.status_code in (200, 201, 202):
                     logger.info(f"[WHATSAPP WEBHOOK] Dispatched: {news.get('title', '')[:30]}...")
                     return True
-                else:
-                    logger.warning(f"WhatsApp Webhook returned {resp.status_code}: {resp.text[:100]}")
             except Exception as e:
                 logger.error(f"WhatsApp Webhook error: {e}")
 
-        # 2. Meta Official Cloud API
+        # 3. Meta Cloud API
         if self.meta_token and self.phone_number_id and self.recipient_id:
             try:
                 url = f"https://graph.facebook.com/v19.0/{self.phone_number_id}/messages"
@@ -116,21 +146,17 @@ class WhatsAppNotifier:
                 }
                 resp = requests.post(url, headers=headers, json=payload, timeout=5)
                 if resp.status_code == 200:
-                    logger.info(f"[WHATSAPP META] Dispatched: {news.get('title', '')[:30]}...")
                     return True
-                else:
-                    logger.warning(f"Meta WhatsApp API returned {resp.status_code}: {resp.text[:100]}")
             except Exception as e:
                 logger.error(f"Meta WhatsApp API error: {e}")
 
-        # 3. CallMeBot Gateway
+        # 4. CallMeBot Gateway
         if self.callmebot_phone and self.callmebot_apikey:
             try:
                 encoded_msg = quote(message)
                 url = f"https://api.callmebot.com/whatsapp.php?phone={self.callmebot_phone}&text={encoded_msg}&apikey={self.callmebot_apikey}"
                 resp = requests.get(url, timeout=6)
                 if resp.status_code == 200:
-                    logger.info(f"[CALLMEBOT] Dispatched: {news.get('title', '')[:30]}...")
                     return True
             except Exception as e:
                 logger.error(f"CallMeBot error: {e}")
