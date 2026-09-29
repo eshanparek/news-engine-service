@@ -57,7 +57,7 @@ def record_hash_in_db(hash_id: str, title: str):
     except Exception as e:
         logger.debug(f"Error saving hash to DB: {e}")
 
-# Initialize DB on module load
+# Initialize DB on load
 init_alert_db()
 
 def normalize_title(title: str) -> str:
@@ -249,15 +249,15 @@ class NewsEngineWorker:
         self.seen_hashes: Set[str] = set()
         self.alerted_hashes: Set[str] = set()
         self.is_running = False
-        self.is_initialized = False # Cold-start warmup flag to prevent backlogged spam
+        self.is_initialized = False # Cold-start warmup flag
         self.last_fetch_time: Optional[datetime] = None
-        self.refresh_interval = int(os.getenv("REFRESH_INTERVAL", "5"))
+        self.refresh_interval = int(os.getenv("REFRESH_INTERVAL", "3")) # Fast 3-second cycle
         self.enable_ai = os.getenv("ENABLE_AI_SCORING", "true").lower() == "true"
-        self.alert_threshold = int(os.getenv("ALERT_THRESHOLD", "75"))
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
         }
+        self.lock = threading.Lock()
         self._load_saved_hashes()
 
     def _load_saved_hashes(self):
@@ -303,7 +303,7 @@ class NewsEngineWorker:
         items = []
         try:
             url = f"https://inshorts.com/en/read/{category}"
-            resp = requests.get(url, headers=self.headers, timeout=5)
+            resp = requests.get(url, headers=self.headers, timeout=4)
             if resp.status_code == 200:
                 soup = BeautifulSoup(resp.text, "html.parser")
                 cards = soup.find_all("div", class_=re.compile(r"news-card"))
@@ -343,7 +343,7 @@ class NewsEngineWorker:
             if not url:
                 return results
 
-            resp = requests.get(url, headers=self.headers, timeout=5)
+            resp = requests.get(url, headers=self.headers, timeout=4)
             if resp.status_code == 200:
                 soup = None
                 try:
@@ -380,7 +380,7 @@ class NewsEngineWorker:
 
             if not results and source.get("fallback_scrape_url"):
                 scrape_url = source["fallback_scrape_url"]
-                s_resp = requests.get(scrape_url, headers=self.headers, timeout=5)
+                s_resp = requests.get(scrape_url, headers=self.headers, timeout=4)
                 if s_resp.status_code == 200:
                     s_soup = BeautifulSoup(s_resp.content, "html.parser")
                     anchors = s_soup.find_all("a", href=True)
@@ -404,9 +404,29 @@ class NewsEngineWorker:
 
         return results
 
+    def process_and_dispatch_single_item(self, item: Dict):
+        """Immediately rate and forward a single newly detected story in real time."""
+        hid = item.get("id") or compute_dedup_key(item)
+        with self.lock:
+            if hid in self.alerted_hashes or is_hash_in_db(hid):
+                return
+            self.alerted_hashes.add(hid)
+            record_hash_in_db(hid, item.get("title", ""))
+
+        # 1. AI Impact & Sentiment Rating (Immediate)
+        rating = ai_analyzer.analyze_news(item["title"], item.get("summary", "") or item["title"], item.get("source", ""))
+        item["ai_score"] = rating.get("score", 5)
+        item["ai_sentiment"] = rating.get("sentiment", "NEUTRAL")
+        item["ai_impact"] = rating.get("impact", "MEDIUM")
+        item["ai_sectors"] = rating.get("sectors", [])
+        item["ai_reasoning"] = rating.get("reasoning", "")
+
+        # 2. Instant Real-Time Dispatch to Telegram
+        telegram_notifier.send_news_alert(item)
+
     def fetch_all_sources(self) -> List[Dict]:
         all_news = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
             futures = [executor.submit(self.fetch_single_feed, src) for src in self.sources]
             for fut in concurrent.futures.as_completed(futures):
                 try:
@@ -416,91 +436,66 @@ class NewsEngineWorker:
                 except Exception:
                     pass
 
-        deduped = []
+        newly_arrived = []
         for item in all_news:
             h = compute_dedup_key(item)
             if h not in self.seen_hashes:
                 self.seen_hashes.add(h)
                 item["id"] = h
-                deduped.append(item)
+                newly_arrived.append(item)
 
-        if len(self.seen_hashes) > 2000:
-            self.seen_hashes = set(list(self.seen_hashes)[-1000:])
+        if len(self.seen_hashes) > 3000:
+            self.seen_hashes = set(list(self.seen_hashes)[-1500:])
 
-        return deduped
-
-    def enrich_with_ai(self, news_items: List[Dict]):
-        """Analyze all incoming news items with Gemini and forward to Telegram ONLY for truly live new items."""
-        def _enrich_task():
-            for item in news_items:
-                if "ai_score" not in item or item.get("ai_score") == 0:
-                    if self.enable_ai and ai_analyzer.is_configured():
-                        rating = ai_analyzer.analyze_news(item["title"], item.get("summary", "") or item["title"], item.get("source", ""))
-                        item["ai_score"] = rating.get("score", 5)
-                        item["ai_sentiment"] = rating.get("sentiment", "NEUTRAL")
-                        item["ai_impact"] = rating.get("impact", "MEDIUM")
-                        item["ai_sectors"] = rating.get("sectors", [])
-                        item["ai_reasoning"] = rating.get("reasoning", "")
-                    else:
-                        item["ai_score"] = 5
-                        item["ai_sentiment"] = "NEUTRAL"
-                        item["ai_impact"] = "MEDIUM"
-
-                    # ONLY forward to Telegram if engine has completed initial cold-start warmup
-                    if self.is_initialized:
-                        self.check_and_trigger_alert(item)
-                        time.sleep(0.4) # Rate limit safety
-
-        threading.Thread(target=_enrich_task, daemon=True).start()
-
-    def check_and_trigger_alert(self, news: Dict):
-        """Send Telegram alert for newly published live news item."""
-        item_id = news.get("id") or compute_dedup_key(news)
-        if item_id in self.alerted_hashes or is_hash_in_db(item_id):
-            return
-
-        self.alerted_hashes.add(item_id)
-        record_hash_in_db(item_id, news.get("title", ""))
-        telegram_notifier.send_news_alert(news)
-        
-        if len(self.alerted_hashes) > 2000:
-            self.alerted_hashes = set(list(self.alerted_hashes)[-1000:])
+        return newly_arrived, all_news
 
     def poll_cycle(self):
-        """Single poll step: fetch, rank, cache, AI enrich."""
-        new_items = self.fetch_all_sources()
-        if new_items:
-            combined = new_items + self.news_cache
+        """Ultra-fast poll cycle: checks all feeds in parallel and immediately dispatches new arrivals."""
+        newly_arrived, all_scraped = self.fetch_all_sources()
+
+        # Update Live Cache for Dashboard
+        if all_scraped:
+            # Merge and sort
+            combined = newly_arrived + self.news_cache
             combined.sort(key=lambda x: x.get("relevance", 0), reverse=True)
             self.news_cache = combined[:80]
-            
-            # Cold-start warmup handling:
-            if not self.is_initialized:
-                # Mark all initial current news as already recorded so we don't blast historical news
-                for it in new_items:
-                    hid = it.get("id") or compute_dedup_key(it)
-                    self.alerted_hashes.add(hid)
-                    record_hash_in_db(hid, it.get("title", ""))
-                self.is_initialized = True
-                logger.info(f"Cold-start warmup complete. {len(new_items)} historical items cached without Telegram broadcast.")
-                # Run AI rating in background for dashboard display
-                self.enrich_with_ai(new_items[:15])
-            else:
-                # Subsequent runs: Truly newly detected stories will trigger Telegram alerts
-                self.enrich_with_ai(new_items)
-            
+
+        # First boot: record existing backlog so we don't spam historical news
+        if not self.is_initialized:
+            for it in all_scraped:
+                hid = it.get("id") or compute_dedup_key(it)
+                self.alerted_hashes.add(hid)
+                record_hash_in_db(hid, it.get("title", ""))
+            self.is_initialized = True
+            logger.info(f"Cold-start warmup complete. {len(all_scraped)} backlog items cached without alerting.")
+            # Rate a few items for visual dashboard
+            for it in self.news_cache[:15]:
+                if "ai_score" not in it:
+                    r = ai_analyzer.analyze_news(it["title"], it.get("summary", "") or it["title"], it.get("source", ""))
+                    it["ai_score"] = r.get("score", 5)
+                    it["ai_sentiment"] = r.get("sentiment", "NEUTRAL")
+                    it["ai_impact"] = r.get("impact", "MEDIUM")
+                    it["ai_sectors"] = r.get("sectors", [])
+                    it["ai_reasoning"] = r.get("reasoning", "")
+        else:
+            # LIVE RUN: Every single freshly arrived story is scored and sent IMMEDIATELY as it arrives
+            if newly_arrived:
+                for item in newly_arrived:
+                    # Dispatch each item in its own real-time execution
+                    threading.Thread(target=self.process_and_dispatch_single_item, args=(item,), daemon=True).start()
+
         self.last_fetch_time = datetime.now()
 
     def run_worker_loop(self):
         self.is_running = True
-        logger.info("News Engine background loop started.")
+        logger.info("News Engine real-time worker loop started.")
         while self.is_running:
             try:
                 self.poll_cycle()
                 time.sleep(self.refresh_interval)
             except Exception as e:
                 logger.error(f"Worker loop error: {e}")
-                time.sleep(10)
+                time.sleep(5)
 
     def start(self):
         if not self.is_running:
