@@ -386,11 +386,12 @@ class NewsEngineWorker:
             return
 
         def _enrich_task():
-            for item in news_items[:6]: # Process top 6 impactful stories
-                if "ai_score" not in item:
-                    rating = ai_analyzer.analyze_news(item["title"], item["summary"], item["source"])
+            for item in news_items[:12]: # Process top impactful stories
+                if "ai_score" not in item or item.get("ai_score") == 0:
+                    rating = ai_analyzer.analyze_news(item["title"], item.get("summary", "") or item["title"], item.get("source", ""))
                     item["ai_score"] = rating.get("score", 5)
-                    item["ai_impact"] = rating.get("impact", "NEUTRAL")
+                    item["ai_sentiment"] = rating.get("sentiment", "NEUTRAL")
+                    item["ai_impact"] = rating.get("impact", "MEDIUM")
                     item["ai_sectors"] = rating.get("sectors", [])
                     item["ai_reasoning"] = rating.get("reasoning", "")
 

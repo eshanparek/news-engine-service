@@ -17,7 +17,7 @@ from telegram_notifier import telegram_notifier
 # 1. Start the Background Ingestion Worker
 news_worker.start()
 
-# 2. FastAPI Setup for Machine-to-Machine REST API
+# 2. FastAPI REST Endpoints
 app = FastAPI(
     title="EPM Pro Live News Engine",
     description="Decoupled high-speed real-time news scraping, AI impact evaluation, and Telegram alerts service.",
@@ -51,7 +51,7 @@ def get_news(
     search: Optional[str] = None
 ):
     """
-    Returns latest cached news with optional filtering for Trading Terminal.
+    Returns latest cached news with AI sentiment & impact scores.
     """
     items = list(news_worker.news_cache)
 
@@ -75,7 +75,6 @@ def get_news(
 
 @app.get("/api/sources")
 def get_sources():
-    """List of all configured parallel sources."""
     return {
         "total": len(news_worker.sources),
         "sources": news_worker.sources
@@ -83,81 +82,123 @@ def get_sources():
 
 @app.post("/api/trigger")
 def trigger_fetch(background_tasks: BackgroundTasks):
-    """Force an immediate parallel fetch cycle."""
     background_tasks.add_task(news_worker.poll_cycle)
     return {"status": "triggered", "message": "News poll cycle triggered in background."}
 
 @app.post("/api/rate")
 def rate_headline(item: NewsItem):
-    """On-demand Gemini AI impact score on any headline."""
     res = ai_analyzer.analyze_news(item.title, item.summary or item.title, item.source or "Custom")
     return res
 
-# 3. Gradio Visual Dashboard for Free Hugging Face Spaces Web UI
-def get_dashboard_data():
+# 3. Gradio Side-by-Side Dashboard
+def get_dashboard_tables():
     items = list(news_worker.news_cache)
-    rows = []
-    for item in items[:25]:
-        ai_score = f"{item.get('ai_score', '-')}/10" if "ai_score" in item else "Pending"
-        impact = item.get("ai_impact", "-")
-        rows.append([
-            item.get("timestamp", ""),
-            item.get("source", ""),
-            item.get("title", ""),
-            f"{item.get('relevance', 0)}%",
-            f"{ai_score} ({impact})",
-            item.get("link", "#")
-        ])
     
-    status_str = f"🟢 **Engine Status:** Online | **Cached News:** {len(news_worker.news_cache)} | **Active Sources:** {len(news_worker.sources)} | **Last Fetch:** {news_worker.last_fetch_time.strftime('%H:%M:%S') if news_worker.last_fetch_time else 'Init'}"
-    return status_str, rows
+    # Left Table: Consolidated Feed
+    news_rows = []
+    for it in items[:30]:
+        news_rows.append([
+            it.get("timestamp", "")[:19],
+            it.get("source", ""),
+            it.get("title", ""),
+            f"{it.get('relevance', 0)}%"
+        ])
 
-def manual_trigger():
+    # Right Table: AI Sentiment & Market Impact Watch
+    ai_rows = []
+    for it in items:
+        if "ai_score" in it:
+            score = it.get("ai_score", 5)
+            sentiment = it.get("ai_sentiment", "NEUTRAL")
+            
+            # Formatting badges
+            if sentiment == "BULLISH":
+                sent_badge = "🟢 BULLISH"
+            elif sentiment == "BEARISH":
+                sent_badge = "🔴 BEARISH"
+            else:
+                sent_badge = "⚪ NEUTRAL"
+
+            impact = it.get("ai_impact", "MEDIUM")
+            sectors = ", ".join(it.get("ai_sectors", [])) if it.get("ai_sectors") else "General"
+            reasoning = it.get("ai_reasoning", "")
+            
+            ai_rows.append([
+                f"{score}/10",
+                sent_badge,
+                impact,
+                it.get("title", ""),
+                sectors,
+                reasoning
+            ])
+
+    if not ai_rows:
+        ai_rows.append(["-", "⚪ Analyzing...", "-", "Evaluating incoming feed with Gemini AI...", "-", "Please wait for background enrichment"])
+
+    status_str = f"🟢 **Engine Status:** Online | **Total Cached Stories:** {len(items)} | **Active Sources:** {len(news_worker.sources)} | **Last Scrape:** {news_worker.last_fetch_time.strftime('%H:%M:%S') if news_worker.last_fetch_time else 'Init'}"
+    return status_str, news_rows, ai_rows
+
+def manual_refresh():
     news_worker.poll_cycle()
-    return get_dashboard_data()
+    time.sleep(1)
+    return get_dashboard_tables()
 
 def test_ai_rating(headline: str, summary: str):
     if not headline:
         return "Please enter a headline."
     res = ai_analyzer.analyze_news(headline, summary, "Manual Test")
+    sent = res.get('sentiment', 'NEUTRAL')
+    badge = "🟢 BULLISH" if sent == "BULLISH" else ("🔴 BEARISH" if sent == "BEARISH" else "⚪ NEUTRAL")
     return (
-        f"**Impact Score:** {res.get('score', 0)}/10\n\n"
-        f"**Direction:** {res.get('impact', 'NEUTRAL')}\n\n"
-        f"**Sectors/Stocks:** {', '.join(res.get('sectors', [])) or 'General Market'}\n\n"
-        f"**Reasoning:** {res.get('reasoning', '')}"
+        f"**Impact Score:** {res.get('score', 0)}/10  |  **Sentiment:** {badge}  |  **Impact Level:** {res.get('impact', 'MEDIUM')}\n\n"
+        f"**Affected Sectors/Stocks:** {', '.join(res.get('sectors', [])) or 'Broad Market'}\n\n"
+        f"**Market Context:** {res.get('reasoning', '')}"
     )
 
-with gr.Blocks(title="EPM Pro News Terminal", theme=gr.themes.Soft()) as demo:
-    gr.Markdown("# 📰 EPM Pro Live Market News Microservice")
-    gr.Markdown("Real-time parallel news scraper, Gemini AI market impact scoring, and high-frequency REST API.")
+with gr.Blocks(title="EPM Pro News & Sentiment Terminal", theme=gr.themes.Soft()) as demo:
+    gr.Markdown("# 📰 EPM Pro Live Market News & AI Sentiment Terminal")
+    gr.Markdown("Real-time parallel news scraper, Gemini 2.5 AI market impact scoring, and automated Telegram alerts.")
     
     status_box = gr.Markdown(value="🟢 **Engine Status:** Online | Initializing...")
     
     with gr.Row():
-        refresh_btn = gr.Button("🔄 Force Refresh News", variant="primary")
-    
-    news_table = gr.Dataframe(
-        headers=["Time", "Source", "Headline", "Relevance", "AI Impact", "URL"],
-        datatype=["str", "str", "str", "str", "str", "str"],
-        value=[],
-        interactive=False,
-        wrap=True
-    )
+        refresh_btn = gr.Button("🔄 Force Refresh & Re-Score News", variant="primary")
+
+    with gr.Row():
+        with gr.Column(scale=1):
+            gr.Markdown("### 🌐 Consolidated Real-Time News Feed")
+            news_table = gr.Dataframe(
+                headers=["Time", "Source", "Headline", "Relevance"],
+                datatype=["str", "str", "str", "str"],
+                value=[],
+                interactive=False,
+                wrap=True
+            )
+
+        with gr.Column(scale=1):
+            gr.Markdown("### 🤖 AI Sentiment & Market Impact Watch")
+            ai_table = gr.Dataframe(
+                headers=["Score", "Sentiment", "Impact", "Headline", "Sectors", "AI Reasoning"],
+                datatype=["str", "str", "str", "str", "str", "str"],
+                value=[],
+                interactive=False,
+                wrap=True
+            )
     
     gr.Markdown("---")
-    gr.Markdown("### 🤖 Test Gemini AI Impact Analyzer")
+    gr.Markdown("### ⚡ Live AI Impact Tester (Test Any Headline)")
     with gr.Row():
-        test_title = gr.Textbox(label="Headline / Breaking News", placeholder="e.g. RBI unexpectedly hikes repo rate by 25 bps")
+        test_title = gr.Textbox(label="Headline / Breaking News", placeholder="e.g. Brent crude spikes 5% on Middle East escalation")
         test_desc = gr.Textbox(label="Summary (Optional)", placeholder="Context details...")
     
-    analyze_btn = gr.Button("Analyze Market Impact")
+    analyze_btn = gr.Button("Analyze Market Sentiment & Impact")
     ai_output = gr.Markdown()
     
     analyze_btn.click(test_ai_rating, inputs=[test_title, test_desc], outputs=ai_output)
-    refresh_btn.click(manual_trigger, outputs=[status_box, news_table])
-    demo.load(get_dashboard_data, outputs=[status_box, news_table])
+    refresh_btn.click(manual_refresh, outputs=[status_box, news_table, ai_table])
+    demo.load(get_dashboard_tables, outputs=[status_box, news_table, ai_table])
 
-# 4. Mount Gradio UI inside FastAPI App so both UI and REST API run on port 7860
+# Mount Gradio UI inside FastAPI App
 app = gr.mount_gradio_app(app, demo, path="/")
 
 if __name__ == "__main__":
