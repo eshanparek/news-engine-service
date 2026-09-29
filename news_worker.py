@@ -2,6 +2,7 @@ import os
 import re
 import time
 import json
+import sqlite3
 import logging
 import hashlib
 import threading
@@ -17,8 +18,50 @@ from telegram_notifier import telegram_notifier
 
 logger = logging.getLogger("NewsWorker")
 
+DB_PATH = os.getenv("ALERT_DB_PATH", "news_alerts.db")
+
+def init_alert_db():
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS sent_news (
+                hash_id TEXT PRIMARY KEY,
+                title TEXT,
+                sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.error(f"Error initializing alert database: {e}")
+
+def is_hash_in_db(hash_id: str) -> bool:
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT 1 FROM sent_news WHERE hash_id = ?", (hash_id,))
+        row = c.fetchone()
+        conn.close()
+        return bool(row)
+    except Exception:
+        return False
+
+def record_hash_in_db(hash_id: str, title: str):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("INSERT OR IGNORE INTO sent_news (hash_id, title) VALUES (?, ?)", (hash_id, title[:200]))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.debug(f"Error saving hash to DB: {e}")
+
+# Initialize DB on module load
+init_alert_db()
+
 def normalize_title(title: str) -> str:
-    """Lowercase, strip punctuation and source suffixes (e.g., ' - Bloomberg', ' | Mint')."""
+    """Lowercase, strip punctuation and source suffixes."""
     if not title:
         return ""
     t = title.lower()
@@ -45,9 +88,9 @@ def compute_dedup_key(item: Dict) -> str:
     key = f"{normalize_title(item.get('title', ''))}|{canonical_link(item.get('link', ''))}"
     return hashlib.sha256(key.encode('utf-8')).hexdigest()
 
-# Comprehensive Multi-Source Directory
+# Multi-Source Directory
 DEFAULT_SOURCES = [
-    # Indian Financial & Equity Feeds
+    # Indian Feeds
     {
         "id": "moneycontrol_markets",
         "name": "Moneycontrol Markets",
@@ -125,7 +168,7 @@ DEFAULT_SOURCES = [
         "category": "business"
     },
 
-    # Global & Macro Financial Feeds
+    # Global Feeds
     {
         "id": "bloomberg_markets",
         "name": "Bloomberg Markets",
@@ -191,7 +234,6 @@ DEFAULT_SOURCES = [
     }
 ]
 
-# Market keywords for relevance scoring
 CORE_KEYWORDS = [
     "NIFTY", "SENSEX", "BANKNIFTY", "RBI", "FED", "RATE HIKE", "RATE CUT",
     "INFLATION", "CPI", "GDP", "CRUDE", "BRENT", "OPEC", "EARNINGS", "QUARTER",
@@ -207,14 +249,29 @@ class NewsEngineWorker:
         self.seen_hashes: Set[str] = set()
         self.alerted_hashes: Set[str] = set()
         self.is_running = False
+        self.is_initialized = False # Cold-start warmup flag to prevent backlogged spam
         self.last_fetch_time: Optional[datetime] = None
-        self.refresh_interval = int(os.getenv("REFRESH_INTERVAL", "5")) # seconds
+        self.refresh_interval = int(os.getenv("REFRESH_INTERVAL", "5"))
         self.enable_ai = os.getenv("ENABLE_AI_SCORING", "true").lower() == "true"
         self.alert_threshold = int(os.getenv("ALERT_THRESHOLD", "75"))
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
         }
+        self._load_saved_hashes()
+
+    def _load_saved_hashes(self):
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.cursor()
+            c.execute("SELECT hash_id FROM sent_news")
+            for row in c.fetchall():
+                self.alerted_hashes.add(row[0])
+                self.seen_hashes.add(row[0])
+            conn.close()
+            logger.info(f"Loaded {len(self.alerted_hashes)} existing alert hashes from DB.")
+        except Exception as e:
+            logger.debug(f"Could not load hashes: {e}")
 
     def clean_text(self, html_or_text: str) -> str:
         if not html_or_text:
@@ -237,14 +294,12 @@ class NewsEngineWorker:
         matches = sum(1 for kw in CORE_KEYWORDS if kw in text_upper)
         score += min(matches * 15, 75)
         
-        # High impact events
         if any(urgent in text_upper for urgent in ["BREAKING", "ALERT", "SURGES", "CRASHES", "EMERGENCY", "SANCTION", "WAR", "TARIFF"]):
             score += 15
 
         return min(score, 100)
 
     def fetch_inshorts(self, category: str = "business") -> List[Dict]:
-        """Fetch real-time micro-news summaries from Inshorts."""
         items = []
         try:
             url = f"https://inshorts.com/en/read/{category}"
@@ -275,7 +330,6 @@ class NewsEngineWorker:
         return items
 
     def fetch_single_feed(self, source: Dict) -> List[Dict]:
-        """Fetch and parse feed or fall back to web scraping."""
         import warnings
         from bs4 import XMLParsedAsHTMLWarning
         warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
@@ -291,7 +345,6 @@ class NewsEngineWorker:
 
             resp = requests.get(url, headers=self.headers, timeout=5)
             if resp.status_code == 200:
-                # 1. Try parsing as XML / RSS
                 soup = None
                 try:
                     soup = BeautifulSoup(resp.content, "xml")
@@ -301,7 +354,7 @@ class NewsEngineWorker:
                 if soup:
                     rss_items = soup.find_all("item")
                     if not rss_items:
-                        rss_items = soup.find_all("entry") # Atom format
+                        rss_items = soup.find_all("entry")
 
                     for it in rss_items[:12]:
                         title = it.find("title").text if it.find("title") else ""
@@ -325,7 +378,6 @@ class NewsEngineWorker:
                                 "relevance": self.calculate_relevance(title + " " + desc)
                             })
 
-            # 2. Scrape Fallback if RSS is empty or blocked
             if not results and source.get("fallback_scrape_url"):
                 scrape_url = source["fallback_scrape_url"]
                 s_resp = requests.get(scrape_url, headers=self.headers, timeout=5)
@@ -353,7 +405,6 @@ class NewsEngineWorker:
         return results
 
     def fetch_all_sources(self) -> List[Dict]:
-        """Fetch all news sources simultaneously in worker threads."""
         all_news = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
             futures = [executor.submit(self.fetch_single_feed, src) for src in self.sources]
@@ -365,7 +416,6 @@ class NewsEngineWorker:
                 except Exception:
                     pass
 
-        # Deduplicate
         deduped = []
         for item in all_news:
             h = compute_dedup_key(item)
@@ -374,14 +424,13 @@ class NewsEngineWorker:
                 item["id"] = h
                 deduped.append(item)
 
-        # Retain history limit in memory
-        if len(self.seen_hashes) > 1000:
-            self.seen_hashes = set(list(self.seen_hashes)[-500:])
+        if len(self.seen_hashes) > 2000:
+            self.seen_hashes = set(list(self.seen_hashes)[-1000:])
 
         return deduped
 
     def enrich_with_ai(self, news_items: List[Dict]):
-        """Analyze all incoming news items with Gemini and forward to Telegram with AI ratings."""
+        """Analyze all incoming news items with Gemini and forward to Telegram ONLY for truly live new items."""
         def _enrich_task():
             for item in news_items:
                 if "ai_score" not in item or item.get("ai_score") == 0:
@@ -397,42 +446,52 @@ class NewsEngineWorker:
                         item["ai_sentiment"] = "NEUTRAL"
                         item["ai_impact"] = "MEDIUM"
 
-                    # Forward every new deduplicated story to Telegram
-                    self.check_and_trigger_alert(item)
-                    time.sleep(0.3) # Rate limit protection for Telegram
+                    # ONLY forward to Telegram if engine has completed initial cold-start warmup
+                    if self.is_initialized:
+                        self.check_and_trigger_alert(item)
+                        time.sleep(0.4) # Rate limit safety
 
         threading.Thread(target=_enrich_task, daemon=True).start()
 
     def check_and_trigger_alert(self, news: Dict):
-        """Send Telegram alert for all news items with AI rating and distinct high-impact highlight."""
+        """Send Telegram alert for newly published live news item."""
         item_id = news.get("id") or compute_dedup_key(news)
-        if item_id in self.alerted_hashes:
+        if item_id in self.alerted_hashes or is_hash_in_db(item_id):
             return
 
         self.alerted_hashes.add(item_id)
+        record_hash_in_db(item_id, news.get("title", ""))
         telegram_notifier.send_news_alert(news)
         
-        # Keep recent deduplicated history
-        if len(self.alerted_hashes) > 1000:
-            self.alerted_hashes = set(list(self.alerted_hashes)[-500:])
+        if len(self.alerted_hashes) > 2000:
+            self.alerted_hashes = set(list(self.alerted_hashes)[-1000:])
 
     def poll_cycle(self):
         """Single poll step: fetch, rank, cache, AI enrich."""
         new_items = self.fetch_all_sources()
         if new_items:
-            # Combine with existing cache
             combined = new_items + self.news_cache
-            # Sort by relevance
             combined.sort(key=lambda x: x.get("relevance", 0), reverse=True)
-            self.news_cache = combined[:60] # Keep latest 60 in memory
+            self.news_cache = combined[:80]
             
-            # AI enrichment and alert checks
-            self.enrich_with_ai(new_items)
+            # Cold-start warmup handling:
+            if not self.is_initialized:
+                # Mark all initial current news as already recorded so we don't blast historical news
+                for it in new_items:
+                    hid = it.get("id") or compute_dedup_key(it)
+                    self.alerted_hashes.add(hid)
+                    record_hash_in_db(hid, it.get("title", ""))
+                self.is_initialized = True
+                logger.info(f"Cold-start warmup complete. {len(new_items)} historical items cached without Telegram broadcast.")
+                # Run AI rating in background for dashboard display
+                self.enrich_with_ai(new_items[:15])
+            else:
+                # Subsequent runs: Truly newly detected stories will trigger Telegram alerts
+                self.enrich_with_ai(new_items)
             
         self.last_fetch_time = datetime.now()
 
     def run_worker_loop(self):
-        """Infinite background polling loop."""
         self.is_running = True
         logger.info("News Engine background loop started.")
         while self.is_running:
