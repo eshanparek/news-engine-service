@@ -14,10 +14,10 @@ from news_worker import news_worker
 from ai_analyzer import ai_analyzer
 from telegram_notifier import telegram_notifier
 
-# 1. Start the Background Ingestion Worker
+# 1. Start Background Scraper & Scorer
 news_worker.start()
 
-# 2. FastAPI REST Endpoints
+# 2. FastAPI Machine-to-Machine Endpoints
 app = FastAPI(
     title="EPM Pro Live News Engine",
     description="Decoupled high-speed real-time news scraping, AI impact evaluation, and Telegram alerts service.",
@@ -45,13 +45,13 @@ def health():
 
 @app.get("/api/news")
 def get_news(
-    limit: int = Query(30, ge=1, le=100),
+    limit: int = Query(40, ge=1, le=100),
     min_relevance: int = Query(0, ge=0, le=100),
     source: Optional[str] = None,
     search: Optional[str] = None
 ):
     """
-    Returns latest cached news with AI sentiment & impact scores.
+    Returns latest news with AI sentiment & impact scores.
     """
     items = list(news_worker.news_cache)
 
@@ -90,53 +90,66 @@ def rate_headline(item: NewsItem):
     res = ai_analyzer.analyze_news(item.title, item.summary or item.title, item.source or "Custom")
     return res
 
-# 3. Gradio Side-by-Side Dashboard
+# 3. Stacked Top/Bottom Dashboard
 def get_dashboard_tables():
     items = list(news_worker.news_cache)
     
-    # Left Table: Consolidated Feed
-    news_rows = []
-    for it in items[:30]:
-        news_rows.append([
-            it.get("timestamp", "")[:19],
-            it.get("source", ""),
-            it.get("title", ""),
-            f"{it.get('relevance', 0)}%"
-        ])
+    top_rows = []
+    bottom_rows = []
 
-    # Right Table: AI Sentiment & Market Impact Watch
-    ai_rows = []
     for it in items:
-        if "ai_score" in it:
-            score = it.get("ai_score", 5)
-            sentiment = it.get("ai_sentiment", "NEUTRAL")
-            
-            # Formatting badges
-            if sentiment == "BULLISH":
-                sent_badge = "🟢 BULLISH"
-            elif sentiment == "BEARISH":
-                sent_badge = "🔴 BEARISH"
-            else:
-                sent_badge = "⚪ NEUTRAL"
+        score = it.get("ai_score", 5)
+        sentiment = it.get("ai_sentiment", "NEUTRAL")
+        impact = it.get("ai_impact", "MEDIUM")
+        relevance = it.get("relevance", 0)
+        
+        # Sentiment format
+        if sentiment == "BULLISH":
+            sent_badge = "🟢 BULLISH"
+        elif sentiment == "BEARISH":
+            sent_badge = "🔴 BEARISH"
+        else:
+            sent_badge = "⚪ NEUTRAL"
 
-            impact = it.get("ai_impact", "MEDIUM")
-            sectors = ", ".join(it.get("ai_sectors", [])) if it.get("ai_sectors") else "General"
-            reasoning = it.get("ai_reasoning", "")
-            
-            ai_rows.append([
+        sectors = ", ".join(it.get("ai_sectors", [])) if it.get("ai_sectors") else "General"
+        reasoning = it.get("ai_reasoning", "")
+        time_str = str(it.get("timestamp", ""))[:19]
+        source = it.get("source", "")
+        title = it.get("title", "")
+        link = it.get("link", "#")
+
+        # High Impact & Priority Market News (Top Card)
+        if relevance >= 40 or score >= 7 or impact == "HIGH":
+            top_rows.append([
                 f"{score}/10",
                 sent_badge,
                 impact,
-                it.get("title", ""),
+                title,
                 sectors,
-                reasoning
+                reasoning,
+                source,
+                f"{relevance}%",
+                time_str
+            ])
+        else:
+            # General / Lower Relevance News (Bottom Card)
+            bottom_rows.append([
+                time_str,
+                source,
+                title,
+                f"{relevance}%",
+                sent_badge,
+                link
             ])
 
-    if not ai_rows:
-        ai_rows.append(["-", "⚪ Analyzing...", "-", "Evaluating incoming feed with Gemini AI...", "-", "Please wait for background enrichment"])
+    if not top_rows:
+        top_rows.append(["-", "⚪ Evaluating...", "-", "Analyzing high priority news items with Gemini 2.5...", "-", "Please wait a moment...", "-", "-", "-"])
 
-    status_str = f"🟢 **Engine Status:** Online | **Total Cached Stories:** {len(items)} | **Active Sources:** {len(news_worker.sources)} | **Last Scrape:** {news_worker.last_fetch_time.strftime('%H:%M:%S') if news_worker.last_fetch_time else 'Init'}"
-    return status_str, news_rows, ai_rows
+    if not bottom_rows:
+        bottom_rows.append(["-", "-", "No general news items in cache", "-", "-", "-"])
+
+    status_str = f"🟢 **Engine Status:** Online | **Total Cached Stories:** {len(items)} | **Priority Stories:** {len(top_rows)} | **General Stories:** {len(bottom_rows)} | **Active Feeds:** {len(news_worker.sources)} | **Last Scrape:** {news_worker.last_fetch_time.strftime('%H:%M:%S') if news_worker.last_fetch_time else 'Init'}"
+    return status_str, top_rows, bottom_rows
 
 def manual_refresh():
     news_worker.poll_cycle()
@@ -155,50 +168,52 @@ def test_ai_rating(headline: str, summary: str):
         f"**Market Context:** {res.get('reasoning', '')}"
     )
 
-with gr.Blocks(title="EPM Pro News & Sentiment Terminal", theme=gr.themes.Soft()) as demo:
+with gr.Blocks(title="EPM Pro News Terminal", theme=gr.themes.Soft()) as demo:
     gr.Markdown("# 📰 EPM Pro Live Market News & AI Sentiment Terminal")
-    gr.Markdown("Real-time parallel news scraper, Gemini 2.5 AI market impact scoring, and automated Telegram alerts.")
+    gr.Markdown("Real-time parallel multi-feed news scraper, Gemini 2.5 AI sentiment & volatility scoring, and automated Telegram alert engine.")
     
     status_box = gr.Markdown(value="🟢 **Engine Status:** Online | Initializing...")
     
     with gr.Row():
-        refresh_btn = gr.Button("🔄 Force Refresh & Re-Score News", variant="primary")
+        refresh_btn = gr.Button("🔄 Force Refresh & Re-Score Feeds", variant="primary")
 
-    with gr.Row():
-        with gr.Column(scale=1):
-            gr.Markdown("### 🌐 Consolidated Real-Time News Feed")
-            news_table = gr.Dataframe(
-                headers=["Time", "Source", "Headline", "Relevance"],
-                datatype=["str", "str", "str", "str"],
-                value=[],
-                interactive=False,
-                wrap=True
-            )
-
-        with gr.Column(scale=1):
-            gr.Markdown("### 🤖 AI Sentiment & Market Impact Watch")
-            ai_table = gr.Dataframe(
-                headers=["Score", "Sentiment", "Impact", "Headline", "Sectors", "AI Reasoning"],
-                datatype=["str", "str", "str", "str", "str", "str"],
-                value=[],
-                interactive=False,
-                wrap=True
-            )
-    
+    # TOP CARD: High Impact & Priority News
     gr.Markdown("---")
-    gr.Markdown("### ⚡ Live AI Impact Tester (Test Any Headline)")
+    gr.Markdown("### 🚨 High-Impact News & AI Sentiment Watch (Top Priority)")
+    top_table = gr.Dataframe(
+        headers=["Score", "Sentiment", "Impact", "Headline", "Sectors/Tickers", "AI Reasoning", "Source", "Relevance", "Time"],
+        datatype=["str", "str", "str", "str", "str", "str", "str", "str", "str"],
+        value=[],
+        interactive=False,
+        wrap=True
+    )
+
+    # BOTTOM CARD: General & Low Relevance News
+    gr.Markdown("---")
+    gr.Markdown("### 🌐 General & Broad Market News Wire (Secondary / Low Relevance)")
+    bottom_table = gr.Dataframe(
+        headers=["Time", "Source", "Headline", "Relevance", "Sentiment", "URL"],
+        datatype=["str", "str", "str", "str", "str", "str"],
+        value=[],
+        interactive=False,
+        wrap=True
+    )
+
+    # TESTER SECTION
+    gr.Markdown("---")
+    gr.Markdown("### ⚡ Live AI Impact & Sentiment Tester")
     with gr.Row():
-        test_title = gr.Textbox(label="Headline / Breaking News", placeholder="e.g. Brent crude spikes 5% on Middle East escalation")
+        test_title = gr.Textbox(label="Headline / Breaking News", placeholder="e.g. RBI unexpectedly cuts interest rates by 25 bps")
         test_desc = gr.Textbox(label="Summary (Optional)", placeholder="Context details...")
     
-    analyze_btn = gr.Button("Analyze Market Sentiment & Impact")
+    analyze_btn = gr.Button("Analyze Headline with Gemini 2.5")
     ai_output = gr.Markdown()
     
     analyze_btn.click(test_ai_rating, inputs=[test_title, test_desc], outputs=ai_output)
-    refresh_btn.click(manual_refresh, outputs=[status_box, news_table, ai_table])
-    demo.load(get_dashboard_tables, outputs=[status_box, news_table, ai_table])
+    refresh_btn.click(manual_refresh, outputs=[status_box, top_table, bottom_table])
+    demo.load(get_dashboard_tables, outputs=[status_box, top_table, bottom_table])
 
-# Mount Gradio UI inside FastAPI App
+# Mount Gradio UI inside FastAPI
 app = gr.mount_gradio_app(app, demo, path="/")
 
 if __name__ == "__main__":
