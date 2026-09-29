@@ -381,42 +381,40 @@ class NewsEngineWorker:
         return deduped
 
     def enrich_with_ai(self, news_items: List[Dict]):
-        """Analyze top news items with Gemini in a background thread."""
-        if not self.enable_ai or not ai_analyzer.is_configured():
-            return
-
+        """Analyze all incoming news items with Gemini and forward to Telegram with AI ratings."""
         def _enrich_task():
-            for item in news_items[:12]: # Process top impactful stories
+            for item in news_items:
                 if "ai_score" not in item or item.get("ai_score") == 0:
-                    rating = ai_analyzer.analyze_news(item["title"], item.get("summary", "") or item["title"], item.get("source", ""))
-                    item["ai_score"] = rating.get("score", 5)
-                    item["ai_sentiment"] = rating.get("sentiment", "NEUTRAL")
-                    item["ai_impact"] = rating.get("impact", "MEDIUM")
-                    item["ai_sectors"] = rating.get("sectors", [])
-                    item["ai_reasoning"] = rating.get("reasoning", "")
+                    if self.enable_ai and ai_analyzer.is_configured():
+                        rating = ai_analyzer.analyze_news(item["title"], item.get("summary", "") or item["title"], item.get("source", ""))
+                        item["ai_score"] = rating.get("score", 5)
+                        item["ai_sentiment"] = rating.get("sentiment", "NEUTRAL")
+                        item["ai_impact"] = rating.get("impact", "MEDIUM")
+                        item["ai_sectors"] = rating.get("sectors", [])
+                        item["ai_reasoning"] = rating.get("reasoning", "")
+                    else:
+                        item["ai_score"] = 5
+                        item["ai_sentiment"] = "NEUTRAL"
+                        item["ai_impact"] = "MEDIUM"
 
-                    # Check Telegram Alert Condition
+                    # Forward every new deduplicated story to Telegram
                     self.check_and_trigger_alert(item)
+                    time.sleep(0.3) # Rate limit protection for Telegram
 
         threading.Thread(target=_enrich_task, daemon=True).start()
 
     def check_and_trigger_alert(self, news: Dict):
-        """Send Telegram alert if relevance >= threshold or AI score >= 8."""
+        """Send Telegram alert for all news items with AI rating and distinct high-impact highlight."""
         item_id = news.get("id") or compute_dedup_key(news)
         if item_id in self.alerted_hashes:
             return
 
-        ai_score = news.get("ai_score", 0)
-        relevance = news.get("relevance", 0)
-
-        should_alert = (relevance >= self.alert_threshold) or (ai_score >= 8)
-        if should_alert:
-            self.alerted_hashes.add(item_id)
-            telegram_notifier.send_news_alert(news)
-            
-            # Trim alerted memory
-            if len(self.alerted_hashes) > 500:
-                self.alerted_hashes = set(list(self.alerted_hashes)[-250:])
+        self.alerted_hashes.add(item_id)
+        telegram_notifier.send_news_alert(news)
+        
+        # Keep recent deduplicated history
+        if len(self.alerted_hashes) > 1000:
+            self.alerted_hashes = set(list(self.alerted_hashes)[-500:])
 
     def poll_cycle(self):
         """Single poll step: fetch, rank, cache, AI enrich."""

@@ -8,7 +8,8 @@ logger = logging.getLogger("TelegramNotifier")
 
 class TelegramNotifier:
     """
-    Sends structured breaking news alerts directly to Telegram channel / chat.
+    Sends structured breaking news alerts directly to Telegram channel / chat
+    with distinct visual highlights for high-impact market catalysts.
     """
     def __init__(self):
         self.bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
@@ -22,30 +23,53 @@ class TelegramNotifier:
         if not self.enabled or not self.is_configured():
             return False
 
-        ai_score = news.get("ai_score", 0)
-        ai_impact = news.get("ai_impact", "NEUTRAL")
+        ai_score = news.get("ai_score", 5)
+        ai_sentiment = news.get("ai_sentiment", "NEUTRAL")
+        ai_impact = news.get("ai_impact", "MEDIUM")
         ai_reasoning = news.get("ai_reasoning", "")
+        ai_sectors = news.get("ai_sectors", [])
         relevance = news.get("relevance", 0)
+        source = news.get("source", "Market Wire")
+        title = news.get("title", "")
+        link = news.get("link", "#")
 
-        # Impact icon
-        if ai_impact == "POSITIVE":
-            impact_emoji = "🟢 POSITIVE"
-        elif ai_impact == "NEGATIVE":
-            impact_emoji = "🔴 NEGATIVE"
+        # Determine if High Priority (Score >= 8 or Impact == 'HIGH')
+        is_high_impact = (ai_score >= 8) or (ai_impact == "HIGH") or (relevance >= 80)
+
+        # Sentiment badge
+        if ai_sentiment == "BULLISH":
+            sentiment_label = "🟢 BULLISH"
+        elif ai_sentiment == "BEARISH":
+            sentiment_label = "🔴 BEARISH"
         else:
-            impact_emoji = "⚪ NEUTRAL"
+            sentiment_label = "⚪ NEUTRAL"
 
-        ai_block = ""
-        if ai_score > 0:
-            ai_block = f"\n\n<b>AI Impact Score:</b> {ai_score}/10 | {impact_emoji}\n<b>Context:</b> <i>{ai_reasoning}</i>"
+        sectors_str = ", ".join(ai_sectors) if ai_sectors else "Broad Market"
+
+        if is_high_impact:
+            header = (
+                "🚨🚨🚨 <b>HIGH IMPACT MARKET CATALYST</b> 🚨🚨🚨\n"
+                "━━━━━━━━━━━━━━━━━━━━━━"
+            )
+            score_line = f"🔥 <b>AI Impact Score:</b> <b>{ai_score}/10 [HIGH VOLATILITY]</b>"
+        else:
+            header = (
+                "📰 <b>MARKET NEWS UPDATE</b>\n"
+                "──────────────────────"
+            )
+            score_line = f"🤖 <b>AI Impact Score:</b> {ai_score}/10"
+
+        context_block = f"\n💡 <b>Analysis:</b> <i>{ai_reasoning}</i>" if ai_reasoning else ""
 
         text = (
-            f"🚨 <b>BREAKING MARKET NEWS</b>\n\n"
-            f"📰 <b>{news.get('title', 'News Update')}</b>\n\n"
-            f"<b>Source:</b> {news.get('source', 'Financial Wire')}\n"
-            f"<b>Relevance:</b> {relevance}%"
-            f"{ai_block}\n\n"
-            f"🔗 <a href='{news.get('link', '#')}'>Read Original Story</a>"
+            f"{header}\n\n"
+            f"<b>{title}</b>\n\n"
+            f"{score_line}\n"
+            f"📊 <b>Sentiment:</b> {sentiment_label}\n"
+            f"🎯 <b>Affected:</b> {sectors_str}"
+            f"{context_block}\n\n"
+            f"🏛 <b>Source:</b> {source} | <b>Relevance:</b> {relevance}%\n"
+            f"🔗 <a href='{link}'>Read Full Article</a>"
         )
 
         url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
@@ -59,7 +83,7 @@ class TelegramNotifier:
         try:
             resp = requests.post(url, json=payload, timeout=6)
             if resp.status_code == 200:
-                logger.info(f"Sent Telegram alert for: {news.get('title', '')[:40]}...")
+                logger.info(f"[TG ALERT] Sent {'(HIGH IMPACT) ' if is_high_impact else ''}for: {title[:40]}...")
                 return True
             else:
                 logger.warning(f"Telegram API failed ({resp.status_code}): {resp.text[:120]}")
