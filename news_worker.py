@@ -22,6 +22,7 @@ from whatsapp_notifier import whatsapp_notifier
 logger = logging.getLogger("NewsWorker")
 
 DB_PATH = os.getenv("ALERT_DB_PATH", "news_alerts.db")
+CONFIG_FILE = "sources_config.json"
 
 def init_alert_db():
     try:
@@ -60,11 +61,9 @@ def record_hash_in_db(hash_id: str, title: str):
     except Exception as e:
         logger.debug(f"Error saving hash to DB: {e}")
 
-# Initialize DB on load
 init_alert_db()
 
 def normalize_title(title: str) -> str:
-    """Lowercase, strip punctuation and source suffixes."""
     if not title:
         return ""
     t = title.lower()
@@ -74,7 +73,6 @@ def normalize_title(title: str) -> str:
     return t
 
 def canonical_link(link: str) -> str:
-    """Standardize URL by stripping queries, anchors, trailing slashes."""
     if not link:
         return ""
     try:
@@ -87,153 +85,239 @@ def canonical_link(link: str) -> str:
         return link.lower()
 
 def compute_dedup_key(item: Dict) -> str:
-    """Unique hash combining normalized title and link."""
     key = f"{normalize_title(item.get('title', ''))}|{canonical_link(item.get('link', ''))}"
     return hashlib.sha256(key.encode('utf-8')).hexdigest()
 
-# Multi-Source Directory
 DEFAULT_SOURCES = [
     # Indian Feeds
     {
         "id": "moneycontrol_markets",
         "name": "Moneycontrol Markets",
-        "type": "rss",
+        "category": "Indian Equity",
+        "type": "RSS / Scrape",
         "url": "https://www.moneycontrol.com/rss/latestnews.xml",
-        "fallback_scrape_url": "https://www.moneycontrol.com/news/business/markets/"
+        "fallback_scrape_url": "https://www.moneycontrol.com/news/business/markets/",
+        "enabled": True,
+        "forward_telegram": True,
+        "forward_whatsapp": True
     },
     {
         "id": "moneycontrol_corp",
         "name": "Moneycontrol Corporate",
-        "type": "rss",
-        "url": "https://www.moneycontrol.com/rss/MC_corpuniversity.xml"
+        "category": "Indian Equity",
+        "type": "RSS",
+        "url": "https://www.moneycontrol.com/rss/MC_corpuniversity.xml",
+        "enabled": True,
+        "forward_telegram": True,
+        "forward_whatsapp": True
     },
     {
         "id": "et_markets",
         "name": "Economic Times Markets",
-        "type": "rss",
+        "category": "Indian Equity",
+        "type": "RSS / Scrape",
         "url": "https://economictimes.indiatimes.com/markets/rssfeedstopstories.cms",
-        "fallback_scrape_url": "https://economictimes.indiatimes.com/markets"
+        "fallback_scrape_url": "https://economictimes.indiatimes.com/markets",
+        "enabled": True,
+        "forward_telegram": True,
+        "forward_whatsapp": True
     },
     {
         "id": "et_top",
         "name": "Economic Times Top Stories",
-        "type": "rss",
-        "url": "https://economictimes.indiatimes.com/rssfeedstopstories.cms"
+        "category": "Indian Equity",
+        "type": "RSS",
+        "url": "https://economictimes.indiatimes.com/rssfeedstopstories.cms",
+        "enabled": True,
+        "forward_telegram": True,
+        "forward_whatsapp": True
     },
     {
         "id": "livemint_markets",
         "name": "Livemint Markets",
-        "type": "rss",
+        "category": "Indian Equity",
+        "type": "RSS / Scrape",
         "url": "https://www.livemint.com/rss/markets",
-        "fallback_scrape_url": "https://www.livemint.com/market"
+        "fallback_scrape_url": "https://www.livemint.com/market",
+        "enabled": True,
+        "forward_telegram": True,
+        "forward_whatsapp": True
     },
     {
         "id": "livemint_companies",
         "name": "Livemint Companies",
-        "type": "rss",
-        "url": "https://www.livemint.com/rss/companies"
+        "category": "Indian Equity",
+        "type": "RSS",
+        "url": "https://www.livemint.com/rss/companies",
+        "enabled": True,
+        "forward_telegram": True,
+        "forward_whatsapp": True
     },
     {
         "id": "cnbc_tv18",
         "name": "CNBC TV18",
-        "type": "rss",
+        "category": "Indian Equity",
+        "type": "RSS / Scrape",
         "url": "https://www.cnbctv18.com/commonrss/allnews.xml",
-        "fallback_scrape_url": "https://www.cnbctv18.com/market/"
+        "fallback_scrape_url": "https://www.cnbctv18.com/market/",
+        "enabled": True,
+        "forward_telegram": True,
+        "forward_whatsapp": True
     },
     {
         "id": "financial_express",
         "name": "Financial Express",
-        "type": "rss",
-        "url": "https://www.financialexpress.com/market/feed/"
+        "category": "Indian Equity",
+        "type": "RSS",
+        "url": "https://www.financialexpress.com/market/feed/",
+        "enabled": True,
+        "forward_telegram": True,
+        "forward_whatsapp": True
     },
     {
         "id": "ndtv_profit",
         "name": "NDTV Profit",
-        "type": "rss",
-        "url": "https://feeds.feedburner.com/ndtvprofit-latest"
+        "category": "Indian Equity",
+        "type": "RSS",
+        "url": "https://feeds.feedburner.com/ndtvprofit-latest",
+        "enabled": True,
+        "forward_telegram": True,
+        "forward_whatsapp": True
     },
     {
         "id": "times_of_india",
         "name": "Times of India Business",
-        "type": "rss",
-        "url": "https://timesofindia.indiatimes.com/rssfeeds/1898055.cms"
+        "category": "Indian Equity",
+        "type": "RSS",
+        "url": "https://timesofindia.indiatimes.com/rssfeeds/1898055.cms",
+        "enabled": True,
+        "forward_telegram": True,
+        "forward_whatsapp": True
     },
     {
         "id": "zee_business",
         "name": "Zee Business",
-        "type": "rss",
-        "url": "https://www.zeebiz.com/markets/rss.xml"
+        "category": "Indian Equity",
+        "type": "RSS",
+        "url": "https://www.zeebiz.com/markets/rss.xml",
+        "enabled": True,
+        "forward_telegram": True,
+        "forward_whatsapp": True
     },
     {
         "id": "inshorts_business",
         "name": "Inshorts Business",
-        "type": "inshorts",
-        "category": "business"
+        "category": "Indian Equity",
+        "type": "Real-Time Scrape",
+        "url": "https://inshorts.com/en/read/business",
+        "enabled": True,
+        "forward_telegram": True,
+        "forward_whatsapp": True
     },
 
     # Global Feeds
     {
         "id": "bloomberg_markets",
         "name": "Bloomberg Markets",
-        "type": "rss",
+        "category": "Global Macro",
+        "type": "RSS / Scrape",
         "url": "https://www.bloomberg.com/feeds/bpol/markets.xml",
-        "fallback_scrape_url": "https://www.bloomberg.com/markets"
+        "fallback_scrape_url": "https://www.bloomberg.com/markets",
+        "enabled": True,
+        "forward_telegram": True,
+        "forward_whatsapp": True
     },
     {
         "id": "reuters_markets",
         "name": "Reuters Markets",
-        "type": "rss",
+        "category": "Global Macro",
+        "type": "RSS / Scrape",
         "url": "https://www.reutersagency.com/feed/?best-topics=business-finance&post_type=best",
-        "fallback_scrape_url": "https://www.reuters.com/markets/"
+        "fallback_scrape_url": "https://www.reuters.com/markets/",
+        "enabled": True,
+        "forward_telegram": True,
+        "forward_whatsapp": True
     },
     {
         "id": "wsj_markets",
         "name": "Wall Street Journal",
-        "type": "rss",
-        "url": "https://feeds.a.dj.com/rss/RSSMarketsMain.xml"
+        "category": "Global Macro",
+        "type": "RSS",
+        "url": "https://feeds.a.dj.com/rss/RSSMarketsMain.xml",
+        "enabled": True,
+        "forward_telegram": True,
+        "forward_whatsapp": True
     },
     {
         "id": "wsj_business",
         "name": "WSJ Business",
-        "type": "rss",
-        "url": "https://feeds.a.dj.com/rss/WSJcomUSBusiness.xml"
+        "category": "Global Macro",
+        "type": "RSS",
+        "url": "https://feeds.a.dj.com/rss/WSJcomUSBusiness.xml",
+        "enabled": True,
+        "forward_telegram": True,
+        "forward_whatsapp": True
     },
     {
         "id": "marketwatch_top",
         "name": "MarketWatch Top Stories",
-        "type": "rss",
-        "url": "https://feeds.content.dowjones.io/public/rss/mw_topstories"
+        "category": "Global Macro",
+        "type": "RSS",
+        "url": "https://feeds.content.dowjones.io/public/rss/mw_topstories",
+        "enabled": True,
+        "forward_telegram": True,
+        "forward_whatsapp": True
     },
     {
         "id": "marketwatch_pulse",
         "name": "MarketWatch MarketPulse",
-        "type": "rss",
-        "url": "https://feeds.content.dowjones.io/public/rss/mw_marketpulse"
+        "category": "Global Macro",
+        "type": "RSS",
+        "url": "https://feeds.content.dowjones.io/public/rss/mw_marketpulse",
+        "enabled": True,
+        "forward_telegram": True,
+        "forward_whatsapp": True
     },
     {
         "id": "nyt_business",
         "name": "New York Times Business",
-        "type": "rss",
-        "url": "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml"
+        "category": "Global Macro",
+        "type": "RSS",
+        "url": "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml",
+        "enabled": True,
+        "forward_telegram": True,
+        "forward_whatsapp": True
     },
     {
         "id": "nyt_economy",
         "name": "New York Times Economy",
-        "type": "rss",
-        "url": "https://rss.nytimes.com/services/xml/rss/nyt/Economy.xml"
+        "category": "Global Macro",
+        "type": "RSS",
+        "url": "https://rss.nytimes.com/services/xml/rss/nyt/Economy.xml",
+        "enabled": True,
+        "forward_telegram": True,
+        "forward_whatsapp": True
     },
     {
         "id": "yahoo_finance",
         "name": "Yahoo Finance",
-        "type": "rss",
-        "url": "https://finance.yahoo.com/news/rssindex"
+        "category": "Global Macro",
+        "type": "RSS",
+        "url": "https://finance.yahoo.com/news/rssindex",
+        "enabled": True,
+        "forward_telegram": True,
+        "forward_whatsapp": True
     },
     {
         "id": "coindesk_crypto",
         "name": "CoinDesk Crypto & Macro",
-        "type": "rss",
+        "category": "Crypto & Macro",
+        "type": "RSS / Scrape",
         "url": "https://www.coindesk.com/arc/outboundfeeds/rss/",
-        "fallback_scrape_url": "https://www.coindesk.com/"
+        "fallback_scrape_url": "https://www.coindesk.com/",
+        "enabled": True,
+        "forward_telegram": True,
+        "forward_whatsapp": True
     }
 ]
 
@@ -247,18 +331,18 @@ CORE_KEYWORDS = [
 
 class NewsEngineWorker:
     def __init__(self):
-        self.sources = DEFAULT_SOURCES
+        self.sources = list(DEFAULT_SOURCES)
         self.news_cache: List[Dict] = []
         self.seen_hashes: Set[str] = set()
         self.alerted_hashes: Set[str] = set()
         self.is_running = False
-        self.is_initialized = False # Cold-start warmup flag
+        self.is_initialized = False
         self.last_fetch_time: Optional[datetime] = None
-        self.refresh_interval = int(os.getenv("REFRESH_INTERVAL", "1")) # 1-second ultra-high frequency cycle
+        self.refresh_interval = int(os.getenv("REFRESH_INTERVAL", "1"))
         self.enable_ai = os.getenv("ENABLE_AI_SCORING", "true").lower() == "true"
+        self.min_forward_score = 0 # 0 = forward all, 7 = high impact only
         self.lock = threading.Lock()
         
-        # High-performance connection-pooled session
         self.session = requests.Session()
         adapter = HTTPAdapter(pool_connections=35, pool_maxsize=35, max_retries=Retry(total=1, backoff_factor=0.1))
         self.session.mount('http://', adapter)
@@ -267,7 +351,52 @@ class NewsEngineWorker:
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
         })
+        self._load_config()
         self._load_saved_hashes()
+
+    def _load_config(self):
+        """Load user-defined channel forwarding overrides."""
+        if os.path.exists(CONFIG_FILE):
+            try:
+                with open(CONFIG_FILE, "r") as f:
+                    data = json.load(f)
+                    source_overrides = data.get("sources", {})
+                    self.min_forward_score = int(data.get("min_forward_score", 0))
+                    for src in self.sources:
+                        if src["name"] in source_overrides:
+                            ov = source_overrides[src["name"]]
+                            src["enabled"] = ov.get("enabled", True)
+                            src["forward_telegram"] = ov.get("forward_telegram", True)
+                            src["forward_whatsapp"] = ov.get("forward_whatsapp", True)
+                logger.info("Loaded custom news sources forwarding configuration.")
+            except Exception as e:
+                logger.debug(f"Error loading sources config: {e}")
+
+    def save_config(self, selected_tg: List[str], selected_wa: List[str], min_score: int):
+        """Save manual channel forwarding selections to disk."""
+        with self.lock:
+            self.min_forward_score = int(min_score)
+            source_overrides = {}
+            for src in self.sources:
+                src["forward_telegram"] = src["name"] in selected_tg
+                src["forward_whatsapp"] = src["name"] in selected_wa
+                source_overrides[src["name"]] = {
+                    "enabled": src["enabled"],
+                    "forward_telegram": src["forward_telegram"],
+                    "forward_whatsapp": src["forward_whatsapp"]
+                }
+            
+            payload = {
+                "min_forward_score": self.min_forward_score,
+                "sources": source_overrides,
+                "updated_at": datetime.now().isoformat()
+            }
+            try:
+                with open(CONFIG_FILE, "w") as f:
+                    json.dump(payload, f, indent=2)
+                logger.info("Saved news sources forwarding configuration.")
+            except Exception as e:
+                logger.error(f"Error saving sources config: {e}")
 
     def _load_saved_hashes(self):
         try:
@@ -329,7 +458,7 @@ class NewsEngineWorker:
                         items.append({
                             "title": title,
                             "summary": self.clean_text(body or title),
-                            "source": "Inshorts",
+                            "source": "Inshorts Business",
                             "link": link,
                             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                             "relevance": self.calculate_relevance(title + " " + body)
@@ -339,14 +468,17 @@ class NewsEngineWorker:
         return items
 
     def fetch_single_feed(self, source: Dict) -> List[Dict]:
+        if not source.get("enabled", True):
+            return []
+
         import warnings
         from bs4 import XMLParsedAsHTMLWarning
         warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
         results = []
         try:
-            if source.get("type") == "inshorts":
-                return self.fetch_inshorts(source.get("category", "business"))
+            if "Inshorts" in source.get("name", ""):
+                return self.fetch_inshorts("business")
 
             url = source.get("url")
             if not url:
@@ -413,8 +545,14 @@ class NewsEngineWorker:
 
         return results
 
+    def get_source_config(self, source_name: str) -> Dict:
+        for s in self.sources:
+            if s["name"].lower() == source_name.lower():
+                return s
+        return {"forward_telegram": True, "forward_whatsapp": True}
+
     def process_and_dispatch_single_item(self, item: Dict):
-        """Immediately rate and forward a single newly detected story in real time."""
+        """Immediately rate and forward a single newly detected story according to user rules."""
         hid = item.get("id") or compute_dedup_key(item)
         with self.lock:
             if hid in self.alerted_hashes or is_hash_in_db(hid):
@@ -422,7 +560,7 @@ class NewsEngineWorker:
             self.alerted_hashes.add(hid)
             record_hash_in_db(hid, item.get("title", ""))
 
-        # 1. AI Impact & Sentiment Rating (Immediate)
+        # 1. AI Impact & Sentiment Rating
         rating = ai_analyzer.analyze_news(item["title"], item.get("summary", "") or item["title"], item.get("source", ""))
         item["ai_score"] = rating.get("score", 5)
         item["ai_sentiment"] = rating.get("sentiment", "NEUTRAL")
@@ -430,9 +568,18 @@ class NewsEngineWorker:
         item["ai_sectors"] = rating.get("sectors", [])
         item["ai_reasoning"] = rating.get("reasoning", "")
 
-        # 2. Instant Real-Time Dispatch to Telegram & WhatsApp
-        telegram_notifier.send_news_alert(item)
-        whatsapp_notifier.send_news_alert(item)
+        # 2. Check Forwarding Score Filter
+        if item["ai_score"] < self.min_forward_score:
+            return
+
+        # 3. Check Per-Source Channel Forwarding Rules
+        src_cfg = self.get_source_config(item.get("source", ""))
+        
+        if src_cfg.get("forward_telegram", True):
+            telegram_notifier.send_news_alert(item)
+
+        if src_cfg.get("forward_whatsapp", True):
+            whatsapp_notifier.send_news_alert(item)
 
     def fetch_all_sources(self) -> List[Dict]:
         all_news = []
@@ -460,16 +607,13 @@ class NewsEngineWorker:
         return newly_arrived, all_news
 
     def poll_cycle(self):
-        """Ultra-fast 1-second poll cycle: checks all feeds in parallel with pooled HTTP connections."""
         newly_arrived, all_scraped = self.fetch_all_sources()
 
-        # Update Live Cache for Dashboard
         if all_scraped:
             combined = newly_arrived + self.news_cache
             combined.sort(key=lambda x: x.get("relevance", 0), reverse=True)
             self.news_cache = combined[:80]
 
-        # First boot: record existing backlog so we don't spam historical news
         if not self.is_initialized:
             for it in all_scraped:
                 hid = it.get("id") or compute_dedup_key(it)
@@ -477,7 +621,6 @@ class NewsEngineWorker:
                 record_hash_in_db(hid, it.get("title", ""))
             self.is_initialized = True
             logger.info(f"Cold-start warmup complete. {len(all_scraped)} backlog items cached without alerting.")
-            # Rate a few items for visual dashboard
             for it in self.news_cache[:15]:
                 if "ai_score" not in it:
                     r = ai_analyzer.analyze_news(it["title"], it.get("summary", "") or it["title"], it.get("source", ""))
@@ -487,7 +630,6 @@ class NewsEngineWorker:
                     it["ai_sectors"] = r.get("sectors", [])
                     it["ai_reasoning"] = r.get("reasoning", "")
         else:
-            # LIVE RUN: Every single freshly arrived story is scored and sent IMMEDIATELY as it arrives
             if newly_arrived:
                 for item in newly_arrived:
                     threading.Thread(target=self.process_and_dispatch_single_item, args=(item,), daemon=True).start()
@@ -496,7 +638,7 @@ class NewsEngineWorker:
 
     def run_worker_loop(self):
         self.is_running = True
-        logger.info("News Engine 1-second ultra-high frequency loop started.")
+        logger.info("News Engine 1-second loop started.")
         while self.is_running:
             try:
                 self.poll_cycle()
@@ -510,5 +652,5 @@ class NewsEngineWorker:
             t = threading.Thread(target=self.run_worker_loop, daemon=True)
             t.start()
 
-# Global worker instance
+# Global instance
 news_worker = NewsEngineWorker()
