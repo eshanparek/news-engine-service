@@ -11,6 +11,8 @@ from datetime import datetime
 from typing import List, Dict, Optional, Set
 from urllib.parse import urlparse, urlunparse, urljoin
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
 
 from ai_analyzer import ai_analyzer
@@ -251,13 +253,19 @@ class NewsEngineWorker:
         self.is_running = False
         self.is_initialized = False # Cold-start warmup flag
         self.last_fetch_time: Optional[datetime] = None
-        self.refresh_interval = int(os.getenv("REFRESH_INTERVAL", "3")) # Fast 3-second cycle
+        self.refresh_interval = int(os.getenv("REFRESH_INTERVAL", "1")) # 1-second ultra-high frequency cycle
         self.enable_ai = os.getenv("ENABLE_AI_SCORING", "true").lower() == "true"
-        self.headers = {
+        self.lock = threading.Lock()
+        
+        # High-performance connection-pooled session
+        self.session = requests.Session()
+        adapter = HTTPAdapter(pool_connections=35, pool_maxsize=35, max_retries=Retry(total=1, backoff_factor=0.1))
+        self.session.mount('http://', adapter)
+        self.session.mount('https://', adapter)
+        self.session.headers.update({
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
-        }
-        self.lock = threading.Lock()
+        })
         self._load_saved_hashes()
 
     def _load_saved_hashes(self):
@@ -303,7 +311,7 @@ class NewsEngineWorker:
         items = []
         try:
             url = f"https://inshorts.com/en/read/{category}"
-            resp = requests.get(url, headers=self.headers, timeout=4)
+            resp = self.session.get(url, timeout=2.5)
             if resp.status_code == 200:
                 soup = BeautifulSoup(resp.text, "html.parser")
                 cards = soup.find_all("div", class_=re.compile(r"news-card"))
@@ -343,7 +351,7 @@ class NewsEngineWorker:
             if not url:
                 return results
 
-            resp = requests.get(url, headers=self.headers, timeout=4)
+            resp = self.session.get(url, timeout=2.5)
             if resp.status_code == 200:
                 soup = None
                 try:
@@ -380,7 +388,7 @@ class NewsEngineWorker:
 
             if not results and source.get("fallback_scrape_url"):
                 scrape_url = source["fallback_scrape_url"]
-                s_resp = requests.get(scrape_url, headers=self.headers, timeout=4)
+                s_resp = self.session.get(scrape_url, timeout=2.5)
                 if s_resp.status_code == 200:
                     s_soup = BeautifulSoup(s_resp.content, "html.parser")
                     anchors = s_soup.find_all("a", href=True)
@@ -426,7 +434,7 @@ class NewsEngineWorker:
 
     def fetch_all_sources(self) -> List[Dict]:
         all_news = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=25) as executor:
             futures = [executor.submit(self.fetch_single_feed, src) for src in self.sources]
             for fut in concurrent.futures.as_completed(futures):
                 try:
@@ -450,12 +458,11 @@ class NewsEngineWorker:
         return newly_arrived, all_news
 
     def poll_cycle(self):
-        """Ultra-fast poll cycle: checks all feeds in parallel and immediately dispatches new arrivals."""
+        """Ultra-fast 1-second poll cycle: checks all feeds in parallel with pooled HTTP connections."""
         newly_arrived, all_scraped = self.fetch_all_sources()
 
         # Update Live Cache for Dashboard
         if all_scraped:
-            # Merge and sort
             combined = newly_arrived + self.news_cache
             combined.sort(key=lambda x: x.get("relevance", 0), reverse=True)
             self.news_cache = combined[:80]
@@ -481,21 +488,20 @@ class NewsEngineWorker:
             # LIVE RUN: Every single freshly arrived story is scored and sent IMMEDIATELY as it arrives
             if newly_arrived:
                 for item in newly_arrived:
-                    # Dispatch each item in its own real-time execution
                     threading.Thread(target=self.process_and_dispatch_single_item, args=(item,), daemon=True).start()
 
         self.last_fetch_time = datetime.now()
 
     def run_worker_loop(self):
         self.is_running = True
-        logger.info("News Engine real-time worker loop started.")
+        logger.info("News Engine 1-second ultra-high frequency loop started.")
         while self.is_running:
             try:
                 self.poll_cycle()
                 time.sleep(self.refresh_interval)
             except Exception as e:
                 logger.error(f"Worker loop error: {e}")
-                time.sleep(5)
+                time.sleep(1)
 
     def start(self):
         if not self.is_running:
