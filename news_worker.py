@@ -17,6 +17,7 @@ from bs4 import BeautifulSoup
 
 from ai_analyzer import ai_analyzer
 from telegram_notifier import telegram_notifier
+from whatsapp_notifier import whatsapp_notifier
 
 logger = logging.getLogger("NewsWorker")
 
@@ -429,8 +430,9 @@ class NewsEngineWorker:
         item["ai_sectors"] = rating.get("sectors", [])
         item["ai_reasoning"] = rating.get("reasoning", "")
 
-        # 2. Instant Real-Time Dispatch to Telegram
+        # 2. Instant Real-Time Dispatch to Telegram & WhatsApp
         telegram_notifier.send_news_alert(item)
+        whatsapp_notifier.send_news_alert(item)
 
     def fetch_all_sources(self) -> List[Dict]:
         all_news = []
