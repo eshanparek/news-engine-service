@@ -18,6 +18,7 @@ from bs4 import BeautifulSoup
 from ai_analyzer import ai_analyzer
 from telegram_notifier import telegram_notifier
 from whatsapp_notifier import whatsapp_notifier
+from calendar_engine import calendar_engine
 
 logger = logging.getLogger("NewsWorker")
 
@@ -568,11 +569,17 @@ class NewsEngineWorker:
         item["ai_sectors"] = rating.get("sectors", [])
         item["ai_reasoning"] = rating.get("reasoning", "")
 
-        # 2. Check Forwarding Score Filter
+        # 2. Link Breaking News to Market Calendar Events & Outcomes
+        try:
+            calendar_engine.link_news_to_calendar(item)
+        except Exception as e:
+            logger.debug(f"Calendar link error: {e}")
+
+        # 3. Check Forwarding Score Filter
         if item["ai_score"] < self.min_forward_score:
             return
 
-        # 3. Check Per-Source Channel Forwarding Rules
+        # 4. Check Per-Source Channel Forwarding Rules
         src_cfg = self.get_source_config(item.get("source", ""))
         
         if src_cfg.get("forward_telegram", True):
@@ -629,6 +636,10 @@ class NewsEngineWorker:
                     it["ai_impact"] = r.get("impact", "MEDIUM")
                     it["ai_sectors"] = r.get("sectors", [])
                     it["ai_reasoning"] = r.get("reasoning", "")
+                try:
+                    calendar_engine.link_news_to_calendar(it)
+                except Exception:
+                    pass
         else:
             if newly_arrived:
                 for item in newly_arrived:
