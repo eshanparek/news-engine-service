@@ -15,17 +15,17 @@ from news_worker import news_worker
 from ai_analyzer import ai_analyzer
 from telegram_notifier import telegram_notifier
 from whatsapp_notifier import whatsapp_notifier
-from calendar_engine import calendar_engine, now_ist
+from calendar_engine import calendar_engine, now_ist, MARKETS_ORDER, MARKET_META
 
-# 1. Start Background Scraper, Scorer & Calendar Timer Daemons
+# 1. Start Background Scraper, Scorer & Multi-Market Calendar Timer Daemons
 news_worker.start()
 calendar_engine.start()
 
 # 2. FastAPI Machine-to-Machine Endpoints
 app = FastAPI(
-    title="EPM Pro Live News & Market Calendar Engine",
-    description="Decoupled high-speed real-time news scraping, AI impact evaluation, Market Calendar countdowns, linked outcomes, and multi-channel Telegram/WhatsApp alerts.",
-    version="2.0.0"
+    title="EPM Pro Live News & Multi-Market Calendar Engine",
+    description="Decoupled high-speed real-time news scraping, AI impact evaluation, Multi-Market Calendar (NSE, BSE, MCX, Crypto, NYSE), 7:00 AM / 7:05 AM IST daily dispatches, next-day holiday alerts, and live unfolding outcomes.",
+    version="3.0.0"
 )
 
 app.add_middleware(
@@ -38,13 +38,16 @@ app.add_middleware(
 
 START_TIME = time.time()
 
+
 class NewsItem(BaseModel):
     title: str
     summary: Optional[str] = ""
     source: Optional[str] = "Manual"
 
+
 class CalendarEventUpdate(BaseModel):
     id: Optional[str] = ""
+    market: Optional[str] = "NSE"
     date: str
     time: str
     symbol: str
@@ -56,6 +59,7 @@ class CalendarEventUpdate(BaseModel):
     sentiment: Optional[str] = "⚪ NEUTRAL"
     forward_telegram: Optional[bool] = True
 
+
 class AdminTelegramConfig(BaseModel):
     news_bot_token: Optional[str] = ""
     news_chat_id: Optional[str] = ""
@@ -66,6 +70,10 @@ class AdminTelegramConfig(BaseModel):
     alert_on_countdown: Optional[bool] = True
     alert_on_outcome: Optional[bool] = True
     alert_on_linked_news: Optional[bool] = True
+    auto_daily_today_7am: Optional[bool] = True
+    auto_daily_tomorrow_705am: Optional[bool] = True
+    auto_holiday_7am: Optional[bool] = True
+
 
 @app.get("/health")
 def health():
@@ -73,8 +81,10 @@ def health():
         "status": "healthy",
         "timestamp": now_ist().isoformat(),
         "cached_news": len(news_worker.news_cache),
-        "calendar_events": len(calendar_engine.events)
+        "calendar_events": len(calendar_engine.events),
+        "markets": MARKETS_ORDER
     }
+
 
 @app.get("/api/news")
 def get_news(
@@ -103,6 +113,7 @@ def get_news(
         "news": items[:limit]
     }
 
+
 @app.get("/api/sources")
 def get_sources():
     return {
@@ -110,33 +121,41 @@ def get_sources():
         "sources": news_worker.sources
     }
 
+
 @app.post("/api/trigger")
 def trigger_fetch(background_tasks: BackgroundTasks):
     background_tasks.add_task(news_worker.poll_cycle)
     return {"status": "triggered", "message": "News poll cycle triggered in background."}
+
 
 @app.post("/api/rate")
 def rate_headline(item: NewsItem):
     res = ai_analyzer.analyze_news(item.title, item.summary or item.title, item.source or "Custom")
     return res
 
+
 # ─── Calendar & Sync REST API Endpoints ──────────────────────────────────────
 
 @app.get("/api/calendar")
-def get_calendar(range_filter: str = Query("all", alias="range")):
-    events = calendar_engine.get_enriched_events(filter_range=range_filter)
+def get_calendar(
+    range_filter: str = Query("all", alias="range"),
+    market_filter: str = Query("ALL", alias="market")
+):
+    events = calendar_engine.get_enriched_events(filter_range=range_filter, market_filter=market_filter)
     return {
         "status": "success",
         "as_of_ist": now_ist().strftime("%Y-%m-%d %H:%M:%S IST"),
+        "markets": MARKETS_ORDER,
         "count": len(events),
         "events": events
     }
+
 
 @app.get("/api/calendar/unified")
 def get_unified_calendar():
     """Unified endpoint compatible with Trading Terminal v34_core.js and external clients."""
     holidays = calendar_engine.get_holiday_snapshot()
-    events = calendar_engine.get_enriched_events(filter_range="all")
+    events = calendar_engine.get_enriched_events(filter_range="all", market_filter="ALL")
     corporate_formatted = []
     for e in events:
         outcome_str = f"Prev: {e['previous']} | Est: {e['forecast']} → Actual: {e['actual']} ({e['outcome_sentiment']})"
@@ -144,8 +163,9 @@ def get_unified_calendar():
             outcome_str += f" | 🔗 {e['linked_news_title']}"
         corporate_formatted.append({
             "id": e["id"],
+            "market": e.get("market", "NSE"),
             "symbol": e["symbol"],
-            "event": f"{e['event']} [{e['timer']}]",
+            "event": f"[{e.get('market', 'NSE')}] {e['event']} [{e['timer']}]",
             "date": e["date"],
             "time": e["time"],
             "timer": e["timer"],
@@ -166,6 +186,7 @@ def get_unified_calendar():
     holidays["events"] = events
     return holidays
 
+
 @app.post("/api/calendar/sync")
 def sync_calendar():
     calendar_engine.sync_all_calendars()
@@ -175,11 +196,31 @@ def sync_calendar():
         "synced_at": now_ist().strftime("%Y-%m-%d %H:%M:%S IST")
     }
 
+
+@app.post("/api/calendar/dispatch/today")
+def api_dispatch_today():
+    ok, msg = calendar_engine.dispatch_all_markets_today_snapshot()
+    return {"status": "success" if ok else "error", "detail": msg}
+
+
+@app.post("/api/calendar/dispatch/tomorrow")
+def api_dispatch_tomorrow():
+    ok, msg = calendar_engine.dispatch_all_markets_tomorrow_snapshot()
+    return {"status": "success" if ok else "error", "detail": msg}
+
+
+@app.post("/api/calendar/dispatch/holiday")
+def api_dispatch_holiday():
+    ok, msg = calendar_engine.dispatch_next_day_holiday_alerts(force_preview=True)
+    return {"status": "success" if ok else "error", "detail": msg}
+
+
 @app.get("/api/calendar/ics", response_class=PlainTextResponse)
 def download_calendar_ics():
     """iCal (.ics) subscription endpoint for Google Calendar, Apple Calendar & Outlook."""
     ics_content = calendar_engine.export_ical_ics()
     return PlainTextResponse(content=ics_content, media_type="text/calendar")
+
 
 @app.post("/api/calendar/event")
 def upsert_calendar_event(payload: CalendarEventUpdate):
@@ -194,9 +235,11 @@ def upsert_calendar_event(payload: CalendarEventUpdate):
         forecast=payload.forecast or "—",
         actual=payload.actual or "⏳ Pending",
         sentiment=payload.sentiment or "⚪ NEUTRAL",
+        market=payload.market or "AUTO",
         forward_now=bool(payload.forward_telegram)
     )
     return {"status": "success", "event": ev}
+
 
 @app.get("/api/admin/settings")
 def get_admin_settings():
@@ -209,8 +252,12 @@ def get_admin_settings():
         "calendar_configured": telegram_notifier.is_calendar_configured(),
         "alert_on_countdown": telegram_notifier.alert_on_countdown,
         "alert_on_outcome": telegram_notifier.alert_on_outcome,
-        "alert_on_linked_news": telegram_notifier.alert_on_linked_news
+        "alert_on_linked_news": telegram_notifier.alert_on_linked_news,
+        "auto_daily_today_7am": telegram_notifier.auto_daily_today_7am,
+        "auto_daily_tomorrow_705am": telegram_notifier.auto_daily_tomorrow_705am,
+        "auto_holiday_7am": telegram_notifier.auto_holiday_7am
     }
+
 
 @app.post("/api/admin/settings")
 def update_admin_settings(cfg: AdminTelegramConfig):
@@ -223,7 +270,10 @@ def update_admin_settings(cfg: AdminTelegramConfig):
         calendar_enabled=bool(cfg.calendar_enabled),
         alert_on_countdown=bool(cfg.alert_on_countdown),
         alert_on_outcome=bool(cfg.alert_on_outcome),
-        alert_on_linked_news=bool(cfg.alert_on_linked_news)
+        alert_on_linked_news=bool(cfg.alert_on_linked_news),
+        auto_daily_today_7am=bool(cfg.auto_daily_today_7am),
+        auto_daily_tomorrow_705am=bool(cfg.auto_daily_tomorrow_705am),
+        auto_holiday_7am=bool(cfg.auto_holiday_7am)
     )
     return {"status": "saved", "settings": saved}
 
@@ -240,7 +290,7 @@ def get_dashboard_tables():
         sentiment = it.get("ai_sentiment", "NEUTRAL")
         impact = it.get("ai_impact", "MEDIUM")
         relevance = it.get("relevance", 0)
-        
+
         if sentiment == "BULLISH":
             sent_badge = "🟢 BULLISH"
         elif sentiment == "BEARISH":
@@ -286,16 +336,19 @@ def get_dashboard_tables():
     cal_status = "🟢 Configured" if telegram_notifier.is_calendar_configured() else "⚠️ Set Calendar Chat ID in Tab 3"
     status_str = (
         f"🟢 **Engine Status:** Online | **Cached News:** {len(items)} | "
-        f"**Calendar Events:** {len(calendar_engine.events)} | "
+        f"**Multi-Market Events (NSE/BSE/MCX/Crypto/NYSE):** {len(calendar_engine.events)} | "
         f"**Calendar TG Channel:** {cal_status} | "
         f"**IST Clock:** {now_ist().strftime('%H:%M:%S IST')}"
     )
     return status_str, top_rows, bottom_rows
 
-def get_calendar_tables(range_filter: str = "all"):
-    events = calendar_engine.get_enriched_events(filter_range=range_filter)
+
+def get_calendar_tables(range_filter: str = "all", market_filter: str = "ALL"):
+    events = calendar_engine.get_enriched_events(filter_range=range_filter, market_filter=market_filter)
     cal_rows = []
     for ev in events:
+        mkt = ev.get("market", "NSE").upper()
+        mkt_badge = MARKET_META.get(mkt, MARKET_META["NSE"])["badge"]
         impact = ev.get("impact", "HIGH")
         imp_badge = "🔥 HIGH" if impact == "HIGH" else ("⚡ MEDIUM" if impact == "MEDIUM" else "💤 LOW")
         linked_info = ev.get("linked_news_title", "")
@@ -306,6 +359,7 @@ def get_calendar_tables(range_filter: str = "all"):
 
         cal_rows.append([
             ev.get("id", ""),
+            mkt_badge,
             ev.get("date", ""),
             f"{ev.get('time', '')} IST",
             ev.get("timer", ""),
@@ -320,7 +374,7 @@ def get_calendar_tables(range_filter: str = "all"):
         ])
 
     if not cal_rows:
-        cal_rows.append(["-", "-", "-", "-", "-", "No events for selected filter", "-", "-", "-", "-", "-", "-"])
+        cal_rows.append(["-", "-", "-", "-", "-", "-", "No events for selected market/time filter", "-", "-", "-", "-", "-", "-"])
 
     holidays_data = calendar_engine.get_holiday_snapshot().get("comparison", [])
     hol_rows = []
@@ -330,30 +384,50 @@ def get_calendar_tables(range_filter: str = "all"):
             h.get("day", ""),
             h.get("description", ""),
             h.get("nse_status", ""),
-            h.get("mcx_status", "")
+            h.get("bse_status", ""),
+            h.get("mcx_status", ""),
+            h.get("nyse_status", ""),
+            h.get("crypto_status", "")
         ])
 
     cal_summary = (
-        f"📅 **Active Calendar Events:** {len(events)} | "
+        f"📅 **Displayed Events:** {len(events)} (Filter: `{market_filter}` / `{range_filter.upper()}`) | "
         f"**Current IST Time:** `{now_ist().strftime('%Y-%m-%d %H:%M:%S IST')}` | "
-        f"**Last Sync:** `{calendar_engine.last_sync_time.strftime('%H:%M:%S IST') if calendar_engine.last_sync_time else 'Just now'}` | "
-        f"**iCal Sync Feed:** `/api/calendar/ics`  |  **JSON Sync API:** `/api/calendar/unified`"
+        f"**Auto Daily Dispatches:** `07:00 AM IST (Today + Holiday Check)` & `07:05 AM IST (Tomorrow)` | "
+        f"**iCal Feed:** `/api/calendar/ics`"
     )
     return cal_summary, cal_rows, hol_rows
 
-def sync_and_refresh_calendar(range_filter: str):
-    calendar_engine.sync_all_calendars()
-    return get_calendar_tables(range_filter)
 
-def push_calendar_digest_to_tg():
-    digest_html = calendar_engine.build_telegram_calendar_digest()
-    ok, msg = telegram_notifier.send_calendar_digest(digest_html)
+def sync_and_refresh_calendar(range_filter: str, market_filter: str):
+    calendar_engine.sync_all_calendars()
+    return get_calendar_tables(range_filter, market_filter)
+
+
+def push_today_snapshot_all_markets():
+    ok, msg = calendar_engine.dispatch_all_markets_today_snapshot()
     if ok:
-        return f"✅ **Calendar & Outcomes Digest successfully sent to Calendar Telegram Channel (`{telegram_notifier.calendar_chat_id}`)!**"
-    return f"⚠️ **Could not send Calendar Digest:** {msg} *(Configure Calendar Telegram Chat ID in Tab 3)*"
+        return f"✅ **Today's Complete Calendar & Timer Snapshot sent as 5 separate messages (`NSE`, `BSE`, `MCX`, `CRYPTO`, `NYSE`) to `{telegram_notifier.calendar_chat_id}`!** ({msg})"
+    return f"⚠️ **Could not send Today's Snapshot:** {msg} *(Configure Calendar Telegram Chat ID in Tab 3)*"
+
+
+def push_tomorrow_snapshot_all_markets():
+    ok, msg = calendar_engine.dispatch_all_markets_tomorrow_snapshot()
+    if ok:
+        return f"✅ **Tomorrow's Lined-Up Events Snapshot sent as 5 separate messages (`NSE`, `BSE`, `MCX`, `CRYPTO`, `NYSE`) to `{telegram_notifier.calendar_chat_id}`!** ({msg})"
+    return f"⚠️ **Could not send Tomorrow's Snapshot:** {msg} *(Configure Calendar Telegram Chat ID in Tab 3)*"
+
+
+def push_holiday_check_alert():
+    ok, msg = calendar_engine.dispatch_next_day_holiday_alerts(force_preview=True)
+    if ok:
+        return f"✅ **Trading Holiday Alert dispatched separately per market to `{telegram_notifier.calendar_chat_id}`!** ({msg})"
+    return f"ℹ️ **Holiday Check:** {msg}"
+
 
 def handle_manual_event_save(
     evt_id: str,
+    mkt_s: str,
     date_s: str,
     time_s: str,
     symbol_s: str,
@@ -364,7 +438,8 @@ def handle_manual_event_save(
     actual_s: str,
     sent_s: str,
     forward_tg: bool,
-    current_filter: str
+    current_range: str,
+    current_market: str
 ):
     ev = calendar_engine.update_or_add_event(
         event_id=evt_id,
@@ -377,13 +452,15 @@ def handle_manual_event_save(
         forecast=fore_s,
         actual=actual_s,
         sentiment=sent_s,
+        market=mkt_s,
         forward_now=forward_tg
     )
-    cal_summary, cal_rows, _ = get_calendar_tables(current_filter)
-    status_msg = f"✅ **Saved Event `{ev['id']}` ({ev['event']}) — Outcome: `{ev['actual']}`.**"
+    cal_summary, cal_rows, _ = get_calendar_tables(current_range, current_market)
+    status_msg = f"✅ **Saved [{ev['market']}] Event `{ev['id']}` ({ev['event']}) — Outcome: `{ev['actual']}`.**"
     if forward_tg:
-        status_msg += " Dispatched update to Calendar Telegram Channel!"
+        status_msg += f" Dispatched individual `{ev['market']}` update to Calendar Telegram Channel!"
     return status_msg, cal_summary, cal_rows
+
 
 def save_admin_telegram_settings(
     news_token: str,
@@ -394,7 +471,10 @@ def save_admin_telegram_settings(
     cal_en: bool,
     on_countdown: bool,
     on_outcome: bool,
-    on_linked: bool
+    on_linked: bool,
+    auto_today_7am: bool,
+    auto_tom_705am: bool,
+    auto_hol_7am: bool
 ):
     telegram_notifier.save_admin_settings(
         news_bot_token=news_token,
@@ -405,19 +485,25 @@ def save_admin_telegram_settings(
         calendar_enabled=cal_en,
         alert_on_countdown=on_countdown,
         alert_on_outcome=on_outcome,
-        alert_on_linked_news=on_linked
+        alert_on_linked_news=on_linked,
+        auto_daily_today_7am=auto_today_7am,
+        auto_daily_tomorrow_705am=auto_tom_705am,
+        auto_holiday_7am=auto_hol_7am
     )
     return (
-        f"✅ **Admin Telegram Settings Saved!**\n"
+        f"✅ **Admin Telegram & Automated Schedule Settings Saved!**\n"
         f"- **News Channel ID:** `{telegram_notifier.chat_id or 'Not Set'}` (Enabled: `{telegram_notifier.enabled}`)\n"
-        f"- **Calendar & Outcomes Channel ID:** `{telegram_notifier.calendar_chat_id or 'Not Set'}` (Enabled: `{telegram_notifier.calendar_enabled}`)"
+        f"- **Calendar & Outcomes Channel ID:** `{telegram_notifier.calendar_chat_id or 'Not Set'}` (Enabled: `{telegram_notifier.calendar_enabled}`)\n"
+        f"- **Daily IST Automation:** 7:00 AM Today Snapshot=`{auto_today_7am}` | 7:05 AM Tomorrow Snapshot=`{auto_tom_705am}` | 7:00 AM Pre-Holiday Alert=`{auto_hol_7am}`"
     )
+
 
 def trigger_test_telegram(target_channel: str):
     ok, detail = telegram_notifier.send_test_alert(channel_type=target_channel)
     if ok:
         return f"✅ **Test alert delivered to {target_channel.upper()} Telegram channel!**"
     return f"❌ **Test alert failed for {target_channel.upper()} channel:** {detail}"
+
 
 def get_sources_table():
     rows = []
@@ -434,10 +520,12 @@ def get_sources_table():
         ])
     return rows
 
+
 def manual_refresh():
     news_worker.poll_cycle()
     time.sleep(1)
     return get_dashboard_tables()
+
 
 def test_ai_rating(headline: str, summary: str):
     if not headline:
@@ -451,10 +539,12 @@ def test_ai_rating(headline: str, summary: str):
         f"**Market Context:** {res.get('reasoning', '')}"
     )
 
+
 def save_forwarding_rules(tg_selected: List[str], wa_selected: List[str], min_score: int):
     news_worker.save_config(tg_selected, wa_selected, min_score)
     updated_sources = get_sources_table()
     return f"✅ **Forwarding rules successfully updated!** ({len(tg_selected)} sources for Telegram, {len(wa_selected)} for WhatsApp, Min AI Score: {min_score})", updated_sources
+
 
 all_source_names = [s["name"] for s in news_worker.sources]
 default_tg_selected = [s["name"] for s in news_worker.sources if s.get("forward_telegram", True)]
@@ -463,8 +553,8 @@ default_wa_selected = [s["name"] for s in news_worker.sources if s.get("forward_
 
 # ─── Build Gradio Blocks UI ──────────────────────────────────────────────────
 
-with gr.Blocks(title="EPM Pro News & Market Calendar Terminal", theme=gr.themes.Soft()) as demo:
-    gr.Markdown("# 📰 EPM Pro Live Market News, Calendar & AI Sentiment Terminal")
+with gr.Blocks(title="EPM Pro Multi-Market News & Calendar Terminal", theme=gr.themes.Soft()) as demo:
+    gr.Markdown("# 📰 EPM Pro Live Market News, Multi-Market Calendar (NSE · BSE · MCX · Crypto · NYSE) & AI Terminal")
     status_box = gr.Markdown(value="🟢 **Engine Status:** Online | Initializing...")
 
     with gr.Tabs():
@@ -499,38 +589,67 @@ with gr.Blocks(title="EPM Pro News & Market Calendar Terminal", theme=gr.themes.
             with gr.Row():
                 test_title = gr.Textbox(label="Headline / Breaking News", placeholder="e.g. RBI unexpectedly cuts interest rates by 25 bps")
                 test_desc = gr.Textbox(label="Summary (Optional)", placeholder="Context details...")
-            
+
             analyze_btn = gr.Button("Analyze Headline with Gemini 2.5")
             ai_output = gr.Markdown()
             analyze_btn.click(test_ai_rating, inputs=[test_title, test_desc], outputs=ai_output)
 
         # ═══════════════════════════════════════════════════════════
-        # TAB 2: Market Calendar, Live Timers, Outcomes & Linked News
+        # TAB 2: Multi-Market Calendar, Live Timers, Outcomes & Linked News
         # ═══════════════════════════════════════════════════════════
         with gr.TabItem("📅 Market Calendar, Timers & Outcomes"):
-            gr.Markdown("### ⏱️ Live Economic & Corporate Calendar (With Countdown Timers, Outcomes & Linked News)")
-            cal_info_bar = gr.Markdown("Loading calendar & live timers...")
+            gr.Markdown(
+                "### ⏱️ Multi-Market Economic & Corporate Calendar (`NSE` · `BSE` · `MCX` · `CRYPTO` · `NYSE`)\n"
+                "- **07:00 AM IST Daily:** Automatically forwards Today's complete calendar & timer snapshot as **5 separate market messages** + **Next-Day Trading Holiday Alert** (1 day before any holiday).\n"
+                "- **07:05 AM IST Daily:** Automatically forwards Tomorrow's lined-up events snapshot as **5 separate market messages**.\n"
+                "- **Real-Time Unfolding:** Automatically forwards individual event outcomes & linked news as soon as results unfold."
+            )
+            cal_info_bar = gr.Markdown("Loading multi-market calendar & live timers...")
 
             with gr.Row():
-                cal_filter = gr.Radio(
-                    choices=[("All Scheduled Events", "all"), ("Today's Events", "today"), ("Next 7 Days", "week"), ("Upcoming Only", "upcoming")],
-                    value="all",
-                    label="Filter Calendar View",
-                    scale=2
+                cal_market_filter = gr.Radio(
+                    choices=[
+                        ("🌐 All 5 Markets", "ALL"),
+                        ("🇮🇳 NSE", "NSE"),
+                        ("🇮🇳 BSE", "BSE"),
+                        ("⛽ MCX", "MCX"),
+                        ("₿ CRYPTO", "CRYPTO"),
+                        ("🇺🇸 NYSE", "NYSE")
+                    ],
+                    value="ALL",
+                    label="Filter by Market",
+                    scale=3
                 )
-                cal_sync_btn = gr.Button("🔄 Sync Calendar & Refresh Countdown Timers", variant="primary", scale=1)
-                cal_push_tg_btn = gr.Button("📤 Push Calendar Digest to Telegram Channel", variant="secondary", scale=1)
+                cal_filter = gr.Radio(
+                    choices=[
+                        ("All Scheduled", "all"),
+                        ("Today's Events (7:00 AM)", "today"),
+                        ("Tomorrow's Events (7:05 AM)", "tomorrow"),
+                        ("Next 7 Days", "week"),
+                        ("Upcoming Only (Active Timer)", "upcoming")
+                    ],
+                    value="all",
+                    label="Filter by Time Window",
+                    scale=3
+                )
+
+            with gr.Row():
+                cal_sync_btn = gr.Button("🔄 Sync All 5 Markets & Refresh Timers", variant="primary", scale=1)
+                btn_push_today = gr.Button("🌅 Send Today's Snapshot (5 Separate Market Msgs)", variant="secondary", scale=1)
+                btn_push_tomorrow = gr.Button("🌄 Send Tomorrow's Snapshot (5 Separate Market Msgs)", variant="secondary", scale=1)
+                btn_push_holiday = gr.Button("🏖️ Send Next-Day Holiday Alert (Trader Notice)", variant="secondary", scale=1)
 
             cal_action_msg = gr.Markdown()
 
             calendar_table = gr.Dataframe(
                 headers=[
                     "Event ID",
+                    "Market",
                     "Date",
                     "Time (IST)",
                     "⏱ Live Timer",
                     "Asset / Symbol",
-                    "Market Event",
+                    "Market Event / Corporate Release",
                     "Impact",
                     "Previous",
                     "Forecast",
@@ -538,26 +657,27 @@ with gr.Blocks(title="EPM Pro News & Market Calendar Terminal", theme=gr.themes.
                     "📊 Verdict",
                     "🔗 Linked Breaking News"
                 ],
-                datatype=["str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "str"],
+                datatype=["str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "str"],
                 value=[],
                 interactive=False,
                 wrap=True
             )
 
             gr.Markdown("---")
-            with gr.Accordion("✏️ Add Custom Calendar Event or Update Event Outcome Manually", open=False):
-                gr.Markdown("Enter an existing **Event ID** from the table above to update its outcome, or leave Event ID blank to create a new scheduled event:")
+            with gr.Accordion("✏️ Add Custom Calendar Event or Record / Update Official Outcome Manually", open=False):
+                gr.Markdown("Enter an existing **Event ID** from the table above to update its outcome (e.g. Reliance Result), or leave Event ID blank to create a new scheduled event:")
                 with gr.Row():
-                    in_ev_id = gr.Textbox(label="Event ID (Optional for new)", placeholder="e.g. ind_cpi_2026-10-08")
+                    in_ev_id = gr.Textbox(label="Event ID (Optional for new)", placeholder="e.g. nse_reliance_res_2026-10-09")
+                    in_ev_mkt = gr.Dropdown(choices=["NSE", "BSE", "MCX", "CRYPTO", "NYSE"], value="NSE", label="Market")
                     in_ev_date = gr.Textbox(label="Date (YYYY-MM-DD)", value=now_ist().strftime("%Y-%m-%d"))
-                    in_ev_time = gr.Textbox(label="Time IST (HH:MM)", value="14:00")
-                    in_ev_sym = gr.Textbox(label="Symbol / Currency", value="🇮🇳 INR / NSE")
+                    in_ev_time = gr.Textbox(label="Time IST (HH:MM)", value="14:30")
+                    in_ev_sym = gr.Textbox(label="Symbol / Ticker", value="🇮🇳 NSE:RELIANCE")
                     in_ev_imp = gr.Dropdown(choices=["HIGH", "MEDIUM", "LOW"], value="HIGH", label="Impact")
                 with gr.Row():
-                    in_ev_name = gr.Textbox(label="Event Title", placeholder="e.g. RBI Repo Rate Decision / Reliance Q2 Results", scale=2)
-                    in_ev_prev = gr.Textbox(label="Previous", placeholder="e.g. 6.50%", scale=1)
-                    in_ev_fore = gr.Textbox(label="Forecast", placeholder="e.g. 6.25%", scale=1)
-                    in_ev_act = gr.Textbox(label="Actual Outcome", value="⏳ Pending", placeholder="e.g. 6.25% (25 bps Cut)", scale=1)
+                    in_ev_name = gr.Textbox(label="Event Title", placeholder="e.g. Reliance Q2 Results / US CPI / EIA Crude Inventory", scale=2)
+                    in_ev_prev = gr.Textbox(label="Previous", placeholder="e.g. ₹41,100 Cr", scale=1)
+                    in_ev_fore = gr.Textbox(label="Forecast", placeholder="e.g. ₹43,250 Cr", scale=1)
+                    in_ev_act = gr.Textbox(label="Actual Outcome", value="⏳ Pending", placeholder="e.g. ₹44,180 Cr (Beats)", scale=1)
                     in_ev_sent = gr.Dropdown(
                         choices=["⏳ PENDING", "🟢 BULLISH", "🔴 BEARISH", "⚪ NEUTRAL"],
                         value="🟢 BULLISH",
@@ -565,36 +685,48 @@ with gr.Blocks(title="EPM Pro News & Market Calendar Terminal", theme=gr.themes.
                         scale=1
                     )
                 with gr.Row():
-                    in_ev_push = gr.Checkbox(value=True, label="Immediately forward this Event / Outcome to the Calendar Telegram Channel")
-                    save_ev_btn = gr.Button("💾 Save Event / Outcome & Notify Channel", variant="primary")
+                    in_ev_push = gr.Checkbox(value=True, label="Immediately forward this Individual Market Event & Outcome to the Calendar Telegram Channel")
+                    save_ev_btn = gr.Button("💾 Save Event / Outcome & Dispatch Market Update", variant="primary")
 
             gr.Markdown("---")
-            gr.Markdown("### 🏛️ 2026 Authoritative NSE/BSE & MCX Market Holidays")
+            gr.Markdown("### 🏛️ 2026 Authoritative Multi-Market Trading Holidays (`NSE` · `BSE` · `MCX` · `NYSE` · `CRYPTO`)")
             holidays_table = gr.Dataframe(
-                headers=["Date", "Day", "Holiday Description", "NSE/BSE Equity & F&O", "MCX Commodities (Morning / Evening)"],
-                datatype=["str", "str", "str", "str", "str"],
+                headers=[
+                    "Date",
+                    "Day",
+                    "Holiday / Occasion",
+                    "🇮🇳 NSE Status",
+                    "🇮🇳 BSE Status",
+                    "⛽ MCX Status (Morning / Evening)",
+                    "🇺🇸 NYSE Status (EST / IST)",
+                    "₿ Crypto Status"
+                ],
+                datatype=["str", "str", "str", "str", "str", "str", "str", "str"],
                 value=[],
                 interactive=False,
                 wrap=True
             )
 
-            cal_filter.change(get_calendar_tables, inputs=[cal_filter], outputs=[cal_info_bar, calendar_table, holidays_table])
-            cal_sync_btn.click(sync_and_refresh_calendar, inputs=[cal_filter], outputs=[cal_info_bar, calendar_table, holidays_table])
-            cal_push_tg_btn.click(push_calendar_digest_to_tg, outputs=[cal_action_msg])
+            cal_filter.change(get_calendar_tables, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_table, holidays_table])
+            cal_market_filter.change(get_calendar_tables, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_table, holidays_table])
+            cal_sync_btn.click(sync_and_refresh_calendar, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_table, holidays_table])
+            btn_push_today.click(push_today_snapshot_all_markets, outputs=[cal_action_msg])
+            btn_push_tomorrow.click(push_tomorrow_snapshot_all_markets, outputs=[cal_action_msg])
+            btn_push_holiday.click(push_holiday_check_alert, outputs=[cal_action_msg])
             save_ev_btn.click(
                 handle_manual_event_save,
-                inputs=[in_ev_id, in_ev_date, in_ev_time, in_ev_sym, in_ev_name, in_ev_imp, in_ev_prev, in_ev_fore, in_ev_act, in_ev_sent, in_ev_push, cal_filter],
+                inputs=[in_ev_id, in_ev_mkt, in_ev_date, in_ev_time, in_ev_sym, in_ev_name, in_ev_imp, in_ev_prev, in_ev_fore, in_ev_act, in_ev_sent, in_ev_push, cal_filter, cal_market_filter],
                 outputs=[cal_action_msg, cal_info_bar, calendar_table]
             )
 
         # ═══════════════════════════════════════════════════════════
-        # TAB 3: Admin Control Page — Telegram Channels & Sources
+        # TAB 3: Admin Control Page — Telegram Channels & Schedules
         # ═══════════════════════════════════════════════════════════
         with gr.TabItem("⚙️ Admin Control & Telegram Channel Settings"):
-            gr.Markdown("### 🔐 Telegram Channels Configuration (Separate Channels for News vs. Market Calendar)")
+            gr.Markdown("### 🔐 Telegram Channels & Automated Daily IST Dispatch Configuration")
             gr.Markdown(
                 "Configure your **Live Breaking News** channel and your separate **Market Calendar & Outcomes** group/channel below. "
-                "*(Tip: You can use the exact same Bot Token for both channels—just add the bot as an Admin to your second channel and enter its Chat ID!)*"
+                "All Calendar dispatches send **separate messages per market** (`NSE`, `BSE`, `MCX`, `CRYPTO`, `NYSE`) using a unified institutional reporting format."
             )
 
             with gr.Row():
@@ -634,13 +766,27 @@ with gr.Blocks(title="EPM Pro News & Market Calendar Terminal", theme=gr.themes.
                         label="Enable Market Calendar & Outcomes Telegram Forwarding",
                         value=telegram_notifier.calendar_enabled
                     )
+                    gr.Markdown("**⏰ Automated Daily Morning Dispatches (IST):**")
+                    adm_auto_today_7am = gr.Checkbox(
+                        label="🌅 07:00 AM IST — Auto-Forward Today's Complete Calendar & Timer Snapshot (5 Separate Msgs: NSE, BSE, MCX, Crypto, NYSE)",
+                        value=telegram_notifier.auto_daily_today_7am
+                    )
+                    adm_auto_tom_705am = gr.Checkbox(
+                        label="🌄 07:05 AM IST — Auto-Forward Tomorrow's Lined-Up Events Snapshot (5 Separate Msgs: NSE, BSE, MCX, Crypto, NYSE)",
+                        value=telegram_notifier.auto_daily_tomorrow_705am
+                    )
+                    adm_auto_hol_7am = gr.Checkbox(
+                        label="🏖️ 07:00 AM IST — Auto-Forward Next-Day Trading Holiday Alert (1 Day Before NSE/BSE/MCX/NYSE Holiday)",
+                        value=telegram_notifier.auto_holiday_7am
+                    )
+                    gr.Markdown("**⚡ Real-Time Individual Event Triggers:**")
                     with gr.Row():
                         adm_cal_countdown = gr.Checkbox(label="⏰ T-15m Countdown Alerts", value=telegram_notifier.alert_on_countdown)
-                        adm_cal_outcome = gr.Checkbox(label="🏁 Actual Outcome Alerts", value=telegram_notifier.alert_on_outcome)
-                        adm_cal_linked = gr.Checkbox(label="🔗 Linked News Alerts", value=telegram_notifier.alert_on_linked_news)
+                        adm_cal_outcome = gr.Checkbox(label="🏁 Unfolded Outcome Alerts", value=telegram_notifier.alert_on_outcome)
+                        adm_cal_linked = gr.Checkbox(label="🔗 Linked News Results", value=telegram_notifier.alert_on_linked_news)
                     test_cal_tg_btn = gr.Button("🔔 Send Test Message to Calendar Channel")
 
-            save_adm_tg_btn = gr.Button("💾 Save All Telegram Channel Settings", variant="primary")
+            save_adm_tg_btn = gr.Button("💾 Save All Telegram & Schedule Settings", variant="primary")
             adm_tg_status = gr.Markdown()
 
             save_adm_tg_btn.click(
@@ -648,7 +794,8 @@ with gr.Blocks(title="EPM Pro News & Market Calendar Terminal", theme=gr.themes.
                 inputs=[
                     adm_news_token, adm_news_chat, adm_news_enabled,
                     adm_cal_token, adm_cal_chat, adm_cal_enabled,
-                    adm_cal_countdown, adm_cal_outcome, adm_cal_linked
+                    adm_cal_countdown, adm_cal_outcome, adm_cal_linked,
+                    adm_auto_today_7am, adm_auto_tom_705am, adm_auto_hol_7am
                 ],
                 outputs=[adm_tg_status]
             )
@@ -687,7 +834,7 @@ with gr.Blocks(title="EPM Pro News & Market Calendar Terminal", theme=gr.themes.
 
     refresh_btn.click(manual_refresh, outputs=[status_box, top_table, bottom_table])
     demo.load(get_dashboard_tables, outputs=[status_box, top_table, bottom_table])
-    demo.load(get_calendar_tables, inputs=[cal_filter], outputs=[cal_info_bar, calendar_table, holidays_table])
+    demo.load(get_calendar_tables, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_table, holidays_table])
 
 # Mount Gradio UI inside FastAPI
 app = gr.mount_gradio_app(app, demo, path="/")

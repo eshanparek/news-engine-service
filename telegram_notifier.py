@@ -3,16 +3,23 @@ import json
 import time
 import logging
 import requests
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 logger = logging.getLogger("TelegramNotifier")
 
 ADMIN_SETTINGS_FILE = "admin_settings.json"
 
+
 class TelegramNotifier:
     """
     Sends structured breaking news alerts and Market Calendar / Outcome alerts
     to separate configurable Telegram channels or groups.
+    Supports per-market separate message dispatching for:
+      - NSE, BSE, MCX, CRYPTO, NYSE
+      - 7:00 AM IST Today's Snapshot (per market)
+      - 7:05 AM IST Tomorrow's Lined-Up Snapshot (per market)
+      - 7:00 AM IST Next-Day Trading Holiday Alert (per market)
+      - Individual Happening / Unfolded Event Outcomes & T-15m Countdowns
     """
     def __init__(self):
         # 1. News Channel Credentials
@@ -24,9 +31,14 @@ class TelegramNotifier:
         self.calendar_bot_token = os.getenv("CALENDAR_TELEGRAM_BOT_TOKEN", "").strip()
         self.calendar_chat_id = os.getenv("CALENDAR_TELEGRAM_CHAT_ID", "").strip()
         self.calendar_enabled = os.getenv("ENABLE_CALENDAR_ALERTS", "true").lower() == "true"
-        self.alert_on_countdown = True   # T-15m reminder alert
-        self.alert_on_outcome = True     # Actual outcome release alert
-        self.alert_on_linked_news = True # Linked breaking news alert
+
+        # Granular Calendar Automation Toggles
+        self.alert_on_countdown = True         # T-15m reminder alert per event
+        self.alert_on_outcome = True           # Individual event outcome / unfolding alert
+        self.alert_on_linked_news = True       # Individual event linked breaking news alert
+        self.auto_daily_today_7am = True       # 7:00 AM IST Today's complete snapshot (5 separate market msgs)
+        self.auto_daily_tomorrow_705am = True  # 7:05 AM IST Tomorrow's lined-up snapshot (5 separate market msgs)
+        self.auto_holiday_7am = True           # 7:00 AM IST Next-day trading holiday alert
 
         self._load_admin_settings()
 
@@ -54,6 +66,12 @@ class TelegramNotifier:
                     self.alert_on_outcome = bool(data["alert_on_outcome"])
                 if "alert_on_linked_news" in data:
                     self.alert_on_linked_news = bool(data["alert_on_linked_news"])
+                if "auto_daily_today_7am" in data:
+                    self.auto_daily_today_7am = bool(data["auto_daily_today_7am"])
+                if "auto_daily_tomorrow_705am" in data:
+                    self.auto_daily_tomorrow_705am = bool(data["auto_daily_tomorrow_705am"])
+                if "auto_holiday_7am" in data:
+                    self.auto_holiday_7am = bool(data["auto_holiday_7am"])
                 logger.info("Loaded Telegram & Calendar channel settings from admin_settings.json")
             except Exception as e:
                 logger.warning(f"Failed to load admin_settings.json: {e}")
@@ -68,7 +86,10 @@ class TelegramNotifier:
         calendar_enabled: bool,
         alert_on_countdown: bool = True,
         alert_on_outcome: bool = True,
-        alert_on_linked_news: bool = True
+        alert_on_linked_news: bool = True,
+        auto_daily_today_7am: bool = True,
+        auto_daily_tomorrow_705am: bool = True,
+        auto_holiday_7am: bool = True
     ) -> Dict:
         if news_bot_token.strip():
             self.bot_token = news_bot_token.strip()
@@ -82,6 +103,9 @@ class TelegramNotifier:
         self.alert_on_countdown = bool(alert_on_countdown)
         self.alert_on_outcome = bool(alert_on_outcome)
         self.alert_on_linked_news = bool(alert_on_linked_news)
+        self.auto_daily_today_7am = bool(auto_daily_today_7am)
+        self.auto_daily_tomorrow_705am = bool(auto_daily_tomorrow_705am)
+        self.auto_holiday_7am = bool(auto_holiday_7am)
 
         payload = {
             "news_bot_token": self.bot_token,
@@ -92,7 +116,10 @@ class TelegramNotifier:
             "calendar_enabled": self.calendar_enabled,
             "alert_on_countdown": self.alert_on_countdown,
             "alert_on_outcome": self.alert_on_outcome,
-            "alert_on_linked_news": self.alert_on_linked_news
+            "alert_on_linked_news": self.alert_on_linked_news,
+            "auto_daily_today_7am": self.auto_daily_today_7am,
+            "auto_daily_tomorrow_705am": self.auto_daily_tomorrow_705am,
+            "auto_holiday_7am": self.auto_holiday_7am
         }
         try:
             with open(ADMIN_SETTINGS_FILE, "w") as f:
@@ -123,7 +150,7 @@ class TelegramNotifier:
             "disable_web_page_preview": not preview
         }
         try:
-            resp = requests.post(url, json=payload, timeout=8)
+            resp = requests.post(url, json=payload, timeout=10)
             if resp.status_code == 200:
                 return True, "Delivered"
             else:
@@ -188,10 +215,10 @@ class TelegramNotifier:
         ok, _ = self._send_raw_html(self.bot_token, self.chat_id, text, preview=True)
         return ok
 
-    def send_calendar_alert(self, event: Dict, alert_type: str = "OUTCOME") -> bool:
+    def send_calendar_alert(self, event: Dict, alert_type: str = "OUTCOME", formatted_html: Optional[str] = None) -> bool:
         """
-        Dispatches Calendar Event alerts to the dedicated Calendar Telegram Channel.
-        alert_type: 'COUNTDOWN' | 'OUTCOME' | 'LINKED_NEWS'
+        Dispatches an individual Calendar Event alert (T-15m Countdown, Live Unfolded Outcome, or Linked News)
+        in the unified market reporting format to the dedicated Calendar Telegram Channel.
         """
         if not self.calendar_enabled or not self.is_calendar_configured():
             return False
@@ -204,82 +231,75 @@ class TelegramNotifier:
             return False
 
         token = self.get_effective_calendar_token()
-        title = event.get("event", "Market Event")
-        symbol = event.get("symbol", "GLOBAL")
-        date_str = event.get("date", "")
-        time_str = event.get("time", "")
-        impact = event.get("impact", "HIGH")
-        previous = event.get("previous", "—")
-        forecast = event.get("forecast", "—")
-        actual = event.get("actual", "Pending")
-        sentiment = event.get("outcome_sentiment", "⏳ PENDING")
-        details = event.get("details", "")
-        linked_title = event.get("linked_news_title", "")
         linked_url = event.get("linked_news_url", "")
 
-        impact_badge = "🔥 HIGH IMPACT" if impact == "HIGH" else ("⚡ MEDIUM IMPACT" if impact == "MEDIUM" else "📌 EVENT")
-
-        if alert_type == "COUNTDOWN":
-            header = (
-                "⏰⏳ <b>UPCOMING CALENDAR EVENT (T-15 MINS)</b> ⏳⏰\n"
-                "━━━━━━━━━━━━━━━━━━━━━━"
-            )
-            body = (
-                f"📌 <b>{title}</b>\n"
-                f"🏷 <b>Asset / Region:</b> {symbol}  |  {impact_badge}\n"
-                f"🕒 <b>Scheduled Time:</b> {date_str} at {time_str} IST\n\n"
-                f"📉 <b>Previous:</b> <code>{previous}</code>\n"
-                f"🎯 <b>Consensus Forecast:</b> <code>{forecast}</code>\n"
-                f"⏳ <b>Status:</b> Releasing in ~15 minutes\n"
-            )
-            if details:
-                body += f"\n💡 <i>{details}</i>"
-
-        elif alert_type == "LINKED_NEWS":
-            header = (
-                "🔗📊 <b>CALENDAR EVENT — LIVE NEWS UPDATE</b> 📊🔗\n"
-                "━━━━━━━━━━━━━━━━━━━━━━"
-            )
-            body = (
-                f"📌 <b>Event:</b> {title} ({symbol})\n"
-                f"⚡ <b>Impact:</b> {impact_badge}\n\n"
-                f"📉 <b>Previous:</b> <code>{previous}</code>  |  🎯 <b>Forecast:</b> <code>{forecast}</code>\n"
-                f"🏁 <b>Outcome / Actual:</b> <b>{actual}</b>\n"
-                f"📊 <b>Market Verdict:</b> <b>{sentiment}</b>\n\n"
-                f"📰 <b>Linked Breaking News:</b>\n"
-                f"<i>\"{linked_title}\"</i>\n"
-                f"🔗 <a href='{linked_url}'>Read Full Coverage</a>"
-            )
+        if formatted_html:
+            text = formatted_html
         else:
-            # OUTCOME RELEASED
-            header = (
-                "🔔📊 <b>MARKET CALENDAR OUTCOME RELEASED</b> 📊🔔\n"
-                "━━━━━━━━━━━━━━━━━━━━━━"
-            )
-            body = (
-                f"📌 <b>{title}</b>\n"
-                f"🏷 <b>Asset / Region:</b> {symbol}  |  {impact_badge}\n"
-                f"🕒 <b>Release Time:</b> {date_str} at {time_str} IST\n\n"
-                f"📉 <b>Previous:</b> <code>{previous}</code>\n"
-                f"🎯 <b>Forecast:</b> <code>{forecast}</code>\n"
-                f"🏁 <b>Actual Outcome:</b> <b>{actual}</b>\n\n"
-                f"📊 <b>Market Sentiment Verdict:</b> <b>{sentiment}</b>"
+            # Fallback formatting if caller did not pass pre-rendered unified HTML
+            market = event.get("market", "NSE").upper()
+            title = event.get("event", "Market Event")
+            symbol = event.get("symbol", market)
+            date_str = event.get("date", "")
+            time_str = event.get("time", "")
+            timer_str = event.get("timer", "⚡ LIVE")
+            impact = event.get("impact", "HIGH")
+            previous = event.get("previous", "—")
+            forecast = event.get("forecast", "—")
+            actual = event.get("actual", "⏳ Pending")
+            sentiment = event.get("outcome_sentiment", "⏳ PENDING")
+            details = event.get("details", "")
+            linked_title = event.get("linked_news_title", "")
+
+            text = (
+                f"📊 <b>[{market}] MARKET CALENDAR — {alert_type} UPDATE</b>\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"📌 <b>[{time_str} IST] {symbol} — {title}</b>\n"
+                f"   🗓 <b>Date:</b> <code>{date_str}</code>  |  ⏱ <b>Timer:</b> <code>{timer_str}</code>\n"
+                f"   ⚡ <b>Impact:</b> <b>{impact}</b>\n"
+                f"   📉 <b>Prev:</b> <code>{previous}</code>  |  🎯 <b>Forecast:</b> <code>{forecast}</code>\n"
+                f"   🏁 <b>Outcome:</b> <b>{actual}</b>  |  📊 <b>Verdict:</b> <b>{sentiment}</b>\n"
             )
             if details:
-                body += f"\n💡 <b>Context:</b> <i>{details}</i>"
+                text += f"   💡 <i>{details}</i>\n"
             if linked_title and linked_url:
-                body += f"\n\n📰 <a href='{linked_url}'>{linked_title}</a>"
+                text += f"   📰 <b>Live Wire:</b> <a href='{linked_url}'>{linked_title}</a>\n"
+            text += f"\n━━━━━━━━━━━━━━━━━━━━━━\n<i>— EPM PRO Market Calendar Engine ({market})</i>"
 
-        text = f"{header}\n\n{body}"
         ok, _ = self._send_raw_html(token, self.calendar_chat_id, text, preview=bool(linked_url))
         return ok
 
     def send_calendar_digest(self, summary_html: str) -> tuple[bool, str]:
-        """Sends a full daily/upcoming calendar digest to the Calendar Telegram Channel."""
+        """Sends a single HTML calendar message to the Calendar Telegram Channel."""
         token = self.get_effective_calendar_token()
         if not token or not self.calendar_chat_id:
             return False, "Calendar Telegram Bot Token or Calendar Chat ID is not configured."
         return self._send_raw_html(token, self.calendar_chat_id, summary_html, preview=False)
+
+    def send_calendar_messages_batch(self, messages: List[str]) -> tuple[bool, str]:
+        """
+        Sends multiple separate per-market messages sequentially (e.g. NSE, BSE, MCX, CRYPTO, NYSE)
+        with a short spacing delay so Telegram preserves strict ordering without rate-limiting.
+        """
+        token = self.get_effective_calendar_token()
+        if not token or not self.calendar_chat_id:
+            return False, "Calendar Telegram Bot Token or Calendar Chat ID is not configured."
+
+        sent_count = 0
+        last_err = ""
+        for msg in messages:
+            if not msg or not msg.strip():
+                continue
+            ok, detail = self._send_raw_html(token, self.calendar_chat_id, msg, preview=False)
+            if ok:
+                sent_count += 1
+            else:
+                last_err = detail
+            time.sleep(0.35)
+
+        if sent_count > 0:
+            return True, f"Delivered {sent_count}/{len(messages)} separate market messages"
+        return False, last_err or "No messages sent"
 
     def send_test_alert(self, channel_type: str = "calendar") -> tuple[bool, str]:
         """Sends a test message to verify credentials from the Admin panel."""
@@ -287,12 +307,20 @@ class TelegramNotifier:
             token = self.get_effective_calendar_token()
             chat_id = self.calendar_chat_id
             msg = (
-                "✅ <b>EPM PRO — CALENDAR CHANNEL CONNECTED</b>\n"
+                "✅ <b>EPM PRO — MULTI-MARKET CALENDAR CHANNEL CONNECTED</b>\n"
                 "━━━━━━━━━━━━━━━━━━━━━━\n"
                 "Your dedicated <b>Market Calendar & Outcomes</b> Telegram channel is active!\n\n"
-                "• ⏰ <b>Pre-Event Countdown Alerts (T-15m):</b> Enabled\n"
-                "• 🏁 <b>Live Actual vs Forecast Outcomes:</b> Enabled\n"
-                "• 🔗 <b>Linked Breaking News Updates:</b> Enabled"
+                "🏛 <b>Markets Covered (Sent Separately):</b>\n"
+                "• 🇮🇳 <b>NSE</b> (Nifty, Corporate Results, RBI, India Macro)\n"
+                "• 🇮🇳 <b>BSE</b> (Sensex, Board Filings, Corporate Actions)\n"
+                "• ⛽ <b>MCX</b> (Gold, Silver, Crude Oil, NatGas, Base Metals)\n"
+                "• ₿ <b>CRYPTO</b> (BTC/ETH ETFs, Options Expiry, Token Unlocks)\n"
+                "• 🇺🇸 <b>NYSE</b> (Wall Street Earnings, Fed FOMC, US Macro)\n\n"
+                "⏰ <b>Automated Daily Schedule (IST):</b>\n"
+                "• <b>07:00 AM IST:</b> Today's Complete Calendar & Timer Snapshot (5 Separate Market Messages)\n"
+                "• <b>07:00 AM IST:</b> Next-Day Trading Holiday Alert (1 Day Before Any Market Holiday)\n"
+                "• <b>07:05 AM IST:</b> Tomorrow's Lined-Up Events Snapshot (5 Separate Market Messages)\n"
+                "• <b>Live 24/7:</b> Individual Event Unfolding Outcomes, Linked News & T-15m Alerts"
             )
         else:
             token = self.bot_token
@@ -303,6 +331,7 @@ class TelegramNotifier:
                 "Your real-time breaking news & AI sentiment feed is active!"
             )
         return self._send_raw_html(token, chat_id, msg, preview=False)
+
 
 # Global instance
 telegram_notifier = TelegramNotifier()
