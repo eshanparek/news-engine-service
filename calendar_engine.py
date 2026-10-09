@@ -613,19 +613,17 @@ class MarketCalendarEngine:
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
             "Accept": "application/json, text/plain, */*",
             "Origin": "https://www.nasdaq.com",
-            "Referer": "https://www.nasdaq.com/"
+            "Referer": "https://www.nasdaq.com/",
+            "Connection": "close"
         }
 
-        s_ndq = requests.Session()
-        s_ndq.headers.update(nasdaq_headers)
-
-        # Query Today, Tomorrow, and next business day so NYSE earnings/dividends/economic events load in < 3s
+        # Query Today, Tomorrow, and next business day so NYSE earnings/dividends/economic events load quickly
         target_dates = [(curr + timedelta(days=i)).strftime("%Y-%m-%d") for i in (0, 1, 3)]
 
         for d_str in target_dates:
             # A. All US Corporate Earnings (NYSE & Nasdaq)
             try:
-                r_earn = s_ndq.get(f"https://api.nasdaq.com/api/calendar/earnings?date={d_str}", timeout=3.5)
+                r_earn = requests.get(f"https://api.nasdaq.com/api/calendar/earnings?date={d_str}", headers=nasdaq_headers, timeout=4)
                 if r_earn.status_code == 200:
                     rows = ((r_earn.json().get("data") or {}).get("rows")) or []
                     for row in rows:
@@ -665,7 +663,7 @@ class MarketCalendarEngine:
             # B. US Corporate Ex-Dividends (For Today & Tomorrow)
             if d_str in (today_str, tomorrow_str):
                 try:
-                    r_div = s_ndq.get(f"https://api.nasdaq.com/api/calendar/dividends?date={d_str}", timeout=3.5)
+                    r_div = requests.get(f"https://api.nasdaq.com/api/calendar/dividends?date={d_str}", headers=nasdaq_headers, timeout=4)
                     if r_div.status_code == 200:
                         div_rows = (((r_div.json().get("data") or {}).get("calendar") or {}).get("rows")) or []
                         for row in div_rows[:30]:
@@ -699,7 +697,7 @@ class MarketCalendarEngine:
 
                 # C. Global & US Economic Events Calendar (Today & Tomorrow)
                 try:
-                    r_econ = s_ndq.get(f"https://api.nasdaq.com/api/calendar/economicevents?date={d_str}", timeout=3.5)
+                    r_econ = requests.get(f"https://api.nasdaq.com/api/calendar/economicevents?date={d_str}", headers=nasdaq_headers, timeout=4)
                     if r_econ.status_code == 200:
                         econ_rows = ((r_econ.json().get("data") or {}).get("rows")) or []
                         for row in econ_rows:
@@ -1359,15 +1357,15 @@ class MarketCalendarEngine:
             except Exception:
                 pass
             try:
-                nse_events = f_nse.result(timeout=12)
+                nse_events = f_nse.result(timeout=20)
             except Exception:
                 nse_events = []
             try:
-                bse_events = f_bse.result(timeout=12)
+                bse_events = f_bse.result(timeout=20)
             except Exception:
                 bse_events = []
             try:
-                nyse_mcx_events = f_nyse_mcx.result(timeout=12)
+                nyse_mcx_events = f_nyse_mcx.result(timeout=20)
             except Exception:
                 nyse_mcx_events = []
 
