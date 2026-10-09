@@ -143,23 +143,68 @@ class TelegramNotifier:
         if not token or not chat_id:
             return False, "Missing Bot Token or Chat ID"
         url = f"https://api.telegram.org/bot{token}/sendMessage"
-        payload = {
-            "chat_id": chat_id,
-            "text": text,
-            "parse_mode": "HTML",
-            "disable_web_page_preview": not preview
-        }
-        try:
-            resp = requests.post(url, json=payload, timeout=10)
-            if resp.status_code == 200:
-                return True, "Delivered"
-            else:
-                err_msg = resp.text[:160]
-                logger.warning(f"Telegram API error ({resp.status_code}): {err_msg}")
-                return False, f"HTTP {resp.status_code}: {err_msg}"
-        except Exception as e:
-            logger.error(f"Telegram connection error: {e}")
-            return False, str(e)
+
+        # Automatically split messages exceeding Telegram's 4096-char limit on clean paragraph/line boundaries
+        max_len = 3800
+        chunks: List[str] = []
+        if len(text) <= max_len:
+            chunks = [text]
+        else:
+            paragraphs = text.split("\n\n")
+            current_chunk = ""
+            for p in paragraphs:
+                candidate = f"{current_chunk}\n\n{p}" if current_chunk else p
+                if len(candidate) <= max_len:
+                    current_chunk = candidate
+                else:
+                    if current_chunk:
+                        chunks.append(current_chunk)
+                    if len(p) <= max_len:
+                        current_chunk = p
+                    else:
+                        # Split very long single block by single newline
+                        lines = p.split("\n")
+                        sub_chunk = ""
+                        for ln in lines:
+                            sub_cand = f"{sub_chunk}\n{ln}" if sub_chunk else ln
+                            if len(sub_cand) <= max_len:
+                                sub_chunk = sub_cand
+                            else:
+                                if sub_chunk:
+                                    chunks.append(sub_chunk)
+                                sub_chunk = ln[:max_len]
+                        current_chunk = sub_chunk
+            if current_chunk:
+                chunks.append(current_chunk)
+
+        total_parts = len(chunks)
+        last_err = ""
+        sent_ok = False
+        for idx, chunk in enumerate(chunks, 1):
+            part_text = f"<i>[Part {idx}/{total_parts}]</i>\n{chunk}" if total_parts > 1 else chunk
+            payload = {
+                "chat_id": chat_id,
+                "text": part_text,
+                "parse_mode": "HTML",
+                "disable_web_page_preview": not preview
+            }
+            try:
+                resp = requests.post(url, json=payload, timeout=10)
+                if resp.status_code == 200:
+                    sent_ok = True
+                else:
+                    err_msg = resp.text[:160]
+                    logger.warning(f"Telegram API error ({resp.status_code}): {err_msg}")
+                    last_err = f"HTTP {resp.status_code}: {err_msg}"
+                if total_parts > 1:
+                    time.sleep(0.3)
+            except Exception as e:
+                logger.error(f"Telegram connection error: {e}")
+                last_err = str(e)
+
+        if sent_ok:
+            return True, "Delivered"
+        return False, last_err or "Delivery failed"
 
     def send_news_alert(self, news: Dict) -> bool:
         if not self.enabled or not self.is_configured():
