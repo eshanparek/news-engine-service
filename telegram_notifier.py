@@ -130,14 +130,19 @@ class TelegramNotifier:
 
     def get_effective_calendar_token(self) -> str:
         """Uses dedicated calendar bot token if provided, otherwise falls back to main bot token."""
-        return self.calendar_bot_token or self.bot_token
+        return (self.calendar_bot_token or self.bot_token).strip()
+
+    def get_effective_calendar_chat_id(self) -> str:
+        """Uses dedicated calendar chat ID if provided, otherwise falls back to main news chat ID."""
+        return (self.calendar_chat_id or self.chat_id).strip()
 
     def is_configured(self) -> bool:
         return bool(self.bot_token and self.chat_id)
 
     def is_calendar_configured(self) -> bool:
         token = self.get_effective_calendar_token()
-        return bool(token and self.calendar_chat_id)
+        chat_id = self.get_effective_calendar_chat_id()
+        return bool(token and chat_id)
 
     def _send_raw_html(self, token: str, chat_id: str, text: str, preview: bool = False) -> tuple[bool, str]:
         if not token or not chat_id:
@@ -311,15 +316,21 @@ class TelegramNotifier:
                 text += f"   📰 <b>Live Wire:</b> <a href='{linked_url}'>{linked_title}</a>\n"
             text += f"\n━━━━━━━━━━━━━━━━━━━━━━\n<i>— EPM PRO Market Calendar Engine ({market})</i>"
 
-        ok, _ = self._send_raw_html(token, self.calendar_chat_id, text, preview=bool(linked_url))
+        chat_id = self.get_effective_calendar_chat_id()
+        if not token or not chat_id:
+            logger.warning("No effective Telegram token or chat ID configured for calendar alert.")
+            return False
+
+        ok, _ = self._send_raw_html(token, chat_id, text, preview=bool(linked_url))
         return ok
 
     def send_calendar_digest(self, summary_html: str) -> tuple[bool, str]:
-        """Sends a single HTML calendar message to the Calendar Telegram Channel."""
+        """Sends a single HTML calendar message to the Calendar Telegram Channel (or fallback news channel)."""
         token = self.get_effective_calendar_token()
-        if not token or not self.calendar_chat_id:
-            return False, "Calendar Telegram Bot Token or Calendar Chat ID is not configured."
-        return self._send_raw_html(token, self.calendar_chat_id, summary_html, preview=False)
+        chat_id = self.get_effective_calendar_chat_id()
+        if not token or not chat_id:
+            return False, "Telegram Bot Token or Chat ID is not configured."
+        return self._send_raw_html(token, chat_id, summary_html, preview=False)
 
     def send_calendar_messages_batch(self, messages: List[str]) -> tuple[bool, str]:
         """
@@ -327,15 +338,16 @@ class TelegramNotifier:
         with a short spacing delay so Telegram preserves strict ordering without rate-limiting.
         """
         token = self.get_effective_calendar_token()
-        if not token or not self.calendar_chat_id:
-            return False, "Calendar Telegram Bot Token or Calendar Chat ID is not configured."
+        chat_id = self.get_effective_calendar_chat_id()
+        if not token or not chat_id:
+            return False, "Telegram Bot Token or Chat ID is not configured."
 
         sent_count = 0
         last_err = ""
         for msg in messages:
             if not msg or not msg.strip():
                 continue
-            ok, detail = self._send_raw_html(token, self.calendar_chat_id, msg, preview=False)
+            ok, detail = self._send_raw_html(token, chat_id, msg, preview=False)
             if ok:
                 sent_count += 1
             else:
@@ -350,7 +362,9 @@ class TelegramNotifier:
         """Sends a test message to verify credentials from the Admin panel."""
         if channel_type == "calendar":
             token = self.get_effective_calendar_token()
-            chat_id = self.calendar_chat_id
+            chat_id = self.get_effective_calendar_chat_id()
+            if not token or not chat_id:
+                return False, "No Telegram Bot Token or Chat ID configured for Calendar (or fallback News)."
             msg = (
                 "✅ <b>EPM PRO — MULTI-MARKET CALENDAR CHANNEL CONNECTED</b>\n"
                 "━━━━━━━━━━━━━━━━━━━━━━\n"

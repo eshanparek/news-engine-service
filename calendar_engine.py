@@ -1932,28 +1932,43 @@ class MarketCalendarEngine:
         tomorrow_str = (curr + timedelta(days=1)).strftime("%Y-%m-%d")
 
         # ── 1. 07:00 AM IST: Next-Day Trading Holiday Alert (1 day before holiday) ──
-        if curr.hour == 7 and 0 <= curr.minute < 5 and self.last_holiday_alert_date != today_str:
-            self.last_holiday_alert_date = today_str
-            self._save_state()
-            if telegram_notifier.calendar_enabled and telegram_notifier.auto_holiday_7am:
+        if curr.hour >= 7 and self.last_holiday_alert_date != today_str:
+            if telegram_notifier.calendar_enabled and telegram_notifier.auto_holiday_7am and telegram_notifier.is_calendar_configured():
                 logger.info(f"Running 07:00 AM IST Next-Day Holiday check for {tomorrow_str}...")
                 self.dispatch_next_day_holiday_alerts(target_date=tomorrow_str, force_preview=False)
+                self.last_holiday_alert_date = today_str
+                self._save_state()
+            elif not telegram_notifier.is_calendar_configured():
+                pass  # Keep unburned until Telegram is configured
+            else:
+                self.last_holiday_alert_date = today_str
+                self._save_state()
 
         # ── 2. 07:00 AM IST: Today's Complete Events & Timer Snapshot (Per Market) ──
-        if curr.hour == 7 and 0 <= curr.minute < 5 and self.last_today_snapshot_date != today_str:
-            self.last_today_snapshot_date = today_str
-            self._save_state()
-            if telegram_notifier.calendar_enabled and telegram_notifier.auto_daily_today_7am:
+        if curr.hour >= 7 and self.last_today_snapshot_date != today_str:
+            if telegram_notifier.calendar_enabled and telegram_notifier.auto_daily_today_7am and telegram_notifier.is_calendar_configured():
                 logger.info(f"Dispatching 07:00 AM IST Today's Snapshot across {MARKETS_ORDER}...")
                 self.dispatch_all_markets_today_snapshot()
+                self.last_today_snapshot_date = today_str
+                self._save_state()
+            elif not telegram_notifier.is_calendar_configured():
+                pass  # Keep unburned until Telegram is configured
+            else:
+                self.last_today_snapshot_date = today_str
+                self._save_state()
 
         # ── 3. 07:05 AM IST: Tomorrow's Lined-Up Events Snapshot (Per Market) ──
-        if curr.hour == 7 and 5 <= curr.minute < 15 and self.last_tomorrow_snapshot_date != today_str:
-            self.last_tomorrow_snapshot_date = today_str
-            self._save_state()
-            if telegram_notifier.calendar_enabled and telegram_notifier.auto_daily_tomorrow_705am:
+        if (curr.hour > 7 or (curr.hour == 7 and curr.minute >= 5)) and self.last_tomorrow_snapshot_date != today_str:
+            if telegram_notifier.calendar_enabled and telegram_notifier.auto_daily_tomorrow_705am and telegram_notifier.is_calendar_configured():
                 logger.info(f"Dispatching 07:05 AM IST Tomorrow's Lined-Up Snapshot across {MARKETS_ORDER}...")
                 self.dispatch_all_markets_tomorrow_snapshot()
+                self.last_tomorrow_snapshot_date = today_str
+                self._save_state()
+            elif not telegram_notifier.is_calendar_configured():
+                pass  # Keep unburned until Telegram is configured
+            else:
+                self.last_tomorrow_snapshot_date = today_str
+                self._save_state()
 
         # ── 4. Individual Happening Events: T-15m Countdown & Unfolded Outcome Alerts ──
         with self.lock:

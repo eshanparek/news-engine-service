@@ -86,6 +86,17 @@ def health():
     }
 
 
+@app.get("/ping")
+def ping():
+    """Lightweight keep-alive endpoint for cron services (UptimeRobot, cron-job.org)."""
+    return {
+        "status": "pong",
+        "timestamp_ist": now_ist().strftime("%Y-%m-%d %H:%M:%S IST"),
+        "calendar_events": len(calendar_engine.events),
+        "news_items": len(news_worker.news_cache)
+    }
+
+
 @app.get("/api/news")
 def get_news(
     limit: int = Query(40, ge=1, le=100),
@@ -248,6 +259,8 @@ def get_admin_settings():
         "news_enabled": telegram_notifier.enabled,
         "news_configured": telegram_notifier.is_configured(),
         "calendar_chat_id": telegram_notifier.calendar_chat_id,
+        "effective_calendar_chat_id": telegram_notifier.get_effective_calendar_chat_id(),
+        "using_news_chat_as_calendar_fallback": not bool(telegram_notifier.calendar_chat_id) and bool(telegram_notifier.chat_id),
         "calendar_enabled": telegram_notifier.calendar_enabled,
         "calendar_configured": telegram_notifier.is_calendar_configured(),
         "alert_on_countdown": telegram_notifier.alert_on_countdown,
