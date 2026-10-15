@@ -1796,12 +1796,13 @@ class MarketCalendarEngine:
                         self.outcome_alerted.add(eid)
                         self._save_state()
                         ev_copy = dict(ev)
-                        formatted_msg = self.format_single_event_message(ev_copy, alert_type="LINKED_NEWS")
-                        threading.Thread(
-                            target=telegram_notifier.send_calendar_alert,
-                            args=(ev_copy, "LINKED_NEWS", formatted_msg),
-                            daemon=True
-                        ).start()
+                        if self.initial_boot_complete:
+                            formatted_msg = self.format_single_event_message(ev_copy, alert_type="LINKED_NEWS")
+                            threading.Thread(
+                                target=telegram_notifier.send_calendar_alert,
+                                args=(ev_copy, "LINKED_NEWS", formatted_msg),
+                                daemon=True
+                            ).start()
 
             if not matched_any:
                 is_result_headline = any(
@@ -1851,12 +1852,13 @@ class MarketCalendarEngine:
                         self.events[dyn_id] = new_ev
                         self.outcome_alerted.add(dyn_id)
                         self._save_state()
-                        formatted_msg = self.format_single_event_message(new_ev, alert_type="LINKED_NEWS")
-                        threading.Thread(
-                            target=telegram_notifier.send_calendar_alert,
-                            args=(dict(new_ev), "LINKED_NEWS", formatted_msg),
-                            daemon=True
-                        ).start()
+                        if self.initial_boot_complete:
+                            formatted_msg = self.format_single_event_message(new_ev, alert_type="LINKED_NEWS")
+                            threading.Thread(
+                                target=telegram_notifier.send_calendar_alert,
+                                args=(dict(new_ev), "LINKED_NEWS", formatted_msg),
+                                daemon=True
+                            ).start()
 
     # ─────────────────────────────────────────────────────────────
     #  MANUAL EVENT / OUTCOME UPSERT FROM ADMIN UI

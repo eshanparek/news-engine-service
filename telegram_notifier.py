@@ -2,6 +2,7 @@ import os
 import json
 import time
 import logging
+import threading
 import requests
 from typing import Dict, List, Optional
 
@@ -39,6 +40,8 @@ class TelegramNotifier:
         self.auto_daily_today_7am = True       # 7:00 AM IST Today's complete snapshot (5 separate market msgs)
         self.auto_daily_tomorrow_705am = True  # 7:05 AM IST Tomorrow's lined-up snapshot (5 separate market msgs)
         self.auto_holiday_7am = True           # 7:00 AM IST Next-day trading holiday alert
+        self._send_lock = threading.Lock()
+        self._last_send_time = 0.0
 
         self._load_admin_settings()
 
@@ -193,19 +196,36 @@ class TelegramNotifier:
                 "parse_mode": "HTML",
                 "disable_web_page_preview": not preview
             }
-            try:
-                resp = requests.post(url, json=payload, timeout=10)
-                if resp.status_code == 200:
-                    sent_ok = True
-                else:
-                    err_msg = resp.text[:160]
-                    logger.warning(f"Telegram API error ({resp.status_code}): {err_msg}")
-                    last_err = f"HTTP {resp.status_code}: {err_msg}"
-                if total_parts > 1:
-                    time.sleep(0.3)
-            except Exception as e:
-                logger.error(f"Telegram connection error: {e}")
-                last_err = str(e)
+            with self._send_lock:
+                # Keep minimum 0.8s spacing between ANY telegram message to avoid 429 flood limits
+                elapsed = time.time() - self._last_send_time
+                if elapsed < 0.8:
+                    time.sleep(0.8 - elapsed)
+
+                for attempt in range(3):
+                    try:
+                        resp = requests.post(url, json=payload, timeout=12)
+                        self._last_send_time = time.time()
+                        if resp.status_code == 200:
+                            sent_ok = True
+                            break
+                        elif resp.status_code == 429:
+                            retry_after = 5
+                            try:
+                                retry_after = int(resp.json().get("parameters", {}).get("retry_after", 5))
+                            except Exception:
+                                pass
+                            logger.warning(f"Telegram Rate Limit (429): backing off for {retry_after + 1}s (attempt {attempt + 1}/3)...")
+                            time.sleep(retry_after + 1)
+                        else:
+                            err_msg = resp.text[:160]
+                            logger.warning(f"Telegram API error ({resp.status_code}): {err_msg}")
+                            last_err = f"HTTP {resp.status_code}: {err_msg}"
+                            break
+                    except Exception as e:
+                        logger.error(f"Telegram connection error: {e}")
+                        last_err = str(e)
+                        time.sleep(1)
 
         if sent_ok:
             return True, "Delivered"
