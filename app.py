@@ -564,9 +564,185 @@ default_tg_selected = [s["name"] for s in news_worker.sources if s.get("forward_
 default_wa_selected = [s["name"] for s in news_worker.sources if s.get("forward_whatsapp", True)]
 
 
+# ─── Custom Responsive CSS (100% Full-Width Display, Zero Horizontal Scroll) ─
+
+CUSTOM_CSS = """
+/* 1. Universal Reset & Full-Width Viewport */
+html, body {
+    width: 100% !important;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+}
+
+*, *::before, *::after {
+    box-sizing: border-box !important;
+}
+
+/* 2. Gradio Root Container: stretch 100% full width, remove fixed 1200px max-width */
+.gradio-container, 
+.gradio-container > .main, 
+.gradio-container > .wrap,
+div[class*="gradio-container"] {
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 8px 16px !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
+}
+
+/* 3. Containers, Tabs, Rows, Columns, Panels, Accordions */
+.tabs, .tab-nav, .tabitem, 
+.gr-row, .row, 
+.gr-column, .column, 
+.gr-group, .gr-box, .gr-panel, .gr-accordion,
+.gr-form, .form {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.gr-row, .row {
+    flex-wrap: wrap !important;
+}
+
+/* 4. Kill Horizontal Scrollbar Universally on all Dataframe / Table wrappers */
+.table-wrap,
+.gradio-dataframe,
+div[data-testid="dataframe"],
+.table-container,
+.gr-dataframe,
+.gr-dataframe > div,
+.table-wrap > div {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
+}
+
+/* 5. Force Table Fixed Layout & Clean Text Wrapping */
+table {
+    table-layout: fixed !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    border-collapse: collapse !important;
+}
+
+th, td {
+    white-space: normal !important;
+    word-break: break-word !important;
+    overflow-wrap: anywhere !important;
+    font-size: 12px !important;
+    padding: 6px 8px !important;
+    vertical-align: middle !important;
+    line-height: 1.35 !important;
+}
+
+td *, th * {
+    white-space: normal !important;
+    word-break: break-word !important;
+    overflow-wrap: anywhere !important;
+    max-width: 100% !important;
+}
+
+th {
+    font-weight: 600 !important;
+    background-color: rgba(0, 0, 0, 0.04) !important;
+    letter-spacing: 0.01em !important;
+}
+
+*::-webkit-scrollbar:horizontal {
+    display: none !important;
+    height: 0px !important;
+    width: 0px !important;
+}
+* {
+    scrollbar-width: thin;
+}
+
+/* 6. Specific Proportional Column Allocations per Table */
+
+/* --- Top Priority News Table (9 cols) --- */
+#top_news_table table {
+    table-layout: fixed !important;
+    width: 100% !important;
+}
+#top_news_table th:nth-child(1), #top_news_table td:nth-child(1) { width: 5% !important; text-align: center !important; }
+#top_news_table th:nth-child(2), #top_news_table td:nth-child(2) { width: 8% !important; text-align: center !important; }
+#top_news_table th:nth-child(3), #top_news_table td:nth-child(3) { width: 6% !important; text-align: center !important; }
+#top_news_table th:nth-child(4), #top_news_table td:nth-child(4) { width: 34% !important; }
+#top_news_table th:nth-child(5), #top_news_table td:nth-child(5) { width: 11% !important; }
+#top_news_table th:nth-child(6), #top_news_table td:nth-child(6) { width: 20% !important; }
+#top_news_table th:nth-child(7), #top_news_table td:nth-child(7) { width: 7% !important; }
+#top_news_table th:nth-child(8), #top_news_table td:nth-child(8) { width: 4% !important; text-align: center !important; }
+#top_news_table th:nth-child(9), #top_news_table td:nth-child(9) { width: 5% !important; text-align: center !important; }
+
+/* --- General News Wire Table (6 cols) --- */
+#bottom_news_table table {
+    table-layout: fixed !important;
+    width: 100% !important;
+}
+#bottom_news_table th:nth-child(1), #bottom_news_table td:nth-child(1) { width: 7% !important; text-align: center !important; }
+#bottom_news_table th:nth-child(2), #bottom_news_table td:nth-child(2) { width: 11% !important; }
+#bottom_news_table th:nth-child(3), #bottom_news_table td:nth-child(3) { width: 52% !important; }
+#bottom_news_table th:nth-child(4), #bottom_news_table td:nth-child(4) { width: 6% !important; text-align: center !important; }
+#bottom_news_table th:nth-child(5), #bottom_news_table td:nth-child(5) { width: 9% !important; text-align: center !important; }
+#bottom_news_table th:nth-child(6), #bottom_news_table td:nth-child(6) { width: 15% !important; word-break: break-all !important; font-size: 11px !important; }
+
+/* --- Multi-Market Calendar Table (13 cols) --- */
+#calendar_table table {
+    table-layout: fixed !important;
+    width: 100% !important;
+}
+#calendar_table th:nth-child(1), #calendar_table td:nth-child(1) { width: 6% !important; word-break: break-all !important; font-size: 10.5px !important; }
+#calendar_table th:nth-child(2), #calendar_table td:nth-child(2) { width: 5% !important; text-align: center !important; }
+#calendar_table th:nth-child(3), #calendar_table td:nth-child(3) { width: 6% !important; text-align: center !important; }
+#calendar_table th:nth-child(4), #calendar_table td:nth-child(4) { width: 5% !important; text-align: center !important; }
+#calendar_table th:nth-child(5), #calendar_table td:nth-child(5) { width: 8% !important; text-align: center !important; font-weight: bold !important; color: #d97706 !important; }
+#calendar_table th:nth-child(6), #calendar_table td:nth-child(6) { width: 8% !important; }
+#calendar_table th:nth-child(7), #calendar_table td:nth-child(7) { width: 23% !important; }
+#calendar_table th:nth-child(8), #calendar_table td:nth-child(8) { width: 5% !important; text-align: center !important; }
+#calendar_table th:nth-child(9), #calendar_table td:nth-child(9) { width: 6% !important; text-align: right !important; }
+#calendar_table th:nth-child(10), #calendar_table td:nth-child(10) { width: 6% !important; text-align: right !important; }
+#calendar_table th:nth-child(11), #calendar_table td:nth-child(11) { width: 8% !important; text-align: right !important; font-weight: bold !important; }
+#calendar_table th:nth-child(12), #calendar_table td:nth-child(12) { width: 6% !important; text-align: center !important; }
+#calendar_table th:nth-child(13), #calendar_table td:nth-child(13) { width: 8% !important; }
+
+/* --- Multi-Market Trading Holidays Table (8 cols) --- */
+#holidays_table table {
+    table-layout: fixed !important;
+    width: 100% !important;
+}
+#holidays_table th:nth-child(1), #holidays_table td:nth-child(1) { width: 8% !important; text-align: center !important; }
+#holidays_table th:nth-child(2), #holidays_table td:nth-child(2) { width: 7% !important; text-align: center !important; }
+#holidays_table th:nth-child(3), #holidays_table td:nth-child(3) { width: 23% !important; font-weight: 500 !important; }
+#holidays_table th:nth-child(4), #holidays_table td:nth-child(4) { width: 12% !important; text-align: center !important; }
+#holidays_table th:nth-child(5), #holidays_table td:nth-child(5) { width: 12% !important; text-align: center !important; }
+#holidays_table th:nth-child(6), #holidays_table td:nth-child(6) { width: 15% !important; text-align: center !important; }
+#holidays_table th:nth-child(7), #holidays_table td:nth-child(7) { width: 13% !important; text-align: center !important; }
+#holidays_table th:nth-child(8), #holidays_table td:nth-child(8) { width: 10% !important; text-align: center !important; }
+
+/* --- Ingested News Sources Table (6 cols) --- */
+#sources_table table {
+    table-layout: fixed !important;
+    width: 100% !important;
+}
+#sources_table th:nth-child(1), #sources_table td:nth-child(1) { width: 16% !important; }
+#sources_table th:nth-child(2), #sources_table td:nth-child(2) { width: 12% !important; }
+#sources_table th:nth-child(3), #sources_table td:nth-child(3) { width: 10% !important; text-align: center !important; }
+#sources_table th:nth-child(4), #sources_table td:nth-child(4) { width: 12% !important; text-align: center !important; }
+#sources_table th:nth-child(5), #sources_table td:nth-child(5) { width: 12% !important; text-align: center !important; }
+#sources_table th:nth-child(6), #sources_table td:nth-child(6) { width: 38% !important; word-break: break-all !important; font-size: 11px !important; }
+"""
+
+
 # ─── Build Gradio Blocks UI ──────────────────────────────────────────────────
 
-with gr.Blocks(title="EPM Pro Multi-Market News & Calendar Terminal", theme=gr.themes.Soft()) as demo:
+with gr.Blocks(title="EPM Pro Multi-Market News & Calendar Terminal", theme=gr.themes.Soft(), fill_width=True) as demo:
+    gr.HTML(f"<style>{CUSTOM_CSS}</style>")
     gr.Markdown("# 📰 EPM Pro Live Market News, Multi-Market Calendar (NSE · BSE · MCX · Crypto · NYSE) & AI Terminal")
     status_box = gr.Markdown(value="🟢 **Engine Status:** Online | Initializing...")
 
@@ -584,7 +760,8 @@ with gr.Blocks(title="EPM Pro Multi-Market News & Calendar Terminal", theme=gr.t
                 datatype=["str", "str", "str", "str", "str", "str", "str", "str", "str"],
                 value=[],
                 interactive=False,
-                wrap=True
+                wrap=True,
+                elem_id="top_news_table"
             )
 
             gr.Markdown("---")
@@ -594,7 +771,8 @@ with gr.Blocks(title="EPM Pro Multi-Market News & Calendar Terminal", theme=gr.t
                 datatype=["str", "str", "str", "str", "str", "str"],
                 value=[],
                 interactive=False,
-                wrap=True
+                wrap=True,
+                elem_id="bottom_news_table"
             )
 
             gr.Markdown("---")
@@ -673,7 +851,8 @@ with gr.Blocks(title="EPM Pro Multi-Market News & Calendar Terminal", theme=gr.t
                 datatype=["str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "str"],
                 value=[],
                 interactive=False,
-                wrap=True
+                wrap=True,
+                elem_id="calendar_table"
             )
 
             gr.Markdown("---")
@@ -717,7 +896,8 @@ with gr.Blocks(title="EPM Pro Multi-Market News & Calendar Terminal", theme=gr.t
                 datatype=["str", "str", "str", "str", "str", "str", "str", "str"],
                 value=[],
                 interactive=False,
-                wrap=True
+                wrap=True,
+                elem_id="holidays_table"
             )
 
             cal_filter.change(get_calendar_tables, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_table, holidays_table])
@@ -822,7 +1002,8 @@ with gr.Blocks(title="EPM Pro Multi-Market News & Calendar Terminal", theme=gr.t
                 datatype=["str", "str", "str", "str", "str", "str"],
                 value=get_sources_table(),
                 interactive=False,
-                wrap=True
+                wrap=True,
+                elem_id="sources_table"
             )
 
             min_score_slider = gr.Slider(
@@ -849,8 +1030,8 @@ with gr.Blocks(title="EPM Pro Multi-Market News & Calendar Terminal", theme=gr.t
     demo.load(get_dashboard_tables, outputs=[status_box, top_table, bottom_table])
     demo.load(get_calendar_tables, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_table, holidays_table])
 
-# Mount Gradio UI inside FastAPI
-app = gr.mount_gradio_app(app, demo, path="/")
+# Mount Gradio UI inside FastAPI with full-width responsive CSS
+app = gr.mount_gradio_app(app, demo, path="/", css=CUSTOM_CSS, head=f"<style>{CUSTOM_CSS}</style>")
 
 if __name__ == "__main__":
     import uvicorn
