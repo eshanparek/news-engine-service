@@ -3,9 +3,8 @@ title: EPM Pro Live News Engine
 emoji: 📰
 colorFrom: blue
 colorTo: indigo
-sdk: gradio
-sdk_version: 4.40.0
-app_file: app.py
+sdk: docker
+app_port: 7860
 pinned: false
 ---
 
