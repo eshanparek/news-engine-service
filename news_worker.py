@@ -339,10 +339,12 @@ class NewsEngineWorker:
         self.is_running = False
         self.is_initialized = False
         self.last_fetch_time: Optional[datetime] = None
-        self.refresh_interval = int(os.getenv("REFRESH_INTERVAL", "1"))
+        self.refresh_interval = int(os.getenv("REFRESH_INTERVAL", "3"))
         self.enable_ai = os.getenv("ENABLE_AI_SCORING", "true").lower() == "true"
         self.min_forward_score = 0 # 0 = forward all, 7 = high impact only
         self.lock = threading.Lock()
+        self.etags: Dict[str, str] = {}
+        self.last_modified: Dict[str, str] = {}
         
         self.session = requests.Session()
         adapter = HTTPAdapter(pool_connections=35, pool_maxsize=35, max_retries=Retry(total=1, backoff_factor=0.1))
@@ -350,7 +352,8 @@ class NewsEngineWorker:
         self.session.mount('https://', adapter)
         self.session.headers.update({
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept-Encoding": "gzip, deflate"
         })
         self._load_config()
         self._load_saved_hashes()
@@ -485,8 +488,24 @@ class NewsEngineWorker:
             if not url:
                 return results
 
-            resp = self.session.get(url, timeout=2.5)
+            # Bandwidth Optimization: Use conditional GET (If-None-Match / If-Modified-Since)
+            headers = {}
+            if url in self.etags:
+                headers["If-None-Match"] = self.etags[url]
+            if url in self.last_modified:
+                headers["If-Modified-Since"] = self.last_modified[url]
+
+            resp = self.session.get(url, headers=headers, timeout=3.0)
+            if resp.status_code == 304:
+                # 304 Not Modified: 0 bytes transferred over network!
+                return []
+
             if resp.status_code == 200:
+                if "ETag" in resp.headers:
+                    self.etags[url] = resp.headers["ETag"]
+                if "Last-Modified" in resp.headers:
+                    self.last_modified[url] = resp.headers["Last-Modified"]
+
                 soup = None
                 try:
                     soup = BeautifulSoup(resp.content, "xml")
@@ -647,16 +666,41 @@ class NewsEngineWorker:
 
         self.last_fetch_time = datetime.now()
 
+    def get_adaptive_interval(self) -> float:
+        """
+        Dynamically adjusts polling frequency based on active market sessions
+        to ensure free-tier bandwidth never runs out while maintaining sub-5s speed during trading hours:
+          - Active Indian Market (09:00 - 15:45 IST Mon-Fri): 3.0 seconds
+          - Active US Market Session (19:00 - 01:30 IST Mon-Fri): 4.0 seconds
+          - Pre/Post Market Daytime (07:00 - 19:00 IST Mon-Fri): 8.0 seconds
+          - Off-Market / Night (01:30 - 07:00 IST): 30.0 seconds
+          - Weekends (Sat - Sun): 45.0 seconds
+        """
+        now = datetime.now()
+        if now.weekday() in (5, 6):
+            return 45.0
+
+        time_val = now.hour + now.minute / 60.0
+        if 9.0 <= time_val <= 15.75:
+            return 3.0
+        elif time_val >= 19.0 or time_val <= 1.5:
+            return 4.0
+        elif 7.0 <= time_val < 19.0:
+            return 8.0
+        else:
+            return 30.0
+
     def run_worker_loop(self):
         self.is_running = True
-        logger.info("News Engine 1-second loop started.")
+        logger.info("News Engine smart adaptive loop started.")
         while self.is_running:
             try:
                 self.poll_cycle()
-                time.sleep(self.refresh_interval)
+                sleep_sec = self.get_adaptive_interval()
+                time.sleep(sleep_sec)
             except Exception as e:
                 logger.error(f"Worker loop error: {e}")
-                time.sleep(1)
+                time.sleep(5)
 
     def start(self):
         if not self.is_running:

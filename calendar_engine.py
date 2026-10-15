@@ -2130,10 +2130,17 @@ class MarketCalendarEngine:
         last_external_sync = time.time()
         while self.is_running:
             try:
-                # Re-sync live NSE, BSE, NYSE, MCX & Crypto exchange feeds every 3 minutes
-                if time.time() - last_external_sync > 180:
+                # Bandwidth & API Saver: sync every 5 mins in market hours, every 20 mins off-market
+                curr_dt = now_ist()
+                is_weekend = curr_dt.weekday() in (5, 6)
+                t_dec = curr_dt.hour + curr_dt.minute / 60.0
+                is_market = (not is_weekend) and ((8.75 <= t_dec <= 16.0) or (18.75 <= t_dec or t_dec <= 1.75))
+                sync_gap = 300 if is_market else 1200
+
+                if time.time() - last_external_sync > sync_gap:
                     self.sync_all_calendars()
                     last_external_sync = time.time()
+
                 self.check_timers_and_alerts()
                 time.sleep(10)
             except Exception as e:
