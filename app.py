@@ -933,16 +933,30 @@ code, .timer-cell, pre {
 
 # ─── Build Gradio Blocks UI ──────────────────────────────────────────────────
 
-with gr.Blocks(title="EPM Pro Multi-Market News & Calendar Terminal", theme=gr.themes.Soft(), fill_width=True) as demo:
-    gr.HTML(f"<style>{CUSTOM_CSS}</style>")
-    gr.Markdown("# 📰 EPM Pro Live Market News, Multi-Market Calendar (NSE · BSE · MCX · Crypto · NYSE) & AI Terminal")
-    status_box = gr.Markdown(value="🟢 **Engine Status:** Online | Initializing...")
+with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence Terminal", theme=gr.themes.Soft(), fill_width=True) as demo:
+    gr.HTML(f"""
+    <style>{CUSTOM_CSS}</style>
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 16px;">
+        <div>
+            <div style="font-size: 11px; font-weight: 700; color: #2563eb; letter-spacing: 0.1em; text-transform: uppercase;">Real-Time Financial Wire & Macro Engine</div>
+            <div style="font-size: 22px; font-weight: 800; color: #0f172a; letter-spacing: -0.03em;">📰 EPM PRO FINANCIAL TERMINAL</div>
+        </div>
+        <div style="display: flex; gap: 18px; align-items: center; font-size: 12.5px; font-weight: 600;">
+            <span style="color: #059669; display: flex; align-items: center; gap: 6px;">● <span style="color: #0f172a;">SYSTEM ONLINE</span></span>
+            <span style="color: #64748b;">|</span>
+            <a href="/api/calendar/ics" target="_blank" style="color: #2563eb; text-decoration: none;">📅 iCal Subscription Feed</a>
+            <span style="color: #64748b;">|</span>
+            <a href="/docs" target="_blank" style="color: #2563eb; text-decoration: none;">⚡ REST API Docs</a>
+        </div>
+    </div>
+    """)
+    status_box = gr.Markdown(value="🟢 **Engine Status:** Online | Initializing real-time feeds...")
 
     with gr.Tabs():
         # ═══════════════════════════════════════════════════════════
         # TAB 1: Live Stream & AI Sentiment
         # ═══════════════════════════════════════════════════════════
-        with gr.TabItem("📊 Live Market Feed & Sentiment Watch"):
+        with gr.TabItem("📰 Live Financial Wire & Breaking Catalysts"):
             with gr.Row():
                 refresh_btn = gr.Button("🔄 Force Refresh & Re-Score Feeds", variant="primary")
 
@@ -1107,13 +1121,12 @@ with gr.Blocks(title="EPM Pro Multi-Market News & Calendar Terminal", theme=gr.t
             )
 
         # ═══════════════════════════════════════════════════════════
-        # TAB 3: Admin Control Page — Telegram Channels & Schedules
+        # TAB 3: Portal Settings Page (Alert Channels, Google Cal & Sources)
         # ═══════════════════════════════════════════════════════════
-        with gr.TabItem("⚙️ Admin Control & Telegram Channel Settings"):
-            gr.Markdown("### 🔐 Telegram Channels & Automated Daily IST Dispatch Configuration")
+        with gr.TabItem("⚙️ Portal Settings & Integrations"):
+            gr.Markdown("## ⚙️ System Settings & External Integrations Hub")
             gr.Markdown(
-                "Configure your **Live Breaking News** channel and your separate **Market Calendar & Outcomes** group/channel below. "
-                "All Calendar dispatches send **separate messages per market** (`NSE`, `BSE`, `MCX`, `CRYPTO`, `NYSE`) using a unified institutional reporting format."
+                "Manage all credentials, automated dispatch frequencies, Google Calendar synchronization, and connected market news wires for the portal."
             )
 
             with gr.Row():
