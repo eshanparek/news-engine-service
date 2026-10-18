@@ -247,11 +247,25 @@ def api_dispatch_holiday():
     return {"status": "success" if ok else "error", "detail": msg}
 
 
+@app.post("/api/calendar/dispatch/weekly")
+def api_dispatch_weekly():
+    ok, msg = calendar_engine.dispatch_weekly_calendar_message()
+    return {"status": "success" if ok else "error", "detail": msg}
+
+
 @app.get("/api/calendar/ics", response_class=PlainTextResponse)
-def download_calendar_ics():
+def download_calendar_ics(
+    range_filter: str = Query("all", alias="range"),
+    market_filter: str = Query("ALL", alias="market")
+):
     """iCal (.ics) subscription endpoint for Google Calendar, Apple Calendar & Outlook."""
-    ics_content = calendar_engine.export_ical_ics()
-    return PlainTextResponse(content=ics_content, media_type="text/calendar")
+    events = calendar_engine.get_enriched_events(filter_range=range_filter, market_filter=market_filter)
+    ics_content = google_calendar_manager.generate_enhanced_ics(events)
+    return PlainTextResponse(
+        content=ics_content,
+        media_type="text/calendar",
+        headers={"Content-Disposition": f"attachment; filename=epm_market_calendar_{range_filter}.ics"}
+    )
 
 
 @app.post("/api/calendar/google/sync")
@@ -698,6 +712,13 @@ def handle_manual_event_save(
     return status_msg, cal_summary, cal_visual_html, cal_rows
 
 
+def push_weekly_calendar_dispatch():
+    ok, msg = calendar_engine.dispatch_weekly_calendar_message()
+    if ok:
+        return f"✅ **Complete 7-Day Weekly Calendar Link dispatched to `{telegram_notifier.calendar_chat_id}` with 1-click Google Calendar & Apple Calendar sync!**"
+    return f"⚠️ **Could not send Weekly Calendar Link:** {msg} *(Configure Calendar Telegram Chat ID in Tab 3)*"
+
+
 def save_admin_telegram_settings(
     news_token: str,
     news_chat: str,
@@ -711,7 +732,9 @@ def save_admin_telegram_settings(
     auto_today_7am: bool,
     auto_tom_705am: bool,
     auto_hol_7am: bool,
-    send_photos: bool = True
+    send_photos: bool = True,
+    public_url: str = "",
+    auto_weekly_mon7am: bool = True
 ):
     telegram_notifier.save_admin_settings(
         news_bot_token=news_token,
@@ -726,15 +749,18 @@ def save_admin_telegram_settings(
         auto_daily_today_7am=auto_today_7am,
         auto_daily_tomorrow_705am=auto_tom_705am,
         auto_holiday_7am=auto_hol_7am,
-        send_as_photos=send_photos
+        send_as_photos=send_photos,
+        public_app_url=public_url,
+        auto_weekly_mon_7am=auto_weekly_mon7am
     )
     format_mode = "Infographic Photo Cards 📸" if send_photos else "Detailed Text Messages 💬"
     return (
         f"✅ **Admin Telegram & Automated Schedule Settings Saved!**\n"
         f"- **News Channel ID:** `{telegram_notifier.chat_id or 'Not Set'}` (Enabled: `{telegram_notifier.enabled}`)\n"
         f"- **Calendar & Outcomes Channel ID:** `{telegram_notifier.calendar_chat_id or 'Not Set'}` (Enabled: `{telegram_notifier.calendar_enabled}`)\n"
+        f"- **Public Portal URL:** `{telegram_notifier.get_public_url()}`\n"
         f"- **Morning Dispatch Format:** `{format_mode}`\n"
-        f"- **Daily IST Automation:** 7:00 AM Today Snapshot=`{auto_today_7am}` | 7:05 AM Tomorrow Snapshot=`{auto_tom_705am}` | 7:00 AM Pre-Holiday Alert=`{auto_hol_7am}`"
+        f"- **Daily IST Automation:** 7:00 AM Today Snapshot=`{auto_today_7am}` | 7:05 AM Tomorrow Snapshot=`{auto_tom_705am}` | 7:00 AM Pre-Holiday Alert=`{auto_hol_7am}` | Monday 7:00 AM Weekly Link=`{auto_weekly_mon7am}`"
     )
 
 
@@ -1581,6 +1607,7 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                 btn_push_holiday = gr.Button("🏖️ Send Next-Day Holiday Alert", variant="secondary", scale=1)
 
             with gr.Row():
+                btn_push_weekly = gr.Button("🗓️ Send Complete 7-Day Weekly Calendar Link (Apple & Google)", variant="primary", scale=2)
                 btn_push_today = gr.Button("💬 Send Today's Text Snapshot (5 Markets)", variant="secondary", scale=1)
                 btn_push_tomorrow = gr.Button("💬 Send Tomorrow's Text Snapshot (5 Markets)", variant="secondary", scale=1)
 
@@ -1662,6 +1689,7 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
             cal_market_filter.change(get_calendar_tables, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_visual_feed, calendar_table, holidays_table])
             cal_sync_btn.click(sync_and_refresh_calendar, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_visual_feed, calendar_table, holidays_table])
             btn_sync_gcal.click(trigger_sync_google_cal, outputs=[cal_action_msg])
+            btn_push_weekly.click(push_weekly_calendar_dispatch, outputs=[cal_action_msg])
             btn_push_today_photo.click(push_today_photo_snapshot_all_markets, outputs=[cal_action_msg])
             btn_push_tomorrow_photo.click(push_tomorrow_photo_snapshot_all_markets, outputs=[cal_action_msg])
             btn_push_today.click(push_today_snapshot_all_markets, outputs=[cal_action_msg])
@@ -1732,9 +1760,18 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                         label="🏖️ 07:00 AM IST — Auto-Forward Next-Day Trading Holiday Alert (1 Day Before NSE/BSE/MCX/NYSE Holiday)",
                         value=telegram_notifier.auto_holiday_7am
                     )
+                    adm_auto_weekly_mon7am = gr.Checkbox(
+                        label="🗓️ Monday 07:00 AM IST — Auto-Forward Complete 7-Day Weekly Calendar Link (Apple & Google)",
+                        value=getattr(telegram_notifier, "auto_weekly_mon_7am", True)
+                    )
                     adm_send_as_photos = gr.Checkbox(
                         label="📸 Deliver Morning Calendar Snapshots as Infographic Photo Cards (Details rendered directly in image)",
                         value=getattr(telegram_notifier, "send_as_photos", True)
+                    )
+                    adm_public_app_url = gr.Textbox(
+                        label="Public Web Portal / API URL (Used for Apple & Google Calendar 1-Click Sync Links)",
+                        value=telegram_notifier.public_app_url,
+                        placeholder="e.g. https://news-engine-service.onrender.com or your custom domain"
                     )
                     gr.Markdown("**⚡ Real-Time Individual Event Triggers:**")
                     with gr.Row():
@@ -1753,7 +1790,7 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                     adm_cal_token, adm_cal_chat, adm_cal_enabled,
                     adm_cal_countdown, adm_cal_outcome, adm_cal_linked,
                     adm_auto_today_7am, adm_auto_tom_705am, adm_auto_hol_7am,
-                    adm_send_as_photos
+                    adm_send_as_photos, adm_public_app_url, adm_auto_weekly_mon7am
                 ],
                 outputs=[adm_tg_status]
             )

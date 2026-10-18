@@ -211,6 +211,7 @@ class MarketCalendarEngine:
                 self.last_today_snapshot_date = data.get("last_today_snapshot_date", "")
                 self.last_tomorrow_snapshot_date = data.get("last_tomorrow_snapshot_date", "")
                 self.last_holiday_alert_date = data.get("last_holiday_alert_date", "")
+                self.last_weekly_dispatch_date = data.get("last_weekly_dispatch_date", "")
             except Exception as e:
                 logger.warning(f"Error loading calendar state: {e}")
 
@@ -224,6 +225,7 @@ class MarketCalendarEngine:
                 "last_today_snapshot_date": self.last_today_snapshot_date,
                 "last_tomorrow_snapshot_date": self.last_tomorrow_snapshot_date,
                 "last_holiday_alert_date": self.last_holiday_alert_date,
+                "last_weekly_dispatch_date": getattr(self, "last_weekly_dispatch_date", ""),
                 "updated_at": now_ist().isoformat()
             }
             with open(CALENDAR_STATE_FILE, "w") as f:
@@ -1746,15 +1748,13 @@ class MarketCalendarEngine:
         page_events: Optional[List[Dict]] = None
     ) -> str:
         """
-        Creates a clean, informative caption (under 1024 characters) for Telegram sendPhoto.
-        The full schedule details are baked directly inside the infographic photo itself.
-        Supports multi-part dispatches when schedules are long.
+        Creates an ultra-concise, elegant caption for Telegram sendPhoto.
+        All event details, timings, metrics, and consensus forecasts are baked directly inside the image card.
         """
         mkt = market.upper()
         meta = MARKET_META.get(mkt, MARKET_META["NSE"])
         events = day_events or []
         relevant_events = page_events if page_events is not None else events
-        high_impact = [e for e in relevant_events if str(e.get("impact", "")).upper() == "HIGH"]
 
         try:
             dt_obj = datetime.strptime(target_date, "%Y-%m-%d")
@@ -1762,32 +1762,24 @@ class MarketCalendarEngine:
         except Exception:
             date_pretty = target_date
 
-        report_title = "TODAY'S CALENDAR INFOGRAPHIC" if mode == "TODAY" else "TOMORROW'S LINED-UP INFOGRAPHIC"
+        report_title = "Today's Schedule & Timers" if mode == "TODAY" else "Tomorrow's Lined-Up Schedule"
         if total_pages > 1:
-            report_title += f" [PART {page_num}/{total_pages}]"
+            report_title += f" [Part {page_num}/{total_pages}]"
 
         hol = self.get_market_holiday_on_date(mkt, target_date)
-
-        events_summary = f"<b>Events {start_idx}–{end_idx} of {len(events)} Total</b>" if total_pages > 1 else f"<b>Total Events:</b> <b>{len(events)}</b>"
+        events_summary = f"Events {start_idx}–{end_idx} of {len(events)} Total" if total_pages > 1 else f"Total Events: {len(events)}"
 
         caption = (
             f"{meta['badge']} <b>{meta['title']}</b>\n"
             f"📋 <b>{report_title}</b>\n"
-            f"🗓 <code>{date_pretty}</code>  |  📊 {events_summary}\n"
+            f"🗓 <code>{date_pretty}</code>  •  📊 <b>{events_summary}</b>\n"
         )
         if hol and page_num == 1:
-            caption += f"🏖️ <b>Trading Holiday:</b> <i>{hol.get('description', 'Market Closed')} ({hol.get('trading_status', 'Closed')})</i>\n"
+            caption += f"🏖️ <b>Trading Holiday Notice:</b> <i>{hol.get('description', 'Market Closed')} ({hol.get('trading_status', 'Closed')})</i>\n"
 
-        if high_impact:
-            seg_label = f"in this Card ({len(high_impact)})" if total_pages > 1 else f"({len(high_impact)})"
-            caption += f"\n🔥 <b>Key High-Impact Catalysts {seg_label}:</b>\n"
-            for ev in high_impact[:3]:
-                t = ev.get("time", "10:00")
-                sym = str(ev.get("symbol", mkt)).replace("<", "").replace(">", "")
-                ev_name = str(ev.get("event", ""))[:32].replace("<", "").replace(">", "")
-                caption += f"• <b>[{t} IST]</b> <code>{sym}</code> — {ev_name}\n"
+        caption += "\n<i>All timings, consensus estimates, metrics & verdicts are detailed directly in the infographic card above.</i>\n"
 
-        # One-click compact Google Calendar add link (strictly under 160 chars)
+        high_impact = [e for e in relevant_events if str(e.get("impact", "")).upper() == "HIGH"]
         if high_impact and page_num == 1:
             top_ev = high_impact[0]
             clean_sym = str(top_ev.get("symbol", mkt)).split(":")[-1].replace("<", "").replace(">", "").strip()
@@ -1796,12 +1788,79 @@ class MarketCalendarEngine:
             d_clean = target_date.replace("-", "")
             title_q = requests.utils.quote(f"[{mkt}] {clean_sym}: {clean_name}")
             short_gcal = f"https://calendar.google.com/calendar/render?action=TEMPLATE&text={title_q}&dates={d_clean}T{t_clean}00Z/{d_clean}T{t_clean}00Z"
-            caption += f"\n📅 <a href='{short_gcal}'>Add Top Catalyst to Google Calendar (1-Click)</a>\n"
+            caption += f"\n📅 <a href='{short_gcal}'>➕ Add Benchmark to Google Calendar (1-Click)</a>\n"
         elif total_pages > 1 and page_num > 1:
             caption += f"\nℹ️ <i>Part {page_num} of {total_pages} — Complete multi-part schedule for {mkt}.</i>\n"
 
         caption += f"\n━━━━━━━━━━━━━━━━━━━━━━\n<i>— EPM PRO Visual Calendar Engine ({mkt})</i>"
         return caption
+
+    def format_weekly_calendar_message(self, start_date: Optional[str] = None) -> str:
+        """
+        Formats a prominently highlighted 7-Day Multi-Market Calendar dispatch for Telegram
+        with direct 1-click subscription and sync links for Google Calendar, Apple Calendar, and iCal.
+        """
+        curr = now_ist()
+        d_start = start_date or curr.strftime("%Y-%m-%d")
+        try:
+            dt_start = datetime.strptime(d_start, "%Y-%m-%d")
+        except Exception:
+            dt_start = curr
+        dt_end = dt_start + timedelta(days=6)
+
+        range_label = f"{dt_start.strftime('%a, %d %b %Y')} – {dt_end.strftime('%a, %d %b %Y')}"
+
+        week_events = self.get_enriched_events(filter_range="week", market_filter="ALL")
+        high_impact = [e for e in week_events if str(e.get("impact", "")).upper() == "HIGH"]
+
+        base_url = telegram_notifier.get_public_url()
+        webcal_url = base_url.replace("https://", "webcal://").replace("http://", "webcal://") + "/api/calendar/ics?range=week"
+        gcal_sub_url = f"https://calendar.google.com/calendar/render?cid={requests.utils.quote(webcal_url)}"
+        ics_direct_url = f"{base_url}/api/calendar/ics?range=week"
+
+        msg = (
+            f"📅 <b>COMPLETE 7-DAY MULTI-MARKET CALENDAR (FULL WEEK SYNC)</b>\n"
+            f"🏛 <b>Markets Covered:</b> <code>NSE</code> • <code>BSE</code> • <code>MCX</code> • <code>CRYPTO</code> • <code>NYSE</code>\n"
+            f"🗓 <b>Schedule Window:</b> <code>{range_label}</code>\n"
+            f"⚡ <b>Total Catalysts Scheduled:</b> <b>{len(week_events)} Events</b> ({len(high_impact)} High-Impact Benchmarks)\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"📲 <b>1-CLICK SYNC ENTIRE WEEK TO YOUR CALENDAR (60m Prior Alarms):</b>\n\n"
+            f"🍏 <b>APPLE CALENDAR (iPhone / iPad / Mac):</b>\n"
+            f"👉 <a href='{webcal_url}'><b>➕ Subscribe on Apple Calendar (1-Tap Auto-Sync)</b></a>\n"
+            f"<i>(Opens Apple Calendar and automatically synchronizes all events for the entire week)</i>\n\n"
+            f"🌐 <b>GOOGLE CALENDAR (Android / Web / Desktop):</b>\n"
+            f"👉 <a href='{gcal_sub_url}'><b>➕ Add Full Week to Google Calendar (1-Click)</b></a>\n"
+            f"<i>(Imports the complete 7-day multi-market schedule into your Google Calendar)</i>\n\n"
+            f"📥 <b>UNIVERSAL .ICS FILE (Outlook / Windows / Any App):</b>\n"
+            f"👉 <a href='{ics_direct_url}'><b>📥 Download Complete 7-Day .ICS Schedule File</b></a>\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"🔥 <b>TOP BENCHMARK CATALYSTS THIS WEEK:</b>\n"
+        )
+
+        for ev in high_impact[:6]:
+            m = ev.get("market", "NSE")
+            badge = MARKET_META.get(m, MARKET_META["NSE"])["badge"].split()[0]
+            d = ev.get("date", "")
+            try:
+                d_short = datetime.strptime(d, "%Y-%m-%d").strftime("%d %b")
+            except Exception:
+                d_short = d
+            t = ev.get("time", "10:00")
+            sym = str(ev.get("symbol", m)).split(":")[-1].replace("<", "").replace(">", "").strip()
+            ev_name = str(ev.get("event", ""))[:32].replace("<", "").replace(">", "").strip()
+            msg += f"• <b>[{d_short} {t} IST]</b> {badge} <code>{sym}</code> — {ev_name}\n"
+
+        msg += f"\n━━━━━━━━━━━━━━━━━━━━━━\n<i>— EPM PRO Multi-Market Calendar Engine</i>"
+        return msg
+
+    def dispatch_weekly_calendar_message(self) -> tuple[bool, str]:
+        """Dispatches the highlighted 7-Day Weekly Calendar sync message to the Telegram Calendar channel."""
+        if not telegram_notifier.calendar_enabled or not telegram_notifier.is_calendar_configured():
+            return False, "Calendar Telegram channel is disabled or not configured."
+        token = telegram_notifier.get_effective_calendar_token()
+        chat_id = telegram_notifier.get_effective_calendar_chat_id()
+        msg = self.format_weekly_calendar_message()
+        return telegram_notifier._send_raw_html(token, chat_id, msg, preview=False)
 
     def _dispatch_markets_photos(self, target_date: str, mode: str = "TODAY") -> tuple[bool, str]:
         """Iterates through all 5 markets, generates branded HD multi-page infographic cards, and sends them as Telegram photos."""
@@ -2153,6 +2212,20 @@ class MarketCalendarEngine:
                 pass  # Keep unburned until Telegram is configured
             else:
                 self.last_tomorrow_snapshot_date = today_str
+                self._save_state()
+
+        # ── 3B. Monday 07:00 AM IST: Complete 7-Day Weekly Calendar Sync Dispatch ──
+        is_monday = (curr.weekday() == 0)
+        if is_monday and curr.hour >= 7 and getattr(self, "last_weekly_dispatch_date", "") != today_str:
+            if telegram_notifier.calendar_enabled and getattr(telegram_notifier, "auto_weekly_mon_7am", True) and telegram_notifier.is_calendar_configured():
+                logger.info("Dispatching Monday 07:00 AM IST Full 7-Day Weekly Calendar Link to Telegram...")
+                self.dispatch_weekly_calendar_message()
+                self.last_weekly_dispatch_date = today_str
+                self._save_state()
+            elif not telegram_notifier.is_calendar_configured():
+                pass
+            else:
+                self.last_weekly_dispatch_date = today_str
                 self._save_state()
 
         # ── 4. Individual Happening Events: T-15m Countdown & Unfolded Outcome Alerts ──

@@ -248,21 +248,21 @@ class CalendarCardGenerator:
 
         # Col 2: High Impact
         hi_color = (220, 38, 38) if high_impact_count > 0 else (71, 85, 105)
-        draw.text((310, current_y + 17), f"HIGH-IMPACT: {high_impact_count}", fill=hi_color, font=self.font_bold)
+        draw.text((250, current_y + 17), f"HIGH-IMPACT: {high_impact_count}", fill=hi_color, font=self.font_bold)
 
         # Col 3: Status
-        session_str = "HOLIDAY (CLOSED)" if holiday_info else "REGULAR TRADING ACTIVE"
+        session_str = "HOLIDAY (CLOSED)" if holiday_info else "ACTIVE (REGULAR)"
         sess_color = (185, 28, 28) if holiday_info else (22, 101, 52)
-        draw.text((560, current_y + 17), f"STATUS: {session_str}", fill=sess_color, font=self.font_bold)
+        draw.text((450, current_y + 17), f"STATUS: {session_str}", fill=sess_color, font=self.font_bold)
 
         # Col 4: Page Indicator (or Wire Status)
         if total_pages > 1:
-            draw.text((850, current_y + 17), f"PAGE {page_num} OF {total_pages} (ITEMS {start_idx}–{end_idx})", fill=(30, 58, 138), font=self.font_bold)
+            draw.text((750, current_y + 17), f"PAGE {page_num} OF {total_pages} (ITEMS {start_idx}–{end_idx})", fill=(30, 58, 138), font=self.font_bold)
         else:
-            draw.text((850, current_y + 17), "COMPLETE SCHEDULE", fill=(71, 85, 105), font=self.font_bold)
+            draw.text((750, current_y + 17), "COMPLETE SCHEDULE", fill=(71, 85, 105), font=self.font_bold)
 
         # Col 5: Verified Wire
-        draw.text((1060, current_y + 17), "VERIFIED WIRE", fill=theme["accent"], font=self.font_bold)
+        draw.text((1040, current_y + 17), "VERIFIED WIRE", fill=theme["accent"], font=self.font_bold)
 
         current_y += stats_ribbon_height + 22
 
@@ -283,26 +283,28 @@ class CalendarCardGenerator:
             current_y += 130
         else:
             for idx, e in enumerate(page_events, start=start_idx):
-                is_high = e.get("impact", "").upper() == "HIGH"
-                card_bg = (255, 247, 237) if is_high else ((248, 250, 252) if (idx % 2 == 0) else (255, 255, 255))
+                is_high = str(e.get("impact", "")).upper() == "HIGH"
+                card_bg = (255, 251, 235) if is_high else ((248, 250, 252) if (idx % 2 == 0) else (255, 255, 255))
                 card_border = (251, 146, 60) if is_high else (226, 232, 240)
                 border_width = 2 if is_high else 1
 
                 row_h = event_row_height - 12
                 row_rect = [(40, current_y), (width - 40, current_y + row_h)]
                 draw.rounded_rectangle(row_rect, radius=8, fill=card_bg, outline=card_border, width=border_width)
+                if is_high:
+                    draw.rectangle([(40, current_y + 6), (46, current_y + row_h - 6)], fill=(234, 88, 12))
 
                 # Time Badge (IST)
                 time_str = f"{clean_text_for_image(e.get('time', '10:00'))} IST"
-                time_badge_rect = [(52, current_y + 9), (175, current_y + 40)]
+                time_badge_rect = [(54, current_y + 9), (175, current_y + 39)]
                 t_bg = (220, 38, 38) if is_high else (15, 23, 42)
                 draw.rounded_rectangle(time_badge_rect, radius=6, fill=t_bg)
-                draw.text((62, current_y + 15), time_str, fill=(255, 255, 255), font=self.font_mono)
+                draw.text((64, current_y + 14), time_str, fill=(255, 255, 255), font=self.font_mono)
 
                 # Impact Tag (Clean text, no emojis)
                 imp_str = "HIGH IMPACT" if is_high else clean_text_for_image(e.get("impact", "MEDIUM"))
                 imp_color = (194, 65, 12) if is_high else (71, 85, 105)
-                draw.text((60, current_y + 48), imp_str, fill=imp_color, font=self.font_small)
+                draw.text((62, current_y + 47), imp_str, fill=imp_color, font=self.font_small)
 
                 # Clean Symbol
                 sym_str = clean_text_for_image(e.get("symbol", mkt))
@@ -311,35 +313,43 @@ class CalendarCardGenerator:
                 else:
                     clean_sym = sym_str
 
-                # Clean Event Title
+                # Clean Event Title (Safe width, truncated to max 60 chars)
                 ev_str = clean_text_for_image(e.get("event", "Scheduled Release"))
                 full_ev = f"{clean_sym} — {ev_str}"
-                max_title_chars = 68
+                max_title_chars = 60
                 if len(full_ev) > max_title_chars:
                     full_ev = full_ev[:max_title_chars - 3] + "..."
 
-                draw.text((195, current_y + 11), full_ev, fill=(15, 23, 42), font=self.font_bold)
+                draw.text((192, current_y + 11), full_ev, fill=(15, 23, 42), font=self.font_bold)
 
-                # Financial Metrics: Prev vs Forecast vs Actual (Strictly cleaned of emojis)
-                prev_val = clean_text_for_image(e.get("previous", "—")) or "—"
-                fore_val = clean_text_for_image(e.get("forecast", "—")) or "—"
-                act_val = clean_text_for_image(e.get("actual", "Pending")) or "Pending"
+                # Financial Metrics: Prev vs Consensus vs Actual (Safe length, capped to max 65 chars)
+                prev_val = (clean_text_for_image(e.get("previous", "—")) or "—")[:15]
+                fore_val = (clean_text_for_image(e.get("forecast", "—")) or "—")[:18]
+                act_val = (clean_text_for_image(e.get("actual", "Pending")) or "Pending")[:22]
                 metrics_str = f"Prev: {prev_val}   |   Consensus: {fore_val}   |   Actual: {act_val}"
-                draw.text((195, current_y + 44), metrics_str, fill=(71, 85, 105), font=self.font_body)
+                draw.text((192, current_y + 44), metrics_str, fill=(71, 85, 105), font=self.font_body)
 
-                # Verdict / Sentiment Badge (Clean text, no emojis)
+                # Verdict / Sentiment Pill (Drawn as dedicated high-contrast terminal pill)
                 raw_sent = clean_text_for_image(e.get("outcome_sentiment", "PENDING")).upper()
                 if "BULL" in raw_sent:
                     sent_str = "BULLISH"
+                    pill_bg = (240, 253, 244)
+                    pill_border = (187, 247, 208)
                     sent_color = (22, 101, 52)
                 elif "BEAR" in raw_sent:
                     sent_str = "BEARISH"
+                    pill_bg = (254, 242, 242)
+                    pill_border = (254, 202, 202)
                     sent_color = (185, 28, 28)
                 else:
                     sent_str = "PENDING"
-                    sent_color = (100, 116, 139)
+                    pill_bg = (241, 245, 249)
+                    pill_border = (226, 232, 240)
+                    sent_color = (71, 85, 105)
 
-                draw.text((width - 230, current_y + 44), f"Verdict: {sent_str}", fill=sent_color, font=self.font_bold)
+                verdict_rect = [(width - 235, current_y + 20), (width - 55, current_y + 54)]
+                draw.rounded_rectangle(verdict_rect, radius=6, fill=pill_bg, outline=pill_border, width=1)
+                draw.text((width - 222, current_y + 27), f"VERDICT: {sent_str}", fill=sent_color, font=self.font_bold)
 
                 current_y += event_row_height
 
