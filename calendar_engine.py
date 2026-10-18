@@ -1770,18 +1770,23 @@ class MarketCalendarEngine:
             caption += f"\n🔥 <b>Key High-Impact Catalysts ({len(high_impact)}):</b>\n"
             for ev in high_impact[:3]:
                 t = ev.get("time", "10:00")
-                sym = ev.get("symbol", mkt)
-                ev_name = ev.get("event", "")[:35]
+                sym = str(ev.get("symbol", mkt)).replace("<", "").replace(">", "")
+                ev_name = str(ev.get("event", ""))[:32].replace("<", "").replace(">", "")
                 caption += f"• <b>[{t} IST]</b> <code>{sym}</code> — {ev_name}\n"
 
-        # One-click Google Calendar add link for the top high impact event (if available)
+        # One-click compact Google Calendar add link (strictly under 160 chars)
         if high_impact:
             top_ev = high_impact[0]
-            gcal_url = google_calendar_manager.generate_one_click_url(top_ev)
-            caption += f"\n📅 <a href='{gcal_url}'>Add Key Catalyst to Google Calendar (1-Click)</a>\n"
+            clean_sym = str(top_ev.get("symbol", mkt)).split(":")[-1].replace("<", "").replace(">", "").strip()
+            clean_name = str(top_ev.get("event", "Catalyst"))[:28].replace("<", "").replace(">", "").strip()
+            t_clean = str(top_ev.get("time", "10:00")).replace(":", "").strip()
+            d_clean = target_date.replace("-", "")
+            title_q = requests.utils.quote(f"[{mkt}] {clean_sym}: {clean_name}")
+            short_gcal = f"https://calendar.google.com/calendar/render?action=TEMPLATE&text={title_q}&dates={d_clean}T{t_clean}00Z/{d_clean}T{t_clean}00Z"
+            caption += f"\n📅 <a href='{short_gcal}'>Add Top Catalyst to Google Calendar (1-Click)</a>\n"
 
         caption += f"\n━━━━━━━━━━━━━━━━━━━━━━\n<i>— EPM PRO Visual Calendar Engine ({mkt})</i>"
-        return caption[:1020]
+        return caption
 
     def _dispatch_markets_photos(self, target_date: str, mode: str = "TODAY") -> tuple[bool, str]:
         """Iterates through all 5 markets, generates branded HD infographic cards, and sends them as Telegram photos."""

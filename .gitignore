@@ -4,6 +4,7 @@ __pycache__/
 .DS_Store
 venv/
 *.db
+*.db-journal
 admin_settings.json
 calendar_state.json
 sources_config.json

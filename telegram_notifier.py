@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import time
 import logging
@@ -265,6 +266,17 @@ class TelegramNotifier:
                     self._last_send_time = time.time()
                     if resp.status_code == 200:
                         return True, "Delivered"
+                    elif resp.status_code == 400 and "can't parse entities" in resp.text.lower():
+                        logger.warning("Telegram HTML parse error, retrying without HTML formatting...")
+                        data_plain = dict(data)
+                        data_plain.pop("parse_mode", None)
+                        data_plain["caption"] = re.sub(r'<[^>]+>', '', caption)[:1020]
+                        resp_plain = requests.post(url, data=data_plain, files=files, timeout=20)
+                        if resp_plain.status_code == 200:
+                            return True, "Delivered (plain text fallback)"
+                        err = resp_plain.text[:160]
+                        logger.warning(f"Telegram sendPhoto plain error ({resp_plain.status_code}): {err}")
+                        return False, f"HTTP {resp_plain.status_code}: {err}"
                     elif resp.status_code == 429:
                         retry_after = 5
                         try:

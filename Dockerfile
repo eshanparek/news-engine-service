@@ -1,5 +1,11 @@
 FROM python:3.11-slim
 
+# Install system fonts for crisp graphic card rendering
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    fonts-dejavu-core \
+    fonts-freefont-ttf \
+    && rm -rf /var/lib/apt/lists/*
+
 # Create user with UID 1000 for Hugging Face Spaces security compliance
 RUN useradd -m -u 1000 user
 USER user

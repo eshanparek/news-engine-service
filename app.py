@@ -1,5 +1,6 @@
 import os
 import time
+import html
 from typing import Optional, List, Dict
 from datetime import datetime
 from fastapi import FastAPI, Query, BackgroundTasks
@@ -340,7 +341,154 @@ def update_admin_settings(cfg: AdminTelegramConfig):
     return {"status": "saved", "settings": saved}
 
 
-# ─── 3. Gradio Web Interface Functions ───────────────────────────────────────
+# ─── 3. Gradio Web Interface Functions & 2035 Terminal HTML Generators ─────
+
+def render_news_feed_html(items: List[Dict]) -> str:
+    """Renders 2035 Bloomberg-style visual news feed with glowing pills and AI impact scores on pure white canvas."""
+    if not items:
+        return (
+            '<div class="epm-empty-state">'
+            '  <div class="epm-empty-icon">📡</div>'
+            '  <div class="epm-empty-title">Connecting to Global Multi-Market Financial Wire...</div>'
+            '  <div class="epm-empty-sub">Ingesting real-time feeds from NSE, BSE, Bloomberg, Reuters, MCX, Crypto & SEC.</div>'
+            '</div>'
+        )
+
+    cards_html = []
+    for item in items[:40]:
+        score = item.get("ai_score", 5)
+        sent = str(item.get("ai_sentiment", "NEUTRAL")).upper()
+        impact = str(item.get("ai_impact", "MEDIUM")).upper()
+        title = html.escape(str(item.get("title", "")))
+        source = html.escape(str(item.get("source", "Market Wire")))
+        link = item.get("link", "#")
+        time_str = html.escape(str(item.get("timestamp", ""))[:19])
+        reasoning = html.escape(str(item.get("ai_reasoning", "")))
+        sectors = item.get("ai_sectors", [])
+        rel = item.get("relevance", 75)
+
+        sent_class = "bullish" if "BULL" in sent else ("bearish" if "BEAR" in sent else "neutral")
+        is_high = impact == "HIGH" or score >= 8
+        impact_badge = f'<span class="epm-badge impact-{"high" if is_high else impact.lower()}">{"🔥 HIGH IMPACT" if is_high else ("⚡ MEDIUM" if impact == "MEDIUM" else "LOW")}</span>'
+        score_badge = f'<span class="epm-score-pill">AI {score}/10</span>'
+        sent_badge = f'<span class="epm-badge sent-{sent_class}">{sent}</span>'
+
+        sector_pills = "".join(f'<span class="epm-sector-tag">{html.escape(str(s))}</span>' for s in sectors[:3]) if sectors else ""
+
+        card = f'''
+        <div class="epm-card epm-news-card {sent_class}">
+            <div class="epm-card-header">
+                <div class="epm-meta-left">
+                    <span class="epm-source-chip">{source}</span>
+                    <span class="epm-time-chip">⏱ {time_str}</span>
+                    {impact_badge}
+                    {sent_badge}
+                </div>
+                <div class="epm-meta-right">
+                    {score_badge}
+                </div>
+            </div>
+            <div class="epm-card-body">
+                <a href="{link}" target="_blank" class="epm-news-title">{title} <span class="epm-link-icon">↗</span></a>
+                {f'<div class="epm-news-reasoning">{reasoning}</div>' if reasoning else ""}
+            </div>
+            <div class="epm-card-footer">
+                <div class="epm-sectors-wrap">{sector_pills}</div>
+                <div class="epm-rel-badge">Relevance: <b>{rel}%</b></div>
+            </div>
+        </div>
+        '''
+        cards_html.append(card)
+
+    return f'<div class="epm-stream-container">{"".join(cards_html)}</div>'
+
+
+def render_calendar_feed_html(events: List[Dict]) -> str:
+    """Renders 2035 multi-market interactive catalyst cards with live countdown timers and 1-click Google Calendar sync."""
+    if not events:
+        return (
+            '<div class="epm-empty-state">'
+            '  <div class="epm-empty-icon">📅</div>'
+            '  <div class="epm-empty-title">No Scheduled Catalysts Found For This Filter</div>'
+            '  <div class="epm-empty-sub">Switch the market or time window filter above to explore scheduled corporate releases.</div>'
+            '</div>'
+        )
+
+    cards_html = []
+    for ev in events[:60]:
+        mkt = str(ev.get("market", "NSE")).upper()
+        meta = MARKET_META.get(mkt, MARKET_META["NSE"])
+        sym = html.escape(str(ev.get("symbol", mkt)))
+        name = html.escape(str(ev.get("event", "Scheduled Release")))
+        date_str = html.escape(str(ev.get("date", "")))
+        time_str = html.escape(str(ev.get("time", "10:00")))
+        timer = html.escape(str(ev.get("timer", "⚡ LIVE")))
+        impact = str(ev.get("impact", "HIGH")).upper()
+        prev = html.escape(str(ev.get("previous", "—")))
+        fore = html.escape(str(ev.get("forecast", "—")))
+        actual = html.escape(str(ev.get("actual", "⏳ Pending")))
+        sent = html.escape(str(ev.get("outcome_sentiment", "⏳ PENDING")))
+        linked_title = html.escape(str(ev.get("linked_news_title", "")))
+        linked_url = ev.get("linked_news_url", "")
+
+        is_high = impact == "HIGH"
+        impact_badge = f'<span class="epm-badge impact-{"high" if is_high else "medium"}">{"🔥 HIGH IMPACT BENCHMARK" if is_high else "⚡ MEDIUM"}</span>'
+        sent_class = "bullish" if "BULL" in sent else ("bearish" if "BEAR" in sent else ("pending" if "PEND" in sent else "neutral"))
+
+        # Compact one-click Google Calendar URL
+        gcal_url = google_calendar_manager.generate_one_click_url(ev)
+
+        timer_upper = timer.upper()
+        timer_class = "timer-live" if "LIVE" in timer_upper else ("timer-done" if "RELEASED" in timer_upper or "PAST" in timer_upper else "timer-active")
+
+        linked_snippet = ""
+        if linked_title and linked_url:
+            linked_snippet = f'<div class="epm-linked-news">🔗 <b>Breaking Wire Link:</b> <a href="{linked_url}" target="_blank">{linked_title} ↗</a></div>'
+
+        card = f'''
+        <div class="epm-card epm-cal-card market-{mkt.lower()} {'is-high-impact' if is_high else ''}">
+            <div class="epm-card-header">
+                <div class="epm-meta-left">
+                    <span class="epm-mkt-chip mkt-{mkt.lower()}">{meta['badge']}</span>
+                    <span class="epm-time-ist"><b>{time_str} IST</b>  •  <code>{date_str}</code></span>
+                    <span class="epm-timer-pill {timer_class}">⏱ {timer}</span>
+                    {impact_badge}
+                </div>
+                <div class="epm-meta-right">
+                    <a href="{gcal_url}" target="_blank" class="epm-gcal-btn">📅 + Google Calendar</a>
+                </div>
+            </div>
+            <div class="epm-card-body">
+                <div class="epm-cal-title-row">
+                    <span class="epm-sym-pill">{sym}</span>
+                    <span class="epm-cal-name">{name}</span>
+                </div>
+                <div class="epm-metrics-grid">
+                    <div class="epm-metric-box">
+                        <span class="epm-m-label">PREVIOUS</span>
+                        <span class="epm-m-val">{prev}</span>
+                    </div>
+                    <div class="epm-metric-box">
+                        <span class="epm-m-label">CONSENSUS</span>
+                        <span class="epm-m-val">{fore}</span>
+                    </div>
+                    <div class="epm-metric-box epm-actual-box">
+                        <span class="epm-m-label">ACTUAL / OUTCOME</span>
+                        <span class="epm-m-val">{actual}</span>
+                    </div>
+                    <div class="epm-metric-box epm-verdict-box">
+                        <span class="epm-m-label">MARKET VERDICT</span>
+                        <span class="epm-badge sent-{sent_class}">{sent}</span>
+                    </div>
+                </div>
+                {linked_snippet}
+            </div>
+        </div>
+        '''
+        cards_html.append(card)
+
+    return f'<div class="epm-stream-container">{"".join(cards_html)}</div>'
+
 
 def get_dashboard_tables():
     items = list(news_worker.news_cache)
@@ -412,11 +560,13 @@ def get_dashboard_tables():
         f"**Calendar TG Channel:** {cal_status} | "
         f"**IST Clock:** {now_ist().strftime('%H:%M:%S IST')}"
     )
-    return status_str, top_rows, bottom_rows
+    news_visual_html = render_news_feed_html(items)
+    return status_str, news_visual_html, top_rows, bottom_rows
 
 
 def get_calendar_tables(range_filter: str = "all", market_filter: str = "ALL"):
     events = calendar_engine.get_enriched_events(filter_range=range_filter, market_filter=market_filter)
+    calendar_visual_html = render_calendar_feed_html(events)
     cal_rows = []
     for ev in events:
         mkt = ev.get("market", "NSE").upper()
@@ -468,7 +618,7 @@ def get_calendar_tables(range_filter: str = "all", market_filter: str = "ALL"):
         f"**Auto Daily Dispatches:** `07:00 AM IST (Today + Holiday Check)` & `07:05 AM IST (Tomorrow)` | "
         f"**iCal Feed:** `/api/calendar/ics`"
     )
-    return cal_summary, cal_rows, hol_rows
+    return cal_summary, calendar_visual_html, cal_rows, hol_rows
 
 
 def sync_and_refresh_calendar(range_filter: str, market_filter: str):
@@ -541,11 +691,11 @@ def handle_manual_event_save(
         market=mkt_s,
         forward_now=forward_tg
     )
-    cal_summary, cal_rows, _ = get_calendar_tables(current_range, current_market)
+    cal_summary, cal_visual_html, cal_rows, _ = get_calendar_tables(current_range, current_market)
     status_msg = f"✅ **Saved [{ev['market']}] Event `{ev['id']}` ({ev['event']}) — Outcome: `{ev['actual']}`.**"
     if forward_tg:
         status_msg += f" Dispatched individual `{ev['market']}` update to Calendar Telegram Channel!"
-    return status_msg, cal_summary, cal_rows
+    return status_msg, cal_summary, cal_visual_html, cal_rows
 
 
 def save_admin_telegram_settings(
@@ -958,6 +1108,366 @@ code, .timer-cell, pre {
 #sources_table th:nth-child(4), #sources_table td:nth-child(4) { width: 12% !important; text-align: center !important; font-weight: 600 !important; }
 #sources_table th:nth-child(5), #sources_table td:nth-child(5) { width: 12% !important; text-align: center !important; font-weight: 600 !important; }
 #sources_table th:nth-child(6), #sources_table td:nth-child(6) { width: 38% !important; word-break: break-all !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #2563eb !important; }
+
+/* 12. 2035 Ultra-Futuristic Financial Intelligence Terminal Feeds */
+.epm-stream-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100% !important;
+    margin: 12px 0 24px 0;
+}
+
+.epm-card {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 12px !important;
+    padding: 15px 20px !important;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04) !important;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease !important;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.epm-card:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08) !important;
+    border-color: #cbd5e1 !important;
+}
+
+.epm-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.epm-meta-left {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.epm-meta-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.epm-source-chip {
+    font-family: var(--font-sans) !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.04em !important;
+    background: #f1f5f9 !important;
+    color: #1e293b !important;
+    padding: 3px 8px !important;
+    border-radius: 5px !important;
+    border: 1px solid #e2e8f0 !important;
+}
+
+.epm-time-chip {
+    font-family: var(--font-mono) !important;
+    font-size: 11px !important;
+    color: #64748b !important;
+    font-weight: 500 !important;
+}
+
+.epm-score-pill {
+    font-family: var(--font-mono) !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    background: #0f172a !important;
+    color: #38bdf8 !important;
+    padding: 3px 10px !important;
+    border-radius: 6px !important;
+    letter-spacing: 0.02em !important;
+}
+
+.epm-badge {
+    font-family: var(--font-sans) !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    padding: 3px 8px !important;
+    border-radius: 6px !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.epm-badge.impact-high {
+    background: #fff1f2 !important;
+    color: #e11d48 !important;
+    border: 1px solid #fecdd3 !important;
+}
+
+.epm-badge.impact-medium {
+    background: #f0f9ff !important;
+    color: #0284c7 !important;
+    border: 1px solid #bae6fd !important;
+}
+
+.epm-badge.impact-low {
+    background: #f8fafc !important;
+    color: #64748b !important;
+    border: 1px solid #e2e8f0 !important;
+}
+
+.epm-badge.sent-bullish {
+    background: #f0fdf4 !important;
+    color: #16a34a !important;
+    border: 1px solid #bbf7d0 !important;
+}
+
+.epm-badge.sent-bearish {
+    background: #fef2f2 !important;
+    color: #dc2626 !important;
+    border: 1px solid #fecaca !important;
+}
+
+.epm-badge.sent-neutral {
+    background: #f8fafc !important;
+    color: #475569 !important;
+    border: 1px solid #e2e8f0 !important;
+}
+
+.epm-badge.sent-pending {
+    background: #fffbeb !important;
+    color: #b45309 !important;
+    border: 1px solid #fde68a !important;
+}
+
+.epm-news-title {
+    font-family: var(--font-sans) !important;
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    color: #0f172a !important;
+    text-decoration: none !important;
+    line-height: 1.45 !important;
+    display: inline-block;
+    transition: color 0.15s ease !important;
+}
+
+.epm-news-title:hover {
+    color: #2563eb !important;
+}
+
+.epm-link-icon {
+    font-size: 12px !important;
+    color: #94a3b8 !important;
+    margin-left: 3px !important;
+}
+
+.epm-news-reasoning {
+    font-family: var(--font-sans) !important;
+    font-size: 13px !important;
+    color: #475569 !important;
+    background: #f8fafc !important;
+    padding: 8px 12px !important;
+    border-radius: 8px !important;
+    border-left: 3px solid #cbd5e1 !important;
+    margin-top: 6px !important;
+    line-height: 1.5 !important;
+}
+
+.epm-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px !important;
+    color: #64748b !important;
+    padding-top: 4px;
+}
+
+.epm-sectors-wrap {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.epm-sector-tag {
+    background: #f1f5f9 !important;
+    color: #334155 !important;
+    padding: 2px 7px !important;
+    border-radius: 4px !important;
+    font-size: 10.5px !important;
+    font-weight: 600 !important;
+}
+
+/* Calendar Card Specifics */
+.epm-cal-card {
+    border-left: 4px solid #3b82f6 !important;
+}
+.epm-cal-card.market-nse { border-left-color: #2563eb !important; }
+.epm-cal-card.market-bse { border-left-color: #9333ea !important; }
+.epm-cal-card.market-mcx { border-left-color: #ea580c !important; }
+.epm-cal-card.market-crypto { border-left-color: #eab308 !important; }
+.epm-cal-card.market-nyse { border-left-color: #1d4ed8 !important; }
+
+.epm-cal-card.is-high-impact {
+    border-color: #fed7aa !important;
+    box-shadow: 0 2px 8px rgba(234, 88, 12, 0.06) !important;
+}
+
+.epm-mkt-chip {
+    font-family: var(--font-sans) !important;
+    font-weight: 700 !important;
+    font-size: 11px !important;
+    padding: 3px 8px !important;
+    border-radius: 5px !important;
+    background: #f1f5f9 !important;
+    border: 1px solid #cbd5e1 !important;
+}
+.epm-mkt-chip.mkt-nse { color: #1e3a8a !important; }
+.epm-mkt-chip.mkt-bse { color: #581c87 !important; }
+.epm-mkt-chip.mkt-mcx { color: #9a3412 !important; }
+.epm-mkt-chip.mkt-crypto { color: #854d0e !important; }
+.epm-mkt-chip.mkt-nyse { color: #1e40af !important; }
+
+.epm-time-ist {
+    font-family: var(--font-mono) !important;
+    font-size: 12px !important;
+    color: #0f172a !important;
+}
+
+.epm-timer-pill {
+    font-family: var(--font-mono) !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    padding: 3px 8px !important;
+    border-radius: 5px !important;
+}
+.timer-active { background: #fff7ed !important; color: #c2410c !important; border: 1px solid #ffedd5 !important; }
+.timer-live { background: #ecfdf5 !important; color: #047857 !important; border: 1px solid #a7f3d0 !important; }
+.timer-done { background: #f8fafc !important; color: #64748b !important; border: 1px solid #e2e8f0 !important; }
+
+.epm-gcal-btn {
+    font-family: var(--font-sans) !important;
+    font-size: 11.5px !important;
+    font-weight: 600 !important;
+    background: #f8fafc !important;
+    color: #1d4ed8 !important;
+    border: 1px solid #bfdbfe !important;
+    padding: 5px 12px !important;
+    border-radius: 6px !important;
+    text-decoration: none !important;
+    transition: all 0.15s ease !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.epm-gcal-btn:hover {
+    background: #eff6ff !important;
+    color: #1e40af !important;
+    border-color: #3b82f6 !important;
+}
+
+.epm-cal-title-row {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.epm-sym-pill {
+    font-family: var(--font-mono) !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    color: #0f172a !important;
+    background: #f1f5f9 !important;
+    padding: 3px 8px !important;
+    border-radius: 6px !important;
+    border: 1px solid #cbd5e1 !important;
+    white-space: nowrap;
+}
+
+.epm-cal-name {
+    font-family: var(--font-sans) !important;
+    font-size: 14.5px !important;
+    font-weight: 700 !important;
+    color: #0f172a !important;
+    line-height: 1.4 !important;
+}
+
+.epm-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.epm-metric-box {
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 8px !important;
+    padding: 6px 10px !important;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.epm-actual-box {
+    background: #f0fdf4 !important;
+    border-color: #bbf7d0 !important;
+}
+
+.epm-m-label {
+    font-family: var(--font-sans) !important;
+    font-size: 9.5px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    color: #64748b !important;
+}
+
+.epm-m-val {
+    font-family: var(--font-mono) !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    color: #0f172a !important;
+}
+
+.epm-actual-box .epm-m-val {
+    color: #15803d !important;
+}
+
+.epm-linked-news {
+    font-family: var(--font-sans) !important;
+    font-size: 12px !important;
+    color: #334155 !important;
+    background: #eff6ff !important;
+    border: 1px solid #dbeafe !important;
+    padding: 6px 10px !important;
+    border-radius: 6px !important;
+    margin-top: 8px;
+}
+.epm-linked-news a {
+    color: #2563eb !important;
+    text-decoration: none !important;
+    font-weight: 600 !important;
+}
+.epm-linked-news a:hover {
+    text-decoration: underline !important;
+}
+
+.epm-empty-state {
+    background: #ffffff !important;
+    border: 1px dashed #cbd5e1 !important;
+    border-radius: 12px !important;
+    padding: 40px 20px !important;
+    text-align: center !important;
+    color: #64748b !important;
+    margin: 15px 0 !important;
+}
+.epm-empty-icon { font-size: 32px !important; margin-bottom: 8px; }
+.epm-empty-title { font-size: 15px !important; font-weight: 700 !important; color: #0f172a !important; margin-bottom: 4px; }
+.epm-empty-sub { font-size: 13px !important; color: #64748b !important; }
 """
 
 
@@ -990,26 +1500,29 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
             with gr.Row():
                 refresh_btn = gr.Button("🔄 Force Refresh & Re-Score Feeds", variant="primary")
 
-            gr.Markdown("### 🚨 High-Impact News & AI Sentiment Watch (Top Priority)")
-            top_table = gr.Dataframe(
-                headers=["Score", "Sentiment", "Impact", "Headline", "Sectors/Tickers", "AI Reasoning", "Source", "Relevance", "Time"],
-                datatype=["str", "str", "str", "str", "str", "str", "str", "str", "str"],
-                value=[],
-                interactive=False,
-                wrap=True,
-                elem_id="top_news_table"
-            )
+            gr.Markdown("### 🚨 2035 Live High-Impact Catalyst Feed")
+            top_news_visual = gr.HTML(elem_id="news_visual_feed")
 
-            gr.Markdown("---")
-            gr.Markdown("### 🌐 General & Broad Market News Wire (Secondary / Low Relevance)")
-            bottom_table = gr.Dataframe(
-                headers=["Time", "Source", "Headline", "Relevance", "Sentiment", "URL"],
-                datatype=["str", "str", "str", "str", "str", "str"],
-                value=[],
-                interactive=False,
-                wrap=True,
-                elem_id="bottom_news_table"
-            )
+            with gr.Accordion("📊 Tabular View & Data Export (Raw Feeds)", open=False):
+                gr.Markdown("#### High-Impact Filtered Table")
+                top_table = gr.Dataframe(
+                    headers=["Score", "Sentiment", "Impact", "Headline", "Sectors/Tickers", "AI Reasoning", "Source", "Relevance", "Time"],
+                    datatype=["str", "str", "str", "str", "str", "str", "str", "str", "str"],
+                    value=[],
+                    interactive=False,
+                    wrap=True,
+                    elem_id="top_news_table"
+                )
+
+                gr.Markdown("#### General & Broad Market Secondary Table")
+                bottom_table = gr.Dataframe(
+                    headers=["Time", "Source", "Headline", "Relevance", "Sentiment", "URL"],
+                    datatype=["str", "str", "str", "str", "str", "str"],
+                    value=[],
+                    interactive=False,
+                    wrap=True,
+                    elem_id="bottom_news_table"
+                )
 
             gr.Markdown("---")
             gr.Markdown("### ⚡ Live AI Impact & Sentiment Tester")
@@ -1073,28 +1586,32 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
 
             cal_action_msg = gr.Markdown()
 
-            calendar_table = gr.Dataframe(
-                headers=[
-                    "Event ID",
-                    "Market",
-                    "Date",
-                    "Time (IST)",
-                    "⏱ Live Timer",
-                    "Asset / Symbol",
-                    "Market Event / Corporate Release",
-                    "Impact",
-                    "Previous",
-                    "Forecast",
-                    "🏁 Actual / Outcome",
-                    "📊 Verdict",
-                    "🔗 Linked Breaking News"
-                ],
-                datatype=["str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "str"],
-                value=[],
-                interactive=False,
-                wrap=True,
-                elem_id="calendar_table"
-            )
+            gr.Markdown("### 📡 2035 Multi-Market Catalysts & Live Countdown Feed")
+            calendar_visual_feed = gr.HTML(elem_id="calendar_visual_feed")
+
+            with gr.Accordion("📊 Raw Calendar Data Table & Historical Metrics", open=False):
+                calendar_table = gr.Dataframe(
+                    headers=[
+                        "Event ID",
+                        "Market",
+                        "Date",
+                        "Time (IST)",
+                        "⏱ Live Timer",
+                        "Asset / Symbol",
+                        "Market Event / Corporate Release",
+                        "Impact",
+                        "Previous",
+                        "Forecast",
+                        "🏁 Actual / Outcome",
+                        "📊 Verdict",
+                        "🔗 Linked Breaking News"
+                    ],
+                    datatype=["str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "str"],
+                    value=[],
+                    interactive=False,
+                    wrap=True,
+                    elem_id="calendar_table"
+                )
 
             gr.Markdown("---")
             with gr.Accordion("✏️ Add Custom Calendar Event or Record / Update Official Outcome Manually", open=False):
@@ -1141,9 +1658,9 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                 elem_id="holidays_table"
             )
 
-            cal_filter.change(get_calendar_tables, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_table, holidays_table])
-            cal_market_filter.change(get_calendar_tables, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_table, holidays_table])
-            cal_sync_btn.click(sync_and_refresh_calendar, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_table, holidays_table])
+            cal_filter.change(get_calendar_tables, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_visual_feed, calendar_table, holidays_table])
+            cal_market_filter.change(get_calendar_tables, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_visual_feed, calendar_table, holidays_table])
+            cal_sync_btn.click(sync_and_refresh_calendar, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_visual_feed, calendar_table, holidays_table])
             btn_sync_gcal.click(trigger_sync_google_cal, outputs=[cal_action_msg])
             btn_push_today_photo.click(push_today_photo_snapshot_all_markets, outputs=[cal_action_msg])
             btn_push_tomorrow_photo.click(push_tomorrow_photo_snapshot_all_markets, outputs=[cal_action_msg])
@@ -1153,7 +1670,7 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
             save_ev_btn.click(
                 handle_manual_event_save,
                 inputs=[in_ev_id, in_ev_mkt, in_ev_date, in_ev_time, in_ev_sym, in_ev_name, in_ev_imp, in_ev_prev, in_ev_fore, in_ev_act, in_ev_sent, in_ev_push, cal_filter, cal_market_filter],
-                outputs=[cal_action_msg, cal_info_bar, calendar_table]
+                outputs=[cal_action_msg, cal_info_bar, calendar_visual_feed, calendar_table]
             )
 
         # ═══════════════════════════════════════════════════════════
@@ -1316,9 +1833,9 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                 outputs=[rules_status, sources_table]
             )
 
-    refresh_btn.click(manual_refresh, outputs=[status_box, top_table, bottom_table])
-    demo.load(get_dashboard_tables, outputs=[status_box, top_table, bottom_table])
-    demo.load(get_calendar_tables, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_table, holidays_table])
+    refresh_btn.click(manual_refresh, outputs=[status_box, top_news_visual, top_table, bottom_table])
+    demo.load(get_dashboard_tables, outputs=[status_box, top_news_visual, top_table, bottom_table])
+    demo.load(get_calendar_tables, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_visual_feed, calendar_table, holidays_table])
 
 # Mount Gradio UI inside FastAPI with full-width responsive CSS
 app = gr.mount_gradio_app(app, demo, path="/", css=CUSTOM_CSS, head=f"<style>{CUSTOM_CSS}</style>")
