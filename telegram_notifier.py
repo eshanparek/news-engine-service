@@ -40,6 +40,7 @@ class TelegramNotifier:
         self.auto_daily_today_7am = True       # 7:00 AM IST Today's complete snapshot (5 separate market msgs)
         self.auto_daily_tomorrow_705am = True  # 7:05 AM IST Tomorrow's lined-up snapshot (5 separate market msgs)
         self.auto_holiday_7am = True           # 7:00 AM IST Next-day trading holiday alert
+        self.send_as_photos = True             # Deliver morning calendar as high-definition infographic photos
         self._send_lock = threading.Lock()
         self._last_send_time = 0.0
 
@@ -75,6 +76,8 @@ class TelegramNotifier:
                     self.auto_daily_tomorrow_705am = bool(data["auto_daily_tomorrow_705am"])
                 if "auto_holiday_7am" in data:
                     self.auto_holiday_7am = bool(data["auto_holiday_7am"])
+                if "send_as_photos" in data:
+                    self.send_as_photos = bool(data["send_as_photos"])
                 logger.info("Loaded Telegram & Calendar channel settings from admin_settings.json")
             except Exception as e:
                 logger.warning(f"Failed to load admin_settings.json: {e}")
@@ -92,7 +95,8 @@ class TelegramNotifier:
         alert_on_linked_news: bool = True,
         auto_daily_today_7am: bool = True,
         auto_daily_tomorrow_705am: bool = True,
-        auto_holiday_7am: bool = True
+        auto_holiday_7am: bool = True,
+        send_as_photos: bool = True
     ) -> Dict:
         if news_bot_token.strip():
             self.bot_token = news_bot_token.strip()
@@ -109,6 +113,7 @@ class TelegramNotifier:
         self.auto_daily_today_7am = bool(auto_daily_today_7am)
         self.auto_daily_tomorrow_705am = bool(auto_daily_tomorrow_705am)
         self.auto_holiday_7am = bool(auto_holiday_7am)
+        self.send_as_photos = bool(send_as_photos)
 
         payload = {
             "news_bot_token": self.bot_token,
@@ -122,7 +127,8 @@ class TelegramNotifier:
             "alert_on_linked_news": self.alert_on_linked_news,
             "auto_daily_today_7am": self.auto_daily_today_7am,
             "auto_daily_tomorrow_705am": self.auto_daily_tomorrow_705am,
-            "auto_holiday_7am": self.auto_holiday_7am
+            "auto_holiday_7am": self.auto_holiday_7am,
+            "send_as_photos": self.send_as_photos
         }
         try:
             with open(ADMIN_SETTINGS_FILE, "w") as f:
@@ -230,6 +236,90 @@ class TelegramNotifier:
         if sent_ok:
             return True, "Delivered"
         return False, last_err or "Delivery failed"
+
+    def send_photo(self, token: str, chat_id: str, photo_bytes: bytes, caption: str = "") -> tuple[bool, str]:
+        """
+        Uploads and dispatches an infographic image card to the target Telegram channel using sendPhoto API.
+        """
+        if not token or not chat_id:
+            return False, "Missing Bot Token or Chat ID"
+
+        url = f"https://api.telegram.org/bot{token}/sendPhoto"
+        files = {
+            "photo": ("market_calendar.png", photo_bytes, "image/png")
+        }
+        data = {
+            "chat_id": chat_id,
+            "caption": caption[:1024],  # Telegram caption limit is 1024 chars
+            "parse_mode": "HTML"
+        }
+
+        with self._send_lock:
+            elapsed = time.time() - self._last_send_time
+            if elapsed < 0.8:
+                time.sleep(0.8 - elapsed)
+
+            for attempt in range(3):
+                try:
+                    resp = requests.post(url, data=data, files=files, timeout=20)
+                    self._last_send_time = time.time()
+                    if resp.status_code == 200:
+                        return True, "Delivered"
+                    elif resp.status_code == 429:
+                        retry_after = 5
+                        try:
+                            retry_after = int(resp.json().get("parameters", {}).get("retry_after", 5))
+                        except Exception:
+                            pass
+                        logger.warning(f"Telegram Photo Rate Limit (429): backing off {retry_after + 1}s...")
+                        time.sleep(retry_after + 1)
+                    else:
+                        err = resp.text[:160]
+                        logger.warning(f"Telegram sendPhoto error ({resp.status_code}): {err}")
+                        return False, f"HTTP {resp.status_code}: {err}"
+                except Exception as e:
+                    logger.error(f"Telegram sendPhoto connection error: {e}")
+                    time.sleep(1)
+
+        return False, "Failed to send photo"
+
+    def send_calendar_photo(self, photo_bytes: bytes, caption: str = "") -> tuple[bool, str]:
+        """Dispatches an infographic card directly to the dedicated Calendar Telegram channel."""
+        if not self.calendar_enabled or not self.is_calendar_configured():
+            return False, "Calendar Telegram channel is disabled or not configured."
+        token = self.get_effective_calendar_token()
+        chat_id = self.get_effective_calendar_chat_id()
+        return self.send_photo(token, chat_id, photo_bytes, caption)
+
+    def send_calendar_photos_batch(self, photo_items: List[tuple]) -> tuple[bool, str]:
+        """
+        Sends multiple separate per-market infographic photo cards sequentially (e.g. NSE, BSE, MCX, CRYPTO, NYSE)
+        with spacing delay to prevent Telegram 429 rate limits.
+        Each item in photo_items is (photo_bytes, caption).
+        """
+        if not self.calendar_enabled or not self.is_calendar_configured():
+            return False, "Calendar Telegram channel is disabled or not configured."
+
+        token = self.get_effective_calendar_token()
+        chat_id = self.get_effective_calendar_chat_id()
+        if not token or not chat_id:
+            return False, "Telegram Bot Token or Chat ID is not configured."
+
+        sent_count = 0
+        last_err = ""
+        for photo_bytes, caption in photo_items:
+            if not photo_bytes:
+                continue
+            ok, detail = self.send_photo(token, chat_id, photo_bytes, caption)
+            if ok:
+                sent_count += 1
+            else:
+                last_err = detail
+            time.sleep(0.5)
+
+        if sent_count > 0:
+            return True, f"Delivered {sent_count}/{len(photo_items)} market infographic photo cards"
+        return False, last_err or "No photo cards delivered"
 
     def send_news_alert(self, news: Dict) -> bool:
         if not self.enabled or not self.is_configured():

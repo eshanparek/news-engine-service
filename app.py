@@ -222,9 +222,21 @@ def api_dispatch_today():
     return {"status": "success" if ok else "error", "detail": msg}
 
 
+@app.post("/api/calendar/dispatch/today-photo")
+def api_dispatch_today_photo():
+    ok, msg = calendar_engine.dispatch_all_markets_today_photo_snapshot()
+    return {"status": "success" if ok else "error", "detail": msg}
+
+
 @app.post("/api/calendar/dispatch/tomorrow")
 def api_dispatch_tomorrow():
     ok, msg = calendar_engine.dispatch_all_markets_tomorrow_snapshot()
+    return {"status": "success" if ok else "error", "detail": msg}
+
+
+@app.post("/api/calendar/dispatch/tomorrow-photo")
+def api_dispatch_tomorrow_photo():
+    ok, msg = calendar_engine.dispatch_all_markets_tomorrow_photo_snapshot()
     return {"status": "success" if ok else "error", "detail": msg}
 
 
@@ -464,17 +476,31 @@ def sync_and_refresh_calendar(range_filter: str, market_filter: str):
     return get_calendar_tables(range_filter, market_filter)
 
 
+def push_today_photo_snapshot_all_markets():
+    ok, msg = calendar_engine.dispatch_all_markets_today_photo_snapshot()
+    if ok:
+        return f"✅ **Today's Infographic Photo Cards dispatched as 5 separate market images (`NSE`, `BSE`, `MCX`, `CRYPTO`, `NYSE`) to `{telegram_notifier.calendar_chat_id}`!** ({msg})"
+    return f"⚠️ **Could not send Today's Photo Cards:** {msg} *(Configure Calendar Telegram Chat ID in Tab 3)*"
+
+
+def push_tomorrow_photo_snapshot_all_markets():
+    ok, msg = calendar_engine.dispatch_all_markets_tomorrow_photo_snapshot()
+    if ok:
+        return f"✅ **Tomorrow's Infographic Photo Cards dispatched as 5 separate market images (`NSE`, `BSE`, `MCX`, `CRYPTO`, `NYSE`) to `{telegram_notifier.calendar_chat_id}`!** ({msg})"
+    return f"⚠️ **Could not send Tomorrow's Photo Cards:** {msg} *(Configure Calendar Telegram Chat ID in Tab 3)*"
+
+
 def push_today_snapshot_all_markets():
     ok, msg = calendar_engine.dispatch_all_markets_today_snapshot()
     if ok:
-        return f"✅ **Today's Complete Calendar & Timer Snapshot sent as 5 separate messages (`NSE`, `BSE`, `MCX`, `CRYPTO`, `NYSE`) to `{telegram_notifier.calendar_chat_id}`!** ({msg})"
+        return f"✅ **Today's Complete Calendar & Timer Snapshot sent as 5 separate text messages (`NSE`, `BSE`, `MCX`, `CRYPTO`, `NYSE`) to `{telegram_notifier.calendar_chat_id}`!** ({msg})"
     return f"⚠️ **Could not send Today's Snapshot:** {msg} *(Configure Calendar Telegram Chat ID in Tab 3)*"
 
 
 def push_tomorrow_snapshot_all_markets():
     ok, msg = calendar_engine.dispatch_all_markets_tomorrow_snapshot()
     if ok:
-        return f"✅ **Tomorrow's Lined-Up Events Snapshot sent as 5 separate messages (`NSE`, `BSE`, `MCX`, `CRYPTO`, `NYSE`) to `{telegram_notifier.calendar_chat_id}`!** ({msg})"
+        return f"✅ **Tomorrow's Lined-Up Events Snapshot sent as 5 separate text messages (`NSE`, `BSE`, `MCX`, `CRYPTO`, `NYSE`) to `{telegram_notifier.calendar_chat_id}`!** ({msg})"
     return f"⚠️ **Could not send Tomorrow's Snapshot:** {msg} *(Configure Calendar Telegram Chat ID in Tab 3)*"
 
 
@@ -534,7 +560,8 @@ def save_admin_telegram_settings(
     on_linked: bool,
     auto_today_7am: bool,
     auto_tom_705am: bool,
-    auto_hol_7am: bool
+    auto_hol_7am: bool,
+    send_photos: bool = True
 ):
     telegram_notifier.save_admin_settings(
         news_bot_token=news_token,
@@ -548,12 +575,15 @@ def save_admin_telegram_settings(
         alert_on_linked_news=on_linked,
         auto_daily_today_7am=auto_today_7am,
         auto_daily_tomorrow_705am=auto_tom_705am,
-        auto_holiday_7am=auto_hol_7am
+        auto_holiday_7am=auto_hol_7am,
+        send_as_photos=send_photos
     )
+    format_mode = "Infographic Photo Cards 📸" if send_photos else "Detailed Text Messages 💬"
     return (
         f"✅ **Admin Telegram & Automated Schedule Settings Saved!**\n"
         f"- **News Channel ID:** `{telegram_notifier.chat_id or 'Not Set'}` (Enabled: `{telegram_notifier.enabled}`)\n"
         f"- **Calendar & Outcomes Channel ID:** `{telegram_notifier.calendar_chat_id or 'Not Set'}` (Enabled: `{telegram_notifier.calendar_enabled}`)\n"
+        f"- **Morning Dispatch Format:** `{format_mode}`\n"
         f"- **Daily IST Automation:** 7:00 AM Today Snapshot=`{auto_today_7am}` | 7:05 AM Tomorrow Snapshot=`{auto_tom_705am}` | 7:00 AM Pre-Holiday Alert=`{auto_hol_7am}`"
     )
 
@@ -1033,9 +1063,13 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
             with gr.Row():
                 cal_sync_btn = gr.Button("🔄 Sync All 5 Markets & Refresh Timers", variant="primary", scale=1)
                 btn_sync_gcal = gr.Button("📅 Sync to Google Calendar (1h Alert)", variant="secondary", scale=1)
-                btn_push_today = gr.Button("🌅 Send Today's Snapshot (5 Separate Market Msgs)", variant="secondary", scale=1)
-                btn_push_tomorrow = gr.Button("🌄 Send Tomorrow's Snapshot (5 Separate Market Msgs)", variant="secondary", scale=1)
-                btn_push_holiday = gr.Button("🏖️ Send Next-Day Holiday Alert (Trader Notice)", variant="secondary", scale=1)
+                btn_push_today_photo = gr.Button("📸 Send Today's Infographic Cards (5 Regulators)", variant="primary", scale=1)
+                btn_push_tomorrow_photo = gr.Button("📸 Send Tomorrow's Infographic Cards (5 Regulators)", variant="secondary", scale=1)
+                btn_push_holiday = gr.Button("🏖️ Send Next-Day Holiday Alert", variant="secondary", scale=1)
+
+            with gr.Row():
+                btn_push_today = gr.Button("💬 Send Today's Text Snapshot (5 Markets)", variant="secondary", scale=1)
+                btn_push_tomorrow = gr.Button("💬 Send Tomorrow's Text Snapshot (5 Markets)", variant="secondary", scale=1)
 
             cal_action_msg = gr.Markdown()
 
@@ -1111,6 +1145,8 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
             cal_market_filter.change(get_calendar_tables, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_table, holidays_table])
             cal_sync_btn.click(sync_and_refresh_calendar, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_table, holidays_table])
             btn_sync_gcal.click(trigger_sync_google_cal, outputs=[cal_action_msg])
+            btn_push_today_photo.click(push_today_photo_snapshot_all_markets, outputs=[cal_action_msg])
+            btn_push_tomorrow_photo.click(push_tomorrow_photo_snapshot_all_markets, outputs=[cal_action_msg])
             btn_push_today.click(push_today_snapshot_all_markets, outputs=[cal_action_msg])
             btn_push_tomorrow.click(push_tomorrow_snapshot_all_markets, outputs=[cal_action_msg])
             btn_push_holiday.click(push_holiday_check_alert, outputs=[cal_action_msg])
@@ -1179,6 +1215,10 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                         label="🏖️ 07:00 AM IST — Auto-Forward Next-Day Trading Holiday Alert (1 Day Before NSE/BSE/MCX/NYSE Holiday)",
                         value=telegram_notifier.auto_holiday_7am
                     )
+                    adm_send_as_photos = gr.Checkbox(
+                        label="📸 Deliver Morning Calendar Snapshots as Infographic Photo Cards (Details rendered directly in image)",
+                        value=getattr(telegram_notifier, "send_as_photos", True)
+                    )
                     gr.Markdown("**⚡ Real-Time Individual Event Triggers:**")
                     with gr.Row():
                         adm_cal_countdown = gr.Checkbox(label="⏰ T-15m Countdown Alerts", value=telegram_notifier.alert_on_countdown)
@@ -1195,7 +1235,8 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                     adm_news_token, adm_news_chat, adm_news_enabled,
                     adm_cal_token, adm_cal_chat, adm_cal_enabled,
                     adm_cal_countdown, adm_cal_outcome, adm_cal_linked,
-                    adm_auto_today_7am, adm_auto_tom_705am, adm_auto_hol_7am
+                    adm_auto_today_7am, adm_auto_tom_705am, adm_auto_hol_7am,
+                    adm_send_as_photos
                 ],
                 outputs=[adm_tg_status]
             )

@@ -11,6 +11,7 @@ import requests
 
 from telegram_notifier import telegram_notifier
 from google_calendar_manager import google_calendar_manager
+from calendar_card_generator import calendar_card_generator
 
 logger = logging.getLogger("CalendarEngine")
 
@@ -1732,14 +1733,105 @@ class MarketCalendarEngine:
     #  BATCH DISPATCHERS FOR 7:00 AM TODAY, 7:05 AM TOMORROW & HOLIDAYS
     # ─────────────────────────────────────────────────────────────
 
+    def format_market_photo_caption(
+        self,
+        market: str,
+        target_date: str,
+        mode: str = "TODAY",
+        day_events: Optional[List[Dict]] = None
+    ) -> str:
+        """
+        Creates a clean, informative caption (under 1024 characters) for Telegram sendPhoto.
+        The full schedule details are baked directly inside the infographic photo itself.
+        """
+        mkt = market.upper()
+        meta = MARKET_META.get(mkt, MARKET_META["NSE"])
+        events = day_events or []
+        high_impact = [e for e in events if e.get("impact", "").upper() == "HIGH"]
+
+        try:
+            dt_obj = datetime.strptime(target_date, "%Y-%m-%d")
+            date_pretty = dt_obj.strftime("%A, %d %b %Y")
+        except Exception:
+            date_pretty = target_date
+
+        report_title = "TODAY'S CALENDAR INFOGRAPHIC" if mode == "TODAY" else "TOMORROW'S LINED-UP INFOGRAPHIC"
+        hol = self.get_market_holiday_on_date(mkt, target_date)
+
+        caption = (
+            f"{meta['badge']} <b>{meta['title']}</b>\n"
+            f"📋 <b>{report_title}</b>\n"
+            f"🗓 <code>{date_pretty}</code>  |  📊 <b>Total Events:</b> <b>{len(events)}</b>\n"
+        )
+        if hol:
+            caption += f"🏖️ <b>Trading Holiday:</b> <i>{hol.get('description', 'Market Closed')} ({hol.get('trading_status', 'Closed')})</i>\n"
+
+        if high_impact:
+            caption += f"\n🔥 <b>Key High-Impact Catalysts ({len(high_impact)}):</b>\n"
+            for ev in high_impact[:3]:
+                t = ev.get("time", "10:00")
+                sym = ev.get("symbol", mkt)
+                ev_name = ev.get("event", "")[:35]
+                caption += f"• <b>[{t} IST]</b> <code>{sym}</code> — {ev_name}\n"
+
+        # One-click Google Calendar add link for the top high impact event (if available)
+        if high_impact:
+            top_ev = high_impact[0]
+            gcal_url = google_calendar_manager.generate_one_click_url(top_ev)
+            caption += f"\n📅 <a href='{gcal_url}'>Add Key Catalyst to Google Calendar (1-Click)</a>\n"
+
+        caption += f"\n━━━━━━━━━━━━━━━━━━━━━━\n<i>— EPM PRO Visual Calendar Engine ({mkt})</i>"
+        return caption[:1020]
+
+    def _dispatch_markets_photos(self, target_date: str, mode: str = "TODAY") -> tuple[bool, str]:
+        """Iterates through all 5 markets, generates branded HD infographic cards, and sends them as Telegram photos."""
+        photo_items = []
+        for mkt in MARKETS_ORDER:
+            try:
+                all_events = self.get_enriched_events(filter_range="all", market_filter=mkt)
+                day_events = [e for e in all_events if e.get("date") == target_date]
+                hol = self.get_market_holiday_on_date(mkt, target_date)
+
+                png_bytes = calendar_card_generator.render_market_calendar_card(
+                    market=mkt,
+                    target_date=target_date,
+                    events=day_events,
+                    mode=mode,
+                    holiday_info=hol
+                )
+                caption = self.format_market_photo_caption(
+                    market=mkt,
+                    target_date=target_date,
+                    mode=mode,
+                    day_events=day_events
+                )
+                photo_items.append((png_bytes, caption))
+            except Exception as e:
+                logger.error(f"Error rendering calendar photo card for {mkt}: {e}")
+
+        if not photo_items:
+            return False, "Failed to render any market calendar photo cards."
+
+        return telegram_notifier.send_calendar_photos_batch(photo_items)
+
+    def dispatch_all_markets_today_photo_snapshot(self) -> tuple[bool, str]:
+        """Builds and sends 5 separate visual infographic photo cards (NSE, BSE, MCX, CRYPTO, NYSE) to Telegram."""
+        today_str = now_ist().strftime("%Y-%m-%d")
+        return self._dispatch_markets_photos(today_str, mode="TODAY")
+
+    def dispatch_all_markets_tomorrow_photo_snapshot(self) -> tuple[bool, str]:
+        """Builds and sends 5 separate Tomorrow's visual infographic photo cards (NSE, BSE, MCX, CRYPTO, NYSE) to Telegram."""
+        tomorrow_str = (now_ist() + timedelta(days=1)).strftime("%Y-%m-%d")
+        return self._dispatch_markets_photos(tomorrow_str, mode="TOMORROW")
+
     def dispatch_all_markets_today_snapshot(self) -> tuple[bool, str]:
-        """Builds and sends 5 separate Today's Snapshot messages (NSE, BSE, MCX, CRYPTO, NYSE)."""
+        """Builds and sends 5 separate Today's Snapshot text messages (NSE, BSE, MCX, CRYPTO, NYSE)."""
         today_str = now_ist().strftime("%Y-%m-%d")
         messages = [self.format_market_snapshot_message(mkt, today_str, mode="TODAY") for mkt in MARKETS_ORDER]
         return telegram_notifier.send_calendar_messages_batch(messages)
 
     def dispatch_all_markets_tomorrow_snapshot(self) -> tuple[bool, str]:
-        """Builds and sends 5 separate Tomorrow's Lined-Up Snapshot messages (NSE, BSE, MCX, CRYPTO, NYSE)."""
+        """Builds and sends 5 separate Tomorrow's Lined-Up Snapshot text messages (NSE, BSE, MCX, CRYPTO, NYSE)."""
         tomorrow_str = (now_ist() + timedelta(days=1)).strftime("%Y-%m-%d")
         messages = [self.format_market_snapshot_message(mkt, tomorrow_str, mode="TOMORROW") for mkt in MARKETS_ORDER]
         return telegram_notifier.send_calendar_messages_batch(messages)
@@ -2005,8 +2097,11 @@ class MarketCalendarEngine:
         # ── 2. 07:00 AM IST: Today's Complete Events & Timer Snapshot (Per Market) ──
         if curr.hour >= 7 and self.last_today_snapshot_date != today_str:
             if telegram_notifier.calendar_enabled and telegram_notifier.auto_daily_today_7am and telegram_notifier.is_calendar_configured():
-                logger.info(f"Dispatching 07:00 AM IST Today's Snapshot across {MARKETS_ORDER}...")
-                self.dispatch_all_markets_today_snapshot()
+                logger.info(f"Dispatching 07:00 AM IST Today's Snapshot across {MARKETS_ORDER} (send_as_photos={getattr(telegram_notifier, 'send_as_photos', True)})...")
+                if getattr(telegram_notifier, "send_as_photos", True):
+                    self.dispatch_all_markets_today_photo_snapshot()
+                else:
+                    self.dispatch_all_markets_today_snapshot()
                 self.last_today_snapshot_date = today_str
                 self._save_state()
             elif not telegram_notifier.is_calendar_configured():
@@ -2018,8 +2113,11 @@ class MarketCalendarEngine:
         # ── 3. 07:05 AM IST: Tomorrow's Lined-Up Events Snapshot (Per Market) ──
         if (curr.hour > 7 or (curr.hour == 7 and curr.minute >= 5)) and self.last_tomorrow_snapshot_date != today_str:
             if telegram_notifier.calendar_enabled and telegram_notifier.auto_daily_tomorrow_705am and telegram_notifier.is_calendar_configured():
-                logger.info(f"Dispatching 07:05 AM IST Tomorrow's Lined-Up Snapshot across {MARKETS_ORDER}...")
-                self.dispatch_all_markets_tomorrow_snapshot()
+                logger.info(f"Dispatching 07:05 AM IST Tomorrow's Lined-Up Snapshot across {MARKETS_ORDER} (send_as_photos={getattr(telegram_notifier, 'send_as_photos', True)})...")
+                if getattr(telegram_notifier, "send_as_photos", True):
+                    self.dispatch_all_markets_tomorrow_photo_snapshot()
+                else:
+                    self.dispatch_all_markets_tomorrow_snapshot()
                 self.last_tomorrow_snapshot_date = today_str
                 self._save_state()
             elif not telegram_notifier.is_calendar_configured():
