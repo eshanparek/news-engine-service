@@ -632,47 +632,47 @@ default_wa_selected = [s["name"] for s in news_worker.sources if s.get("forward_
 
 # ─── Custom Responsive CSS (100% Full-Width Display, Zero Horizontal Scroll) ─
 
-# ─── Modern Financial Terminal Design System (CSS Architecture & Design Tokens) ──
+# ─── Clean Modern Financial Terminal (Crisp White Theme, Uniform Typography) ──
 
 CUSTOM_CSS = """
 /* 1. Google Fonts Import: Inter (UI/Body) & JetBrains Mono (Data/Numbers/Timers) */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
-/* 2. CSS Design Tokens on :root */
+/* 2. CSS Design Tokens on :root (Clean White Theme) */
 :root {
     --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     
-    --bg-page: #0b0f19;
-    --bg-surface: #111827;
-    --bg-surface-elevated: #1f2937;
-    --bg-surface-subtle: rgba(255, 255, 255, 0.03);
+    --bg-page: #ffffff;
+    --bg-surface: #ffffff;
+    --bg-surface-elevated: #f8fafc;
+    --bg-surface-subtle: #f1f5f9;
     
-    --border-color: rgba(255, 255, 255, 0.08);
-    --border-highlight: rgba(59, 130, 246, 0.4);
+    --border-color: #e2e8f0;
+    --border-highlight: #3b82f6;
     
-    --text-primary: #f3f4f6;
-    --text-secondary: #9ca3af;
-    --text-muted: #6b7280;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #64748b;
     
-    --accent-blue: #3b82f6;
-    --accent-emerald: #10b981;
-    --accent-amber: #f59e0b;
-    --accent-rose: #f43f5e;
+    --accent-blue: #2563eb;
+    --accent-emerald: #059669;
+    --accent-amber: #d97706;
+    --accent-rose: #e11d48;
     
     --radius-sm: 6px;
     --radius-md: 10px;
     --radius-lg: 14px;
 }
 
-/* 3. Global Reset & Typography Baseline */
+/* 3. Global Reset & Pure White Baseline */
 html, body {
     width: 100% !important;
     max-width: 100vw !important;
     overflow-x: hidden !important;
     margin: 0 !important;
     padding: 0 !important;
-    background-color: var(--bg-page) !important;
+    background-color: #ffffff !important;
     color: var(--text-primary) !important;
     font-family: var(--font-sans) !important;
     font-size: 13px !important;
@@ -685,21 +685,22 @@ html, body {
     box-sizing: border-box !important;
 }
 
-/* 4. Gradio Root Layout Container */
+/* 4. Gradio Root Layout Container (Always White) */
 .gradio-container, 
 .gradio-container > .main, 
 .gradio-container > .wrap,
-div[class*="gradio-container"] {
+div[class*="gradio-container"],
+.dark, .light {
     max-width: 100% !important;
     width: 100% !important;
     margin: 0 !important;
     padding: 10px 24px !important;
-    background-color: var(--bg-page) !important;
+    background-color: #ffffff !important;
     color: var(--text-primary) !important;
     overflow-x: hidden !important;
 }
 
-/* 5. Sleek Header Bar & Status Pill */
+/* 5. Headers & Status Bar */
 h1, h2, h3, h4 {
     font-family: var(--font-sans) !important;
     color: var(--text-primary) !important;
@@ -710,23 +711,24 @@ h1, h2, h3, h4 {
 h1 {
     font-size: 20px !important;
     font-weight: 700 !important;
+    color: #0f172a !important;
     display: flex;
     align-items: center;
     gap: 8px;
 }
 
 h3 {
-    font-size: 14px !important;
-    font-weight: 600 !important;
+    font-size: 13.5px !important;
+    font-weight: 700 !important;
     text-transform: uppercase;
     letter-spacing: 0.05em !important;
-    color: var(--text-secondary) !important;
+    color: #1e293b !important;
 }
 
 /* 6. Tabs & Navigation Bar */
 .tabs, .tab-nav {
-    border-bottom: 1px solid var(--border-color) !important;
-    background: transparent !important;
+    border-bottom: 2px solid #e2e8f0 !important;
+    background: #ffffff !important;
     gap: 8px !important;
 }
 
@@ -734,23 +736,23 @@ button[role="tab"] {
     font-family: var(--font-sans) !important;
     font-size: 13px !important;
     font-weight: 600 !important;
-    padding: 8px 16px !important;
+    padding: 10px 18px !important;
     border-radius: var(--radius-sm) var(--radius-sm) 0 0 !important;
     border: none !important;
-    color: var(--text-secondary) !important;
+    color: #64748b !important;
     background: transparent !important;
     transition: all 0.15s ease-in-out !important;
 }
 
 button[role="tab"]:hover {
-    color: var(--text-primary) !important;
-    background: var(--bg-surface-subtle) !important;
+    color: #0f172a !important;
+    background: #f8fafc !important;
 }
 
 button[role="tab"].selected {
-    color: #60a5fa !important;
-    border-bottom: 2px solid #3b82f6 !important;
-    background: rgba(59, 130, 246, 0.08) !important;
+    color: #2563eb !important;
+    border-bottom: 2px solid #2563eb !important;
+    background: #eff6ff !important;
 }
 
 /* 7. Action Buttons */
@@ -760,50 +762,50 @@ button.primary, .gr-button-primary {
     font-family: var(--font-sans) !important;
     font-weight: 600 !important;
     font-size: 12.5px !important;
-    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    border: 1px solid #1d4ed8 !important;
     border-radius: var(--radius-sm) !important;
     padding: 8px 14px !important;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+    box-shadow: 0 1px 3px rgba(37, 99, 235, 0.2) !important;
     transition: transform 0.1s ease, background 0.15s ease !important;
 }
 
 button.primary:hover, .gr-button-primary:hover {
-    background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+    background: linear-gradient(135deg, #1d4ed8, #1e40af) !important;
     transform: translateY(-1px);
 }
 
 button.secondary, .gr-button-secondary {
-    background: var(--bg-surface-elevated) !important;
-    color: var(--text-primary) !important;
+    background: #f8fafc !important;
+    color: #1e293b !important;
     font-family: var(--font-sans) !important;
-    font-weight: 500 !important;
+    font-weight: 600 !important;
     font-size: 12px !important;
-    border: 1px solid var(--border-color) !important;
+    border: 1px solid #cbd5e1 !important;
     border-radius: var(--radius-sm) !important;
     padding: 8px 12px !important;
     transition: all 0.15s ease !important;
 }
 
 button.secondary:hover, .gr-button-secondary:hover {
-    background: #374151 !important;
-    border-color: rgba(255, 255, 255, 0.2) !important;
+    background: #e2e8f0 !important;
+    border-color: #94a3b8 !important;
 }
 
-/* 8. Radios, Inputs & Controls */
-.gr-form, .form, input, textarea, select {
-    background-color: var(--bg-surface) !important;
-    border-color: var(--border-color) !important;
-    color: var(--text-primary) !important;
+/* 8. Radios, Inputs, Accordions & Forms */
+.gr-form, .form, input, textarea, select, .gr-box, .gr-panel {
+    background-color: #ffffff !important;
+    border-color: #cbd5e1 !important;
+    color: #0f172a !important;
     border-radius: var(--radius-sm) !important;
     font-family: var(--font-sans) !important;
 }
 
 input:focus, textarea:focus, select:focus {
-    border-color: var(--accent-blue) !important;
-    box-shadow: 0 0 0 1px var(--accent-blue) !important;
+    border-color: #2563eb !important;
+    box-shadow: 0 0 0 1px #2563eb !important;
 }
 
-/* 9. Professional Financial Data Tables (Fixed Layout & Crisp Typography) */
+/* 9. Professional Financial Data Tables (White Theme, High Contrast) */
 .table-wrap,
 .gradio-dataframe,
 div[data-testid="dataframe"],
@@ -812,8 +814,9 @@ div[data-testid="dataframe"],
     max-width: 100% !important;
     overflow-x: hidden !important;
     border-radius: var(--radius-md) !important;
-    border: 1px solid var(--border-color) !important;
-    background: var(--bg-surface) !important;
+    border: 1px solid #cbd5e1 !important;
+    background: #ffffff !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
 }
 
 table {
@@ -822,18 +825,19 @@ table {
     max-width: 100% !important;
     border-collapse: collapse !important;
     font-family: var(--font-sans) !important;
+    background: #ffffff !important;
 }
 
 thead th {
-    background-color: #162032 !important;
-    color: #94a3b8 !important;
+    background-color: #f1f5f9 !important;
+    color: #334155 !important;
     font-family: var(--font-sans) !important;
-    font-size: 11px !important;
+    font-size: 11.5px !important;
     font-weight: 700 !important;
     text-transform: uppercase !important;
     letter-spacing: 0.05em !important;
     padding: 9px 10px !important;
-    border-bottom: 1px solid var(--border-color) !important;
+    border-bottom: 2px solid #cbd5e1 !important;
     white-space: normal !important;
     vertical-align: middle !important;
     position: sticky !important;
@@ -843,69 +847,74 @@ thead th {
 
 tbody td {
     padding: 8px 10px !important;
-    font-size: 12px !important;
-    color: #e2e8f0 !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important;
+    font-size: 12.5px !important;
+    color: #0f172a !important;
+    border-bottom: 1px solid #e2e8f0 !important;
     vertical-align: middle !important;
     line-height: 1.4 !important;
     word-break: break-word !important;
     overflow-wrap: anywhere !important;
+    background: #ffffff !important;
 }
 
-tbody tr:nth-child(even) {
-    background-color: rgba(255, 255, 255, 0.015) !important;
+tbody tr:nth-child(even) td {
+    background-color: #f8fafc !important;
 }
 
-tbody tr:hover {
-    background-color: rgba(59, 130, 246, 0.06) !important;
+tbody tr:hover td {
+    background-color: #f0f7ff !important;
 }
 
 /* 10. Monospace Elements for Numbers, Dates, Timers */
 code, .timer-cell, pre {
     font-family: var(--font-mono) !important;
     font-size: 11.5px !important;
+    background: #f1f5f9 !important;
+    color: #0f172a !important;
+    padding: 2px 5px !important;
+    border-radius: 4px !important;
 }
 
 /* 11. Column Allocations for Optimal Text Hierarchy */
 
 /* Top Priority News Table */
-#top_news_table th:nth-child(1), #top_news_table td:nth-child(1) { width: 5.5% !important; text-align: center !important; font-family: var(--font-mono) !important; font-weight: 700 !important; color: #fbbf24 !important; }
+#top_news_table th:nth-child(1), #top_news_table td:nth-child(1) { width: 5.5% !important; text-align: center !important; font-family: var(--font-mono) !important; font-weight: 700 !important; color: #b45309 !important; }
 #top_news_table th:nth-child(2), #top_news_table td:nth-child(2) { width: 8% !important; text-align: center !important; font-weight: 600 !important; }
 #top_news_table th:nth-child(3), #top_news_table td:nth-child(3) { width: 6.5% !important; text-align: center !important; font-weight: 700 !important; }
-#top_news_table th:nth-child(4), #top_news_table td:nth-child(4) { width: 33% !important; font-weight: 600 !important; color: #f8fafc !important; }
-#top_news_table th:nth-child(5), #top_news_table td:nth-child(5) { width: 11% !important; color: #94a3b8 !important; }
-#top_news_table th:nth-child(6), #top_news_table td:nth-child(6) { width: 19% !important; color: #cbd5e1 !important; font-style: italic !important; }
-#top_news_table th:nth-child(7), #top_news_table td:nth-child(7) { width: 8% !important; font-size: 11px !important; color: #38bdf8 !important; }
-#top_news_table th:nth-child(8), #top_news_table td:nth-child(8) { width: 4% !important; text-align: center !important; font-family: var(--font-mono) !important; color: #94a3b8 !important; }
+#top_news_table th:nth-child(4), #top_news_table td:nth-child(4) { width: 33% !important; font-weight: 600 !important; color: #0f172a !important; }
+#top_news_table th:nth-child(5), #top_news_table td:nth-child(5) { width: 11% !important; color: #475569 !important; }
+#top_news_table th:nth-child(6), #top_news_table td:nth-child(6) { width: 19% !important; color: #334155 !important; font-style: italic !important; }
+#top_news_table th:nth-child(7), #top_news_table td:nth-child(7) { width: 8% !important; font-size: 11px !important; color: #0284c7 !important; font-weight: 600 !important; }
+#top_news_table th:nth-child(8), #top_news_table td:nth-child(8) { width: 4% !important; text-align: center !important; font-family: var(--font-mono) !important; color: #475569 !important; }
 #top_news_table th:nth-child(9), #top_news_table td:nth-child(9) { width: 5% !important; text-align: center !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #64748b !important; }
 
 /* General News Wire Table */
 #bottom_news_table th:nth-child(1), #bottom_news_table td:nth-child(1) { width: 7% !important; text-align: center !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #64748b !important; }
-#bottom_news_table th:nth-child(2), #bottom_news_table td:nth-child(2) { width: 12% !important; color: #38bdf8 !important; font-weight: 500 !important; }
-#bottom_news_table th:nth-child(3), #bottom_news_table td:nth-child(3) { width: 52% !important; font-weight: 500 !important; }
-#bottom_news_table th:nth-child(4), #bottom_news_table td:nth-child(4) { width: 6% !important; text-align: center !important; font-family: var(--font-mono) !important; color: #94a3b8 !important; }
+#bottom_news_table th:nth-child(2), #bottom_news_table td:nth-child(2) { width: 12% !important; color: #0284c7 !important; font-weight: 600 !important; }
+#bottom_news_table th:nth-child(3), #bottom_news_table td:nth-child(3) { width: 52% !important; font-weight: 500 !important; color: #0f172a !important; }
+#bottom_news_table th:nth-child(4), #bottom_news_table td:nth-child(4) { width: 6% !important; text-align: center !important; font-family: var(--font-mono) !important; color: #475569 !important; }
 #bottom_news_table th:nth-child(5), #bottom_news_table td:nth-child(5) { width: 8% !important; text-align: center !important; }
-#bottom_news_table th:nth-child(6), #bottom_news_table td:nth-child(6) { width: 15% !important; word-break: break-all !important; font-size: 11px !important; color: #60a5fa !important; }
+#bottom_news_table th:nth-child(6), #bottom_news_table td:nth-child(6) { width: 15% !important; word-break: break-all !important; font-size: 11px !important; color: #2563eb !important; }
 
 /* Multi-Market Calendar Table */
 #calendar_table th:nth-child(1), #calendar_table td:nth-child(1) { width: 6% !important; font-family: var(--font-mono) !important; font-size: 10.5px !important; color: #64748b !important; }
 #calendar_table th:nth-child(2), #calendar_table td:nth-child(2) { width: 5% !important; text-align: center !important; font-weight: 600 !important; }
 #calendar_table th:nth-child(3), #calendar_table td:nth-child(3) { width: 6% !important; text-align: center !important; font-family: var(--font-mono) !important; }
-#calendar_table th:nth-child(4), #calendar_table td:nth-child(4) { width: 5% !important; text-align: center !important; font-family: var(--font-mono) !important; font-weight: 600 !important; color: #38bdf8 !important; }
-#calendar_table th:nth-child(5), #calendar_table td:nth-child(5) { width: 8% !important; text-align: center !important; font-family: var(--font-mono) !important; font-weight: 700 !important; color: #fbbf24 !important; }
-#calendar_table th:nth-child(6), #calendar_table td:nth-child(6) { width: 8% !important; font-weight: 600 !important; color: #f8fafc !important; }
-#calendar_table th:nth-child(7), #calendar_table td:nth-child(7) { width: 23% !important; font-weight: 500 !important; }
+#calendar_table th:nth-child(4), #calendar_table td:nth-child(4) { width: 5% !important; text-align: center !important; font-family: var(--font-mono) !important; font-weight: 700 !important; color: #0284c7 !important; }
+#calendar_table th:nth-child(5), #calendar_table td:nth-child(5) { width: 8% !important; text-align: center !important; font-family: var(--font-mono) !important; font-weight: 700 !important; color: #d97706 !important; }
+#calendar_table th:nth-child(6), #calendar_table td:nth-child(6) { width: 8% !important; font-weight: 600 !important; color: #0f172a !important; }
+#calendar_table th:nth-child(7), #calendar_table td:nth-child(7) { width: 23% !important; font-weight: 600 !important; color: #0f172a !important; }
 #calendar_table th:nth-child(8), #calendar_table td:nth-child(8) { width: 5% !important; text-align: center !important; font-weight: 700 !important; }
-#calendar_table th:nth-child(9), #calendar_table td:nth-child(9) { width: 6% !important; text-align: right !important; font-family: var(--font-mono) !important; color: #94a3b8 !important; }
-#calendar_table th:nth-child(10), #calendar_table td:nth-child(10) { width: 6% !important; text-align: right !important; font-family: var(--font-mono) !important; color: #94a3b8 !important; }
-#calendar_table th:nth-child(11), #calendar_table td:nth-child(11) { width: 8% !important; text-align: right !important; font-family: var(--font-mono) !important; font-weight: 700 !important; color: #34d399 !important; }
+#calendar_table th:nth-child(9), #calendar_table td:nth-child(9) { width: 6% !important; text-align: right !important; font-family: var(--font-mono) !important; color: #475569 !important; }
+#calendar_table th:nth-child(10), #calendar_table td:nth-child(10) { width: 6% !important; text-align: right !important; font-family: var(--font-mono) !important; color: #475569 !important; }
+#calendar_table th:nth-child(11), #calendar_table td:nth-child(11) { width: 8% !important; text-align: right !important; font-family: var(--font-mono) !important; font-weight: 700 !important; color: #059669 !important; }
 #calendar_table th:nth-child(12), #calendar_table td:nth-child(12) { width: 6% !important; text-align: center !important; font-weight: 600 !important; }
-#calendar_table th:nth-child(13), #calendar_table td:nth-child(13) { width: 8% !important; font-size: 11px !important; color: #60a5fa !important; }
+#calendar_table th:nth-child(13), #calendar_table td:nth-child(13) { width: 8% !important; font-size: 11px !important; color: #2563eb !important; }
 
 /* Multi-Market Holidays Table */
 #holidays_table th:nth-child(1), #holidays_table td:nth-child(1) { width: 8% !important; text-align: center !important; font-family: var(--font-mono) !important; }
 #holidays_table th:nth-child(2), #holidays_table td:nth-child(2) { width: 7% !important; text-align: center !important; }
-#holidays_table th:nth-child(3), #holidays_table td:nth-child(3) { width: 23% !important; font-weight: 600 !important; color: #f8fafc !important; }
+#holidays_table th:nth-child(3), #holidays_table td:nth-child(3) { width: 23% !important; font-weight: 600 !important; color: #0f172a !important; }
 #holidays_table th:nth-child(4), #holidays_table td:nth-child(4) { width: 12% !important; text-align: center !important; }
 #holidays_table th:nth-child(5), #holidays_table td:nth-child(5) { width: 12% !important; text-align: center !important; }
 #holidays_table th:nth-child(6), #holidays_table td:nth-child(6) { width: 15% !important; text-align: center !important; }
@@ -913,12 +922,12 @@ code, .timer-cell, pre {
 #holidays_table th:nth-child(8), #holidays_table td:nth-child(8) { width: 10% !important; text-align: center !important; }
 
 /* Ingested News Sources Table */
-#sources_table th:nth-child(1), #sources_table td:nth-child(1) { width: 16% !important; font-weight: 600 !important; }
-#sources_table th:nth-child(2), #sources_table td:nth-child(2) { width: 12% !important; color: #94a3b8 !important; }
+#sources_table th:nth-child(1), #sources_table td:nth-child(1) { width: 16% !important; font-weight: 600 !important; color: #0f172a !important; }
+#sources_table th:nth-child(2), #sources_table td:nth-child(2) { width: 12% !important; color: #475569 !important; }
 #sources_table th:nth-child(3), #sources_table td:nth-child(3) { width: 10% !important; text-align: center !important; }
 #sources_table th:nth-child(4), #sources_table td:nth-child(4) { width: 12% !important; text-align: center !important; font-weight: 600 !important; }
 #sources_table th:nth-child(5), #sources_table td:nth-child(5) { width: 12% !important; text-align: center !important; font-weight: 600 !important; }
-#sources_table th:nth-child(6), #sources_table td:nth-child(6) { width: 38% !important; word-break: break-all !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #60a5fa !important; }
+#sources_table th:nth-child(6), #sources_table td:nth-child(6) { width: 38% !important; word-break: break-all !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #2563eb !important; }
 """
 
 
