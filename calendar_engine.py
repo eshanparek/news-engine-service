@@ -10,6 +10,7 @@ from typing import List, Dict, Optional, Set
 import requests
 
 from telegram_notifier import telegram_notifier
+from google_calendar_manager import google_calendar_manager
 
 logger = logging.getLogger("CalendarEngine")
 
@@ -18,6 +19,35 @@ CALENDAR_STATE_FILE = "calendar_state.json"
 
 # Canonical 5-Market Order for Separate Reporting & Filtering
 MARKETS_ORDER = ["NSE", "BSE", "MCX", "CRYPTO", "NYSE"]
+
+# Core Benchmark & Mega-Cap Tickers/Macro for High-Impact Individual Alert Gatekeeping
+BENCHMARK_KEYWORDS = {
+    # Indian Benchmark & Mega-Caps
+    "NIFTY", "SENSEX", "BANKNIFTY", "RBI", "REPO RATE", "MPC", "CPI", "IIP", "GDP",
+    "RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK", "SBIN", "BHARTIARTL", "ITC",
+    "LT", "HINDUNILVR", "TATAMOTORS", "BAJFINANCE", "MARUTI", "KOTAKBANK", "AXISBANK",
+    "SUNPHARMA", "TITAN", "ULTRACEMCO", "NTPC", "ONGC", "POWERGRID", "ADANIENT",
+    # Global Macro, US & Commodities
+    "FED", "FOMC", "US CPI", "NON-FARM PAYROLLS", "NFP", "US GDP", "EIA", "CRUDE",
+    "BRENT", "OPEC", "BAKER HUGHES", "LBMA", "COMEX", "LME", "COPPER", "GOLD", "SILVER",
+    # Crypto Benchmarks
+    "BITCOIN", "BTC", "ETHEREUM", "ETH", "SOLANA", "SOL", "SPOT ETF", "OPTIONS EXPIRY"
+}
+
+def is_benchmark_event(ev: Dict) -> bool:
+    """Checks whether an event qualifies as a critical market benchmark for individual spontaneous alerts."""
+    if ev.get("impact", "").upper() != "HIGH":
+        return False
+
+    sym = str(ev.get("symbol", "")).upper()
+    name = str(ev.get("event", "")).upper()
+    cat = str(ev.get("category", "")).upper()
+    full_text = f"{sym} {name} {cat}"
+
+    for kw in BENCHMARK_KEYWORDS:
+        if re.search(rf'\b{re.escape(kw)}\b', full_text):
+            return True
+    return False
 
 MARKET_META = {
     "NSE": {
@@ -1581,20 +1611,39 @@ class MarketCalendarEngine:
             )
 
         if day_events:
-            for idx, e in enumerate(day_events, 1):
-                imp = e.get("impact", "HIGH")
-                imp_icon = "🔥 HIGH" if imp == "HIGH" else ("⚡ MEDIUM" if imp == "MEDIUM" else "📌 LOW")
-                msg += (
-                    f"📌 <b>{idx}. [{e['time']} IST] {e['symbol']} — {e['event']}</b>\n"
-                    f"   ⏱ <b>Timer:</b> <code>{e['timer']}</code>  |  <b>Impact:</b> {imp_icon}\n"
-                    f"   📉 <b>Prev:</b> <code>{e['previous']}</code>  |  🎯 <b>Forecast:</b> <code>{e['forecast']}</code>\n"
-                    f"   🏁 <b>Outcome:</b> <b>{e['actual']}</b>  |  📊 <b>Verdict:</b> <b>{e['outcome_sentiment']}</b>\n"
-                )
-                if e.get("details"):
-                    msg += f"   💡 <i>{e['details'][:140]}</i>\n"
-                if e.get("linked_news_title") and e.get("linked_news_url"):
-                    msg += f"   🔗 <a href='{e['linked_news_url']}'>{e['linked_news_title'][:75]}</a>\n"
-                msg += "\n"
+            # Separate High-Impact Benchmark Catalysts from Standard Market Events
+            high_impact_events = [e for e in day_events if e.get("impact", "").upper() == "HIGH"]
+            standard_events = [e for e in day_events if e.get("impact", "").upper() != "HIGH"]
+
+            if high_impact_events:
+                msg += "🚨 <b><u>KEY HIGH-IMPACT BENCHMARK CATALYSTS (WATCH CLOSELY)</u></b>\n"
+                msg += "──────────────────────\n"
+                for idx, e in enumerate(high_impact_events, 1):
+                    gcal_url = google_calendar_manager.generate_one_click_url(e)
+                    msg += (
+                        f"🔥 <b>{idx}. [{e['time']} IST] <b>{e['symbol']}</b> — <b>{e['event']}</b></b>\n"
+                        f"   ⏱ <b>Timer:</b> <code>{e['timer']}</code>  |  <b>Priority:</b> <b>🔥 HIGH IMPACT</b>\n"
+                        f"   📉 <b>Prev:</b> <code>{e['previous']}</code>  |  🎯 <b>Forecast:</b> <code>{e['forecast']}</code>\n"
+                        f"   🏁 <b>Outcome:</b> <b>{e['actual']}</b>  |  📊 <b>Verdict:</b> <b>{e['outcome_sentiment']}</b>\n"
+                        f"   📅 <a href='{gcal_url}'><b>+ Add to Google Calendar (1h Alert)</b></a>\n"
+                    )
+                    if e.get("details"):
+                        msg += f"   💡 <i>{e['details'][:140]}</i>\n"
+                    if e.get("linked_news_title") and e.get("linked_news_url"):
+                        msg += f"   🔗 <a href='{e['linked_news_url']}'>{e['linked_news_title'][:75]}</a>\n"
+                    msg += "\n"
+
+            if standard_events:
+                msg += "📋 <b><u>COMPLETE SCHEDULE OF REMAINING MARKET EVENTS</u></b>\n"
+                msg += "──────────────────────\n"
+                for idx, e in enumerate(standard_events, 1):
+                    msg += (
+                        f"📌 {idx}. <b>[{e['time']} IST]</b> {e['symbol']} — {e['event']}\n"
+                        f"   ⏱ <code>{e['timer']}</code> | Prev: {e['previous']} | Est: {e['forecast']} | Status: {e['actual']}\n"
+                    )
+                    if e.get("details"):
+                        msg += f"   💡 <i>{e['details'][:100]}</i>\n"
+                    msg += "\n"
         else:
             upcoming_mkt = [e for e in all_events if e.get("date", "") > target_date][:5]
             msg += f"• <i>No scheduled releases on {target_date} for {mkt}.</i>\n"
@@ -1642,6 +1691,8 @@ class MarketCalendarEngine:
             f"   🏁 <b>Outcome / Result:</b> <b>{event.get('actual', '⏳ Pending')}</b>\n"
             f"   📊 <b>Market Verdict:</b> <b>{event.get('outcome_sentiment', '⏳ PENDING')}</b>\n"
         )
+        gcal_url = google_calendar_manager.generate_one_click_url(event)
+        msg += f"   📅 <a href='{gcal_url}'><b>+ Add to Google Calendar (1h Alert)</b></a>\n"
         if event.get("details"):
             msg += f"   💡 <b>Result Context:</b> <i>{event['details']}</i>\n"
         if event.get("linked_news_title") and event.get("linked_news_url"):
@@ -1796,13 +1847,15 @@ class MarketCalendarEngine:
                         self.outcome_alerted.add(eid)
                         self._save_state()
                         ev_copy = dict(ev)
-                        if self.initial_boot_complete:
+                        if self.initial_boot_complete and is_benchmark_event(ev_copy):
                             formatted_msg = self.format_single_event_message(ev_copy, alert_type="LINKED_NEWS")
                             threading.Thread(
                                 target=telegram_notifier.send_calendar_alert,
                                 args=(ev_copy, "LINKED_NEWS", formatted_msg),
                                 daemon=True
                             ).start()
+                        else:
+                            logger.debug(f"Silenced non-benchmark live outcome alert for {eid}")
 
             if not matched_any:
                 is_result_headline = any(
@@ -1849,16 +1902,19 @@ class MarketCalendarEngine:
                             "linked_news_url": news_item.get("link", ""),
                             "keywords": []
                         }
-                        self.events[dyn_id] = new_ev
-                        self.outcome_alerted.add(dyn_id)
-                        self._save_state()
-                        if self.initial_boot_complete:
-                            formatted_msg = self.format_single_event_message(new_ev, alert_type="LINKED_NEWS")
-                            threading.Thread(
-                                target=telegram_notifier.send_calendar_alert,
-                                args=(dict(new_ev), "LINKED_NEWS", formatted_msg),
-                                daemon=True
-                            ).start()
+                        if is_benchmark_event(new_ev):
+                            self.events[dyn_id] = new_ev
+                            self.outcome_alerted.add(dyn_id)
+                            self._save_state()
+                            if self.initial_boot_complete:
+                                formatted_msg = self.format_single_event_message(new_ev, alert_type="LINKED_NEWS")
+                                threading.Thread(
+                                    target=telegram_notifier.send_calendar_alert,
+                                    args=(dict(new_ev), "LINKED_NEWS", formatted_msg),
+                                    daemon=True
+                                ).start()
+                        else:
+                            logger.debug(f"Ignored non-benchmark dynamic event creation: {title[:50]}")
 
     # ─────────────────────────────────────────────────────────────
     #  MANUAL EVENT / OUTCOME UPSERT FROM ADMIN UI
@@ -1980,21 +2036,27 @@ class MarketCalendarEngine:
             eid = ev["id"]
             timer_str, status_code, diff_sec = self.compute_event_timer(ev)
 
-            # A. T-15 Minute Countdown Alert (0 < diff_sec <= 900)
+            # A. T-15 Minute Countdown Alert (0 < diff_sec <= 900) - Benchmark High-Impact Events Only!
             if 0 < diff_sec <= 900 and eid not in self.countdown_alerted:
                 self.countdown_alerted.add(eid)
                 self._save_state()
-                formatted_msg = self.format_single_event_message(ev, alert_type="COUNTDOWN")
-                telegram_notifier.send_calendar_alert(ev, alert_type="COUNTDOWN", formatted_html=formatted_msg)
+                if is_benchmark_event(ev):
+                    formatted_msg = self.format_single_event_message(ev, alert_type="COUNTDOWN")
+                    telegram_notifier.send_calendar_alert(ev, alert_type="COUNTDOWN", formatted_html=formatted_msg)
+                else:
+                    logger.debug(f"Silenced non-benchmark countdown alert for {eid}")
 
-            # B. Individual Event Unfolded / Outcome Released Alert
+            # B. Individual Event Unfolded / Outcome Released Alert - Benchmark High-Impact Events Only!
             actual = str(ev.get("actual", "⏳ Pending"))
             has_actual = not actual.startswith("⏳") and actual != ""
             if has_actual and ev.get("date") == today_str and eid not in self.outcome_alerted:
                 self.outcome_alerted.add(eid)
                 self._save_state()
-                formatted_msg = self.format_single_event_message(ev, alert_type="OUTCOME")
-                telegram_notifier.send_calendar_alert(ev, alert_type="OUTCOME", formatted_html=formatted_msg)
+                if is_benchmark_event(ev):
+                    formatted_msg = self.format_single_event_message(ev, alert_type="OUTCOME")
+                    telegram_notifier.send_calendar_alert(ev, alert_type="OUTCOME", formatted_html=formatted_msg)
+                else:
+                    logger.debug(f"Silenced non-benchmark outcome alert for {eid}")
 
     # ─────────────────────────────────────────────────────────────
     #  TABLE & API QUERY HELPERS
@@ -2092,37 +2154,8 @@ class MarketCalendarEngine:
         }
 
     def export_ical_ics(self) -> str:
-        """Generates standard iCalendar (.ics) content for Google/Apple/Outlook Calendar syncing."""
-        lines = [
-            "BEGIN:VCALENDAR",
-            "VERSION:2.0",
-            "PRODID:-//EPM Pro//Full-Market Calendar Engine//EN",
-            "CALSCALE:GREGORIAN",
-            "METHOD:PUBLISH",
-            "X-WR-CALNAME:EPM Pro Full-Market Calendar (NSE, BSE, MCX, Crypto, NYSE)",
-            "X-WR-TIMEZONE:Asia/Kolkata"
-        ]
-        for ev in self.get_enriched_events("all"):
-            try:
-                dt_start = datetime.strptime(f"{ev['date']} {ev['time']}", "%Y-%m-%d %H:%M")
-                dt_end = dt_start + timedelta(minutes=30)
-                uid = f"{ev['id']}@epmpro.calendar"
-                mkt = ev.get("market", "NSE")
-                summary = f"[{mkt} - {ev['impact']}] {ev['symbol']}: {ev['event']}"
-                desc = f"Market: {mkt} | Previous: {ev['previous']} | Forecast: {ev['forecast']} | Actual: {ev['actual']} ({ev['outcome_sentiment']})"
-                lines.extend([
-                    "BEGIN:VEVENT",
-                    f"UID:{uid}",
-                    f"DTSTART:{dt_start.strftime('%Y%m%dT%H%M%S')}",
-                    f"DTEND:{dt_end.strftime('%Y%m%dT%H%M%S')}",
-                    f"SUMMARY:{summary}",
-                    f"DESCRIPTION:{desc}",
-                    "END:VEVENT"
-                ])
-            except Exception:
-                continue
-        lines.append("END:VCALENDAR")
-        return "\r\n".join(lines)
+        """Generates standard RFC 5545 iCalendar (.ics) content with 60-minute VALARM alerts for Google/Apple/Outlook Calendar."""
+        return google_calendar_manager.generate_enhanced_ics(self.get_enriched_events("all"))
 
     def run_calendar_loop(self):
         self.is_running = True

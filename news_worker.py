@@ -19,6 +19,7 @@ from ai_analyzer import ai_analyzer
 from telegram_notifier import telegram_notifier
 from whatsapp_notifier import whatsapp_notifier
 from calendar_engine import calendar_engine
+from semantic_dedup import semantic_clusterer
 
 logger = logging.getLogger("NewsWorker")
 
@@ -577,6 +578,13 @@ class NewsEngineWorker:
         with self.lock:
             if hid in self.alerted_hashes or is_hash_in_db(hid):
                 return
+            
+            # Semantic cross-wire duplicate suppression
+            is_dup, master = semantic_clusterer.check_duplicate_or_cluster(item)
+            if is_dup:
+                logger.info(f"Suppressed cross-wire duplicate story: '{item.get('title')[:60]}' (Clustered with '{master.get('title')[:60]}')")
+                return
+
             self.alerted_hashes.add(hid)
             record_hash_in_db(hid, item.get("title", ""))
 
@@ -625,7 +633,11 @@ class NewsEngineWorker:
             if h not in self.seen_hashes:
                 self.seen_hashes.add(h)
                 item["id"] = h
-                newly_arrived.append(item)
+                
+                # Check semantic cluster for the table view
+                is_dup, master = semantic_clusterer.check_duplicate_or_cluster(item)
+                if not is_dup:
+                    newly_arrived.append(item)
 
         if len(self.seen_hashes) > 3000:
             self.seen_hashes = set(list(self.seen_hashes)[-1500:])

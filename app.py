@@ -16,6 +16,7 @@ from ai_analyzer import ai_analyzer
 from telegram_notifier import telegram_notifier
 from whatsapp_notifier import whatsapp_notifier
 from calendar_engine import calendar_engine, now_ist, MARKETS_ORDER, MARKET_META
+from google_calendar_manager import google_calendar_manager
 
 # 1. Start Background Scraper, Scorer & Multi-Market Calendar Timer Daemons
 news_worker.start()
@@ -73,6 +74,13 @@ class AdminTelegramConfig(BaseModel):
     auto_daily_today_7am: Optional[bool] = True
     auto_daily_tomorrow_705am: Optional[bool] = True
     auto_holiday_7am: Optional[bool] = True
+
+
+class GoogleCalendarConfig(BaseModel):
+    calendar_id: str
+    service_account_json_str: Optional[str] = ""
+    service_account_file: Optional[str] = ""
+    enabled: Optional[bool] = True
 
 
 @app.get("/health")
@@ -233,6 +241,32 @@ def download_calendar_ics():
     return PlainTextResponse(content=ics_content, media_type="text/calendar")
 
 
+@app.post("/api/calendar/google/sync")
+def api_sync_google_calendar():
+    """Batch synchronizes all active market events to the target Google Calendar ID with 1-hr reminder alerts."""
+    events = calendar_engine.get_enriched_events(filter_range="all", market_filter="ALL")
+    success, fail = google_calendar_manager.sync_events_batch(events)
+    return {
+        "status": "completed",
+        "synced": success,
+        "failed": fail,
+        "total": len(events),
+        "calendar_id": google_calendar_manager.calendar_id,
+        "is_configured": google_calendar_manager.is_api_configured()
+    }
+
+
+@app.post("/api/calendar/google/config")
+def api_save_google_calendar_config(cfg: GoogleCalendarConfig):
+    saved = google_calendar_manager.save_config(
+        calendar_id=cfg.calendar_id,
+        service_account_json_str=cfg.service_account_json_str or "",
+        service_account_file=cfg.service_account_file or "",
+        enabled=bool(cfg.enabled)
+    )
+    return {"status": "saved", "config": saved, "is_configured": google_calendar_manager.is_api_configured()}
+
+
 @app.post("/api/calendar/event")
 def upsert_calendar_event(payload: CalendarEventUpdate):
     ev = calendar_engine.update_or_add_event(
@@ -268,7 +302,10 @@ def get_admin_settings():
         "alert_on_linked_news": telegram_notifier.alert_on_linked_news,
         "auto_daily_today_7am": telegram_notifier.auto_daily_today_7am,
         "auto_daily_tomorrow_705am": telegram_notifier.auto_daily_tomorrow_705am,
-        "auto_holiday_7am": telegram_notifier.auto_holiday_7am
+        "auto_holiday_7am": telegram_notifier.auto_holiday_7am,
+        "google_calendar_id": google_calendar_manager.calendar_id,
+        "google_calendar_enabled": google_calendar_manager.enabled,
+        "google_calendar_configured": google_calendar_manager.is_api_configured()
     }
 
 
@@ -318,6 +355,16 @@ def get_dashboard_tables():
         title = it.get("title", "")
         link = it.get("link", "#")
 
+        other_srcs = it.get("other_sources", [])
+        if len(other_srcs) > 1:
+            alt_names = [s["source"] for s in other_srcs if s["source"] != source]
+            if alt_names:
+                source_display = f"{source} (+{len(alt_names)} wires: {', '.join(alt_names[:2])})"
+            else:
+                source_display = source
+        else:
+            source_display = source
+
         if relevance >= 40 or score >= 7 or impact == "HIGH":
             top_rows.append([
                 f"{score}/10",
@@ -326,14 +373,14 @@ def get_dashboard_tables():
                 title,
                 sectors,
                 reasoning,
-                source,
+                source_display,
                 f"{relevance}%",
                 time_str
             ])
         else:
             bottom_rows.append([
                 time_str,
-                source,
+                source_display,
                 title,
                 f"{relevance}%",
                 sent_badge,
@@ -509,6 +556,25 @@ def save_admin_telegram_settings(
         f"- **Calendar & Outcomes Channel ID:** `{telegram_notifier.calendar_chat_id or 'Not Set'}` (Enabled: `{telegram_notifier.calendar_enabled}`)\n"
         f"- **Daily IST Automation:** 7:00 AM Today Snapshot=`{auto_today_7am}` | 7:05 AM Tomorrow Snapshot=`{auto_tom_705am}` | 7:00 AM Pre-Holiday Alert=`{auto_hol_7am}`"
     )
+
+
+def trigger_sync_google_cal():
+    events = calendar_engine.get_enriched_events(filter_range="all", market_filter="ALL")
+    success, fail = google_calendar_manager.sync_events_batch(events)
+    if google_calendar_manager.is_api_configured():
+        return f"✅ **Synced {success} events to Google Calendar (`{google_calendar_manager.calendar_id}`) with 1-hr alarms!** (Failed: {fail})"
+    return f"⚠️ **Google Calendar API not configured yet.** (Configured Calendar ID: `{google_calendar_manager.calendar_id or 'None'}`). Add Service Account credentials in Tab 3."
+
+
+def save_google_calendar_settings(gcal_id: str, sa_json: str, sa_file: str, gcal_enabled: bool):
+    google_calendar_manager.save_config(
+        calendar_id=gcal_id,
+        service_account_json_str=sa_json,
+        service_account_file=sa_file,
+        enabled=gcal_enabled
+    )
+    status_icon = "🟢 Connected" if google_calendar_manager.is_api_configured() else "⚠️ Credentials Needed"
+    return f"✅ **Saved Google Calendar Settings!** Status: {status_icon} (Target ID: `{gcal_id}`)"
 
 
 def trigger_test_telegram(target_channel: str):
@@ -826,6 +892,7 @@ with gr.Blocks(title="EPM Pro Multi-Market News & Calendar Terminal", theme=gr.t
 
             with gr.Row():
                 cal_sync_btn = gr.Button("🔄 Sync All 5 Markets & Refresh Timers", variant="primary", scale=1)
+                btn_sync_gcal = gr.Button("📅 Sync to Google Calendar (1h Alert)", variant="secondary", scale=1)
                 btn_push_today = gr.Button("🌅 Send Today's Snapshot (5 Separate Market Msgs)", variant="secondary", scale=1)
                 btn_push_tomorrow = gr.Button("🌄 Send Tomorrow's Snapshot (5 Separate Market Msgs)", variant="secondary", scale=1)
                 btn_push_holiday = gr.Button("🏖️ Send Next-Day Holiday Alert (Trader Notice)", variant="secondary", scale=1)
@@ -903,6 +970,7 @@ with gr.Blocks(title="EPM Pro Multi-Market News & Calendar Terminal", theme=gr.t
             cal_filter.change(get_calendar_tables, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_table, holidays_table])
             cal_market_filter.change(get_calendar_tables, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_table, holidays_table])
             cal_sync_btn.click(sync_and_refresh_calendar, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_table, holidays_table])
+            btn_sync_gcal.click(trigger_sync_google_cal, outputs=[cal_action_msg])
             btn_push_today.click(push_today_snapshot_all_markets, outputs=[cal_action_msg])
             btn_push_tomorrow.click(push_tomorrow_snapshot_all_markets, outputs=[cal_action_msg])
             btn_push_holiday.click(push_holiday_check_alert, outputs=[cal_action_msg])
@@ -994,6 +1062,48 @@ with gr.Blocks(title="EPM Pro Multi-Market News & Calendar Terminal", theme=gr.t
             )
             test_news_tg_btn.click(lambda: trigger_test_telegram("news"), outputs=[adm_tg_status])
             test_cal_tg_btn.click(lambda: trigger_test_telegram("calendar"), outputs=[adm_tg_status])
+
+            gr.Markdown("---")
+            gr.Markdown("### 📅 Google Calendar Direct API Integration (Automated 1-Hour Reminder Alarms)")
+            gr.Markdown(
+                "Directly synchronizes events from the EPM Pro calendar into your personal or team Google Calendar with **60-minute email and popup reminders**. "
+                "You can authenticate using a Google Cloud Service Account JSON key or JSON string."
+            )
+            with gr.Row():
+                with gr.Column():
+                    adm_gcal_id = gr.Textbox(
+                        label="Google Calendar ID",
+                        value=google_calendar_manager.calendar_id,
+                        placeholder="e.g. primary or your-calendar-id@group.calendar.google.com"
+                    )
+                    adm_gcal_enabled = gr.Checkbox(
+                        label="Enable Direct Google Calendar Sync",
+                        value=google_calendar_manager.enabled
+                    )
+                with gr.Column():
+                    adm_gcal_sa_file = gr.Textbox(
+                        label="Service Account JSON File Path",
+                        value=google_calendar_manager.service_account_file,
+                        placeholder="e.g. service_account.json"
+                    )
+                    adm_gcal_sa_json = gr.Textbox(
+                        label="Service Account JSON String (Optional, for Cloud / Docker)",
+                        value=google_calendar_manager.service_account_json_str,
+                        type="password",
+                        placeholder='Paste full {"type": "service_account", ...} JSON'
+                    )
+
+            with gr.Row():
+                save_gcal_btn = gr.Button("💾 Save Google Calendar Settings", variant="primary")
+                sync_gcal_admin_btn = gr.Button("🔄 Sync All Active Events Now to Google Calendar (1h Alert)")
+
+            gcal_admin_status = gr.Markdown()
+            save_gcal_btn.click(
+                save_google_calendar_settings,
+                inputs=[adm_gcal_id, adm_gcal_sa_json, adm_gcal_sa_file, adm_gcal_enabled],
+                outputs=[gcal_admin_status]
+            )
+            sync_gcal_admin_btn.click(trigger_sync_google_cal, outputs=[gcal_admin_status])
 
             gr.Markdown("---")
             gr.Markdown("### 📡 Connected News Sources & Selective Forwarding Rules")
