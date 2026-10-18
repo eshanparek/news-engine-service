@@ -632,22 +632,60 @@ default_wa_selected = [s["name"] for s in news_worker.sources if s.get("forward_
 
 # ─── Custom Responsive CSS (100% Full-Width Display, Zero Horizontal Scroll) ─
 
+# ─── Modern Financial Terminal Design System (CSS Architecture & Design Tokens) ──
+
 CUSTOM_CSS = """
-/* 1. Universal Reset & Full-Width Viewport */
+/* 1. Google Fonts Import: Inter (UI/Body) & JetBrains Mono (Data/Numbers/Timers) */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+/* 2. CSS Design Tokens on :root */
+:root {
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    
+    --bg-page: #0b0f19;
+    --bg-surface: #111827;
+    --bg-surface-elevated: #1f2937;
+    --bg-surface-subtle: rgba(255, 255, 255, 0.03);
+    
+    --border-color: rgba(255, 255, 255, 0.08);
+    --border-highlight: rgba(59, 130, 246, 0.4);
+    
+    --text-primary: #f3f4f6;
+    --text-secondary: #9ca3af;
+    --text-muted: #6b7280;
+    
+    --accent-blue: #3b82f6;
+    --accent-emerald: #10b981;
+    --accent-amber: #f59e0b;
+    --accent-rose: #f43f5e;
+    
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+}
+
+/* 3. Global Reset & Typography Baseline */
 html, body {
     width: 100% !important;
     max-width: 100vw !important;
     overflow-x: hidden !important;
     margin: 0 !important;
     padding: 0 !important;
-    box-sizing: border-box !important;
+    background-color: var(--bg-page) !important;
+    color: var(--text-primary) !important;
+    font-family: var(--font-sans) !important;
+    font-size: 13px !important;
+    line-height: 1.5 !important;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 *, *::before, *::after {
     box-sizing: border-box !important;
 }
 
-/* 2. Gradio Root Container: stretch 100% full width, remove fixed 1200px max-width */
+/* 4. Gradio Root Layout Container */
 .gradio-container, 
 .gradio-container > .main, 
 .gradio-container > .wrap,
@@ -655,153 +693,232 @@ div[class*="gradio-container"] {
     max-width: 100% !important;
     width: 100% !important;
     margin: 0 !important;
-    padding: 8px 16px !important;
+    padding: 10px 24px !important;
+    background-color: var(--bg-page) !important;
+    color: var(--text-primary) !important;
     overflow-x: hidden !important;
-    box-sizing: border-box !important;
 }
 
-/* 3. Containers, Tabs, Rows, Columns, Panels, Accordions */
-.tabs, .tab-nav, .tabitem, 
-.gr-row, .row, 
-.gr-column, .column, 
-.gr-group, .gr-box, .gr-panel, .gr-accordion,
-.gr-form, .form {
-    width: 100% !important;
-    max-width: 100% !important;
-    box-sizing: border-box !important;
+/* 5. Sleek Header Bar & Status Pill */
+h1, h2, h3, h4 {
+    font-family: var(--font-sans) !important;
+    color: var(--text-primary) !important;
+    letter-spacing: -0.02em !important;
+    margin-block: 0.5rem 0.75rem !important;
 }
 
-.gr-row, .row {
-    flex-wrap: wrap !important;
+h1 {
+    font-size: 20px !important;
+    font-weight: 700 !important;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
-/* 4. Kill Horizontal Scrollbar Universally on all Dataframe / Table wrappers */
+h3 {
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.05em !important;
+    color: var(--text-secondary) !important;
+}
+
+/* 6. Tabs & Navigation Bar */
+.tabs, .tab-nav {
+    border-bottom: 1px solid var(--border-color) !important;
+    background: transparent !important;
+    gap: 8px !important;
+}
+
+button[role="tab"] {
+    font-family: var(--font-sans) !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    padding: 8px 16px !important;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0 !important;
+    border: none !important;
+    color: var(--text-secondary) !important;
+    background: transparent !important;
+    transition: all 0.15s ease-in-out !important;
+}
+
+button[role="tab"]:hover {
+    color: var(--text-primary) !important;
+    background: var(--bg-surface-subtle) !important;
+}
+
+button[role="tab"].selected {
+    color: #60a5fa !important;
+    border-bottom: 2px solid #3b82f6 !important;
+    background: rgba(59, 130, 246, 0.08) !important;
+}
+
+/* 7. Action Buttons */
+button.primary, .gr-button-primary {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+    color: #ffffff !important;
+    font-family: var(--font-sans) !important;
+    font-weight: 600 !important;
+    font-size: 12.5px !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    border-radius: var(--radius-sm) !important;
+    padding: 8px 14px !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+    transition: transform 0.1s ease, background 0.15s ease !important;
+}
+
+button.primary:hover, .gr-button-primary:hover {
+    background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+    transform: translateY(-1px);
+}
+
+button.secondary, .gr-button-secondary {
+    background: var(--bg-surface-elevated) !important;
+    color: var(--text-primary) !important;
+    font-family: var(--font-sans) !important;
+    font-weight: 500 !important;
+    font-size: 12px !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: var(--radius-sm) !important;
+    padding: 8px 12px !important;
+    transition: all 0.15s ease !important;
+}
+
+button.secondary:hover, .gr-button-secondary:hover {
+    background: #374151 !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* 8. Radios, Inputs & Controls */
+.gr-form, .form, input, textarea, select {
+    background-color: var(--bg-surface) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+    border-radius: var(--radius-sm) !important;
+    font-family: var(--font-sans) !important;
+}
+
+input:focus, textarea:focus, select:focus {
+    border-color: var(--accent-blue) !important;
+    box-shadow: 0 0 0 1px var(--accent-blue) !important;
+}
+
+/* 9. Professional Financial Data Tables (Fixed Layout & Crisp Typography) */
 .table-wrap,
 .gradio-dataframe,
 div[data-testid="dataframe"],
-.table-container,
-.gr-dataframe,
-.gr-dataframe > div,
-.table-wrap > div {
+.table-container {
     width: 100% !important;
     max-width: 100% !important;
     overflow-x: hidden !important;
-    box-sizing: border-box !important;
+    border-radius: var(--radius-md) !important;
+    border: 1px solid var(--border-color) !important;
+    background: var(--bg-surface) !important;
 }
 
-/* 5. Force Table Fixed Layout & Clean Text Wrapping */
 table {
     table-layout: fixed !important;
     width: 100% !important;
     max-width: 100% !important;
     border-collapse: collapse !important;
+    font-family: var(--font-sans) !important;
 }
 
-th, td {
+thead th {
+    background-color: #162032 !important;
+    color: #94a3b8 !important;
+    font-family: var(--font-sans) !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    padding: 9px 10px !important;
+    border-bottom: 1px solid var(--border-color) !important;
     white-space: normal !important;
-    word-break: break-word !important;
-    overflow-wrap: anywhere !important;
-    font-size: 12px !important;
-    padding: 6px 8px !important;
     vertical-align: middle !important;
-    line-height: 1.35 !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 2 !important;
 }
 
-td *, th * {
-    white-space: normal !important;
+tbody td {
+    padding: 8px 10px !important;
+    font-size: 12px !important;
+    color: #e2e8f0 !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important;
+    vertical-align: middle !important;
+    line-height: 1.4 !important;
     word-break: break-word !important;
     overflow-wrap: anywhere !important;
-    max-width: 100% !important;
 }
 
-th {
-    font-weight: 600 !important;
-    background-color: rgba(0, 0, 0, 0.04) !important;
-    letter-spacing: 0.01em !important;
+tbody tr:nth-child(even) {
+    background-color: rgba(255, 255, 255, 0.015) !important;
 }
 
-*::-webkit-scrollbar:horizontal {
-    display: none !important;
-    height: 0px !important;
-    width: 0px !important;
-}
-* {
-    scrollbar-width: thin;
+tbody tr:hover {
+    background-color: rgba(59, 130, 246, 0.06) !important;
 }
 
-/* 6. Specific Proportional Column Allocations per Table */
-
-/* --- Top Priority News Table (9 cols) --- */
-#top_news_table table {
-    table-layout: fixed !important;
-    width: 100% !important;
+/* 10. Monospace Elements for Numbers, Dates, Timers */
+code, .timer-cell, pre {
+    font-family: var(--font-mono) !important;
+    font-size: 11.5px !important;
 }
-#top_news_table th:nth-child(1), #top_news_table td:nth-child(1) { width: 5% !important; text-align: center !important; }
-#top_news_table th:nth-child(2), #top_news_table td:nth-child(2) { width: 8% !important; text-align: center !important; }
-#top_news_table th:nth-child(3), #top_news_table td:nth-child(3) { width: 6% !important; text-align: center !important; }
-#top_news_table th:nth-child(4), #top_news_table td:nth-child(4) { width: 34% !important; }
-#top_news_table th:nth-child(5), #top_news_table td:nth-child(5) { width: 11% !important; }
-#top_news_table th:nth-child(6), #top_news_table td:nth-child(6) { width: 20% !important; }
-#top_news_table th:nth-child(7), #top_news_table td:nth-child(7) { width: 7% !important; }
-#top_news_table th:nth-child(8), #top_news_table td:nth-child(8) { width: 4% !important; text-align: center !important; }
-#top_news_table th:nth-child(9), #top_news_table td:nth-child(9) { width: 5% !important; text-align: center !important; }
 
-/* --- General News Wire Table (6 cols) --- */
-#bottom_news_table table {
-    table-layout: fixed !important;
-    width: 100% !important;
-}
-#bottom_news_table th:nth-child(1), #bottom_news_table td:nth-child(1) { width: 7% !important; text-align: center !important; }
-#bottom_news_table th:nth-child(2), #bottom_news_table td:nth-child(2) { width: 11% !important; }
-#bottom_news_table th:nth-child(3), #bottom_news_table td:nth-child(3) { width: 52% !important; }
-#bottom_news_table th:nth-child(4), #bottom_news_table td:nth-child(4) { width: 6% !important; text-align: center !important; }
-#bottom_news_table th:nth-child(5), #bottom_news_table td:nth-child(5) { width: 9% !important; text-align: center !important; }
-#bottom_news_table th:nth-child(6), #bottom_news_table td:nth-child(6) { width: 15% !important; word-break: break-all !important; font-size: 11px !important; }
+/* 11. Column Allocations for Optimal Text Hierarchy */
 
-/* --- Multi-Market Calendar Table (13 cols) --- */
-#calendar_table table {
-    table-layout: fixed !important;
-    width: 100% !important;
-}
-#calendar_table th:nth-child(1), #calendar_table td:nth-child(1) { width: 6% !important; word-break: break-all !important; font-size: 10.5px !important; }
-#calendar_table th:nth-child(2), #calendar_table td:nth-child(2) { width: 5% !important; text-align: center !important; }
-#calendar_table th:nth-child(3), #calendar_table td:nth-child(3) { width: 6% !important; text-align: center !important; }
-#calendar_table th:nth-child(4), #calendar_table td:nth-child(4) { width: 5% !important; text-align: center !important; }
-#calendar_table th:nth-child(5), #calendar_table td:nth-child(5) { width: 8% !important; text-align: center !important; font-weight: bold !important; color: #d97706 !important; }
-#calendar_table th:nth-child(6), #calendar_table td:nth-child(6) { width: 8% !important; }
-#calendar_table th:nth-child(7), #calendar_table td:nth-child(7) { width: 23% !important; }
-#calendar_table th:nth-child(8), #calendar_table td:nth-child(8) { width: 5% !important; text-align: center !important; }
-#calendar_table th:nth-child(9), #calendar_table td:nth-child(9) { width: 6% !important; text-align: right !important; }
-#calendar_table th:nth-child(10), #calendar_table td:nth-child(10) { width: 6% !important; text-align: right !important; }
-#calendar_table th:nth-child(11), #calendar_table td:nth-child(11) { width: 8% !important; text-align: right !important; font-weight: bold !important; }
-#calendar_table th:nth-child(12), #calendar_table td:nth-child(12) { width: 6% !important; text-align: center !important; }
-#calendar_table th:nth-child(13), #calendar_table td:nth-child(13) { width: 8% !important; }
+/* Top Priority News Table */
+#top_news_table th:nth-child(1), #top_news_table td:nth-child(1) { width: 5.5% !important; text-align: center !important; font-family: var(--font-mono) !important; font-weight: 700 !important; color: #fbbf24 !important; }
+#top_news_table th:nth-child(2), #top_news_table td:nth-child(2) { width: 8% !important; text-align: center !important; font-weight: 600 !important; }
+#top_news_table th:nth-child(3), #top_news_table td:nth-child(3) { width: 6.5% !important; text-align: center !important; font-weight: 700 !important; }
+#top_news_table th:nth-child(4), #top_news_table td:nth-child(4) { width: 33% !important; font-weight: 600 !important; color: #f8fafc !important; }
+#top_news_table th:nth-child(5), #top_news_table td:nth-child(5) { width: 11% !important; color: #94a3b8 !important; }
+#top_news_table th:nth-child(6), #top_news_table td:nth-child(6) { width: 19% !important; color: #cbd5e1 !important; font-style: italic !important; }
+#top_news_table th:nth-child(7), #top_news_table td:nth-child(7) { width: 8% !important; font-size: 11px !important; color: #38bdf8 !important; }
+#top_news_table th:nth-child(8), #top_news_table td:nth-child(8) { width: 4% !important; text-align: center !important; font-family: var(--font-mono) !important; color: #94a3b8 !important; }
+#top_news_table th:nth-child(9), #top_news_table td:nth-child(9) { width: 5% !important; text-align: center !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #64748b !important; }
 
-/* --- Multi-Market Trading Holidays Table (8 cols) --- */
-#holidays_table table {
-    table-layout: fixed !important;
-    width: 100% !important;
-}
-#holidays_table th:nth-child(1), #holidays_table td:nth-child(1) { width: 8% !important; text-align: center !important; }
+/* General News Wire Table */
+#bottom_news_table th:nth-child(1), #bottom_news_table td:nth-child(1) { width: 7% !important; text-align: center !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #64748b !important; }
+#bottom_news_table th:nth-child(2), #bottom_news_table td:nth-child(2) { width: 12% !important; color: #38bdf8 !important; font-weight: 500 !important; }
+#bottom_news_table th:nth-child(3), #bottom_news_table td:nth-child(3) { width: 52% !important; font-weight: 500 !important; }
+#bottom_news_table th:nth-child(4), #bottom_news_table td:nth-child(4) { width: 6% !important; text-align: center !important; font-family: var(--font-mono) !important; color: #94a3b8 !important; }
+#bottom_news_table th:nth-child(5), #bottom_news_table td:nth-child(5) { width: 8% !important; text-align: center !important; }
+#bottom_news_table th:nth-child(6), #bottom_news_table td:nth-child(6) { width: 15% !important; word-break: break-all !important; font-size: 11px !important; color: #60a5fa !important; }
+
+/* Multi-Market Calendar Table */
+#calendar_table th:nth-child(1), #calendar_table td:nth-child(1) { width: 6% !important; font-family: var(--font-mono) !important; font-size: 10.5px !important; color: #64748b !important; }
+#calendar_table th:nth-child(2), #calendar_table td:nth-child(2) { width: 5% !important; text-align: center !important; font-weight: 600 !important; }
+#calendar_table th:nth-child(3), #calendar_table td:nth-child(3) { width: 6% !important; text-align: center !important; font-family: var(--font-mono) !important; }
+#calendar_table th:nth-child(4), #calendar_table td:nth-child(4) { width: 5% !important; text-align: center !important; font-family: var(--font-mono) !important; font-weight: 600 !important; color: #38bdf8 !important; }
+#calendar_table th:nth-child(5), #calendar_table td:nth-child(5) { width: 8% !important; text-align: center !important; font-family: var(--font-mono) !important; font-weight: 700 !important; color: #fbbf24 !important; }
+#calendar_table th:nth-child(6), #calendar_table td:nth-child(6) { width: 8% !important; font-weight: 600 !important; color: #f8fafc !important; }
+#calendar_table th:nth-child(7), #calendar_table td:nth-child(7) { width: 23% !important; font-weight: 500 !important; }
+#calendar_table th:nth-child(8), #calendar_table td:nth-child(8) { width: 5% !important; text-align: center !important; font-weight: 700 !important; }
+#calendar_table th:nth-child(9), #calendar_table td:nth-child(9) { width: 6% !important; text-align: right !important; font-family: var(--font-mono) !important; color: #94a3b8 !important; }
+#calendar_table th:nth-child(10), #calendar_table td:nth-child(10) { width: 6% !important; text-align: right !important; font-family: var(--font-mono) !important; color: #94a3b8 !important; }
+#calendar_table th:nth-child(11), #calendar_table td:nth-child(11) { width: 8% !important; text-align: right !important; font-family: var(--font-mono) !important; font-weight: 700 !important; color: #34d399 !important; }
+#calendar_table th:nth-child(12), #calendar_table td:nth-child(12) { width: 6% !important; text-align: center !important; font-weight: 600 !important; }
+#calendar_table th:nth-child(13), #calendar_table td:nth-child(13) { width: 8% !important; font-size: 11px !important; color: #60a5fa !important; }
+
+/* Multi-Market Holidays Table */
+#holidays_table th:nth-child(1), #holidays_table td:nth-child(1) { width: 8% !important; text-align: center !important; font-family: var(--font-mono) !important; }
 #holidays_table th:nth-child(2), #holidays_table td:nth-child(2) { width: 7% !important; text-align: center !important; }
-#holidays_table th:nth-child(3), #holidays_table td:nth-child(3) { width: 23% !important; font-weight: 500 !important; }
+#holidays_table th:nth-child(3), #holidays_table td:nth-child(3) { width: 23% !important; font-weight: 600 !important; color: #f8fafc !important; }
 #holidays_table th:nth-child(4), #holidays_table td:nth-child(4) { width: 12% !important; text-align: center !important; }
 #holidays_table th:nth-child(5), #holidays_table td:nth-child(5) { width: 12% !important; text-align: center !important; }
 #holidays_table th:nth-child(6), #holidays_table td:nth-child(6) { width: 15% !important; text-align: center !important; }
 #holidays_table th:nth-child(7), #holidays_table td:nth-child(7) { width: 13% !important; text-align: center !important; }
 #holidays_table th:nth-child(8), #holidays_table td:nth-child(8) { width: 10% !important; text-align: center !important; }
 
-/* --- Ingested News Sources Table (6 cols) --- */
-#sources_table table {
-    table-layout: fixed !important;
-    width: 100% !important;
-}
-#sources_table th:nth-child(1), #sources_table td:nth-child(1) { width: 16% !important; }
-#sources_table th:nth-child(2), #sources_table td:nth-child(2) { width: 12% !important; }
+/* Ingested News Sources Table */
+#sources_table th:nth-child(1), #sources_table td:nth-child(1) { width: 16% !important; font-weight: 600 !important; }
+#sources_table th:nth-child(2), #sources_table td:nth-child(2) { width: 12% !important; color: #94a3b8 !important; }
 #sources_table th:nth-child(3), #sources_table td:nth-child(3) { width: 10% !important; text-align: center !important; }
-#sources_table th:nth-child(4), #sources_table td:nth-child(4) { width: 12% !important; text-align: center !important; }
-#sources_table th:nth-child(5), #sources_table td:nth-child(5) { width: 12% !important; text-align: center !important; }
-#sources_table th:nth-child(6), #sources_table td:nth-child(6) { width: 38% !important; word-break: break-all !important; font-size: 11px !important; }
+#sources_table th:nth-child(4), #sources_table td:nth-child(4) { width: 12% !important; text-align: center !important; font-weight: 600 !important; }
+#sources_table th:nth-child(5), #sources_table td:nth-child(5) { width: 12% !important; text-align: center !important; font-weight: 600 !important; }
+#sources_table th:nth-child(6), #sources_table td:nth-child(6) { width: 38% !important; word-break: break-all !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #60a5fa !important; }
 """
 
 
