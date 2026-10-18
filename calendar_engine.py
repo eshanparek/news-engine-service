@@ -1738,16 +1738,23 @@ class MarketCalendarEngine:
         market: str,
         target_date: str,
         mode: str = "TODAY",
-        day_events: Optional[List[Dict]] = None
+        day_events: Optional[List[Dict]] = None,
+        page_num: int = 1,
+        total_pages: int = 1,
+        start_idx: int = 1,
+        end_idx: int = 1,
+        page_events: Optional[List[Dict]] = None
     ) -> str:
         """
         Creates a clean, informative caption (under 1024 characters) for Telegram sendPhoto.
         The full schedule details are baked directly inside the infographic photo itself.
+        Supports multi-part dispatches when schedules are long.
         """
         mkt = market.upper()
         meta = MARKET_META.get(mkt, MARKET_META["NSE"])
         events = day_events or []
-        high_impact = [e for e in events if e.get("impact", "").upper() == "HIGH"]
+        relevant_events = page_events if page_events is not None else events
+        high_impact = [e for e in relevant_events if str(e.get("impact", "")).upper() == "HIGH"]
 
         try:
             dt_obj = datetime.strptime(target_date, "%Y-%m-%d")
@@ -1756,18 +1763,24 @@ class MarketCalendarEngine:
             date_pretty = target_date
 
         report_title = "TODAY'S CALENDAR INFOGRAPHIC" if mode == "TODAY" else "TOMORROW'S LINED-UP INFOGRAPHIC"
+        if total_pages > 1:
+            report_title += f" [PART {page_num}/{total_pages}]"
+
         hol = self.get_market_holiday_on_date(mkt, target_date)
+
+        events_summary = f"<b>Events {start_idx}–{end_idx} of {len(events)} Total</b>" if total_pages > 1 else f"<b>Total Events:</b> <b>{len(events)}</b>"
 
         caption = (
             f"{meta['badge']} <b>{meta['title']}</b>\n"
             f"📋 <b>{report_title}</b>\n"
-            f"🗓 <code>{date_pretty}</code>  |  📊 <b>Total Events:</b> <b>{len(events)}</b>\n"
+            f"🗓 <code>{date_pretty}</code>  |  📊 {events_summary}\n"
         )
-        if hol:
+        if hol and page_num == 1:
             caption += f"🏖️ <b>Trading Holiday:</b> <i>{hol.get('description', 'Market Closed')} ({hol.get('trading_status', 'Closed')})</i>\n"
 
         if high_impact:
-            caption += f"\n🔥 <b>Key High-Impact Catalysts ({len(high_impact)}):</b>\n"
+            seg_label = f"in this Card ({len(high_impact)})" if total_pages > 1 else f"({len(high_impact)})"
+            caption += f"\n🔥 <b>Key High-Impact Catalysts {seg_label}:</b>\n"
             for ev in high_impact[:3]:
                 t = ev.get("time", "10:00")
                 sym = str(ev.get("symbol", mkt)).replace("<", "").replace(">", "")
@@ -1775,7 +1788,7 @@ class MarketCalendarEngine:
                 caption += f"• <b>[{t} IST]</b> <code>{sym}</code> — {ev_name}\n"
 
         # One-click compact Google Calendar add link (strictly under 160 chars)
-        if high_impact:
+        if high_impact and page_num == 1:
             top_ev = high_impact[0]
             clean_sym = str(top_ev.get("symbol", mkt)).split(":")[-1].replace("<", "").replace(">", "").strip()
             clean_name = str(top_ev.get("event", "Catalyst"))[:28].replace("<", "").replace(">", "").strip()
@@ -1784,12 +1797,14 @@ class MarketCalendarEngine:
             title_q = requests.utils.quote(f"[{mkt}] {clean_sym}: {clean_name}")
             short_gcal = f"https://calendar.google.com/calendar/render?action=TEMPLATE&text={title_q}&dates={d_clean}T{t_clean}00Z/{d_clean}T{t_clean}00Z"
             caption += f"\n📅 <a href='{short_gcal}'>Add Top Catalyst to Google Calendar (1-Click)</a>\n"
+        elif total_pages > 1 and page_num > 1:
+            caption += f"\nℹ️ <i>Part {page_num} of {total_pages} — Complete multi-part schedule for {mkt}.</i>\n"
 
         caption += f"\n━━━━━━━━━━━━━━━━━━━━━━\n<i>— EPM PRO Visual Calendar Engine ({mkt})</i>"
         return caption
 
     def _dispatch_markets_photos(self, target_date: str, mode: str = "TODAY") -> tuple[bool, str]:
-        """Iterates through all 5 markets, generates branded HD infographic cards, and sends them as Telegram photos."""
+        """Iterates through all 5 markets, generates branded HD multi-page infographic cards, and sends them as Telegram photos."""
         photo_items = []
         for mkt in MARKETS_ORDER:
             try:
@@ -1797,20 +1812,29 @@ class MarketCalendarEngine:
                 day_events = [e for e in all_events if e.get("date") == target_date]
                 hol = self.get_market_holiday_on_date(mkt, target_date)
 
-                png_bytes = calendar_card_generator.render_market_calendar_card(
+                pages = calendar_card_generator.render_market_calendar_cards(
                     market=mkt,
                     target_date=target_date,
                     events=day_events,
                     mode=mode,
-                    holiday_info=hol
+                    holiday_info=hol,
+                    max_per_page=15
                 )
-                caption = self.format_market_photo_caption(
-                    market=mkt,
-                    target_date=target_date,
-                    mode=mode,
-                    day_events=day_events
-                )
-                photo_items.append((png_bytes, caption))
+
+                total_pages = len(pages)
+                for page_idx, (png_bytes, p_events, start_idx, end_idx) in enumerate(pages, 1):
+                    caption = self.format_market_photo_caption(
+                        market=mkt,
+                        target_date=target_date,
+                        mode=mode,
+                        day_events=day_events,
+                        page_num=page_idx,
+                        total_pages=total_pages,
+                        start_idx=start_idx,
+                        end_idx=end_idx,
+                        page_events=p_events
+                    )
+                    photo_items.append((png_bytes, caption))
             except Exception as e:
                 logger.error(f"Error rendering calendar photo card for {mkt}: {e}")
 

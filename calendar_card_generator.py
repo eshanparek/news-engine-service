@@ -1,8 +1,10 @@
 import os
 import io
+import re
+import math
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from PIL import Image, ImageDraw, ImageFont
 
 logger = logging.getLogger("CalendarCardGenerator")
@@ -13,7 +15,7 @@ MARKET_THEMES = {
         "header_bg": (15, 23, 42),       # Dark Slate Obsidian
         "gradient_to": (30, 58, 138),    # Deep Navy Blue
         "accent": (59, 130, 246),        # Electric Azure Blue
-        "flag": "🇮🇳",
+        "badge": "NSE",
         "title": "NSE INDIA — ALL EQUITIES & MACRO",
         "scope": "National Stock Exchange of India (Mainboard, SME & F&O)",
         "hours": "09:15 – 15:30 IST"
@@ -22,7 +24,7 @@ MARKET_THEMES = {
         "header_bg": (24, 16, 47),       # Dark Obsidian Indigo
         "gradient_to": (88, 28, 135),    # Deep Purple
         "accent": (168, 85, 247),        # Neon Purple
-        "flag": "🇮🇳",
+        "badge": "BSE",
         "title": "BSE INDIA — ALL LISTED SCRIPS & ACTIONS",
         "scope": "Bombay Stock Exchange (Corporate Actions, Filings & Boards)",
         "hours": "09:15 – 15:30 IST"
@@ -31,7 +33,7 @@ MARKET_THEMES = {
         "header_bg": (28, 25, 23),       # Dark Stone Bronze
         "gradient_to": (120, 53, 15),    # Deep Amber/Rust
         "accent": (245, 158, 11),        # Radiant Amber/Gold
-        "flag": "⛽",
+        "badge": "MCX",
         "title": "MCX INDIA — BULLION, ENERGY & METALS",
         "scope": "Multi Commodity Exchange of India (Commodities & Derivatives)",
         "hours": "09:00 – 23:30/23:55 IST"
@@ -40,7 +42,7 @@ MARKET_THEMES = {
         "header_bg": (9, 9, 11),         # Cyber Space Black
         "gradient_to": (39, 39, 42),     # Zinc Charcoal
         "accent": (234, 179, 8),         # Cyber Gold / Yellow
-        "flag": "₿",
+        "badge": "CRYPTO",
         "title": "CRYPTO MARKETS — ASSETS & SPOT ETFs",
         "scope": "Global Digital Assets, Bitcoin/Ethereum ETFs & Derivatives",
         "hours": "24/7 Continuous (00:00 – 23:59 IST)"
@@ -49,17 +51,30 @@ MARKET_THEMES = {
         "header_bg": (3, 7, 18),         # Deepest Midnight
         "gradient_to": (23, 37, 84),     # Deep Wall Street Blue
         "accent": (37, 99, 235),         # Electric Royal Blue
-        "flag": "🇺🇸",
+        "badge": "NYSE",
         "title": "NYSE & US MACRO — EARNINGS & FED",
         "scope": "New York Stock Exchange, Nasdaq & US Federal Reserve Releases",
         "hours": "19:00 – 01:30 IST (Pre-Market 13:30 IST)"
     }
 }
 
+EMOJI_CLEAN_REGEX = re.compile(
+    r"[\U00010000-\U0010ffff\u2600-\u27bf\u2300-\u23ff\u2b50\u2b55\u25b6\u25c0\ufe0f]+",
+    flags=re.UNICODE
+)
+
+def clean_text_for_image(text: str) -> str:
+    """Strips emoji codepoints that would otherwise render as missing character tofu boxes (□) in PIL."""
+    if not text:
+        return ""
+    cleaned = EMOJI_CLEAN_REGEX.sub("", str(text))
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
 class CalendarCardGenerator:
     """
     Renders 2035 publication-grade high-contrast infographic cards for financial calendars.
-    Optimized for Telegram sendPhoto so traders can view their daily schedule visually in ultra-crisp resolution.
+    Supports dynamic pagination so NO events are hidden or omitted when schedules are long.
     """
     def __init__(self):
         self._init_fonts()
@@ -90,13 +105,13 @@ class CalendarCardGenerator:
         for path in font_paths:
             if os.path.exists(path):
                 try:
-                    self.font_title = ImageFont.truetype(path, 34)
-                    self.font_header = ImageFont.truetype(path, 22)
-                    self.font_sub = ImageFont.truetype(path, 16)
-                    self.font_bold = ImageFont.truetype(path, 17)
-                    self.font_body = ImageFont.truetype(path, 15)
-                    self.font_mono = ImageFont.truetype(path, 16)
-                    self.font_small = ImageFont.truetype(path, 13)
+                    self.font_title = ImageFont.truetype(path, 30)
+                    self.font_header = ImageFont.truetype(path, 21)
+                    self.font_sub = ImageFont.truetype(path, 15)
+                    self.font_bold = ImageFont.truetype(path, 16)
+                    self.font_body = ImageFont.truetype(path, 14)
+                    self.font_mono = ImageFont.truetype(path, 15)
+                    self.font_small = ImageFont.truetype(path, 12)
                     self.font_micro = ImageFont.truetype(path, 11)
                     logger.info(f"Loaded TTF font for cards from: {path}")
                     break
@@ -115,51 +130,65 @@ class CalendarCardGenerator:
             self.font_small = default_f
             self.font_micro = default_f
 
-    def render_market_calendar_card(
+    def chunk_events_for_cards(self, events: List[Dict], max_per_page: int = 15) -> List[Tuple[List[Dict], int, int]]:
+        """
+        Splits events into balanced pages so no page is overloaded or has hidden overflow.
+        Returns list of (page_events, start_index_1_based, end_index_1_based).
+        """
+        if not events:
+            return [([], 0, 0)]
+        total = len(events)
+        if total <= max_per_page:
+            return [(events, 1, total)]
+
+        num_pages = math.ceil(total / max_per_page)
+        avg_per_page = math.ceil(total / num_pages)
+        pages = []
+        start = 0
+        while start < total:
+            end = min(start + avg_per_page, total)
+            pages.append((events[start:end], start + 1, end))
+            start = end
+        return pages
+
+    def render_single_page(
         self,
         market: str,
         target_date: str,
-        events: List[Dict],
+        page_events: List[Dict],
+        total_events_count: int,
+        high_impact_count: int,
+        start_idx: int,
+        end_idx: int,
+        page_num: int,
+        total_pages: int,
         mode: str = "TODAY",
         holiday_info: Optional[Dict] = None
     ) -> bytes:
         """
-        Renders a 2035 publication-grade 1200px-wide infographic card for a regulator/exchange.
-        Bakes in complete schedule details, timing, impact, benchmarks, and verdicts.
+        Renders a single 1200px-wide high-contrast infographic card page.
+        Guarantees zero tofu boxes (□) and clean alignment.
         """
         mkt = market.upper()
         theme = MARKET_THEMES.get(mkt, MARKET_THEMES["NSE"])
 
         width = 1200
-        header_height = 220
-        holiday_height = 120 if holiday_info else 0
-        stats_ribbon_height = 60
+        header_height = 205
+        holiday_height = 110 if (holiday_info and page_num == 1) else 0
+        stats_ribbon_height = 54
 
-        # Sort events: High impact first, then by time
-        sorted_events = sorted(
-            events or [],
-            key=lambda x: (0 if x.get("impact", "").upper() == "HIGH" else 1, x.get("time", "99:99"))
-        )
-
-        # Show up to 18 events cleanly on card; summarize if more
-        max_events_to_show = 18
-        display_events = sorted_events[:max_events_to_show]
-        remaining_count = max(0, len(sorted_events) - max_events_to_show)
-
-        # Dynamic row height: spacious for few events, high-density for many
-        if len(display_events) <= 4:
-            event_row_height = 110
-        elif len(display_events) <= 8:
-            event_row_height = 96
+        # Dynamic row height based on events on this page
+        if len(page_events) <= 4:
+            event_row_height = 105
+        elif len(page_events) <= 8:
+            event_row_height = 94
         else:
             event_row_height = 84
 
-        events_block_height = max(len(display_events) * event_row_height + 90, 200)
-        if remaining_count > 0:
-            events_block_height += 60
-
-        footer_height = 80
-        total_height = header_height + holiday_height + stats_ribbon_height + events_block_height + footer_height
+        events_block_height = max(len(page_events) * event_row_height + 85, 200)
+        nav_banner_height = 54 if total_pages > 1 else 0
+        footer_height = 70
+        total_height = header_height + holiday_height + stats_ribbon_height + events_block_height + nav_banner_height + footer_height
 
         # Base Canvas: Pure crisp white background (#FFFFFF)
         img = Image.new("RGB", (width, total_height), (255, 255, 255))
@@ -168,9 +197,9 @@ class CalendarCardGenerator:
         # ── 1. Futuristic Header Banner ──
         draw.rectangle([(0, 0), (width, header_height)], fill=theme["header_bg"])
         # Top Accent neon bar
-        draw.rectangle([(0, 0), (width, 6)], fill=theme["accent"])
+        draw.rectangle([(0, 0), (width, 5)], fill=theme["accent"])
         # Bottom Accent neon bar
-        draw.rectangle([(0, header_height - 5), (width, header_height)], fill=theme["accent"])
+        draw.rectangle([(0, header_height - 4), (width, header_height)], fill=theme["accent"])
 
         # Title and Subtitles
         try:
@@ -181,58 +210,81 @@ class CalendarCardGenerator:
 
         report_label = "OFFICIAL DAILY SCHEDULE & TIMERS" if mode == "TODAY" else "TOMORROW'S LINED-UP SCHEDULE"
 
-        # Market Flag & Title
-        draw.text((45, 28), f"{theme['flag']}  {theme['title']}", fill=(255, 255, 255), font=self.font_title)
-        draw.text((45, 82), f"⚡ {theme['scope']}", fill=(203, 213, 225), font=self.font_sub)
-        draw.text((45, 114), f"⏰ Trading Hours: {theme['hours']}   |   Timezone: Indian Standard Time (IST)", fill=(148, 163, 184), font=self.font_small)
+        # Market Badge Pill (Eliminates flag emoji tofu boxes)
+        badge_w = 80
+        draw.rounded_rectangle([(45, 26), (45 + badge_w, 64)], radius=6, fill=theme["accent"])
+        draw.text((58, 33), theme["badge"], fill=(255, 255, 255), font=self.font_bold)
 
-        # Date & Mode Capsule (Top Right)
+        # Title
+        draw.text((45 + badge_w + 14, 28), clean_text_for_image(theme["title"]), fill=(255, 255, 255), font=self.font_title)
+        draw.text((45, 80), f"Scope: {clean_text_for_image(theme['scope'])}", fill=(203, 213, 225), font=self.font_sub)
+        draw.text((45, 110), f"Trading Hours: {theme['hours']}   |   Timezone: Indian Standard Time (IST)", fill=(148, 163, 184), font=self.font_small)
+
+        # Date & Page Capsule (Top Right)
         mode_pill_bg = (30, 41, 59)
-        draw.rounded_rectangle([(width - 390, 28), (width - 45, 84)], radius=8, fill=mode_pill_bg, outline=theme["accent"], width=2)
-        draw.text((width - 375, 38), f"📋 {report_label}", fill=(255, 255, 255), font=self.font_bold)
-        draw.text((width - 375, 62), f"🗓 {date_formatted}", fill=(147, 197, 253), font=self.font_small)
+        capsule_w = 410
+        draw.rounded_rectangle([(width - capsule_w - 45, 24), (width - 45, 88)], radius=8, fill=mode_pill_bg, outline=theme["accent"], width=2)
+        draw.text((width - capsule_w - 30, 32), f"REPORT: {report_label}", fill=(255, 255, 255), font=self.font_bold)
+        page_suffix = f"  |  PAGE {page_num} OF {total_pages}" if total_pages > 1 else ""
+        draw.text((width - capsule_w - 30, 58), f"DATE: {date_formatted}{page_suffix}", fill=(147, 197, 253), font=self.font_small)
 
         current_y = header_height
 
-        # ── 2. Holiday Warning Banner (if market closed) ──
-        if holiday_info:
-            h_rect = [(40, current_y + 15), (width - 40, current_y + 105)]
+        # ── 2. Holiday Warning Banner (Page 1 only) ──
+        if holiday_info and page_num == 1:
+            h_rect = [(40, current_y + 12), (width - 40, current_y + 98)]
             draw.rounded_rectangle(h_rect, radius=10, fill=(254, 242, 242), outline=(220, 38, 38), width=2)
-            draw.text((65, current_y + 28), f"🏖️ TRADING HOLIDAY NOTICE — {mkt} CLOSED / SPECIAL SESSION", fill=(185, 28, 28), font=self.font_bold)
-            draw.text((65, current_y + 58), f"• Occasion: {holiday_info.get('description', 'Official Market Holiday')}", fill=(127, 29, 29), font=self.font_body)
-            draw.text((580, current_y + 58), f"• Trading Session Status: {holiday_info.get('trading_status', 'Closed')}", fill=(153, 27, 27), font=self.font_bold)
+            draw.text((65, current_y + 24), f"[TRADING HOLIDAY NOTICE] — {mkt} CLOSED / SPECIAL SESSION", fill=(185, 28, 28), font=self.font_bold)
+            draw.text((65, current_y + 52), f"• Occasion: {clean_text_for_image(holiday_info.get('description', 'Market Holiday'))}", fill=(127, 29, 29), font=self.font_body)
+            draw.text((600, current_y + 52), f"• Trading Session Status: {clean_text_for_image(holiday_info.get('trading_status', 'Closed'))}", fill=(153, 27, 27), font=self.font_bold)
             current_y += holiday_height
 
-        # ── 3. High-Tech Statistics Ribbon ──
-        high_impact_count = sum(1 for e in sorted_events if e.get("impact", "").upper() == "HIGH")
+        # ── 3. High-Tech Statistics Ribbon (Strict Non-Overlapping Spacing) ──
         draw.rectangle([(0, current_y), (width, current_y + stats_ribbon_height)], fill=(248, 250, 252))
         draw.line([(0, current_y + stats_ribbon_height), (width, current_y + stats_ribbon_height)], fill=(226, 232, 240), width=1)
 
-        # Stats pills
-        draw.text((45, current_y + 18), f"📊 TOTAL CATALYSTS: {len(sorted_events)}", fill=(15, 23, 42), font=self.font_bold)
-        draw.text((320, current_y + 18), f"🔥 HIGH-IMPACT BENCHMARKS: {high_impact_count}", fill=(220, 38, 38) if high_impact_count > 0 else (71, 85, 105), font=self.font_bold)
-        session_str = "🏖️ HOLIDAY (CLOSED)" if holiday_info else "🟢 REGULAR TRADING ACTIVE"
-        draw.text((680, current_y + 18), f"🏛 STATUS: {session_str}", fill=(22, 101, 52) if not holiday_info else (185, 28, 28), font=self.font_bold)
-        draw.text((width - 250, current_y + 18), "⚡ LIVE VERIFIED WIRE", fill=theme["accent"], font=self.font_bold)
+        # Col 1: Total Catalysts
+        draw.text((45, current_y + 17), f"TOTAL CATALYSTS: {total_events_count}", fill=(15, 23, 42), font=self.font_bold)
 
-        current_y += stats_ribbon_height + 25
+        # Col 2: High Impact
+        hi_color = (220, 38, 38) if high_impact_count > 0 else (71, 85, 105)
+        draw.text((310, current_y + 17), f"HIGH-IMPACT: {high_impact_count}", fill=hi_color, font=self.font_bold)
+
+        # Col 3: Status
+        session_str = "HOLIDAY (CLOSED)" if holiday_info else "REGULAR TRADING ACTIVE"
+        sess_color = (185, 28, 28) if holiday_info else (22, 101, 52)
+        draw.text((560, current_y + 17), f"STATUS: {session_str}", fill=sess_color, font=self.font_bold)
+
+        # Col 4: Page Indicator (or Wire Status)
+        if total_pages > 1:
+            draw.text((850, current_y + 17), f"PAGE {page_num} OF {total_pages} (ITEMS {start_idx}–{end_idx})", fill=(30, 58, 138), font=self.font_bold)
+        else:
+            draw.text((850, current_y + 17), "COMPLETE SCHEDULE", fill=(71, 85, 105), font=self.font_bold)
+
+        # Col 5: Verified Wire
+        draw.text((1060, current_y + 17), "VERIFIED WIRE", fill=theme["accent"], font=self.font_bold)
+
+        current_y += stats_ribbon_height + 22
 
         # ── 4. Section Title ──
-        draw.text((45, current_y), f"SCHEDULED ECONOMIC RELEASES & CORPORATE ACTIONS ({mkt})", fill=(15, 23, 42), font=self.font_bold)
-        draw.text((width - 340, current_y + 4), "Indian Standard Time (IST) Timings", fill=(100, 116, 139), font=self.font_small)
-        current_y += 35
+        section_txt = f"SCHEDULED ECONOMIC RELEASES & CORPORATE ACTIONS ({mkt})"
+        if total_pages > 1:
+            section_txt += f" — PART {page_num} OF {total_pages} (ITEMS {start_idx}–{end_idx} OF {total_events_count})"
+        draw.text((45, current_y), section_txt, fill=(15, 23, 42), font=self.font_bold)
+        draw.text((width - 320, current_y + 2), "Indian Standard Time (IST) Timings", fill=(100, 116, 139), font=self.font_small)
+        current_y += 32
 
         # ── 5. Events List Cards ──
-        if not display_events:
-            empty_rect = [(40, current_y), (width - 40, current_y + 120)]
+        if not page_events:
+            empty_rect = [(40, current_y), (width - 40, current_y + 110)]
             draw.rounded_rectangle(empty_rect, radius=10, fill=(248, 250, 252), outline=(226, 232, 240), width=1)
-            draw.text((65, current_y + 45), f"• No official scheduled catalysts or corporate releases found for {mkt} on {date_formatted}.", fill=(100, 116, 139), font=self.font_bold)
-            draw.text((65, current_y + 75), "• Regular secondary market liquidity and order books continue as scheduled.", fill=(148, 163, 184), font=self.font_body)
-            current_y += 140
+            draw.text((65, current_y + 38), f"• No official scheduled catalysts or corporate releases found for {mkt} on {date_formatted}.", fill=(100, 116, 139), font=self.font_bold)
+            draw.text((65, current_y + 68), "• Regular secondary market liquidity and order books continue as scheduled.", fill=(148, 163, 184), font=self.font_body)
+            current_y += 130
         else:
-            for idx, e in enumerate(display_events, 1):
+            for idx, e in enumerate(page_events, start=start_idx):
                 is_high = e.get("impact", "").upper() == "HIGH"
-                card_bg = (255, 247, 237) if is_high else ((248, 250, 252) if idx % 2 == 0 else (255, 255, 255))
+                card_bg = (255, 247, 237) if is_high else ((248, 250, 252) if (idx % 2 == 0) else (255, 255, 255))
                 card_border = (251, 146, 60) if is_high else (226, 232, 240)
                 border_width = 2 if is_high else 1
 
@@ -241,65 +293,144 @@ class CalendarCardGenerator:
                 draw.rounded_rectangle(row_rect, radius=8, fill=card_bg, outline=card_border, width=border_width)
 
                 # Time Badge (IST)
-                time_str = f"{e.get('time', '10:00')} IST"
-                time_badge_rect = [(52, current_y + 10), (175, current_y + 42)]
+                time_str = f"{clean_text_for_image(e.get('time', '10:00'))} IST"
+                time_badge_rect = [(52, current_y + 9), (175, current_y + 40)]
                 t_bg = (220, 38, 38) if is_high else (15, 23, 42)
                 draw.rounded_rectangle(time_badge_rect, radius=6, fill=t_bg)
-                draw.text((62, current_y + 16), time_str, fill=(255, 255, 255), font=self.font_mono)
+                draw.text((62, current_y + 15), time_str, fill=(255, 255, 255), font=self.font_mono)
 
-                # Impact Tag
-                imp_str = "🔥 HIGH IMPACT" if is_high else f"⚡ {e.get('impact', 'MEDIUM')}"
+                # Impact Tag (Clean text, no emojis)
+                imp_str = "HIGH IMPACT" if is_high else clean_text_for_image(e.get("impact", "MEDIUM"))
                 imp_color = (194, 65, 12) if is_high else (71, 85, 105)
-                draw.text((60, current_y + 50), imp_str, fill=imp_color, font=self.font_small)
+                draw.text((60, current_y + 48), imp_str, fill=imp_color, font=self.font_small)
 
-                # Symbol Pill
-                sym_str = str(e.get("symbol", mkt)).strip()
-                if sym_str.startswith("🇮🇳") or sym_str.startswith("🇺🇸") or sym_str.startswith("⛽") or sym_str.startswith("₿"):
-                    clean_sym = sym_str.split(":", 1)[-1].strip() if ":" in sym_str else sym_str[2:].strip()
+                # Clean Symbol
+                sym_str = clean_text_for_image(e.get("symbol", mkt))
+                if ":" in sym_str:
+                    clean_sym = sym_str.split(":", 1)[-1].strip()
                 else:
                     clean_sym = sym_str
 
-                # Event Title
-                ev_str = str(e.get("event", "Scheduled Release")).strip()
+                # Clean Event Title
+                ev_str = clean_text_for_image(e.get("event", "Scheduled Release"))
                 full_ev = f"{clean_sym} — {ev_str}"
-                max_title_chars = 68 if width == 1200 else 55
+                max_title_chars = 68
                 if len(full_ev) > max_title_chars:
                     full_ev = full_ev[:max_title_chars - 3] + "..."
 
-                draw.text((195, current_y + 12), full_ev, fill=(15, 23, 42), font=self.font_bold)
+                draw.text((195, current_y + 11), full_ev, fill=(15, 23, 42), font=self.font_bold)
 
-                # Financial Metrics: Prev vs Forecast vs Actual
-                prev_val = str(e.get("previous", "—"))
-                fore_val = str(e.get("forecast", "—"))
-                act_val = str(e.get("actual", "⏳ Pending"))
+                # Financial Metrics: Prev vs Forecast vs Actual (Strictly cleaned of emojis)
+                prev_val = clean_text_for_image(e.get("previous", "—")) or "—"
+                fore_val = clean_text_for_image(e.get("forecast", "—")) or "—"
+                act_val = clean_text_for_image(e.get("actual", "Pending")) or "Pending"
                 metrics_str = f"Prev: {prev_val}   |   Consensus: {fore_val}   |   Actual: {act_val}"
-                draw.text((195, current_y + 46), metrics_str, fill=(71, 85, 105), font=self.font_body)
+                draw.text((195, current_y + 44), metrics_str, fill=(71, 85, 105), font=self.font_body)
 
-                # Verdict / Sentiment Badge
-                sent_str = str(e.get("outcome_sentiment", "⏳ PENDING")).strip()
-                sent_color = (22, 101, 52) if "BULL" in sent_str else ((185, 28, 28) if "BEAR" in sent_str else (100, 116, 139))
-                draw.text((width - 240, current_y + 46), f"Verdict: {sent_str}", fill=sent_color, font=self.font_bold)
+                # Verdict / Sentiment Badge (Clean text, no emojis)
+                raw_sent = clean_text_for_image(e.get("outcome_sentiment", "PENDING")).upper()
+                if "BULL" in raw_sent:
+                    sent_str = "BULLISH"
+                    sent_color = (22, 101, 52)
+                elif "BEAR" in raw_sent:
+                    sent_str = "BEARISH"
+                    sent_color = (185, 28, 28)
+                else:
+                    sent_str = "PENDING"
+                    sent_color = (100, 116, 139)
+
+                draw.text((width - 230, current_y + 44), f"Verdict: {sent_str}", fill=sent_color, font=self.font_bold)
 
                 current_y += event_row_height
 
-            # Indicator if there are more events scheduled
-            if remaining_count > 0:
-                more_rect = [(40, current_y), (width - 40, current_y + 46)]
-                draw.rounded_rectangle(more_rect, radius=8, fill=(241, 245, 249), outline=(203, 213, 225), width=1)
-                draw.text((60, current_y + 13), f"⚡ +{remaining_count} MORE {mkt} CORPORATE ACTIONS & RELEASES SCHEDULED FOR THIS DATE", fill=(71, 85, 105), font=self.font_bold)
-                draw.text((width - 380, current_y + 13), "Access complete ledger on EPM Pro Web Terminal", fill=theme["accent"], font=self.font_small)
-                current_y += 60
+        # ── 6. Pagination Navigation Banner ──
+        if total_pages > 1:
+            nav_rect = [(40, current_y), (width - 40, current_y + 42)]
+            if page_num < total_pages:
+                draw.rounded_rectangle(nav_rect, radius=6, fill=(239, 246, 255), outline=(191, 219, 254), width=1)
+                remaining = total_events_count - end_idx
+                draw.text((55, current_y + 12), f">> CONTINUED ON CARD {page_num + 1} OF {total_pages} (NEXT {remaining} EVENTS INCLUDED)", fill=(29, 78, 216), font=self.font_bold)
+                draw.text((width - 360, current_y + 12), f"Part {page_num}/{total_pages} Dispatched to Telegram", fill=(100, 116, 139), font=self.font_small)
+            else:
+                draw.rounded_rectangle(nav_rect, radius=6, fill=(240, 253, 244), outline=(187, 247, 208), width=1)
+                draw.text((55, current_y + 12), f"[ALL {total_events_count} {mkt} EVENTS DISPLAYED ACROSS {total_pages} CARDS]", fill=(22, 101, 52), font=self.font_bold)
+                draw.text((width - 340, current_y + 12), "Complete Ledger Verified on EPM Pro", fill=(71, 85, 105), font=self.font_small)
+            current_y += 54
 
-        # ── 6. Futuristic Terminal Footer ──
-        draw.line([(40, current_y + 15), (width - 40, current_y + 15)], fill=(226, 232, 240), width=1)
+        # ── 7. Futuristic Terminal Footer ──
+        draw.line([(40, current_y + 10), (width - 40, current_y + 10)], fill=(226, 232, 240), width=1)
         dispatched_time = datetime.now().strftime("%d %b %Y, %H:%M:%S IST")
-        draw.text((45, current_y + 30), f"EPM Pro Multi-Market Intelligence Engine  •  Verified Output at {dispatched_time}", fill=(148, 163, 184), font=self.font_small)
-        draw.text((width - 420, current_y + 30), "📅 Synchronized with Google Calendar (60m Prior Alarms)", fill=(37, 99, 235), font=self.font_bold)
+        draw.text((45, current_y + 24), f"EPM Pro Multi-Market Intelligence Engine  •  Verified Output at {dispatched_time}", fill=(148, 163, 184), font=self.font_small)
+        draw.text((width - 420, current_y + 24), "• Synchronized with Google Calendar (60m Prior Alarms)", fill=(37, 99, 235), font=self.font_bold)
 
         # Export to optimized PNG buffer
         buf = io.BytesIO()
         img.save(buf, format="PNG", optimize=True)
         buf.seek(0)
         return buf.getvalue()
+
+    def render_market_calendar_cards(
+        self,
+        market: str,
+        target_date: str,
+        events: List[Dict],
+        mode: str = "TODAY",
+        holiday_info: Optional[Dict] = None,
+        max_per_page: int = 15
+    ) -> List[Tuple[bytes, List[Dict], int, int]]:
+        """
+        Renders one or more publication-grade 1200px infographic cards.
+        If events count exceeds max_per_page (e.g. 15), splits automatically into 2 or more cards
+        so NO data is hidden with a "+X more events" message.
+        Returns: List of tuples: (png_bytes, page_events, start_index, end_index)
+        """
+        sorted_events = sorted(
+            events or [],
+            key=lambda x: (0 if str(x.get("impact", "")).upper() == "HIGH" else 1, str(x.get("time", "99:99")))
+        )
+
+        total_count = len(sorted_events)
+        high_impact_count = sum(1 for e in sorted_events if str(e.get("impact", "")).upper() == "HIGH")
+
+        chunks = self.chunk_events_for_cards(sorted_events, max_per_page=max_per_page)
+        total_pages = len(chunks)
+
+        rendered_pages: List[Tuple[bytes, List[Dict], int, int]] = []
+        for page_idx, (page_events, start_idx, end_idx) in enumerate(chunks, start=1):
+            png_bytes = self.render_single_page(
+                market=market,
+                target_date=target_date,
+                page_events=page_events,
+                total_events_count=total_count,
+                high_impact_count=high_impact_count,
+                start_idx=start_idx,
+                end_idx=end_idx,
+                page_num=page_idx,
+                total_pages=total_pages,
+                mode=mode,
+                holiday_info=holiday_info
+            )
+            rendered_pages.append((png_bytes, page_events, start_idx, end_idx))
+
+        return rendered_pages
+
+    def render_market_calendar_card(
+        self,
+        market: str,
+        target_date: str,
+        events: List[Dict],
+        mode: str = "TODAY",
+        holiday_info: Optional[Dict] = None
+    ) -> bytes:
+        """Single-card backward compatibility wrapper."""
+        pages = self.render_market_calendar_cards(
+            market=market,
+            target_date=target_date,
+            events=events,
+            mode=mode,
+            holiday_info=holiday_info,
+            max_per_page=15
+        )
+        return pages[0][0] if pages else b""
 
 calendar_card_generator = CalendarCardGenerator()
