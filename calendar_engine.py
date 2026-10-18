@@ -2214,11 +2214,11 @@ class MarketCalendarEngine:
                 self.last_tomorrow_snapshot_date = today_str
                 self._save_state()
 
-        # ── 3B. Monday 07:00 AM IST: Complete 7-Day Weekly Calendar Sync Dispatch ──
-        is_monday = (curr.weekday() == 0)
-        if is_monday and curr.hour >= 7 and getattr(self, "last_weekly_dispatch_date", "") != today_str:
-            if telegram_notifier.calendar_enabled and getattr(telegram_notifier, "auto_weekly_mon_7am", True) and telegram_notifier.is_calendar_configured():
-                logger.info("Dispatching Monday 07:00 AM IST Full 7-Day Weekly Calendar Link to Telegram...")
+        # ── 3B. Friday 07:00 AM IST: Complete Upcoming Week Calendar Sync Dispatch ──
+        is_friday = (curr.weekday() == 4)
+        if is_friday and curr.hour >= 7 and getattr(self, "last_weekly_dispatch_date", "") != today_str:
+            if telegram_notifier.calendar_enabled and getattr(telegram_notifier, "auto_weekly_fri_7am", True) and telegram_notifier.is_calendar_configured():
+                logger.info("Dispatching Friday 07:00 AM IST Upcoming Week Calendar Link to Telegram...")
                 self.dispatch_weekly_calendar_message()
                 self.last_weekly_dispatch_date = today_str
                 self._save_state()

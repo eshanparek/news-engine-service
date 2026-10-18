@@ -41,7 +41,7 @@ class TelegramNotifier:
         self.auto_daily_today_7am = True       # 7:00 AM IST Today's complete snapshot (5 separate market msgs)
         self.auto_daily_tomorrow_705am = True  # 7:05 AM IST Tomorrow's lined-up snapshot (5 separate market msgs)
         self.auto_holiday_7am = True           # 7:00 AM IST Next-day trading holiday alert
-        self.auto_weekly_mon_7am = True        # Monday 7:00 AM IST Weekly Calendar Sync Link
+        self.auto_weekly_fri_7am = True        # Friday 07:00 AM IST Weekly Calendar Sync Link
         self.send_as_photos = True             # Deliver morning calendar as high-definition infographic photos
         self.public_app_url = os.getenv("PUBLIC_APP_URL", "").strip()
         self._send_lock = threading.Lock()
@@ -87,8 +87,10 @@ class TelegramNotifier:
                     self.auto_daily_tomorrow_705am = bool(data["auto_daily_tomorrow_705am"])
                 if "auto_holiday_7am" in data:
                     self.auto_holiday_7am = bool(data["auto_holiday_7am"])
-                if "auto_weekly_mon_7am" in data:
-                    self.auto_weekly_mon_7am = bool(data["auto_weekly_mon_7am"])
+                if "auto_weekly_fri_7am" in data:
+                    self.auto_weekly_fri_7am = bool(data["auto_weekly_fri_7am"])
+                elif "auto_weekly_mon_7am" in data:
+                    self.auto_weekly_fri_7am = bool(data["auto_weekly_mon_7am"])
                 if "send_as_photos" in data:
                     self.send_as_photos = bool(data["send_as_photos"])
                 if data.get("public_app_url"):
@@ -113,7 +115,7 @@ class TelegramNotifier:
         auto_holiday_7am: bool = True,
         send_as_photos: bool = True,
         public_app_url: str = "",
-        auto_weekly_mon_7am: bool = True
+        auto_weekly_fri_7am: bool = True
     ) -> Dict:
         if news_bot_token.strip():
             self.bot_token = news_bot_token.strip()
@@ -132,7 +134,7 @@ class TelegramNotifier:
         self.auto_holiday_7am = bool(auto_holiday_7am)
         self.send_as_photos = bool(send_as_photos)
         self.public_app_url = public_app_url.strip()
-        self.auto_weekly_mon_7am = bool(auto_weekly_mon_7am)
+        self.auto_weekly_fri_7am = bool(auto_weekly_fri_7am)
 
         payload = {
             "news_bot_token": self.bot_token,
@@ -149,7 +151,7 @@ class TelegramNotifier:
             "auto_holiday_7am": self.auto_holiday_7am,
             "send_as_photos": self.send_as_photos,
             "public_app_url": self.public_app_url,
-            "auto_weekly_mon_7am": self.auto_weekly_mon_7am
+            "auto_weekly_fri_7am": self.auto_weekly_fri_7am
         }
         try:
             with open(ADMIN_SETTINGS_FILE, "w") as f:

@@ -734,7 +734,7 @@ def save_admin_telegram_settings(
     auto_hol_7am: bool,
     send_photos: bool = True,
     public_url: str = "",
-    auto_weekly_mon7am: bool = True
+    auto_weekly_fri7am: bool = True
 ):
     telegram_notifier.save_admin_settings(
         news_bot_token=news_token,
@@ -751,7 +751,7 @@ def save_admin_telegram_settings(
         auto_holiday_7am=auto_hol_7am,
         send_as_photos=send_photos,
         public_app_url=public_url,
-        auto_weekly_mon_7am=auto_weekly_mon7am
+        auto_weekly_fri_7am=auto_weekly_fri7am
     )
     format_mode = "Infographic Photo Cards 📸" if send_photos else "Detailed Text Messages 💬"
     return (
@@ -760,7 +760,7 @@ def save_admin_telegram_settings(
         f"- **Calendar & Outcomes Channel ID:** `{telegram_notifier.calendar_chat_id or 'Not Set'}` (Enabled: `{telegram_notifier.calendar_enabled}`)\n"
         f"- **Public Portal URL:** `{telegram_notifier.get_public_url()}`\n"
         f"- **Morning Dispatch Format:** `{format_mode}`\n"
-        f"- **Daily IST Automation:** 7:00 AM Today Snapshot=`{auto_today_7am}` | 7:05 AM Tomorrow Snapshot=`{auto_tom_705am}` | 7:00 AM Pre-Holiday Alert=`{auto_hol_7am}` | Monday 7:00 AM Weekly Link=`{auto_weekly_mon7am}`"
+        f"- **Daily IST Automation:** 7:00 AM Today Snapshot=`{auto_today_7am}` | 7:05 AM Tomorrow Snapshot=`{auto_tom_705am}` | 7:00 AM Pre-Holiday Alert=`{auto_hol_7am}` | Friday 7:00 AM Weekly Link=`{auto_weekly_fri7am}`"
     )
 
 
@@ -1607,7 +1607,7 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                 btn_push_holiday = gr.Button("🏖️ Send Next-Day Holiday Alert", variant="secondary", scale=1)
 
             with gr.Row():
-                btn_push_weekly = gr.Button("🗓️ Send Complete 7-Day Weekly Calendar Link (Apple & Google)", variant="primary", scale=2)
+                btn_push_weekly = gr.Button("📲 Resend Complete Weekly Calendar Sync Links to Telegram (Apple & Google)", variant="primary", scale=2)
                 btn_push_today = gr.Button("💬 Send Today's Text Snapshot (5 Markets)", variant="secondary", scale=1)
                 btn_push_tomorrow = gr.Button("💬 Send Tomorrow's Text Snapshot (5 Markets)", variant="secondary", scale=1)
 
@@ -1760,9 +1760,9 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                         label="🏖️ 07:00 AM IST — Auto-Forward Next-Day Trading Holiday Alert (1 Day Before NSE/BSE/MCX/NYSE Holiday)",
                         value=telegram_notifier.auto_holiday_7am
                     )
-                    adm_auto_weekly_mon7am = gr.Checkbox(
-                        label="🗓️ Monday 07:00 AM IST — Auto-Forward Complete 7-Day Weekly Calendar Link (Apple & Google)",
-                        value=getattr(telegram_notifier, "auto_weekly_mon_7am", True)
+                    adm_auto_weekly_fri7am = gr.Checkbox(
+                        label="🗓️ Friday 07:00 AM IST — Auto-Forward Complete Upcoming Week Calendar Link (Apple & Google)",
+                        value=getattr(telegram_notifier, "auto_weekly_fri_7am", True)
                     )
                     adm_send_as_photos = gr.Checkbox(
                         label="📸 Deliver Morning Calendar Snapshots as Infographic Photo Cards (Details rendered directly in image)",
@@ -1778,7 +1778,10 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                         adm_cal_countdown = gr.Checkbox(label="⏰ T-15m Countdown Alerts", value=telegram_notifier.alert_on_countdown)
                         adm_cal_outcome = gr.Checkbox(label="🏁 Unfolded Outcome Alerts", value=telegram_notifier.alert_on_outcome)
                         adm_cal_linked = gr.Checkbox(label="🔗 Linked News Results", value=telegram_notifier.alert_on_linked_news)
-                    test_cal_tg_btn = gr.Button("🔔 Send Test Message to Calendar Channel")
+                    
+                    with gr.Row():
+                        test_cal_tg_btn = gr.Button("🔔 Send Test Alert to Calendar Channel")
+                        resend_weekly_btn = gr.Button("📲 Resend Full-Week Calendar Sync Link (Apple & Google) Now")
 
             save_adm_tg_btn = gr.Button("💾 Save All Telegram & Schedule Settings", variant="primary")
             adm_tg_status = gr.Markdown()
@@ -1790,12 +1793,13 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                     adm_cal_token, adm_cal_chat, adm_cal_enabled,
                     adm_cal_countdown, adm_cal_outcome, adm_cal_linked,
                     adm_auto_today_7am, adm_auto_tom_705am, adm_auto_hol_7am,
-                    adm_send_as_photos, adm_public_app_url, adm_auto_weekly_mon7am
+                    adm_send_as_photos, adm_public_app_url, adm_auto_weekly_fri7am
                 ],
                 outputs=[adm_tg_status]
             )
             test_news_tg_btn.click(lambda: trigger_test_telegram("news"), outputs=[adm_tg_status])
             test_cal_tg_btn.click(lambda: trigger_test_telegram("calendar"), outputs=[adm_tg_status])
+            resend_weekly_btn.click(push_weekly_calendar_dispatch, outputs=[adm_tg_status])
 
             gr.Markdown("---")
             gr.Markdown("### 📅 Google Calendar Direct API Integration (Automated 1-Hour Reminder Alarms)")
