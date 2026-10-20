@@ -60,6 +60,135 @@ class AIImpactAnalyzer:
     def is_configured(self) -> bool:
         return bool(self.api_key)
 
+    def heuristic_circular_analysis(self, title: str, text: str, regulator: str) -> Dict:
+        """Fast rule-based institutional breakdown for official circulars & regulatory notices."""
+        combined = f"{title} {text}".upper()
+        
+        # Determine category & impact
+        if any(w in combined for w in ["MARGIN", "CIRCUIT", "SURVEILLANCE", "BAN", "PENALTY", "DEFAULT", "EXPIRE", "RESTRICTION", "DE-LISTING", "DELIST"]):
+            impact = "HIGH"
+            category = "Risk, Margins & Trading Rules"
+        elif any(w in combined for w in ["REPO", "POLICY", "INTEREST RATE", "INFLATION", "LIQUIDITY", "CASH RESERVE", "CRR", "SLR"]):
+            impact = "HIGH"
+            category = "Monetary & Macro Policy"
+        elif any(w in combined for w in ["TAX", "BUDGET", "CUSTOMS", "REVENUE", "FINANCE BILL", "EXEMPTION"]):
+            impact = "HIGH"
+            category = "Fiscal & Tax Regulation"
+        elif any(w in combined for w in ["SETTLEMENT", "CLEARING", "HOLIDAY", "TIMING", "MOCK", "TESTING"]):
+            impact = "MEDIUM"
+            category = "Settlement & Market Operations"
+        else:
+            impact = "MEDIUM"
+            category = "Compliance & Exchange Disclosure"
+
+        bullets = [
+            f"Official regulatory communication released by {regulator.upper()}.",
+            f"Subject focus: {title.strip()[:110]}.",
+            f"Operational Scope: Pertains to {category} across market participants."
+        ]
+        if "MARGIN" in combined:
+            bullets.append("Traders & brokers must check revised margin requirements and exposure thresholds.")
+        elif "SETTLEMENT" in combined or "HOLIDAY" in combined:
+            bullets.append("Clearing corporations and depository participants to follow modified settlement schedules.")
+        elif "REPO" in combined or "RATE" in combined:
+            bullets.append("Direct macro implications for sovereign yields, banking liquidity, and lending rates.")
+        else:
+            bullets.append("Market intermediaries should review official documentation for procedural compliance.")
+
+        return {
+            "impact": impact,
+            "category": category,
+            "bullets": bullets[:5],
+            "action_takeaway": f"Review {regulator.upper()} notification for compliance and operational readiness."
+        }
+
+    def analyze_circular(self, title: str, text: str, regulator: str) -> Dict:
+        """
+        Generate 3-5 bullet executive impact summary for regulatory circulars with direct native PDF links.
+        Uses Gemini 2.5 with immediate heuristic fallback.
+        """
+        heuristic_res = self.heuristic_circular_analysis(title, text, regulator)
+
+        if not self.is_configured() or time.time() < self.rate_limited_until:
+            return heuristic_res
+
+        prompt = f"""
+You are a senior regulatory analyst for institutional trading. Analyze this official notification released by {regulator.upper()}:
+Title: {title}
+Content / Excerpt: {text[:2000]}
+
+Generate an institutional executive summary.
+Output ONLY a JSON object:
+{{
+  "impact": "HIGH" | "MEDIUM" | "LOW",
+  "category": "<Trading Rules | Margins/Risk | Monetary Policy | Fiscal/Tax | Operations | Compliance>",
+  "bullets": [
+    "<Bullet 1: Exactly what regulation, rule, or policy was updated/introduced>",
+    "<Bullet 2: Impact on brokers, institutions, or retail market participants>",
+    "<Bullet 3: Deadlines, effective dates, or compliance requirements>",
+    "<Bullet 4: Affected asset classes, sectors, or market contracts (e.g. F&O, Equity, FX, Crypto)>",
+    "<Bullet 5: Actionable takeaway or key risk alert>"
+  ],
+  "action_takeaway": "<1-sentence direct actionable conclusion>"
+}}
+"""
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "temperature": 0.1,
+                "responseMimeType": "application/json"
+            }
+        }
+
+        time_since_last = time.time() - self.last_api_call
+        if time_since_last < 1.0:
+            time.sleep(1.0 - time_since_last)
+
+        for model in GEMINI_MODELS:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={self.api_key}"
+            try:
+                self.last_api_call = time.time()
+                resp = requests.post(url, json=payload, timeout=7)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    candidates = data.get("candidates", [])
+                    if candidates:
+                        parts = candidates[0].get("content", {}).get("parts", [])
+                        if parts and "text" in parts[0]:
+                            raw_text = parts[0]["text"].strip()
+                            if raw_text.startswith("```json"):
+                                raw_text = raw_text[7:-3].strip()
+                            elif raw_text.startswith("```"):
+                                raw_text = raw_text[3:-3].strip()
+
+                            start = raw_text.find("{")
+                            end = raw_text.rfind("}") + 1
+                            parsed = json.loads(raw_text[start:end]) if start >= 0 and end > start else json.loads(raw_text)
+
+                            imp = str(parsed.get("impact", "MEDIUM")).upper()
+                            if imp not in ("HIGH", "MEDIUM", "LOW"):
+                                imp = heuristic_res["impact"]
+                            
+                            bullets = parsed.get("bullets", [])
+                            if not isinstance(bullets, list) or len(bullets) < 2:
+                                bullets = heuristic_res["bullets"]
+                            else:
+                                bullets = [str(b).strip() for b in bullets[:5] if str(b).strip()]
+
+                            return {
+                                "impact": imp,
+                                "category": str(parsed.get("category", heuristic_res["category"])),
+                                "bullets": bullets,
+                                "action_takeaway": str(parsed.get("action_takeaway", heuristic_res["action_takeaway"]))
+                            }
+                elif resp.status_code == 429:
+                    self.rate_limited_until = time.time() + 60
+                    break
+            except Exception as e:
+                logger.debug(f"Gemini circular analysis error on {model}: {e}")
+
+        return heuristic_res
+
     def heuristic_analysis(self, title: str, summary: str) -> Dict:
         """Fast rule-based financial sentiment & impact analyzer."""
         text = f"{title} {summary}".upper()

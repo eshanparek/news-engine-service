@@ -18,10 +18,12 @@ from telegram_notifier import telegram_notifier
 from whatsapp_notifier import whatsapp_notifier
 from calendar_engine import calendar_engine, now_ist, MARKETS_ORDER, MARKET_META
 from google_calendar_manager import google_calendar_manager
+from circular_engine import circular_engine, REGULATORS, REGULATOR_META
 
 # 1. Start Background Scraper, Scorer & Multi-Market Calendar Timer Daemons
 news_worker.start()
 calendar_engine.start()
+circular_engine.start()
 
 # 2. FastAPI Machine-to-Machine Endpoints
 app = FastAPI(
@@ -417,7 +419,134 @@ def render_news_feed_html(items: List[Dict]) -> str:
     return f'<div class="epm-stream-container">{"".join(cards_html)}</div>'
 
 
-def render_calendar_feed_html(events: List[Dict]) -> str:
+def render_circulars_feed_html(circulars: List[Dict]) -> str:
+    """Renders ultra-modern institutional regulatory circular cards with 3-5 AI bullets and direct PDF action links."""
+    if not circulars:
+        return (
+            '<div class="epm-empty-state">'
+            '  <div class="epm-empty-icon">📜</div>'
+            '  <div class="epm-empty-title">No Official Circulars Found For This Filter</div>'
+            '  <div class="epm-empty-sub">Select another regulator or clear your search term to view official documents.</div>'
+            '</div>'
+        )
+
+    cards = []
+    for c in circulars:
+        reg = c.get("regulator", "NSE")
+        meta = REGULATOR_META.get(reg, {"badge": reg, "color": "#2563eb", "type": "Regulator"})
+        title = html.escape(str(c.get("title", "")))
+        circ_no = html.escape(str(c.get("circular_no", "")))
+        date_str = html.escape(str(c.get("date", "")))
+        pdf_url = c.get("pdf_url") or c.get("web_url", "#")
+        category = html.escape(str(c.get("category", "Regulatory Disclosure")))
+        impact = str(c.get("impact", "MEDIUM")).upper()
+        bullets = c.get("bullets", [])
+        action = html.escape(str(c.get("action_takeaway", "")))
+
+        is_high = impact == "HIGH"
+        impact_badge = f'<span class="epm-badge impact-{"high" if is_high else "medium"}">{"🚨 CRITICAL IMPACT" if is_high else "📌 OFFICIAL DIRECTIVE"}</span>'
+
+        bullet_items = "".join(f'<li>{html.escape(str(b))}</li>' for b in bullets) if bullets else f'<li>{title}</li>'
+
+        card = f'''
+        <div class="epm-card epm-circ-card regulator-{reg.lower()} {'is-high-impact' if is_high else ''}">
+            <div class="epm-card-header">
+                <div class="epm-meta-left">
+                    <span class="epm-reg-chip reg-{reg.lower()}">{meta['badge']}</span>
+                    <span class="epm-circ-no"><code>{circ_no}</code></span>
+                    <span class="epm-time-ist">📅 <b>{date_str}</b></span>
+                    {impact_badge}
+                </div>
+                <div class="epm-meta-right">
+                    <a href="{pdf_url}" target="_blank" class="epm-pdf-btn">📄 Open Official PDF ↗</a>
+                </div>
+            </div>
+            <div class="epm-card-body">
+                <div class="epm-circ-title-row">
+                    <span class="epm-circ-title">{title}</span>
+                </div>
+                <div class="epm-circ-bullets-box">
+                    <div class="epm-circ-bullets-head">🧠 <b>Institutional Impact & Actionable Breakdown (AI 3-5 Bullets):</b></div>
+                    <ul class="epm-circ-bullets-list">
+                        {bullet_items}
+                    </ul>
+                </div>
+                {f'<div class="epm-circ-action">⚡ <b>Operational Takeaway:</b> {action}</div>' if action else ''}
+            </div>
+            <div class="epm-card-footer">
+                <div class="epm-circ-cat">Classification: <b>{category}</b></div>
+                <div class="epm-circ-verified">✅ Verified Document-Backed Release</div>
+            </div>
+        </div>
+        '''
+        cards.append(card)
+
+    return f'<div class="epm-stream-container">{"".join(cards)}</div>'
+
+
+def get_circulars_view(regulator_filter: str = "ALL", impact_filter: str = "ALL", search_query: str = ""):
+    items = circular_engine.get_circulars(
+        regulator_filter=regulator_filter,
+        impact_filter=impact_filter,
+        search_query=search_query
+    )
+    visual_html = render_circulars_feed_html(items)
+    
+    table_rows = []
+    for it in items:
+        meta = REGULATOR_META.get(it["regulator"], {"badge": it["regulator"]})
+        pdf_link = it["pdf_url"] or it["web_url"]
+        pdf_display = f'<a href="{pdf_link}" target="_blank">📄 Open PDF ↗</a>'
+        bullets_text = " • ".join(it.get("bullets", []))
+        table_rows.append([
+            meta["badge"],
+            it["circular_no"],
+            it["date"],
+            it["impact"],
+            it["title"],
+            it["category"],
+            bullets_text,
+            pdf_link
+        ])
+    
+    if not table_rows:
+        table_rows.append(["-", "-", "-", "-", "No circulars matching current filters", "-", "-", "-"])
+
+    summary_text = (
+        f"📜 **Official Documents Indexed:** {len(items)} | "
+        f"**Active Regulator:** `{regulator_filter}` | "
+        f"**Impact:** `{impact_filter}` | "
+        f"**Direct Native PDF Storage:** Verified & Accessible"
+    )
+    return summary_text, visual_html, table_rows
+
+
+def refresh_circulars_data(regulator_filter: str, impact_filter: str, search_query: str):
+    circular_engine.poll_all_regulators()
+    return get_circulars_view(regulator_filter, impact_filter, search_query)
+
+
+def dispatch_circular_to_telegram(circ_id: str):
+    with circular_engine._lock:
+        with sqlite3.connect(circular_engine.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute("SELECT * FROM circulars ORDER BY timestamp DESC LIMIT 1").fetchone()
+            if not row:
+                return "⚠️ No circulars available to dispatch."
+            bullets = json.loads(row["bullets_json"]) if row["bullets_json"] else []
+            msg = circular_engine.format_telegram_circular_alert(
+                regulator=row["regulator"],
+                circ_no=row["circular_no"],
+                title=row["title"],
+                pdf_url=row["pdf_url"] or row["web_url"],
+                category=row["category"],
+                bullets=bullets,
+                action_takeaway=row["action_takeaway"]
+            )
+            ok, err = telegram_notifier.send_calendar_alert(msg)
+            if ok:
+                return f"✅ **Dispatched Official [{row['regulator']}] Circular `{row['circular_no']}` with 3-5 Bullets & PDF Link to Telegram!**"
+            return f"⚠️ **Telegram Dispatch Error:** {err}"
     """Renders 2035 multi-market interactive catalyst cards with live countdown timers and 1-click Google Calendar sync."""
     if not events:
         return (
@@ -734,7 +863,8 @@ def save_admin_telegram_settings(
     auto_hol_7am: bool,
     send_photos: bool = True,
     public_url: str = "",
-    auto_weekly_fri7am: bool = True
+    auto_weekly_fri7am: bool = True,
+    auto_circulars_tg: bool = True
 ):
     telegram_notifier.save_admin_settings(
         news_bot_token=news_token,
@@ -751,7 +881,8 @@ def save_admin_telegram_settings(
         auto_holiday_7am=auto_hol_7am,
         send_as_photos=send_photos,
         public_app_url=public_url,
-        auto_weekly_fri_7am=auto_weekly_fri7am
+        auto_weekly_fri_7am=auto_weekly_fri7am,
+        auto_circulars_tg=auto_circulars_tg
     )
     format_mode = "Infographic Photo Cards 📸" if send_photos else "Detailed Text Messages 💬"
     return (
@@ -760,7 +891,7 @@ def save_admin_telegram_settings(
         f"- **Calendar & Outcomes Channel ID:** `{telegram_notifier.calendar_chat_id or 'Not Set'}` (Enabled: `{telegram_notifier.calendar_enabled}`)\n"
         f"- **Public Portal URL:** `{telegram_notifier.get_public_url()}`\n"
         f"- **Morning Dispatch Format:** `{format_mode}`\n"
-        f"- **Daily IST Automation:** 7:00 AM Today Snapshot=`{auto_today_7am}` | 7:05 AM Tomorrow Snapshot=`{auto_tom_705am}` | 7:00 AM Pre-Holiday Alert=`{auto_hol_7am}` | Friday 7:00 AM Weekly Link=`{auto_weekly_fri7am}`"
+        f"- **Daily IST Automation:** 7:00 AM Today Snapshot=`{auto_today_7am}` | 7:05 AM Tomorrow Snapshot=`{auto_tom_705am}` | 7:00 AM Pre-Holiday Alert=`{auto_hol_7am}` | Friday 7:00 AM Weekly Link=`{auto_weekly_fri7am}` | Regulatory Circular Alerts=`{auto_circulars_tg}`"
     )
 
 
@@ -1494,6 +1625,121 @@ code, .timer-cell, pre {
 .epm-empty-icon { font-size: 32px !important; margin-bottom: 8px; }
 .epm-empty-title { font-size: 15px !important; font-weight: 700 !important; color: #0f172a !important; margin-bottom: 4px; }
 .epm-empty-sub { font-size: 13px !important; color: #64748b !important; }
+
+/* ── Regulatory Circulars Card Styling (2035 Bloomberg White) ── */
+.epm-circ-card {
+    border-left: 4px solid #2563eb !important;
+    background: #ffffff !important;
+}
+.epm-circ-card.regulator-nse { border-left-color: #2563eb !important; }
+.epm-circ-card.regulator-bse { border-left-color: #9333ea !important; }
+.epm-circ-card.regulator-mcx { border-left-color: #ea580c !important; }
+.epm-circ-card.regulator-rbi { border-left-color: #047857 !important; }
+.epm-circ-card.regulator-finmin { border-left-color: #b45309 !important; }
+.epm-circ-card.regulator-fomc { border-left-color: #1e3a8a !important; }
+.epm-circ-card.regulator-nyse { border-left-color: #0f766e !important; }
+.epm-circ-card.regulator-crypto { border-left-color: #d97706 !important; }
+
+.epm-reg-chip {
+    font-family: var(--font-sans) !important;
+    font-weight: 700 !important;
+    font-size: 11px !important;
+    padding: 3px 8px !important;
+    border-radius: 5px !important;
+    background: #f1f5f9 !important;
+    border: 1px solid #cbd5e1 !important;
+}
+.epm-reg-chip.reg-nse { color: #1e3a8a !important; }
+.epm-reg-chip.reg-bse { color: #581c87 !important; }
+.epm-reg-chip.reg-mcx { color: #9a3412 !important; }
+.epm-reg-chip.reg-rbi { color: #064e3b !important; }
+.epm-reg-chip.reg-finmin { color: #78350f !important; }
+.epm-reg-chip.reg-fomc { color: #1e3a8a !important; }
+.epm-reg-chip.reg-nyse { color: #134e4a !important; }
+.epm-reg-chip.reg-crypto { color: #854d0e !important; }
+
+.epm-circ-no code {
+    font-family: var(--font-mono) !important;
+    font-size: 11px !important;
+    background: #f1f5f9 !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+    border: 1px solid #e2e8f0 !important;
+    color: #0f172a !important;
+}
+
+.epm-pdf-btn {
+    font-family: var(--font-sans) !important;
+    font-size: 11.5px !important;
+    font-weight: 700 !important;
+    background: #2563eb !important;
+    color: #ffffff !important;
+    padding: 6px 14px !important;
+    border-radius: 6px !important;
+    text-decoration: none !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    box-shadow: 0 1px 3px rgba(37, 99, 235, 0.2) !important;
+    transition: all 0.15s ease !important;
+}
+.epm-pdf-btn:hover {
+    background: #1d4ed8 !important;
+    box-shadow: 0 3px 8px rgba(37, 99, 235, 0.35) !important;
+}
+
+.epm-circ-title {
+    font-family: var(--font-sans) !important;
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    color: #0f172a !important;
+    line-height: 1.4 !important;
+}
+
+.epm-circ-bullets-box {
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 8px !important;
+    padding: 10px 14px !important;
+    margin-top: 10px !important;
+}
+.epm-circ-bullets-head {
+    font-size: 11px !important;
+    color: #2563eb !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.04em !important;
+    margin-bottom: 6px !important;
+}
+.epm-circ-bullets-list {
+    margin: 0 !important;
+    padding-left: 18px !important;
+    font-size: 12.5px !important;
+    color: #334155 !important;
+    line-height: 1.55 !important;
+}
+.epm-circ-bullets-list li {
+    margin-bottom: 4px !important;
+}
+
+.epm-circ-action {
+    background: #ecfdf5 !important;
+    border: 1px solid #a7f3d0 !important;
+    color: #065f46 !important;
+    font-size: 12px !important;
+    padding: 6px 12px !important;
+    border-radius: 6px !important;
+    margin-top: 8px !important;
+}
+
+.epm-circ-cat {
+    font-size: 11px !important;
+    color: #64748b !important;
+}
+.epm-circ-verified {
+    font-size: 11px !important;
+    color: #059669 !important;
+    font-weight: 600 !important;
+}
 """
 
 
@@ -1702,7 +1948,105 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
             )
 
         # ═══════════════════════════════════════════════════════════
-        # TAB 3: Portal Settings Page (Alert Channels, Google Cal & Sources)
+        # TAB 3: Official Regulatory Circulars & Notifications Repository
+        # ═══════════════════════════════════════════════════════════
+        with gr.TabItem("📜 Regulatory Circulars & Official PDFs"):
+            gr.Markdown(
+                "### 🏛️ Official Regulatory Circulars & Notifications Repository\n"
+                "- **Authentic Document-Backed Feeds:** Ingests official publications directly from **NSE**, **BSE**, **MCX**, **RBI**, **Ministry of Finance (FinMin)**, **FOMC / Fed**, **NYSE / SEC**, and **Crypto**.\n"
+                "- **AI Executive Summaries (3-5 Bullets):** Instantly distills regulatory compliance requirements, margin obligations, and market risk impact.\n"
+                "- **Native PDF Link Access:** Every release provides a direct 1-click link to view or download the authentic official document."
+            )
+            circ_info_bar = gr.Markdown("Loading official regulatory circulars...")
+
+            with gr.Row():
+                circ_reg_filter = gr.Radio(
+                    choices=[
+                        ("🌐 All Regulators", "ALL"),
+                        ("🇮🇳 NSE", "NSE"),
+                        ("🇮🇳 BSE", "BSE"),
+                        ("⛽ MCX", "MCX"),
+                        ("🏛️ RBI", "RBI"),
+                        ("🇮🇳 FINMIN", "FINMIN"),
+                        ("🇺🇸 FOMC", "FOMC"),
+                        ("🇺🇸 NYSE", "NYSE"),
+                        ("₿ CRYPTO", "CRYPTO")
+                    ],
+                    value="ALL",
+                    label="Filter by Regulatory Authority",
+                    scale=4
+                )
+                circ_imp_filter = gr.Radio(
+                    choices=[
+                        ("All Releases", "ALL"),
+                        ("🚨 Critical / High Impact Only", "HIGH")
+                    ],
+                    value="ALL",
+                    label="Filter by Impact Level",
+                    scale=2
+                )
+
+            with gr.Row():
+                circ_search = gr.Textbox(
+                    placeholder="Search circulars by subject, keyword (e.g. margin, circuit, repo, expiry) or reference number...",
+                    label="Search Regulatory Repository",
+                    scale=4
+                )
+                circ_refresh_btn = gr.Button("🔄 Check & Poll Latest Circulars", variant="primary", scale=1)
+                circ_dispatch_btn = gr.Button("📲 Forward Latest Circular to Telegram", variant="secondary", scale=1)
+
+            circ_action_msg = gr.Markdown()
+
+            gr.Markdown("### 📡 Verified Regulatory Stream & AI Impact Breakdown")
+            circ_visual_feed = gr.HTML(elem_id="circ_visual_feed")
+
+            with gr.Accordion("📊 Tabular View & Document Metadata Export", open=False):
+                circ_table = gr.Dataframe(
+                    headers=[
+                        "Regulator",
+                        "Circular Ref No.",
+                        "Date",
+                        "Impact",
+                        "Subject / Directive",
+                        "Category",
+                        "AI 3-5 Bullets Summary",
+                        "PDF / Document Link"
+                    ],
+                    datatype=["str", "str", "str", "str", "str", "str", "str", "str"],
+                    value=[],
+                    interactive=False,
+                    wrap=True,
+                    elem_id="circ_table"
+                )
+
+            circ_reg_filter.change(
+                get_circulars_view,
+                inputs=[circ_reg_filter, circ_imp_filter, circ_search],
+                outputs=[circ_info_bar, circ_visual_feed, circ_table]
+            )
+            circ_imp_filter.change(
+                get_circulars_view,
+                inputs=[circ_reg_filter, circ_imp_filter, circ_search],
+                outputs=[circ_info_bar, circ_visual_feed, circ_table]
+            )
+            circ_search.submit(
+                get_circulars_view,
+                inputs=[circ_reg_filter, circ_imp_filter, circ_search],
+                outputs=[circ_info_bar, circ_visual_feed, circ_table]
+            )
+            circ_refresh_btn.click(
+                refresh_circulars_data,
+                inputs=[circ_reg_filter, circ_imp_filter, circ_search],
+                outputs=[circ_info_bar, circ_visual_feed, circ_table]
+            )
+            circ_dispatch_btn.click(
+                dispatch_circular_to_telegram,
+                inputs=[circ_reg_filter],
+                outputs=[circ_action_msg]
+            )
+
+        # ═══════════════════════════════════════════════════════════
+        # TAB 4: Portal Settings Page (Alert Channels, Google Cal & Sources)
         # ═══════════════════════════════════════════════════════════
         with gr.TabItem("⚙️ Portal Settings & Integrations"):
             gr.Markdown("## ⚙️ System Settings & External Integrations Hub")
@@ -1764,6 +2108,10 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                         label="🗓️ Friday 07:00 AM IST — Auto-Forward Complete Upcoming Week Calendar Link (Apple & Google)",
                         value=getattr(telegram_notifier, "auto_weekly_fri_7am", True)
                     )
+                    adm_auto_circulars = gr.Checkbox(
+                        label="📜 Auto-Forward Critical Regulatory Circulars (NSE, BSE, MCX, RBI, FinMin, FOMC, NYSE, Crypto) with 3-5 Bullets & PDF Link",
+                        value=getattr(telegram_notifier, "auto_circulars_tg", True)
+                    )
                     adm_send_as_photos = gr.Checkbox(
                         label="📸 Deliver Morning Calendar Snapshots as Infographic Photo Cards (Details rendered directly in image)",
                         value=getattr(telegram_notifier, "send_as_photos", True)
@@ -1793,7 +2141,8 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                     adm_cal_token, adm_cal_chat, adm_cal_enabled,
                     adm_cal_countdown, adm_cal_outcome, adm_cal_linked,
                     adm_auto_today_7am, adm_auto_tom_705am, adm_auto_hol_7am,
-                    adm_send_as_photos, adm_public_app_url, adm_auto_weekly_fri7am
+                    adm_send_as_photos, adm_public_app_url, adm_auto_weekly_fri7am,
+                    adm_auto_circulars
                 ],
                 outputs=[adm_tg_status]
             )
@@ -1877,6 +2226,7 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
     refresh_btn.click(manual_refresh, outputs=[status_box, top_news_visual, top_table, bottom_table])
     demo.load(get_dashboard_tables, outputs=[status_box, top_news_visual, top_table, bottom_table])
     demo.load(get_calendar_tables, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_visual_feed, calendar_table, holidays_table])
+    demo.load(get_circulars_view, inputs=[circ_reg_filter, circ_imp_filter, circ_search], outputs=[circ_info_bar, circ_visual_feed, circ_table])
 
 # Mount Gradio UI inside FastAPI with full-width responsive CSS
 app = gr.mount_gradio_app(app, demo, path="/", css=CUSTOM_CSS, head=f"<style>{CUSTOM_CSS}</style>")

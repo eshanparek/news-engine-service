@@ -42,6 +42,7 @@ class TelegramNotifier:
         self.auto_daily_tomorrow_705am = True  # 7:05 AM IST Tomorrow's lined-up snapshot (5 separate market msgs)
         self.auto_holiday_7am = True           # 7:00 AM IST Next-day trading holiday alert
         self.auto_weekly_fri_7am = True        # Friday 07:00 AM IST Weekly Calendar Sync Link
+        self.auto_circulars_tg = True          # Auto-forward high impact official regulatory circulars
         self.send_as_photos = True             # Deliver morning calendar as high-definition infographic photos
         self.public_app_url = os.getenv("PUBLIC_APP_URL", "").strip()
         self._send_lock = threading.Lock()
@@ -87,6 +88,8 @@ class TelegramNotifier:
                     self.auto_daily_tomorrow_705am = bool(data["auto_daily_tomorrow_705am"])
                 if "auto_holiday_7am" in data:
                     self.auto_holiday_7am = bool(data["auto_holiday_7am"])
+                if "auto_circulars_tg" in data:
+                    self.auto_circulars_tg = bool(data["auto_circulars_tg"])
                 if "auto_weekly_fri_7am" in data:
                     self.auto_weekly_fri_7am = bool(data["auto_weekly_fri_7am"])
                 elif "auto_weekly_mon_7am" in data:
@@ -115,7 +118,8 @@ class TelegramNotifier:
         auto_holiday_7am: bool = True,
         send_as_photos: bool = True,
         public_app_url: str = "",
-        auto_weekly_fri_7am: bool = True
+        auto_weekly_fri_7am: bool = True,
+        auto_circulars_tg: bool = True
     ) -> Dict:
         if news_bot_token.strip():
             self.bot_token = news_bot_token.strip()
@@ -135,6 +139,7 @@ class TelegramNotifier:
         self.send_as_photos = bool(send_as_photos)
         self.public_app_url = public_app_url.strip()
         self.auto_weekly_fri_7am = bool(auto_weekly_fri_7am)
+        self.auto_circulars_tg = bool(auto_circulars_tg)
 
         payload = {
             "news_bot_token": self.bot_token,
@@ -151,7 +156,8 @@ class TelegramNotifier:
             "auto_holiday_7am": self.auto_holiday_7am,
             "send_as_photos": self.send_as_photos,
             "public_app_url": self.public_app_url,
-            "auto_weekly_fri_7am": self.auto_weekly_fri_7am
+            "auto_weekly_fri_7am": self.auto_weekly_fri_7am,
+            "auto_circulars_tg": self.auto_circulars_tg
         }
         try:
             with open(ADMIN_SETTINGS_FILE, "w") as f:
