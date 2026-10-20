@@ -1,6 +1,8 @@
 import os
 import time
 import html
+import sqlite3
+import json
 from typing import Optional, List, Dict
 from datetime import datetime
 from fastapi import FastAPI, Query, BackgroundTasks
@@ -485,68 +487,93 @@ def render_circulars_feed_html(circulars: List[Dict]) -> str:
 
 
 def get_circulars_view(regulator_filter: str = "ALL", impact_filter: str = "ALL", search_query: str = ""):
-    items = circular_engine.get_circulars(
-        regulator_filter=regulator_filter,
-        impact_filter=impact_filter,
-        search_query=search_query
-    )
-    visual_html = render_circulars_feed_html(items)
-    
-    table_rows = []
-    for it in items:
-        meta = REGULATOR_META.get(it["regulator"], {"badge": it["regulator"]})
-        pdf_link = it["pdf_url"] or it["web_url"]
-        pdf_display = f'<a href="{pdf_link}" target="_blank">📄 Open PDF ↗</a>'
-        bullets_text = " • ".join(it.get("bullets", []))
-        table_rows.append([
-            meta["badge"],
-            it["circular_no"],
-            it["date"],
-            it["impact"],
-            it["title"],
-            it["category"],
-            bullets_text,
-            pdf_link
-        ])
-    
-    if not table_rows:
-        table_rows.append(["-", "-", "-", "-", "No circulars matching current filters", "-", "-", "-"])
+    try:
+        items = circular_engine.get_circulars(
+            regulator_filter=regulator_filter,
+            impact_filter=impact_filter,
+            search_query=search_query
+        )
+        visual_html = render_circulars_feed_html(items)
+        
+        table_rows = []
+        for it in items:
+            meta = REGULATOR_META.get(it.get("regulator", "NSE"), {"badge": it.get("regulator", "NSE")})
+            pdf_link = it.get("pdf_url") or it.get("web_url") or ""
+            if pdf_link:
+                pdf_display = f"[📄 Open PDF ↗]({pdf_link})"
+            else:
+                pdf_display = "—"
+            bullets = it.get("bullets", []) or []
+            bullets_text = " • ".join(bullets) if bullets else (it.get("action_takeaway") or it.get("title", "—"))
+            table_rows.append([
+                meta.get("badge", it.get("regulator", "NSE")),
+                it.get("circular_no", "—"),
+                it.get("date", "—"),
+                it.get("impact", "MEDIUM"),
+                it.get("title", "—"),
+                it.get("category", "Circular"),
+                bullets_text,
+                pdf_display
+            ])
+        
+        if not table_rows:
+            table_rows.append(["-", "-", "-", "-", "No official circulars matching current filters", "-", "-", "-"] )
 
-    summary_text = (
-        f"📜 **Official Documents Indexed:** {len(items)} | "
-        f"**Active Regulator:** `{regulator_filter}` | "
-        f"**Impact:** `{impact_filter}` | "
-        f"**Direct Native PDF Storage:** Verified & Accessible"
-    )
-    return summary_text, visual_html, table_rows
+        summary_text = (
+            f"📜 **Official Documents Indexed:** {len(items)} | "
+            f"**Active Authority:** `{regulator_filter}` | "
+            f"**Impact Filter:** `{impact_filter}` | "
+            f"**Verified Storage:** Authentic Document PDF Repository"
+        )
+        return summary_text, visual_html, table_rows
+    except Exception as e:
+        empty_rows = [["-", "-", "-", "-", f"Failed to load circulars: {str(e)}", "-", "-", "-"]]
+        return f"⚠️ **Error loading circulars:** {str(e)}", f'<div class="epm-empty-state"><div class="epm-empty-icon">⚠️</div><div class="epm-empty-title">Error Loading Circulars</div><div class="epm-empty-sub">{str(e)}</div></div>', empty_rows
 
 
-def refresh_circulars_data(regulator_filter: str, impact_filter: str, search_query: str):
-    circular_engine.poll_all_regulators()
+def refresh_circulars_data(regulator_filter: str = "ALL", impact_filter: str = "ALL", search_query: str = ""):
+    try:
+        circular_engine.poll_all_regulators()
+    except Exception as e:
+        print(f"[Circulars] Manual poll error: {e}")
     return get_circulars_view(regulator_filter, impact_filter, search_query)
 
 
-def dispatch_circular_to_telegram(circ_id: str):
-    with circular_engine._lock:
-        with sqlite3.connect(circular_engine.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            row = conn.execute("SELECT * FROM circulars ORDER BY timestamp DESC LIMIT 1").fetchone()
-            if not row:
-                return "⚠️ No circulars available to dispatch."
-            bullets = json.loads(row["bullets_json"]) if row["bullets_json"] else []
-            msg = circular_engine.format_telegram_circular_alert(
-                regulator=row["regulator"],
-                circ_no=row["circular_no"],
-                title=row["title"],
-                pdf_url=row["pdf_url"] or row["web_url"],
-                category=row["category"],
-                bullets=bullets,
-                action_takeaway=row["action_takeaway"]
-            )
-            ok, err = telegram_notifier.send_calendar_alert(msg)
-            if ok:
-                return f"✅ **Dispatched Official [{row['regulator']}] Circular `{row['circular_no']}` with 3-5 Bullets & PDF Link to Telegram!**"
-            return f"⚠️ **Telegram Dispatch Error:** {err}"
+def dispatch_circular_to_telegram(regulator_filter: str = "ALL"):
+    try:
+        with circular_engine._lock:
+            with sqlite3.connect(circular_engine.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                if regulator_filter and regulator_filter != "ALL":
+                    row = conn.execute(
+                        "SELECT * FROM circulars WHERE regulator = ? ORDER BY timestamp DESC LIMIT 1",
+                        (regulator_filter.upper(),)
+                    ).fetchone()
+                else:
+                    row = conn.execute("SELECT * FROM circulars ORDER BY timestamp DESC LIMIT 1").fetchone()
+                
+                if not row:
+                    return f"⚠️ No circulars available to dispatch for authority `{regulator_filter}`."
+                
+                bullets = json.loads(row["bullets_json"]) if row["bullets_json"] else []
+                msg = circular_engine.format_telegram_circular_alert(
+                    regulator=row["regulator"],
+                    circ_no=row["circular_no"],
+                    title=row["title"],
+                    pdf_url=row["pdf_url"] or row["web_url"],
+                    category=row["category"],
+                    bullets=bullets,
+                    action_takeaway=row["action_takeaway"]
+                )
+                ok, err = telegram_notifier.send_calendar_alert(msg)
+                if ok:
+                    return f"✅ **Dispatched Official [{row['regulator']}] Circular `{row['circular_no']}` with 3-5 Bullets & PDF Link to Telegram!**"
+                return f"⚠️ **Telegram Dispatch Error:** {err} *(Verify Calendar Telegram Chat ID in Tab 4)*"
+    except Exception as e:
+        return f"⚠️ **Dispatch Exception:** {str(e)}"
+
+
+def render_calendar_feed_html(events: List[Dict]) -> str:
     """Renders 2035 multi-market interactive catalyst cards with live countdown timers and 1-click Google Calendar sync."""
     if not events:
         return (
@@ -634,138 +661,163 @@ def dispatch_circular_to_telegram(circ_id: str):
 
 
 def get_dashboard_tables():
-    items = list(news_worker.news_cache)
-    top_rows = []
-    bottom_rows = []
+    try:
+        items = list(news_worker.news_cache)
+        top_rows = []
+        bottom_rows = []
 
-    for it in items:
-        score = it.get("ai_score", 5)
-        sentiment = it.get("ai_sentiment", "NEUTRAL")
-        impact = it.get("ai_impact", "MEDIUM")
-        relevance = it.get("relevance", 0)
+        for it in items:
+            score = it.get("ai_score", 5)
+            sentiment = it.get("ai_sentiment", "NEUTRAL")
+            impact = it.get("ai_impact", "MEDIUM")
+            relevance = it.get("relevance", 0)
 
-        if sentiment == "BULLISH":
-            sent_badge = "🟢 BULLISH"
-        elif sentiment == "BEARISH":
-            sent_badge = "🔴 BEARISH"
-        else:
-            sent_badge = "⚪ NEUTRAL"
+            if sentiment == "BULLISH":
+                sent_badge = "🟢 BULLISH"
+            elif sentiment == "BEARISH":
+                sent_badge = "🔴 BEARISH"
+            else:
+                sent_badge = "⚪ NEUTRAL"
 
-        sectors = ", ".join(it.get("ai_sectors", [])) if it.get("ai_sectors") else "General"
-        reasoning = it.get("ai_reasoning", "")
-        time_str = str(it.get("timestamp", ""))[:19]
-        source = it.get("source", "")
-        title = it.get("title", "")
-        link = it.get("link", "#")
+            sectors = ", ".join(it.get("ai_sectors", [])) if it.get("ai_sectors") else "General"
+            reasoning = it.get("ai_reasoning", "")
+            time_str = str(it.get("timestamp", ""))[:19]
+            source = it.get("source", "")
+            title = it.get("title", "")
+            link = it.get("link", "#")
 
-        other_srcs = it.get("other_sources", [])
-        if len(other_srcs) > 1:
-            alt_names = [s["source"] for s in other_srcs if s["source"] != source]
-            if alt_names:
-                source_display = f"{source} (+{len(alt_names)} wires: {', '.join(alt_names[:2])})"
+            other_srcs = it.get("other_sources", [])
+            if len(other_srcs) > 1:
+                alt_names = [s.get("source", "") for s in other_srcs if isinstance(s, dict) and s.get("source") != source]
+                if alt_names:
+                    source_display = f"{source} (+{len(alt_names)} wires: {', '.join(alt_names[:2])})"
+                else:
+                    source_display = source
             else:
                 source_display = source
-        else:
-            source_display = source
 
-        if relevance >= 40 or score >= 7 or impact == "HIGH":
-            top_rows.append([
-                f"{score}/10",
-                sent_badge,
-                impact,
-                title,
-                sectors,
-                reasoning,
-                source_display,
-                f"{relevance}%",
-                time_str
-            ])
-        else:
-            bottom_rows.append([
-                time_str,
-                source_display,
-                title,
-                f"{relevance}%",
-                sent_badge,
-                link
-            ])
+            title_link = f"[{title}]({link})" if link and link != "#" else title
 
-    if not top_rows:
-        top_rows.append(["-", "⚪ Evaluating...", "-", "Evaluating live stream with Gemini 2.5...", "-", "Please wait a moment...", "-", "-", "-"])
+            if relevance >= 40 or score >= 7 or impact == "HIGH":
+                top_rows.append([
+                    f"{score}/10",
+                    sent_badge,
+                    impact,
+                    title_link,
+                    sectors,
+                    reasoning,
+                    source_display,
+                    f"{relevance}%",
+                    time_str
+                ])
+            else:
+                bottom_link = f"[🔗 Open Wire ↗]({link})" if link and link != "#" else "—"
+                bottom_rows.append([
+                    time_str,
+                    source_display,
+                    title_link,
+                    f"{relevance}%",
+                    sent_badge,
+                    bottom_link
+                ])
 
-    if not bottom_rows:
-        bottom_rows.append(["-", "-", "No general news items in cache", "-", "-", "-"])
+        if not top_rows:
+            top_rows.append(["-", "⚪ Live Stream", "-", "Awaiting incoming high-impact catalysts from global wires...", "-", "Feeds polling continuously...", "-", "-", "-"])
 
-    cal_status = "🟢 Configured" if telegram_notifier.is_calendar_configured() else "⚠️ Set Calendar Chat ID in Tab 3"
-    status_str = (
-        f"🟢 **Engine Status:** Online | **Cached News:** {len(items)} | "
-        f"**Multi-Market Events (NSE/BSE/MCX/Crypto/NYSE):** {len(calendar_engine.events)} | "
-        f"**Calendar TG Channel:** {cal_status} | "
-        f"**IST Clock:** {now_ist().strftime('%H:%M:%S IST')}"
-    )
-    news_visual_html = render_news_feed_html(items)
-    return status_str, news_visual_html, top_rows, bottom_rows
+        if not bottom_rows:
+            bottom_rows.append(["-", "-", "No general news items in cache", "-", "-", "-"])
+
+        cal_status = "🟢 Connected" if telegram_notifier.is_calendar_configured() else "⚪ Standalone Mode (Configure in Tab 4)"
+        status_str = (
+            f"🟢 **Engine Status:** Online | **Cached News:** {len(items)} | "
+            f"**Multi-Market Events:** {len(calendar_engine.events)} | "
+            f"**Telegram Broadcast:** {cal_status} | "
+            f"**IST Clock:** {now_ist().strftime('%H:%M:%S IST')}"
+        )
+        news_visual_html = render_news_feed_html(items)
+        return status_str, news_visual_html, top_rows, bottom_rows
+    except Exception as e:
+        status_err = f"🟢 **Engine Status:** Online | Refreshed: `{now_ist().strftime('%H:%M:%S IST')}`"
+        empty_top = [["-", "-", "-", f"Feeds syncing: {str(e)}", "-", "-", "-", "-", "-"]]
+        empty_bottom = [["-", "-", "-", "-", "-", "-"]]
+        return status_err, f'<div class="epm-empty-state"><div class="epm-empty-icon">📡</div><div class="epm-empty-title">Connecting to Global Wire...</div><div class="epm-empty-sub">{str(e)}</div></div>', empty_top, empty_bottom
 
 
 def get_calendar_tables(range_filter: str = "all", market_filter: str = "ALL"):
-    events = calendar_engine.get_enriched_events(filter_range=range_filter, market_filter=market_filter)
-    calendar_visual_html = render_calendar_feed_html(events)
-    cal_rows = []
-    for ev in events:
-        mkt = ev.get("market", "NSE").upper()
-        mkt_badge = MARKET_META.get(mkt, MARKET_META["NSE"])["badge"]
-        impact = ev.get("impact", "HIGH")
-        imp_badge = "🔥 HIGH" if impact == "HIGH" else ("⚡ MEDIUM" if impact == "MEDIUM" else "💤 LOW")
-        linked_info = ev.get("linked_news_title", "")
-        if linked_info:
-            linked_display = f"🔗 {linked_info[:65]}..." if len(linked_info) > 65 else f"🔗 {linked_info}"
-        else:
-            linked_display = "—"
+    try:
+        events = calendar_engine.get_enriched_events(filter_range=range_filter, market_filter=market_filter)
+        calendar_visual_html = render_calendar_feed_html(events)
+        cal_rows = []
+        for ev in events:
+            mkt = ev.get("market", "NSE").upper()
+            mkt_badge = MARKET_META.get(mkt, MARKET_META["NSE"])["badge"]
+            impact = ev.get("impact", "HIGH")
+            imp_badge = "🔥 HIGH" if impact == "HIGH" else ("⚡ MEDIUM" if impact == "MEDIUM" else "💤 LOW")
+            linked_title = ev.get("linked_news_title", "")
+            linked_url = ev.get("linked_news_url", "")
+            if linked_title and linked_url:
+                short_title = linked_title[:60] + "..." if len(linked_title) > 60 else linked_title
+                linked_display = f"[🔗 {short_title}]({linked_url})"
+            elif linked_title:
+                linked_display = f"🔗 {linked_title[:60]}"
+            else:
+                linked_display = "—"
 
-        cal_rows.append([
-            ev.get("id", ""),
-            mkt_badge,
-            ev.get("date", ""),
-            f"{ev.get('time', '')} IST",
-            ev.get("timer", ""),
-            ev.get("symbol", ""),
-            ev.get("event", ""),
-            imp_badge,
-            ev.get("previous", "—"),
-            ev.get("forecast", "—"),
-            ev.get("actual", "⏳ Pending"),
-            ev.get("outcome_sentiment", "⏳ PENDING"),
-            linked_display
-        ])
+            cal_rows.append([
+                ev.get("id", ""),
+                mkt_badge,
+                ev.get("date", ""),
+                f"{ev.get('time', '')} IST",
+                ev.get("timer", ""),
+                ev.get("symbol", ""),
+                ev.get("event", ""),
+                imp_badge,
+                ev.get("previous", "—"),
+                ev.get("forecast", "—"),
+                ev.get("actual", "⏳ Pending"),
+                ev.get("outcome_sentiment", "⏳ PENDING"),
+                linked_display
+            ])
 
-    if not cal_rows:
-        cal_rows.append(["-", "-", "-", "-", "-", "-", "No events for selected market/time filter", "-", "-", "-", "-", "-", "-"])
+        if not cal_rows:
+            cal_rows.append(["-", "-", "-", "-", "-", "-", "No events for selected market/time filter", "-", "-", "-", "-", "-", "-"])
 
-    holidays_data = calendar_engine.get_holiday_snapshot().get("comparison", [])
-    hol_rows = []
-    for h in holidays_data:
-        hol_rows.append([
-            h.get("date", ""),
-            h.get("day", ""),
-            h.get("description", ""),
-            h.get("nse_status", ""),
-            h.get("bse_status", ""),
-            h.get("mcx_status", ""),
-            h.get("nyse_status", ""),
-            h.get("crypto_status", "")
-        ])
+        holidays_data = calendar_engine.get_holiday_snapshot().get("comparison", [])
+        hol_rows = []
+        for h in holidays_data:
+            hol_rows.append([
+                h.get("date", ""),
+                h.get("day", ""),
+                h.get("description", ""),
+                h.get("nse_status", ""),
+                h.get("bse_status", ""),
+                h.get("mcx_status", ""),
+                h.get("nyse_status", ""),
+                h.get("crypto_status", "")
+            ])
 
-    cal_summary = (
-        f"📅 **Displayed Events:** {len(events)} (Filter: `{market_filter}` / `{range_filter.upper()}`) | "
-        f"**Current IST Time:** `{now_ist().strftime('%Y-%m-%d %H:%M:%S IST')}` | "
-        f"**Auto Daily Dispatches:** `07:00 AM IST (Today + Holiday Check)` & `07:05 AM IST (Tomorrow)` | "
-        f"**iCal Feed:** `/api/calendar/ics`"
-    )
-    return cal_summary, calendar_visual_html, cal_rows, hol_rows
+        if not hol_rows:
+            hol_rows.append(["-", "-", "No upcoming holidays recorded", "-", "-", "-", "-", "-"])
+
+        cal_summary = (
+            f"📅 **Displayed Events:** {len(events)} (Filter: `{market_filter}` / `{range_filter.upper()}`) | "
+            f"**Current IST Time:** `{now_ist().strftime('%Y-%m-%d %H:%M:%S IST')}` | "
+            f"**Auto Daily Dispatches:** `07:00 AM IST (Today + Holiday Check)` & `07:05 AM IST (Tomorrow)` | "
+            f"**iCal Feed:** `/api/calendar/ics`"
+        )
+        return cal_summary, calendar_visual_html, cal_rows, hol_rows
+    except Exception as e:
+        err_sum = f"📅 **Market Calendar Status:** Active | `{now_ist().strftime('%Y-%m-%d %H:%M:%S IST')}`"
+        empty_cal = [["-", "-", "-", "-", "-", "-", f"Calendar Notice: {str(e)}", "-", "-", "-", "-", "-", "-"]]
+        empty_hol = [["-", "-", "-", "-", "-", "-", "-", "-"]]
+        return err_sum, f'<div class="epm-empty-state"><div class="epm-empty-icon">📅</div><div class="epm-empty-title">Calendar Initializing</div><div class="epm-empty-sub">{str(e)}</div></div>', empty_cal, empty_hol
 
 
-def sync_and_refresh_calendar(range_filter: str, market_filter: str):
-    calendar_engine.sync_all_calendars()
+def sync_and_refresh_calendar(range_filter: str = "all", market_filter: str = "ALL"):
+    try:
+        calendar_engine.sync_all_calendars()
+    except Exception as e:
+        print(f"[Calendar] Sync error: {e}")
     return get_calendar_tables(range_filter, market_filter)
 
 
@@ -922,44 +974,56 @@ def trigger_test_telegram(target_channel: str):
 
 
 def get_sources_table():
-    rows = []
-    for s in news_worker.sources:
-        tg_status = "✅ Enabled" if s.get("forward_telegram", True) else "❌ Disabled"
-        wa_status = "✅ Enabled" if s.get("forward_whatsapp", True) else "❌ Disabled"
-        rows.append([
-            s.get("name", ""),
-            s.get("category", "General"),
-            s.get("type", "RSS"),
-            tg_status,
-            wa_status,
-            s.get("url", "")
-        ])
-    return rows
+    try:
+        rows = []
+        for s in news_worker.sources:
+            tg_status = "✅ Enabled" if s.get("forward_telegram", True) else "❌ Disabled"
+            wa_status = "✅ Enabled" if s.get("forward_whatsapp", True) else "❌ Disabled"
+            rows.append([
+                s.get("name", ""),
+                s.get("category", "General"),
+                s.get("type", "RSS"),
+                tg_status,
+                wa_status,
+                s.get("url", "")
+            ])
+        return rows
+    except Exception as e:
+        return [["-", "-", "-", "-", "-", f"Error loading sources: {str(e)}"]]
 
 
 def manual_refresh():
-    news_worker.poll_cycle()
-    time.sleep(1)
+    try:
+        news_worker.poll_cycle()
+        time.sleep(0.5)
+    except Exception as e:
+        print(f"[NewsWorker] Manual refresh error: {e}")
     return get_dashboard_tables()
 
 
 def test_ai_rating(headline: str, summary: str):
-    if not headline:
-        return "Please enter a headline."
-    res = ai_analyzer.analyze_news(headline, summary, "Manual Test")
-    sent = res.get('sentiment', 'NEUTRAL')
-    badge = "🟢 BULLISH" if sent == "BULLISH" else ("🔴 BEARISH" if sent == "BEARISH" else "⚪ NEUTRAL")
-    return (
-        f"**Impact Score:** {res.get('score', 0)}/10  |  **Sentiment:** {badge}  |  **Impact Level:** {res.get('impact', 'MEDIUM')}\n\n"
-        f"**Affected Sectors/Stocks:** {', '.join(res.get('sectors', [])) or 'Broad Market'}\n\n"
-        f"**Market Context:** {res.get('reasoning', '')}"
-    )
+    if not headline or not headline.strip():
+        return "⚠️ **Input Required:** Please enter a breaking news headline to evaluate."
+    try:
+        res = ai_analyzer.analyze_news(headline.strip(), (summary or "").strip() or headline.strip(), "Manual Test")
+        sent = res.get('sentiment', 'NEUTRAL')
+        badge = "🟢 BULLISH" if sent == "BULLISH" else ("🔴 BEARISH" if sent == "BEARISH" else "⚪ NEUTRAL")
+        return (
+            f"**Impact Score:** `{res.get('score', 0)}/10`  |  **Sentiment:** {badge}  |  **Impact Level:** `{res.get('impact', 'MEDIUM')}`\n\n"
+            f"**Affected Sectors / Tickers:** {', '.join(res.get('sectors', [])) or 'Broad Market'}\n\n"
+            f"**Market Context & Rationale:** {res.get('reasoning', 'No rationale available.')}"
+        )
+    except Exception as e:
+        return f"⚠️ **AI Evaluation Notice:** Could not score headline: {str(e)}"
 
 
 def save_forwarding_rules(tg_selected: List[str], wa_selected: List[str], min_score: int):
-    news_worker.save_config(tg_selected, wa_selected, min_score)
-    updated_sources = get_sources_table()
-    return f"✅ **Forwarding rules successfully updated!** ({len(tg_selected)} sources for Telegram, {len(wa_selected)} for WhatsApp, Min AI Score: {min_score})", updated_sources
+    try:
+        news_worker.save_config(tg_selected, wa_selected, min_score)
+        updated_sources = get_sources_table()
+        return f"✅ **Forwarding rules successfully updated!** ({len(tg_selected)} sources for Telegram, {len(wa_selected)} for WhatsApp, Min AI Score: {min_score})", updated_sources
+    except Exception as e:
+        return f"⚠️ **Error updating forwarding rules:** {str(e)}", get_sources_table()
 
 
 all_source_names = [s["name"] for s in news_worker.sources]
@@ -1265,6 +1329,61 @@ code, .timer-cell, pre {
 #sources_table th:nth-child(4), #sources_table td:nth-child(4) { width: 12% !important; text-align: center !important; font-weight: 600 !important; }
 #sources_table th:nth-child(5), #sources_table td:nth-child(5) { width: 12% !important; text-align: center !important; font-weight: 600 !important; }
 #sources_table th:nth-child(6), #sources_table td:nth-child(6) { width: 38% !important; word-break: break-all !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #2563eb !important; }
+
+/* Official Regulatory Circulars & Verified PDF Directory Table */
+#circ_table th:nth-child(1), #circ_table td:nth-child(1) { width: 7% !important; text-align: center !important; font-weight: 700 !important; }
+#circ_table th:nth-child(2), #circ_table td:nth-child(2) { width: 10% !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #0f172a !important; font-weight: 600 !important; }
+#circ_table th:nth-child(3), #circ_table td:nth-child(3) { width: 7% !important; text-align: center !important; font-family: var(--font-mono) !important; color: #475569 !important; font-size: 11px !important; }
+#circ_table th:nth-child(4), #circ_table td:nth-child(4) { width: 7% !important; text-align: center !important; font-weight: 700 !important; }
+#circ_table th:nth-child(5), #circ_table td:nth-child(5) { width: 27% !important; font-weight: 600 !important; color: #0f172a !important; line-height: 1.4 !important; }
+#circ_table th:nth-child(6), #circ_table td:nth-child(6) { width: 11% !important; color: #475569 !important; font-size: 11.5px !important; }
+#circ_table th:nth-child(7), #circ_table td:nth-child(7) { width: 20% !important; color: #334155 !important; font-size: 11.5px !important; line-height: 1.45 !important; }
+#circ_table th:nth-child(8), #circ_table td:nth-child(8) { width: 11% !important; text-align: center !important; }
+#circ_table td:nth-child(8) a {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 5px 12px !important;
+    background: #2563eb !important;
+    color: #ffffff !important;
+    border-radius: 6px !important;
+    font-weight: 600 !important;
+    font-size: 11.5px !important;
+    text-decoration: none !important;
+    box-shadow: 0 1px 3px rgba(37, 99, 235, 0.25) !important;
+    transition: all 0.15s ease !important;
+    white-space: nowrap !important;
+}
+#circ_table td:nth-child(8) a:hover {
+    background: #1d4ed8 !important;
+    box-shadow: 0 3px 6px rgba(37, 99, 235, 0.35) !important;
+    transform: translateY(-1px) !important;
+}
+
+/* Hyperlinks inside data tables */
+#top_news_table td:nth-child(4) a,
+#bottom_news_table td:nth-child(3) a {
+    color: #0f172a !important;
+    font-weight: 600 !important;
+    text-decoration: none !important;
+    transition: color 0.15s ease !important;
+}
+#top_news_table td:nth-child(4) a:hover,
+#bottom_news_table td:nth-child(3) a:hover {
+    color: #2563eb !important;
+    text-decoration: underline !important;
+}
+#bottom_news_table td:nth-child(6) a,
+#calendar_table td:nth-child(13) a {
+    color: #2563eb !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    text-decoration: none !important;
+}
+#bottom_news_table td:nth-child(6) a:hover,
+#calendar_table td:nth-child(13) a:hover {
+    text-decoration: underline !important;
+}
 
 /* 12. 2035 Ultra-Futuristic Financial Intelligence Terminal Feeds */
 .epm-stream-container {
@@ -1745,7 +1864,12 @@ code, .timer-cell, pre {
 
 # ─── Build Gradio Blocks UI ──────────────────────────────────────────────────
 
-with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence Terminal", theme=gr.themes.Soft(), fill_width=True) as demo:
+# Pre-computed initial states for instantaneous zero-error load across all tabs
+init_status_str, init_news_html, init_top_rows, init_bottom_rows = get_dashboard_tables()
+init_cal_summary, init_cal_html, init_cal_rows, init_hol_rows = get_calendar_tables()
+init_circ_summary, init_circ_html, init_circ_rows = get_circulars_view()
+
+with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence Terminal", fill_width=True) as demo:
     gr.HTML(f"""
     <style>{CUSTOM_CSS}</style>
     <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 16px;">
@@ -1762,7 +1886,7 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
         </div>
     </div>
     """)
-    status_box = gr.Markdown(value="🟢 **Engine Status:** Online | Initializing real-time feeds...")
+    status_box = gr.Markdown(value=init_status_str)
 
     with gr.Tabs():
         # ═══════════════════════════════════════════════════════════
@@ -1773,14 +1897,14 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                 refresh_btn = gr.Button("🔄 Force Refresh & Re-Score Feeds", variant="primary")
 
             gr.Markdown("### 🚨 2035 Live High-Impact Catalyst Feed")
-            top_news_visual = gr.HTML(elem_id="news_visual_feed")
+            top_news_visual = gr.HTML(value=init_news_html, elem_id="news_visual_feed")
 
             with gr.Accordion("📊 Tabular View & Data Export (Raw Feeds)", open=False):
                 gr.Markdown("#### High-Impact Filtered Table")
                 top_table = gr.Dataframe(
                     headers=["Score", "Sentiment", "Impact", "Headline", "Sectors/Tickers", "AI Reasoning", "Source", "Relevance", "Time"],
-                    datatype=["str", "str", "str", "str", "str", "str", "str", "str", "str"],
-                    value=[],
+                    datatype=["str", "str", "str", "markdown", "str", "str", "str", "str", "str"],
+                    value=init_top_rows,
                     interactive=False,
                     wrap=True,
                     elem_id="top_news_table"
@@ -1789,8 +1913,8 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                 gr.Markdown("#### General & Broad Market Secondary Table")
                 bottom_table = gr.Dataframe(
                     headers=["Time", "Source", "Headline", "Relevance", "Sentiment", "URL"],
-                    datatype=["str", "str", "str", "str", "str", "str"],
-                    value=[],
+                    datatype=["str", "str", "markdown", "str", "str", "markdown"],
+                    value=init_bottom_rows,
                     interactive=False,
                     wrap=True,
                     elem_id="bottom_news_table"
@@ -1816,7 +1940,7 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                 "- **07:05 AM IST Daily:** Automatically forwards Tomorrow's lined-up events snapshot as **5 separate market messages**.\n"
                 "- **Real-Time Unfolding:** Automatically forwards individual event outcomes & linked news as soon as results unfold."
             )
-            cal_info_bar = gr.Markdown("Loading multi-market calendar & live timers...")
+            cal_info_bar = gr.Markdown(value=init_cal_summary)
 
             with gr.Row():
                 cal_market_filter = gr.Radio(
@@ -1860,7 +1984,7 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
             cal_action_msg = gr.Markdown()
 
             gr.Markdown("### 📡 2035 Multi-Market Catalysts & Live Countdown Feed")
-            calendar_visual_feed = gr.HTML(elem_id="calendar_visual_feed")
+            calendar_visual_feed = gr.HTML(value=init_cal_html, elem_id="calendar_visual_feed")
 
             with gr.Accordion("📊 Raw Calendar Data Table & Historical Metrics", open=False):
                 calendar_table = gr.Dataframe(
@@ -1879,8 +2003,8 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                         "📊 Verdict",
                         "🔗 Linked Breaking News"
                     ],
-                    datatype=["str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "str"],
-                    value=[],
+                    datatype=["str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "markdown"],
+                    value=init_cal_rows,
                     interactive=False,
                     wrap=True,
                     elem_id="calendar_table"
@@ -1925,7 +2049,7 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                     "₿ Crypto Status"
                 ],
                 datatype=["str", "str", "str", "str", "str", "str", "str", "str"],
-                value=[],
+                value=init_hol_rows,
                 interactive=False,
                 wrap=True,
                 elem_id="holidays_table"
@@ -1957,7 +2081,7 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                 "- **AI Executive Summaries (3-5 Bullets):** Instantly distills regulatory compliance requirements, margin obligations, and market risk impact.\n"
                 "- **Native PDF Link Access:** Every release provides a direct 1-click link to view or download the authentic official document."
             )
-            circ_info_bar = gr.Markdown("Loading official regulatory circulars...")
+            circ_info_bar = gr.Markdown(value=init_circ_summary)
 
             with gr.Row():
                 circ_reg_filter = gr.Radio(
@@ -1997,27 +2121,28 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
 
             circ_action_msg = gr.Markdown()
 
-            gr.Markdown("### 📡 Verified Regulatory Stream & AI Impact Breakdown")
-            circ_visual_feed = gr.HTML(elem_id="circ_visual_feed")
+            gr.Markdown("### 📑 Official Regulatory Documents & Verified PDF Directory")
+            circ_table = gr.Dataframe(
+                headers=[
+                    "Regulator",
+                    "Circular Ref No.",
+                    "Date",
+                    "Impact",
+                    "Subject / Directive",
+                    "Category",
+                    "AI Executive Summary",
+                    "Official PDF Document"
+                ],
+                datatype=["str", "str", "str", "str", "str", "str", "str", "markdown"],
+                value=init_circ_rows,
+                interactive=False,
+                wrap=True,
+                elem_id="circ_table"
+            )
 
-            with gr.Accordion("📊 Tabular View & Document Metadata Export", open=False):
-                circ_table = gr.Dataframe(
-                    headers=[
-                        "Regulator",
-                        "Circular Ref No.",
-                        "Date",
-                        "Impact",
-                        "Subject / Directive",
-                        "Category",
-                        "AI 3-5 Bullets Summary",
-                        "PDF / Document Link"
-                    ],
-                    datatype=["str", "str", "str", "str", "str", "str", "str", "str"],
-                    value=[],
-                    interactive=False,
-                    wrap=True,
-                    elem_id="circ_table"
-                )
+            gr.Markdown("---")
+            gr.Markdown("### 📡 Verified Regulatory Stream & AI 3-5 Bullets Breakdown")
+            circ_visual_feed = gr.HTML(value=init_circ_html, elem_id="circ_visual_feed")
 
             circ_reg_filter.change(
                 get_circulars_view,
@@ -2229,7 +2354,7 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
     demo.load(get_circulars_view, inputs=[circ_reg_filter, circ_imp_filter, circ_search], outputs=[circ_info_bar, circ_visual_feed, circ_table])
 
 # Mount Gradio UI inside FastAPI with full-width responsive CSS
-app = gr.mount_gradio_app(app, demo, path="/", css=CUSTOM_CSS, head=f"<style>{CUSTOM_CSS}</style>")
+app = gr.mount_gradio_app(app, demo, path="/", theme=gr.themes.Soft(), css=CUSTOM_CSS, head=f"<style>{CUSTOM_CSS}</style>")
 
 if __name__ == "__main__":
     import uvicorn
