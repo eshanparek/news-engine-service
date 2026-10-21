@@ -2564,182 +2564,7 @@ div[id*="_table"].epm-table-collapsed .table-container {
     overflow: hidden !important;
 }
 
-/* 18. Command Palette Modal Dialog */
-.epm-cmd-backdrop {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important;
-    background: rgba(15, 23, 42, 0.45) !important;
-    backdrop-filter: blur(4px) !important;
-    z-index: 99999 !important;
-    display: flex !important;
-    align-items: flex-start !important;
-    justify-content: center !important;
-    padding-top: 12vh !important;
-    box-sizing: border-box !important;
-}
-
-.epm-cmd-dialog {
-    width: 600px !important;
-    max-width: 92vw !important;
-    background: #ffffff !important;
-    border: 1px solid #cbd5e1 !important;
-    border-radius: 12px !important;
-    box-shadow: 0 20px 45px rgba(15, 23, 42, 0.2) !important;
-    overflow: hidden !important;
-    display: flex !important;
-    flex-direction: column !important;
-    animation: epmCmdAppear 0.15s ease-out !important;
-}
-
-@keyframes epmCmdAppear {
-    from { opacity: 0; transform: scale(0.97) translateY(-8px); }
-    to { opacity: 1; transform: scale(1) translateY(0); }
-}
-
-.epm-cmd-header {
-    display: flex !important;
-    align-items: center !important;
-    gap: 10px !important;
-    padding: 12px 16px !important;
-    border-bottom: 1px solid #e2e8f0 !important;
-    background: #ffffff !important;
-}
-
-.epm-cmd-search-icon {
-    font-size: 16px !important;
-    color: #64748b !important;
-}
-
-#epm-cmd-input {
-    flex: 1 !important;
-    border: none !important;
-    outline: none !important;
-    font-size: 14px !important;
-    font-family: var(--font-sans) !important;
-    color: #0f172a !important;
-    background: transparent !important;
-    padding: 0 !important;
-}
-
-.epm-cmd-kbd {
-    font-family: var(--font-mono) !important;
-    font-size: 10px !important;
-    background: #f1f5f9 !important;
-    color: #475569 !important;
-    border: 1px solid #cbd5e1 !important;
-    padding: 2px 6px !important;
-    border-radius: 4px !important;
-    cursor: pointer !important;
-}
-
-.epm-cmd-body {
-    max-height: 360px !important;
-    overflow-y: auto !important;
-    padding: 6px !important;
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 2px !important;
-}
-
-.epm-cmd-cat-header {
-    font-size: 10px !important;
-    font-weight: 700 !important;
-    color: #94a3b8 !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.05em !important;
-    padding: 8px 10px 4px 10px !important;
-}
-
-.epm-cmd-item {
-    display: flex !important;
-    align-items: center !important;
-    gap: 10px !important;
-    padding: 8px 12px !important;
-    border-radius: 6px !important;
-    cursor: pointer !important;
-    font-size: 12.5px !important;
-    color: #1e293b !important;
-    font-weight: 500 !important;
-    transition: background 0.1s ease !important;
-}
-
-.epm-cmd-item:hover, .epm-cmd-item.selected {
-    background: #f1f5f9 !important;
-    color: #0f172a !important;
-}
-
-.epm-cmd-item.selected {
-    background: #eff6ff !important;
-    color: #1d4ed8 !important;
-    font-weight: 600 !important;
-}
-
-.epm-cmd-item-icon {
-    font-size: 14px !important;
-    width: 20px !important;
-    text-align: center !important;
-}
-
-.epm-cmd-item-title {
-    flex: 1 !important;
-}
-
-.epm-cmd-item-badge {
-    font-family: var(--font-mono) !important;
-    font-size: 9.5px !important;
-    color: #64748b !important;
-    background: #f8fafc !important;
-    border: 1px solid #e2e8f0 !important;
-    padding: 1px 5px !important;
-    border-radius: 3px !important;
-}
-
-.epm-cmd-empty {
-    padding: 24px !important;
-    text-align: center !important;
-    color: #64748b !important;
-    font-size: 12px !important;
-}
-
-.epm-cmd-footer {
-    display: flex !important;
-    align-items: center !important;
-    gap: 14px !important;
-    padding: 8px 16px !important;
-    border-top: 1px solid #f1f5f9 !important;
-    background: #f8fafc !important;
-    font-size: 11px !important;
-    color: #64748b !important;
-}
-
-.epm-cmd-hint-group {
-    display: flex !important;
-    align-items: center !important;
-    gap: 3px !important;
-}
-
-.epm-cmd-key {
-    font-family: var(--font-mono) !important;
-    background: #ffffff !important;
-    border: 1px solid #cbd5e1 !important;
-    border-radius: 3px !important;
-    padding: 1px 4px !important;
-    font-weight: 700 !important;
-    color: #334155 !important;
-    font-size: 10px !important;
-}
-
-.epm-cmd-footer-brand {
-    margin-left: auto !important;
-    font-size: 10px !important;
-    font-weight: 600 !important;
-    color: #94a3b8 !important;
-}
-
-/* 19. Watchlist Highlighter & Glow */
+/* 18. Watchlist Highlighter & Glow */
 tbody tr.epm-highlight-row td {
     background-color: #f0f7ff !important;
     border-top: 1px solid #bfdbfe !important;
@@ -2841,12 +2666,6 @@ TOP_NAVBAR_HTML = """
                 <span id="epm-audio-status-lbl">Audio ON</span>
             </button>
 
-            <!-- Command Palette Trigger -->
-            <button type="button" class="epm-top-btn epm-cmd-btn" onclick="window.epmOpenCommandPalette()" title="Open Command Palette (Cmd+K / Ctrl+K)">
-                <kbd class="epm-kbd-badge">⌘K</kbd>
-                <span>Palette</span>
-            </button>
-
             <!-- Quick Resource Links -->
             <a href="/api/calendar/ics" target="_blank" class="epm-nav-link" title="RFC-5545 iCalendar Subscription Feed">📅 iCal</a>
             <a href="/docs" target="_blank" class="epm-nav-link" title="OpenAPI / Swagger REST API Docs">⚡ API</a>
@@ -2876,32 +2695,6 @@ TOP_NAVBAR_HTML = """
                 <span class="epm-tab-pill-icon">❓</span>
                 <span>User Guide</span>
             </button>
-        </div>
-    </div>
-</div>
-
-<!-- Command Palette Modal Backdrop & Dialog -->
-<div id="epm-cmd-modal-backdrop" class="epm-cmd-backdrop" style="display: none;" onclick="if(event.target === this) window.epmCloseCommandPalette();">
-    <div class="epm-cmd-dialog">
-        <div class="epm-cmd-header">
-            <span class="epm-cmd-search-icon">🔍</span>
-            <input id="epm-cmd-input" type="text" placeholder="Type a command, navigate tab, toggle density, or export..." autocomplete="off">
-            <kbd class="epm-cmd-kbd" onclick="window.epmCloseCommandPalette()">ESC</kbd>
-        </div>
-        <div id="epm-cmd-results" class="epm-cmd-body">
-            <!-- Injected by JavaScript -->
-        </div>
-        <div class="epm-cmd-footer">
-            <div class="epm-cmd-hint-group">
-                <span class="epm-cmd-key">↑</span><span class="epm-cmd-key">↓</span> Navigate
-            </div>
-            <div class="epm-cmd-hint-group">
-                <span class="epm-cmd-key">↵</span> Execute
-            </div>
-            <div class="epm-cmd-hint-group">
-                <span class="epm-cmd-key">ESC</span> Close
-            </div>
-            <div class="epm-cmd-footer-brand">EPM Pro Command Palette</div>
         </div>
     </div>
 </div>
@@ -3246,146 +3039,10 @@ TERMINAL_CLIENT_JS = r"""
         localStorage.setItem("epm_circ_drawer_collapsed", isCollapsed ? "true" : "false");
     };
 
-    // 9. Command Palette Modal Engine (Cmd+K / Ctrl+K)
-    const COMMANDS = [
-        { id: "tab-1", category: "Navigation", title: "Jump to Live News Wire", icon: "📰", action: () => window.epmSwitchTab(0) },
-        { id: "tab-2", category: "Navigation", title: "Jump to Market Calendar & Timers", icon: "📅", action: () => window.epmSwitchTab(1) },
-        { id: "tab-3", category: "Navigation", title: "Jump to Regulatory Circulars & PDFs", icon: "📜", action: () => window.epmSwitchTab(2) },
-        { id: "tab-4", category: "Navigation", title: "Jump to Portal Settings & Integrations", icon: "⚙️", action: () => window.epmSwitchTab(3) },
-        { id: "tab-5", category: "Navigation", title: "Jump to User Guide & Manual", icon: "❓", action: () => window.epmSwitchTab(4) },
-        
-        { id: "den-compact", category: "Density", title: "Set Density: Compact (2-Line Clamp)", icon: "≡", action: () => window.epmSetGlobalDensity("compact") },
-        { id: "den-standard", category: "Density", title: "Set Density: Standard (4-Line Clamp)", icon: "≡", action: () => window.epmSetGlobalDensity("standard") },
-        { id: "den-expanded", category: "Density", title: "Set Density: Expanded (Full Text)", icon: "≡", action: () => window.epmSetGlobalDensity("expanded") },
-        
-        { id: "csv-top", category: "CSV Export", title: "Export CSV: Breaking News Wire", icon: "📥", action: () => window.epmExportCSV("top_news_table") },
-        { id: "csv-bot", category: "CSV Export", title: "Export CSV: Broad Secondary News", icon: "📥", action: () => window.epmExportCSV("bottom_news_table") },
-        { id: "csv-cal", category: "CSV Export", title: "Export CSV: Market Calendar Events", icon: "📥", action: () => window.epmExportCSV("calendar_table") },
-        { id: "csv-hol", category: "CSV Export", title: "Export CSV: 2026 Market Holidays", icon: "📥", action: () => window.epmExportCSV("holidays_table") },
-        { id: "csv-circ", category: "CSV Export", title: "Export CSV: Regulatory Circulars", icon: "📥", action: () => window.epmExportCSV("circ_table") },
-        
-        { id: "audio-toggle", category: "Audio", title: "Toggle Web Audio Chime Alerts", icon: "🔔", action: () => window.epmToggleAudio() },
-        { id: "audio-test", category: "Audio", title: "Play Test Chime Sound (880Hz -> 1320Hz)", icon: "🎵", action: () => window.epmPlayChime(true) },
-        
-        { id: "zen-cal", category: "Toolbars", title: "Toggle Calendar Action Toolbar (Zen Mode)", icon: "🛠️", action: () => window.epmToggleCalDrawer() },
-        { id: "zen-circ", category: "Toolbars", title: "Toggle Circulars Action Drawer", icon: "⚙️", action: () => window.epmToggleCircDrawer() }
-    ];
-
-    let selectedCmdIndex = 0;
-    let filteredCommands = [...COMMANDS];
-
-    window.epmOpenCommandPalette = function() {
-        const modal = document.getElementById("epm-cmd-modal-backdrop");
-        const input = document.getElementById("epm-cmd-input");
-        if (!modal) return;
-        modal.style.display = "flex";
-        if (input) {
-            input.value = "";
-            input.focus();
-        }
-        selectedCmdIndex = 0;
-        epmRenderCommands("");
-    };
-
-    window.epmCloseCommandPalette = function() {
-        const modal = document.getElementById("epm-cmd-modal-backdrop");
-        if (modal) modal.style.display = "none";
-    };
-
-    function epmRenderCommands(filter) {
-        const q = filter.toLowerCase().trim();
-        filteredCommands = COMMANDS.filter(c => 
-            c.title.toLowerCase().includes(q) || 
-            c.category.toLowerCase().includes(q)
-        );
-        selectedCmdIndex = Math.max(0, Math.min(selectedCmdIndex, filteredCommands.length - 1));
-        
-        const list = document.getElementById("epm-cmd-results");
-        if (!list) return;
-        
-        if (filteredCommands.length === 0) {
-            list.innerHTML = `<div class="epm-cmd-empty">No commands matching "<b>${filter}</b>"</div>`;
-            return;
-        }
-        
-        let html = "";
-        let currentCat = "";
-        filteredCommands.forEach((cmd, idx) => {
-            if (cmd.category !== currentCat) {
-                currentCat = cmd.category;
-                html += `<div class="epm-cmd-cat-header">${currentCat}</div>`;
-            }
-            const isSel = idx === selectedCmdIndex;
-            html += `
-                <div class="epm-cmd-item ${isSel ? 'selected' : ''}" onclick="window.epmExecuteCommand(${idx})" onmouseenter="window.epmHoverCommand(${idx})">
-                    <span class="epm-cmd-item-icon">${cmd.icon}</span>
-                    <span class="epm-cmd-item-title">${cmd.title}</span>
-                    <span class="epm-cmd-item-badge">${cmd.category}</span>
-                </div>
-            `;
-        });
-        list.innerHTML = html;
-        
-        const selEl = list.querySelector(".epm-cmd-item.selected");
-        if (selEl) selEl.scrollIntoView({ block: "nearest" });
-    }
-
-    window.epmHoverCommand = function(idx) {
-        selectedCmdIndex = idx;
-        const list = document.getElementById("epm-cmd-results");
-        if (!list) return;
-        list.querySelectorAll(".epm-cmd-item").forEach((el, i) => {
-            if (i === idx) el.classList.add("selected");
-            else el.classList.remove("selected");
-        });
-    };
-
-    window.epmExecuteCommand = function(idx) {
-        if (filteredCommands[idx]) {
-            const action = filteredCommands[idx].action;
-            window.epmCloseCommandPalette();
-            setTimeout(action, 50);
-        }
-    };
-
-    // Global Key Listener
-    window.addEventListener("keydown", function(e) {
-        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-            e.preventDefault();
-            const modal = document.getElementById("epm-cmd-modal-backdrop");
-            if (modal && modal.style.display !== "none") {
-                window.epmCloseCommandPalette();
-            } else {
-                window.epmOpenCommandPalette();
-            }
-            return;
-        }
-        
         if (e.key === "Escape") {
-            const modal = document.getElementById("epm-cmd-modal-backdrop");
-            if (modal && modal.style.display !== "none") {
-                window.epmCloseCommandPalette();
-                return;
-            }
             if (currentFocusedTable) {
                 window.epmExitFocus();
                 return;
-            }
-        }
-        
-        const modal = document.getElementById("epm-cmd-modal-backdrop");
-        if (modal && modal.style.display !== "none") {
-            if (e.key === "ArrowDown") {
-                e.preventDefault();
-                selectedCmdIndex = (selectedCmdIndex + 1) % filteredCommands.length;
-                epmRenderCommands(document.getElementById("epm-cmd-input").value);
-            } else if (e.key === "ArrowUp") {
-                e.preventDefault();
-                selectedCmdIndex = (selectedCmdIndex - 1 + filteredCommands.length) % filteredCommands.length;
-                epmRenderCommands(document.getElementById("epm-cmd-input").value);
-            } else if (e.key === "Enter") {
-                e.preventDefault();
-                window.epmExecuteCommand(selectedCmdIndex);
             }
         }
     });
@@ -3425,13 +3082,6 @@ TERMINAL_CLIENT_JS = r"""
                 epmSyncActiveTab(idx);
             });
         });
-        
-        const cmdInput = document.getElementById("epm-cmd-input");
-        if (cmdInput) {
-            cmdInput.addEventListener("input", (e) => {
-                epmRenderCommands(e.target.value);
-            });
-        }
     }
 
     if (document.readyState === "loading") {
