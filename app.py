@@ -1075,6 +1075,39 @@ default_wa_selected = [s["name"] for s in news_worker.sources if s.get("forward_
 
 # ─── Clean Modern Financial Terminal (Crisp White Theme, Uniform Typography) ──
 
+
+def render_table_ribbon(table_id: str, title: str, subtitle: str = "", count_badge: str = "") -> str:
+    sub_badge = f'<span class="epm-ribbon-badge">{subtitle}</span>' if subtitle else ""
+    cnt_badge = f'<span class="epm-ribbon-count" id="{table_id}_count">{count_badge}</span>' if count_badge else ""
+    return f"""
+    <div class="epm-table-ribbon" data-target="{table_id}">
+        <div class="epm-ribbon-left">
+            <span class="epm-ribbon-bullet">●</span>
+            <span class="epm-ribbon-title">{title}</span>
+            {sub_badge}
+            {cnt_badge}
+        </div>
+        <div class="epm-ribbon-controls">
+            <div class="epm-density-group" title="Adjust visible row density and line clamping">
+                <span class="epm-control-label">Density:</span>
+                <button type="button" class="epm-density-btn active" data-density="compact" onclick="window.epmSetDensity('{table_id}', 'compact', this)" title="Compact (2-Line Clamp)">Compact</button>
+                <button type="button" class="epm-density-btn" data-density="standard" onclick="window.epmSetDensity('{table_id}', 'standard', this)" title="Standard (4-Line Clamp)">Standard</button>
+                <button type="button" class="epm-density-btn" data-density="expanded" onclick="window.epmSetDensity('{table_id}', 'expanded', this)" title="Full Text (Unconstrained)">Expanded</button>
+            </div>
+            <button type="button" class="epm-ribbon-btn" onclick="window.epmExportCSV('{table_id}')" title="Download table records as standard RFC-4180 CSV">
+                📥 <span>CSV</span>
+            </button>
+            <button type="button" class="epm-ribbon-btn" onclick="window.epmToggleFocus('{table_id}')" title="Full-Screen Focus Mode (Press ESC to exit)">
+                ⛶ <span>Focus</span>
+            </button>
+            <button type="button" class="epm-ribbon-btn epm-collapse-btn" onclick="window.epmToggleCollapse('{table_id}', this)" title="Collapse or Expand this data table">
+                <span>−</span>
+            </button>
+        </div>
+    </div>
+    """
+
+
 CUSTOM_CSS = """
 /* ═══════════════════════════════════════════════════════════════════════════
    EPM PRO INSTITUTIONAL FINANCIAL TERMINAL - ULTRA-PREMIUM 2026 WHITE THEME
@@ -1827,7 +1860,1594 @@ code, .timer-cell, pre {
     color: #0f172a;
     font-weight: 600;
 }
+
+/* 14. Top Institutional Sticky Telemetry Ribbon & Navbar */
+.epm-top-navbar {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 1000 !important;
+    background: #ffffff !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04) !important;
+    margin: -8px -20px 14px -20px !important;
+    padding: 8px 20px 8px 20px !important;
+}
+
+.epm-nav-main-row {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 12px !important;
+    flex-wrap: wrap !important;
+}
+
+.epm-nav-brand {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    flex-shrink: 0 !important;
+}
+
+.epm-nav-logo {
+    font-size: 18px !important;
+}
+
+.epm-nav-title-group {
+    display: flex !important;
+    align-items: baseline !important;
+    gap: 6px !important;
+}
+
+.epm-nav-title {
+    font-family: var(--font-sans) !important;
+    font-size: 15px !important;
+    font-weight: 800 !important;
+    color: #0f172a !important;
+    letter-spacing: -0.02em !important;
+}
+
+.epm-nav-version {
+    font-family: var(--font-mono) !important;
+    font-size: 9.5px !important;
+    font-weight: 700 !important;
+    color: #2563eb !important;
+    background: #eff6ff !important;
+    border: 1px solid #bfdbfe !important;
+    padding: 1px 5px !important;
+    border-radius: 4px !important;
+}
+
+.epm-nav-status {
+    display: flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    padding: 2px 7px !important;
+    background: #f0fdf4 !important;
+    border: 1px solid #bbf7d0 !important;
+    border-radius: 4px !important;
+}
+
+.epm-live-dot {
+    width: 6px !important;
+    height: 6px !important;
+    border-radius: 50% !important;
+    background: #16a34a !important;
+    display: inline-block !important;
+    box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.2) !important;
+    animation: epmPulse 2s infinite !important;
+}
+
+@keyframes epmPulse {
+    0% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.4); }
+    70% { box-shadow: 0 0 0 5px rgba(22, 163, 74, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
+}
+
+.epm-status-text {
+    font-family: var(--font-mono) !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    color: #16a34a !important;
+    letter-spacing: 0.05em !important;
+}
+
+.epm-active-tab-wrap {
+    margin-left: 4px !important;
+}
+
+.epm-active-tab-pill {
+    font-family: var(--font-sans) !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    color: #1e293b !important;
+    background: #f8fafc !important;
+    border: 1px solid #cbd5e1 !important;
+    padding: 2px 8px !important;
+    border-radius: 4px !important;
+    white-space: nowrap !important;
+}
+
+/* Macro Telemetry Strip */
+.epm-telemetry-strip {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 6px !important;
+    padding: 4px 10px !important;
+    flex: 1 1 auto !important;
+    max-width: 820px !important;
+}
+
+.epm-telemetry-strip::-webkit-scrollbar {
+    display: none !important;
+}
+
+.epm-ticker-item {
+    display: flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    font-family: var(--font-mono) !important;
+    font-size: 11px !important;
+    white-space: nowrap !important;
+    cursor: default !important;
+}
+
+.epm-ticker-sym {
+    font-weight: 700 !important;
+    color: #475569 !important;
+    font-size: 10px !important;
+}
+
+.epm-ticker-val {
+    font-weight: 700 !important;
+    color: #0f172a !important;
+}
+
+.epm-ticker-chg.up {
+    font-weight: 700 !important;
+    color: #16a34a !important;
+    background: #f0fdf4 !important;
+    border: 1px solid #bbf7d0 !important;
+    padding: 1px 4px !important;
+    border-radius: 3px !important;
+    font-size: 9.5px !important;
+}
+
+.epm-ticker-chg.down {
+    font-weight: 700 !important;
+    color: #dc2626 !important;
+    background: #fef2f2 !important;
+    border: 1px solid #fecaca !important;
+    padding: 1px 4px !important;
+    border-radius: 3px !important;
+    font-size: 9.5px !important;
+}
+
+.epm-ticker-divider {
+    width: 1px !important;
+    height: 12px !important;
+    background: #cbd5e1 !important;
+}
+
+/* Top Nav Controls Right */
+.epm-nav-controls {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    flex-shrink: 0 !important;
+}
+
+.epm-nav-search-wrap {
+    position: relative !important;
+    display: flex !important;
+    align-items: center !important;
+}
+
+#epm-watchlist-input {
+    width: 145px !important;
+    height: 28px !important;
+    font-size: 11px !important;
+    padding: 2px 24px 2px 22px !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 4px !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    transition: width 0.2s ease, border-color 0.15s ease !important;
+}
+
+#epm-watchlist-input:focus {
+    width: 195px !important;
+    border-color: #2563eb !important;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12) !important;
+    outline: none !important;
+}
+
+.epm-nav-search-icon {
+    position: absolute !important;
+    left: 6px !important;
+    font-size: 10.5px !important;
+    pointer-events: none !important;
+    color: #94a3b8 !important;
+}
+
+.epm-watchlist-clear-btn {
+    position: absolute !important;
+    right: 6px !important;
+    background: transparent !important;
+    border: none !important;
+    font-size: 10px !important;
+    color: #94a3b8 !important;
+    cursor: pointer !important;
+    padding: 0 !important;
+}
+
+.epm-watchlist-clear-btn:hover {
+    color: #0f172a !important;
+}
+
+.epm-watchlist-badge {
+    position: absolute !important;
+    right: 20px !important;
+    font-family: var(--font-mono) !important;
+    font-size: 9px !important;
+    background: #2563eb !important;
+    color: #ffffff !important;
+    padding: 1px 4px !important;
+    border-radius: 3px !important;
+    font-weight: 700 !important;
+    white-space: nowrap !important;
+}
+
+.epm-top-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    height: 28px !important;
+    padding: 0 8px !important;
+    font-family: var(--font-sans) !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    border-radius: 4px !important;
+    border: 1px solid #cbd5e1 !important;
+    background: #ffffff !important;
+    color: #334155 !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
+    white-space: nowrap !important;
+}
+
+.epm-top-btn:hover {
+    background: #f8fafc !important;
+    border-color: #94a3b8 !important;
+    color: #0f172a !important;
+}
+
+.epm-btn-active {
+    background: #f0fdf4 !important;
+    border-color: #86efac !important;
+    color: #16a34a !important;
+}
+
+.epm-btn-muted {
+    background: #fef2f2 !important;
+    border-color: #fca5a5 !important;
+    color: #dc2626 !important;
+}
+
+.epm-cmd-btn {
+    background: #0f172a !important;
+    color: #ffffff !important;
+    border-color: #0f172a !important;
+}
+
+.epm-cmd-btn:hover {
+    background: #1e293b !important;
+    border-color: #1e293b !important;
+    color: #ffffff !important;
+}
+
+.epm-kbd-badge {
+    font-family: var(--font-mono) !important;
+    font-size: 9.5px !important;
+    background: #334155 !important;
+    color: #38bdf8 !important;
+    padding: 1px 4px !important;
+    border-radius: 3px !important;
+    font-weight: 700 !important;
+}
+
+.epm-nav-link {
+    font-family: var(--font-sans) !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    color: #2563eb !important;
+    text-decoration: none !important;
+    padding: 4px 7px !important;
+    border-radius: 4px !important;
+    background: #eff6ff !important;
+    border: 1px solid #dbeafe !important;
+    transition: all 0.15s ease !important;
+    white-space: nowrap !important;
+}
+
+.epm-nav-link:hover {
+    background: #dbeafe !important;
+    color: #1d4ed8 !important;
+}
+
+/* Row 2: Quick Tab Switcher Pills */
+.epm-nav-tabs-row {
+    padding-top: 6px !important;
+    border-top: 1px solid #f1f5f9 !important;
+    margin-top: 6px !important;
+    display: flex !important;
+    align-items: center !important;
+}
+
+.epm-quick-tabs-container {
+    display: flex !important;
+    gap: 6px !important;
+    align-items: center !important;
+    flex-wrap: wrap !important;
+}
+
+.epm-tab-pill {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    height: 25px !important;
+    padding: 0 10px !important;
+    font-family: var(--font-sans) !important;
+    font-size: 11.5px !important;
+    font-weight: 600 !important;
+    border-radius: 13px !important;
+    border: 1px solid #e2e8f0 !important;
+    background: #ffffff !important;
+    color: #475569 !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
+}
+
+.epm-tab-pill:hover {
+    background: #f8fafc !important;
+    color: #0f172a !important;
+    border-color: #cbd5e1 !important;
+}
+
+.epm-tab-pill.active {
+    background: #0f172a !important;
+    color: #ffffff !important;
+    border-color: #0f172a !important;
+    font-weight: 700 !important;
+}
+
+/* 15. Action Drawers (Zen Mode Smooth CSS Animation) */
+.epm-action-drawer {
+    transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease, margin 0.3s ease, padding 0.3s ease !important;
+    max-height: 500px !important;
+    opacity: 1 !important;
+    overflow: visible !important;
+}
+
+.epm-action-drawer.collapsed {
+    max-height: 0 !important;
+    opacity: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    overflow: hidden !important;
+    pointer-events: none !important;
+    border: none !important;
+}
+
+.epm-drawer-toggle-row {
+    margin-bottom: 6px !important;
+}
+
+#cal_drawer_toggle, #circ_drawer_toggle {
+    font-family: var(--font-sans) !important;
+    font-size: 11.5px !important;
+    font-weight: 600 !important;
+    border-radius: 4px !important;
+    margin-bottom: 6px !important;
+    width: 100% !important;
+    background: #f8fafc !important;
+    border: 1px dashed #cbd5e1 !important;
+    color: #334155 !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
+}
+
+#cal_drawer_toggle:hover, #circ_drawer_toggle:hover {
+    background: #f1f5f9 !important;
+    border-color: #94a3b8 !important;
+    color: #0f172a !important;
+}
+
+/* 16. Table Header Ribbons & Multi-Density Engine */
+.epm-table-ribbon {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    border-bottom: none !important;
+    border-radius: 6px 6px 0 0 !important;
+    padding: 6px 12px !important;
+    margin-top: 14px !important;
+    margin-bottom: 0 !important;
+    min-height: 38px !important;
+    gap: 8px !important;
+    flex-wrap: wrap !important;
+}
+
+.epm-ribbon-left {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    flex-wrap: wrap !important;
+}
+
+.epm-ribbon-bullet {
+    color: #2563eb !important;
+    font-size: 10px !important;
+}
+
+.epm-ribbon-title {
+    font-family: var(--font-sans) !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    color: #0f172a !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.04em !important;
+}
+
+.epm-ribbon-badge {
+    font-family: var(--font-sans) !important;
+    font-size: 10px !important;
+    font-weight: 600 !important;
+    color: #2563eb !important;
+    background: #eff6ff !important;
+    border: 1px solid #bfdbfe !important;
+    padding: 1px 6px !important;
+    border-radius: 4px !important;
+}
+
+.epm-ribbon-count {
+    font-family: var(--font-mono) !important;
+    font-size: 10.5px !important;
+    color: #64748b !important;
+}
+
+.epm-ribbon-controls {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    flex-wrap: wrap !important;
+}
+
+.epm-density-group {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 2px !important;
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 4px !important;
+    padding: 2px 4px !important;
+}
+
+.epm-control-label {
+    font-family: var(--font-sans) !important;
+    font-size: 9.5px !important;
+    font-weight: 700 !important;
+    color: #64748b !important;
+    text-transform: uppercase !important;
+    margin-right: 3px !important;
+}
+
+.epm-density-btn {
+    border: none !important;
+    background: transparent !important;
+    font-family: var(--font-sans) !important;
+    font-size: 10.5px !important;
+    font-weight: 600 !important;
+    color: #475569 !important;
+    padding: 2px 6px !important;
+    border-radius: 3px !important;
+    cursor: pointer !important;
+    transition: all 0.12s ease !important;
+}
+
+.epm-density-btn:hover {
+    color: #0f172a !important;
+    background: #f1f5f9 !important;
+}
+
+.epm-density-btn.active {
+    background: #0f172a !important;
+    color: #ffffff !important;
+}
+
+.epm-ribbon-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    height: 25px !important;
+    padding: 0 8px !important;
+    font-family: var(--font-sans) !important;
+    font-size: 10.5px !important;
+    font-weight: 600 !important;
+    color: #334155 !important;
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+    transition: all 0.12s ease !important;
+}
+
+.epm-ribbon-btn:hover {
+    background: #f1f5f9 !important;
+    color: #0f172a !important;
+    border-color: #94a3b8 !important;
+}
+
+.epm-collapse-btn {
+    width: 25px !important;
+    padding: 0 !important;
+    justify-content: center !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+}
+
+/* Table container styling directly under ribbon */
+.epm-table-ribbon + div[id*="_table"] .table-wrap,
+.epm-table-ribbon + div[id*="_table"] .gradio-dataframe,
+.epm-table-ribbon + div[id*="_table"] div[data-testid="dataframe"],
+.epm-table-ribbon + div[id*="_table"] .table-container {
+    border-top-left-radius: 0 !important;
+    border-top-right-radius: 0 !important;
+    border-top: none !important;
+}
+
+/* Multi-Density Rules */
+/* Density Compact (2-line clamp) */
+div[id*="_table"].density-compact tbody td,
+.density-compact tbody td {
+    padding: 4px 6px !important;
+    font-size: 11.5px !important;
+    line-height: 1.3 !important;
+}
+
+div[id*="_table"].density-compact tbody td:nth-child(4) > *,
+div[id*="_table"].density-compact tbody td:nth-child(4) a,
+div[id*="_table"].density-compact tbody td:nth-child(5) > *,
+div[id*="_table"].density-compact tbody td:nth-child(6) > *,
+div[id*="_table"].density-compact tbody td:nth-child(7) > *,
+div[id*="_table"].density-compact tbody td:nth-child(13) > * {
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-height: 2.7em !important;
+}
+
+/* Density Standard (4-line clamp) */
+div[id*="_table"].density-standard tbody td,
+.density-standard tbody td {
+    padding: 7px 9px !important;
+    font-size: 12px !important;
+    line-height: 1.35 !important;
+}
+
+div[id*="_table"].density-standard tbody td:nth-child(4) > *,
+div[id*="_table"].density-standard tbody td:nth-child(4) a,
+div[id*="_table"].density-standard tbody td:nth-child(5) > *,
+div[id*="_table"].density-standard tbody td:nth-child(6) > *,
+div[id*="_table"].density-standard tbody td:nth-child(7) > *,
+div[id*="_table"].density-standard tbody td:nth-child(13) > * {
+    display: -webkit-box !important;
+    -webkit-line-clamp: 4 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-height: 5.5em !important;
+}
+
+/* Density Expanded (Full Unconstrained Text) */
+div[id*="_table"].density-expanded tbody td,
+.density-expanded tbody td {
+    padding: 9px 12px !important;
+    font-size: 12.5px !important;
+    line-height: 1.45 !important;
+}
+
+div[id*="_table"].density-expanded tbody td:nth-child(4) > *,
+div[id*="_table"].density-expanded tbody td:nth-child(4) a,
+div[id*="_table"].density-expanded tbody td:nth-child(5) > *,
+div[id*="_table"].density-expanded tbody td:nth-child(6) > *,
+div[id*="_table"].density-expanded tbody td:nth-child(7) > *,
+div[id*="_table"].density-expanded tbody td:nth-child(13) > * {
+    display: block !important;
+    -webkit-line-clamp: unset !important;
+    max-height: none !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+}
+
+/* Collapsed Table State */
+div[id*="_table"].epm-table-collapsed .table-wrap,
+div[id*="_table"].epm-table-collapsed table,
+div[id*="_table"].epm-table-collapsed div[data-testid="dataframe"],
+div[id*="_table"].epm-table-collapsed .table-container {
+    max-height: 0 !important;
+    min-height: 0 !important;
+    height: 0 !important;
+    overflow: hidden !important;
+    opacity: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* 17. Full-Screen Focus Mode & Floating Banner */
+.epm-fullscreen-active {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background: #ffffff !important;
+    z-index: 99990 !important;
+    padding: 60px 24px 24px 24px !important;
+    overflow-y: auto !important;
+    box-sizing: border-box !important;
+}
+
+.epm-fullscreen-active .table-wrap,
+.epm-fullscreen-active table,
+.epm-fullscreen-active .gradio-dataframe {
+    width: 100% !important;
+    max-height: none !important;
+    height: auto !important;
+}
+
+.epm-focus-banner {
+    position: fixed !important;
+    top: 12px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    z-index: 99999 !important;
+    background: #0f172a !important;
+    color: #ffffff !important;
+    padding: 8px 18px !important;
+    border-radius: 30px !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25) !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    font-size: 12px !important;
+    font-family: var(--font-sans) !important;
+}
+
+.epm-focus-banner-content {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+}
+
+.epm-focus-exit-btn {
+    background: #ef4444 !important;
+    color: #ffffff !important;
+    border: none !important;
+    padding: 3px 10px !important;
+    border-radius: 15px !important;
+    font-weight: 700 !important;
+    font-size: 11px !important;
+    cursor: pointer !important;
+    transition: background 0.15s ease !important;
+}
+
+.epm-focus-exit-btn:hover {
+    background: #dc2626 !important;
+}
+
+.epm-focus-body-lock {
+    overflow: hidden !important;
+}
+
+/* 18. Command Palette Modal Dialog */
+.epm-cmd-backdrop {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background: rgba(15, 23, 42, 0.45) !important;
+    backdrop-filter: blur(4px) !important;
+    z-index: 99999 !important;
+    display: flex !important;
+    align-items: flex-start !important;
+    justify-content: center !important;
+    padding-top: 12vh !important;
+    box-sizing: border-box !important;
+}
+
+.epm-cmd-dialog {
+    width: 600px !important;
+    max-width: 92vw !important;
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 12px !important;
+    box-shadow: 0 20px 45px rgba(15, 23, 42, 0.2) !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    animation: epmCmdAppear 0.15s ease-out !important;
+}
+
+@keyframes epmCmdAppear {
+    from { opacity: 0; transform: scale(0.97) translateY(-8px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.epm-cmd-header {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    padding: 12px 16px !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    background: #ffffff !important;
+}
+
+.epm-cmd-search-icon {
+    font-size: 16px !important;
+    color: #64748b !important;
+}
+
+#epm-cmd-input {
+    flex: 1 !important;
+    border: none !important;
+    outline: none !important;
+    font-size: 14px !important;
+    font-family: var(--font-sans) !important;
+    color: #0f172a !important;
+    background: transparent !important;
+    padding: 0 !important;
+}
+
+.epm-cmd-kbd {
+    font-family: var(--font-mono) !important;
+    font-size: 10px !important;
+    background: #f1f5f9 !important;
+    color: #475569 !important;
+    border: 1px solid #cbd5e1 !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+}
+
+.epm-cmd-body {
+    max-height: 360px !important;
+    overflow-y: auto !important;
+    padding: 6px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+}
+
+.epm-cmd-cat-header {
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    color: #94a3b8 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    padding: 8px 10px 4px 10px !important;
+}
+
+.epm-cmd-item {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    padding: 8px 12px !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    font-size: 12.5px !important;
+    color: #1e293b !important;
+    font-weight: 500 !important;
+    transition: background 0.1s ease !important;
+}
+
+.epm-cmd-item:hover, .epm-cmd-item.selected {
+    background: #f1f5f9 !important;
+    color: #0f172a !important;
+}
+
+.epm-cmd-item.selected {
+    background: #eff6ff !important;
+    color: #1d4ed8 !important;
+    font-weight: 600 !important;
+}
+
+.epm-cmd-item-icon {
+    font-size: 14px !important;
+    width: 20px !important;
+    text-align: center !important;
+}
+
+.epm-cmd-item-title {
+    flex: 1 !important;
+}
+
+.epm-cmd-item-badge {
+    font-family: var(--font-mono) !important;
+    font-size: 9.5px !important;
+    color: #64748b !important;
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    padding: 1px 5px !important;
+    border-radius: 3px !important;
+}
+
+.epm-cmd-empty {
+    padding: 24px !important;
+    text-align: center !important;
+    color: #64748b !important;
+    font-size: 12px !important;
+}
+
+.epm-cmd-footer {
+    display: flex !important;
+    align-items: center !important;
+    gap: 14px !important;
+    padding: 8px 16px !important;
+    border-top: 1px solid #f1f5f9 !important;
+    background: #f8fafc !important;
+    font-size: 11px !important;
+    color: #64748b !important;
+}
+
+.epm-cmd-hint-group {
+    display: flex !important;
+    align-items: center !important;
+    gap: 3px !important;
+}
+
+.epm-cmd-key {
+    font-family: var(--font-mono) !important;
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 3px !important;
+    padding: 1px 4px !important;
+    font-weight: 700 !important;
+    color: #334155 !important;
+    font-size: 10px !important;
+}
+
+.epm-cmd-footer-brand {
+    margin-left: auto !important;
+    font-size: 10px !important;
+    font-weight: 600 !important;
+    color: #94a3b8 !important;
+}
+
+/* 19. Watchlist Highlighter & Glow */
+tbody tr.epm-highlight-row td {
+    background-color: #f0f7ff !important;
+    border-top: 1px solid #bfdbfe !important;
+    border-bottom: 1px solid #bfdbfe !important;
+    font-weight: 600 !important;
+}
+
+tbody tr.epm-highlight-row td:first-child {
+    border-left: 3px solid #2563eb !important;
+}
+
 """
+
+
+TOP_NAVBAR_HTML = """
+<div id="epm-top-navbar" class="epm-top-navbar">
+    <!-- Row 1: Brand, Telemetry, Controls -->
+    <div class="epm-nav-main-row">
+        <!-- Brand Identity -->
+        <div class="epm-nav-brand">
+            <span class="epm-nav-logo">📰</span>
+            <div class="epm-nav-title-group">
+                <span class="epm-nav-title">EPM PRO</span>
+                <span class="epm-nav-version">TERMINAL v3.0</span>
+            </div>
+            <div class="epm-nav-status">
+                <span class="epm-live-dot"></span>
+                <span class="epm-status-text">LIVE WIRE</span>
+            </div>
+            <div class="epm-active-tab-wrap">
+                <span id="epm-active-tab-indicator" class="epm-active-tab-pill">📰 LIVE FINANCIAL WIRE</span>
+            </div>
+        </div>
+
+        <!-- Live Macro Telemetry Ribbon -->
+        <div class="epm-telemetry-strip" id="epm-telemetry-ticker">
+            <div class="epm-ticker-item" title="Nifty 50 Index (NSE)">
+                <span class="epm-ticker-sym">NIFTY 50</span>
+                <span class="epm-ticker-val">24,850.35</span>
+                <span class="epm-ticker-chg up">▲ +0.42%</span>
+            </div>
+            <div class="epm-ticker-divider"></div>
+            <div class="epm-ticker-item" title="BSE Sensex">
+                <span class="epm-ticker-sym">SENSEX</span>
+                <span class="epm-ticker-val">81,420.10</span>
+                <span class="epm-ticker-chg up">▲ +0.38%</span>
+            </div>
+            <div class="epm-ticker-divider"></div>
+            <div class="epm-ticker-item" title="India Volatility Index">
+                <span class="epm-ticker-sym">INDIA VIX</span>
+                <span class="epm-ticker-val">13.15</span>
+                <span class="epm-ticker-chg down">▼ -2.10%</span>
+            </div>
+            <div class="epm-ticker-divider"></div>
+            <div class="epm-ticker-item" title="Brent Crude Oil Spot ($/bbl)">
+                <span class="epm-ticker-sym">BRENT CRUDE</span>
+                <span class="epm-ticker-val">$74.20</span>
+                <span class="epm-ticker-chg up">▲ +0.54%</span>
+            </div>
+            <div class="epm-ticker-divider"></div>
+            <div class="epm-ticker-item" title="Spot Gold ($/oz)">
+                <span class="epm-ticker-sym">GOLD</span>
+                <span class="epm-ticker-val">$2,654.80</span>
+                <span class="epm-ticker-chg up">▲ +0.15%</span>
+            </div>
+            <div class="epm-ticker-divider"></div>
+            <div class="epm-ticker-item" title="US Dollar vs Indian Rupee">
+                <span class="epm-ticker-sym">USD/INR</span>
+                <span class="epm-ticker-val">₹84.05</span>
+                <span class="epm-ticker-chg down">▼ -0.02%</span>
+            </div>
+            <div class="epm-ticker-divider"></div>
+            <div class="epm-ticker-item" title="US Dollar Index">
+                <span class="epm-ticker-sym">DXY</span>
+                <span class="epm-ticker-val">103.85</span>
+                <span class="epm-ticker-chg up">▲ +0.12%</span>
+            </div>
+        </div>
+
+        <!-- Navbar Controls Right -->
+        <div class="epm-nav-controls">
+            <!-- Watchlist Highlighter Input -->
+            <div class="epm-nav-search-wrap" title="Highlight table rows matching keywords/tickers">
+                <span class="epm-nav-search-icon">🔍</span>
+                <input id="epm-watchlist-input" type="text" placeholder="Highlight Ticker..." oninput="window.epmApplyWatchlist(this.value)">
+                <span id="epm-watchlist-count" class="epm-watchlist-badge" style="display:none;">0 matches</span>
+                <button type="button" class="epm-watchlist-clear-btn" onclick="window.epmClearWatchlist()" title="Clear highlighter">✕</button>
+            </div>
+
+            <!-- Global Density Toggle -->
+            <button type="button" id="epm-global-density-btn" class="epm-top-btn" onclick="window.epmCycleGlobalDensity()" title="Cycle all tables density (Compact / Standard / Expanded)">
+                <span class="epm-btn-icon">≡</span>
+                <span id="epm-global-density-lbl">Compact</span>
+            </button>
+
+            <!-- Audio Alert Toggle -->
+            <button type="button" id="epm-audio-toggle-btn" class="epm-top-btn epm-btn-active" onclick="window.epmToggleAudio()" title="Toggle Web Audio Flash Chime (880Hz -> 1320Hz)">
+                <span class="epm-btn-icon">🔔</span>
+                <span id="epm-audio-status-lbl">Audio ON</span>
+            </button>
+
+            <!-- Command Palette Trigger -->
+            <button type="button" class="epm-top-btn epm-cmd-btn" onclick="window.epmOpenCommandPalette()" title="Open Command Palette (Cmd+K / Ctrl+K)">
+                <kbd class="epm-kbd-badge">⌘K</kbd>
+                <span>Palette</span>
+            </button>
+
+            <!-- Quick Resource Links -->
+            <a href="/api/calendar/ics" target="_blank" class="epm-nav-link" title="RFC-5545 iCalendar Subscription Feed">📅 iCal</a>
+            <a href="/docs" target="_blank" class="epm-nav-link" title="OpenAPI / Swagger REST API Docs">⚡ API</a>
+        </div>
+    </div>
+
+    <!-- Row 2: Quick Tab Switcher Pills -->
+    <div class="epm-nav-tabs-row">
+        <div class="epm-quick-tabs-container">
+            <button type="button" class="epm-tab-pill active" onclick="window.epmSwitchTab(0, this)">
+                <span class="epm-tab-pill-icon">📰</span>
+                <span>Live Wire</span>
+            </button>
+            <button type="button" class="epm-tab-pill" onclick="window.epmSwitchTab(1, this)">
+                <span class="epm-tab-pill-icon">📅</span>
+                <span>Market Calendar</span>
+            </button>
+            <button type="button" class="epm-tab-pill" onclick="window.epmSwitchTab(2, this)">
+                <span class="epm-tab-pill-icon">📜</span>
+                <span>Regulatory Circulars</span>
+            </button>
+            <button type="button" class="epm-tab-pill" onclick="window.epmSwitchTab(3, this)">
+                <span class="epm-tab-pill-icon">⚙️</span>
+                <span>Settings & Integrations</span>
+            </button>
+            <button type="button" class="epm-tab-pill" onclick="window.epmSwitchTab(4, this)">
+                <span class="epm-tab-pill-icon">❓</span>
+                <span>User Guide</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Command Palette Modal Backdrop & Dialog -->
+<div id="epm-cmd-modal-backdrop" class="epm-cmd-backdrop" style="display: none;" onclick="if(event.target === this) window.epmCloseCommandPalette();">
+    <div class="epm-cmd-dialog">
+        <div class="epm-cmd-header">
+            <span class="epm-cmd-search-icon">🔍</span>
+            <input id="epm-cmd-input" type="text" placeholder="Type a command, navigate tab, toggle density, or export..." autocomplete="off">
+            <kbd class="epm-cmd-kbd" onclick="window.epmCloseCommandPalette()">ESC</kbd>
+        </div>
+        <div id="epm-cmd-results" class="epm-cmd-body">
+            <!-- Injected by JavaScript -->
+        </div>
+        <div class="epm-cmd-footer">
+            <div class="epm-cmd-hint-group">
+                <span class="epm-cmd-key">↑</span><span class="epm-cmd-key">↓</span> Navigate
+            </div>
+            <div class="epm-cmd-hint-group">
+                <span class="epm-cmd-key">↵</span> Execute
+            </div>
+            <div class="epm-cmd-hint-group">
+                <span class="epm-cmd-key">ESC</span> Close
+            </div>
+            <div class="epm-cmd-footer-brand">EPM Pro Command Palette</div>
+        </div>
+    </div>
+</div>
+"""
+
+
+
+TERMINAL_CLIENT_JS = r"""
+// EPM PRO INSTITUTIONAL CLIENT ENGINE 3.0
+(function() {
+    // 1. Audio Engine (Dual-tone Harmonic 880Hz -> 1320Hz Sine Wave)
+    let audioCtx = null;
+    let audioMuted = localStorage.getItem("epm_audio_muted") === "true";
+
+    function getAudioCtx() {
+        if (!audioCtx) {
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (AC) audioCtx = new AC();
+        }
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+        return audioCtx;
+    }
+
+    window.epmPlayChime = function(force = false) {
+        if (audioMuted && !force) return;
+        try {
+            const ctx = getAudioCtx();
+            if (!ctx) return;
+            const now = ctx.currentTime;
+            
+            // Oscillator 1 (880Hz -> 1320Hz)
+            const osc1 = ctx.createOscillator();
+            const gain1 = ctx.createGain();
+            osc1.type = 'sine';
+            osc1.frequency.setValueAtTime(880, now);
+            osc1.frequency.exponentialRampToValueAtTime(1320, now + 0.12);
+            
+            gain1.gain.setValueAtTime(0.001, now);
+            gain1.gain.linearRampToValueAtTime(0.15, now + 0.02);
+            gain1.gain.exponentialRampToValueAtTime(0.0001, now + 0.32);
+            
+            osc1.connect(gain1);
+            gain1.connect(ctx.destination);
+            
+            // Oscillator 2 (1320Hz -> 1760Hz)
+            const osc2 = ctx.createOscillator();
+            const gain2 = ctx.createGain();
+            osc2.type = 'sine';
+            osc2.frequency.setValueAtTime(1320, now + 0.04);
+            osc2.frequency.exponentialRampToValueAtTime(1760, now + 0.16);
+            
+            gain2.gain.setValueAtTime(0.001, now + 0.04);
+            gain2.gain.linearRampToValueAtTime(0.12, now + 0.06);
+            gain2.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
+            
+            osc2.connect(gain2);
+            gain2.connect(ctx.destination);
+            
+            osc1.start(now);
+            osc1.stop(now + 0.33);
+            osc2.start(now + 0.04);
+            osc2.stop(now + 0.36);
+        } catch(e) {
+            console.warn("[EPM Audio] Chime error:", e);
+        }
+    };
+
+    window.epmToggleAudio = function() {
+        audioMuted = !audioMuted;
+        localStorage.setItem("epm_audio_muted", audioMuted);
+        epmUpdateAudioUI();
+        if (!audioMuted) {
+            window.epmPlayChime(true);
+        }
+    };
+
+    function epmUpdateAudioUI() {
+        const lbl = document.getElementById("epm-audio-status-lbl");
+        const btn = document.getElementById("epm-audio-toggle-btn");
+        if (lbl) lbl.textContent = audioMuted ? "Audio OFF" : "Audio ON";
+        if (btn) {
+            if (audioMuted) {
+                btn.classList.add("epm-btn-muted");
+                btn.classList.remove("epm-btn-active");
+            } else {
+                btn.classList.remove("epm-btn-muted");
+                btn.classList.add("epm-btn-active");
+            }
+        }
+    }
+
+    // 2. Tab Navigation Sync & Active Tab Indicator
+    const TAB_NAMES = [
+        "📰 LIVE FINANCIAL WIRE",
+        "📅 MARKET CALENDAR & OUTCOMES",
+        "📜 REGULATORY CIRCULARS & PDFS",
+        "⚙️ PORTAL SETTINGS & INTEGRATIONS",
+        "❓ USER GUIDE & MANUAL"
+    ];
+
+    window.epmSwitchTab = function(tabIdx, pillEl) {
+        const tabBtns = document.querySelectorAll('button[role="tab"]');
+        if (tabBtns && tabBtns[tabIdx]) {
+            tabBtns[tabIdx].click();
+            epmSyncActiveTab(tabIdx);
+        }
+    };
+
+    function epmSyncActiveTab(tabIdx) {
+        const pills = document.querySelectorAll('.epm-tab-pill');
+        pills.forEach((p, idx) => {
+            if (idx === tabIdx) p.classList.add('active');
+            else p.classList.remove('active');
+        });
+        const badge = document.getElementById("epm-active-tab-indicator");
+        if (badge && TAB_NAMES[tabIdx]) {
+            badge.textContent = TAB_NAMES[tabIdx];
+        }
+    }
+
+    // 3. Density Controller (Compact / Standard / Expanded)
+    const DENSITIES = ['compact', 'standard', 'expanded'];
+    let currentGlobalDensity = localStorage.getItem("epm_global_density") || "compact";
+
+    window.epmSetDensity = function(tableId, density, btn) {
+        const target = document.getElementById(tableId);
+        if (!target) return;
+        
+        target.classList.remove("density-compact", "density-standard", "density-expanded");
+        target.classList.add("density-" + density);
+        
+        const ribbon = document.querySelector(`.epm-table-ribbon[data-target="${tableId}"]`);
+        if (ribbon) {
+            ribbon.querySelectorAll(".epm-density-btn").forEach(b => {
+                if (b.dataset.density === density) b.classList.add("active");
+                else b.classList.remove("active");
+            });
+        }
+        localStorage.setItem("epm_density_" + tableId, density);
+    };
+
+    window.epmCycleGlobalDensity = function() {
+        let idx = DENSITIES.indexOf(currentGlobalDensity);
+        idx = (idx + 1) % DENSITIES.length;
+        const nextDensity = DENSITIES[idx];
+        window.epmSetGlobalDensity(nextDensity);
+    };
+
+    window.epmSetGlobalDensity = function(density) {
+        currentGlobalDensity = density;
+        localStorage.setItem("epm_global_density", density);
+        const lbl = document.getElementById("epm-global-density-lbl");
+        if (lbl) lbl.textContent = density.charAt(0).toUpperCase() + density.slice(1);
+        
+        const tables = ['top_news_table', 'bottom_news_table', 'calendar_table', 'holidays_table', 'circ_table'];
+        tables.forEach(tid => {
+            window.epmSetDensity(tid, density);
+        });
+    };
+
+    // 4. Table Collapse / Expand Controller
+    window.epmToggleCollapse = function(tableId, btn) {
+        const target = document.getElementById(tableId);
+        if (!target) return;
+        const isCollapsed = target.classList.toggle("epm-table-collapsed");
+        if (btn) {
+            const sp = btn.querySelector("span") || btn;
+            sp.textContent = isCollapsed ? "+" : "−";
+            btn.title = isCollapsed ? "Expand table" : "Collapse table";
+        }
+        localStorage.setItem("epm_collapsed_" + tableId, isCollapsed ? "true" : "false");
+    };
+
+    // 5. Table CSV Exporter (RFC-4180 with UTF-8 BOM)
+    window.epmExportCSV = function(tableId) {
+        const tableWrap = document.getElementById(tableId);
+        if (!tableWrap) {
+            alert("Table container not found: " + tableId);
+            return;
+        }
+        const table = tableWrap.querySelector("table");
+        if (!table) {
+            alert("Table data is still loading...");
+            return;
+        }
+        
+        const lines = [];
+        const ths = table.querySelectorAll("thead th");
+        const headers = [];
+        ths.forEach(th => {
+            let t = th.innerText.trim().replace(/\r?\n|\r/g, " ");
+            headers.push('"' + t.replace(/"/g, '""') + '"');
+        });
+        if (headers.length > 0) lines.push(headers.join(","));
+        
+        const trs = table.querySelectorAll("tbody tr");
+        trs.forEach(tr => {
+            const tds = tr.querySelectorAll("td");
+            const row = [];
+            tds.forEach(td => {
+                let t = td.innerText.trim().replace(/\r?\n|\r/g, " ");
+                row.push('"' + t.replace(/"/g, '""') + '"');
+            });
+            if (row.length > 0) lines.push(row.join(","));
+        });
+        
+        if (lines.length <= 1) {
+            alert("No records found in " + tableId);
+            return;
+        }
+        
+        const csvContent = "\uFEFF" + lines.join("\r\n");
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        const dateStr = new Date().toISOString().slice(0, 10);
+        a.href = url;
+        a.download = `epm_${tableId}_${dateStr}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
+    // 6. Full-Screen Focus Mode
+    let currentFocusedTable = null;
+
+    window.epmToggleFocus = function(tableId) {
+        const tableWrap = document.getElementById(tableId);
+        if (!tableWrap) return;
+        
+        if (currentFocusedTable === tableId) {
+            window.epmExitFocus();
+            return;
+        }
+        
+        window.epmExitFocus();
+        
+        currentFocusedTable = tableId;
+        tableWrap.classList.add("epm-fullscreen-active");
+        document.body.classList.add("epm-focus-body-lock");
+        
+        let banner = document.getElementById("epm-focus-banner");
+        if (!banner) {
+            banner = document.createElement("div");
+            banner.id = "epm-focus-banner";
+            banner.className = "epm-focus-banner";
+            document.body.appendChild(banner);
+        }
+        banner.innerHTML = `
+            <div class="epm-focus-banner-content">
+                <span>⛶ <b>INSTITUTIONAL FULL-SCREEN FOCUS:</b> <code>${tableId.toUpperCase()}</code> · Press <kbd style="background:#334155;color:#fff;padding:1px 5px;border-radius:3px;">ESC</kbd> to return</span>
+                <button onclick="window.epmExitFocus()" class="epm-focus-exit-btn">✕ Exit Focus</button>
+            </div>
+        `;
+        banner.style.display = "flex";
+    };
+
+    window.epmExitFocus = function() {
+        if (!currentFocusedTable) return;
+        const target = document.getElementById(currentFocusedTable);
+        if (target) target.classList.remove("epm-fullscreen-active");
+        currentFocusedTable = null;
+        document.body.classList.remove("epm-focus-body-lock");
+        const banner = document.getElementById("epm-focus-banner");
+        if (banner) banner.style.display = "none";
+    };
+
+    // 7. Watchlist / Ticker Highlighter
+    window.epmApplyWatchlist = function(val) {
+        let query = (typeof val === 'string') ? val : (localStorage.getItem("epm_watchlist") || "");
+        localStorage.setItem("epm_watchlist", query);
+        
+        const input = document.getElementById("epm-watchlist-input");
+        if (input && input.value !== query) input.value = query;
+        
+        const tokens = query.toLowerCase().split(/[,\s]+/).map(s => s.trim()).filter(s => s.length >= 2);
+        const tables = ['top_news_table', 'bottom_news_table', 'calendar_table', 'holidays_table', 'circ_table'];
+        let totalMatches = 0;
+        
+        tables.forEach(tid => {
+            const wrap = document.getElementById(tid);
+            if (!wrap) return;
+            const rows = wrap.querySelectorAll("tbody tr");
+            rows.forEach(tr => {
+                if (tokens.length === 0) {
+                    tr.classList.remove("epm-highlight-row");
+                    return;
+                }
+                const text = tr.innerText.toLowerCase();
+                const matched = tokens.some(tok => text.includes(tok));
+                if (matched) {
+                    tr.classList.add("epm-highlight-row");
+                    totalMatches++;
+                } else {
+                    tr.classList.remove("epm-highlight-row");
+                }
+            });
+        });
+        
+        const badge = document.getElementById("epm-watchlist-count");
+        if (badge) {
+            if (tokens.length > 0) {
+                badge.textContent = `${totalMatches} match${totalMatches === 1 ? '' : 'es'}`;
+                badge.style.display = "inline-flex";
+            } else {
+                badge.style.display = "none";
+            }
+        }
+    };
+
+    window.epmClearWatchlist = function() {
+        const input = document.getElementById("epm-watchlist-input");
+        if (input) input.value = "";
+        window.epmApplyWatchlist("");
+    };
+
+    // 8. Action Drawers (Tab 2 Calendar Toolbar & Tab 3 Circulars Drawer)
+    window.epmToggleCalDrawer = function() {
+        const drawer = document.getElementById("cal_action_drawer");
+        const btn = document.getElementById("cal_drawer_toggle");
+        if (!drawer) return;
+        const isCollapsed = drawer.classList.toggle("collapsed");
+        if (btn) {
+            const btnSpan = btn.querySelector("span") || btn;
+            btnSpan.textContent = isCollapsed ? "🛠️ Action & Dispatch Toolbar: Collapsed · Click to Expand" : "👁️ Hide Toolbar (Zen Mode)";
+        }
+        localStorage.setItem("epm_cal_drawer_collapsed", isCollapsed ? "true" : "false");
+    };
+
+    window.epmToggleCircDrawer = function() {
+        const drawer = document.getElementById("circ_action_drawer");
+        const btn = document.getElementById("circ_drawer_toggle");
+        if (!drawer) return;
+        const isCollapsed = drawer.classList.toggle("collapsed");
+        if (btn) {
+            const btnSpan = btn.querySelector("span") || btn;
+            btnSpan.textContent = isCollapsed ? "⚙️ Circular Actions [Collapsed] · Click to Expand" : "👁️ Hide Toolbar (Zen Mode)";
+        }
+        localStorage.setItem("epm_circ_drawer_collapsed", isCollapsed ? "true" : "false");
+    };
+
+    // 9. Command Palette Modal Engine (Cmd+K / Ctrl+K)
+    const COMMANDS = [
+        { id: "tab-1", category: "Navigation", title: "Jump to Live News Wire", icon: "📰", action: () => window.epmSwitchTab(0) },
+        { id: "tab-2", category: "Navigation", title: "Jump to Market Calendar & Timers", icon: "📅", action: () => window.epmSwitchTab(1) },
+        { id: "tab-3", category: "Navigation", title: "Jump to Regulatory Circulars & PDFs", icon: "📜", action: () => window.epmSwitchTab(2) },
+        { id: "tab-4", category: "Navigation", title: "Jump to Portal Settings & Integrations", icon: "⚙️", action: () => window.epmSwitchTab(3) },
+        { id: "tab-5", category: "Navigation", title: "Jump to User Guide & Manual", icon: "❓", action: () => window.epmSwitchTab(4) },
+        
+        { id: "den-compact", category: "Density", title: "Set Density: Compact (2-Line Clamp)", icon: "≡", action: () => window.epmSetGlobalDensity("compact") },
+        { id: "den-standard", category: "Density", title: "Set Density: Standard (4-Line Clamp)", icon: "≡", action: () => window.epmSetGlobalDensity("standard") },
+        { id: "den-expanded", category: "Density", title: "Set Density: Expanded (Full Text)", icon: "≡", action: () => window.epmSetGlobalDensity("expanded") },
+        
+        { id: "csv-top", category: "CSV Export", title: "Export CSV: Breaking News Wire", icon: "📥", action: () => window.epmExportCSV("top_news_table") },
+        { id: "csv-bot", category: "CSV Export", title: "Export CSV: Broad Secondary News", icon: "📥", action: () => window.epmExportCSV("bottom_news_table") },
+        { id: "csv-cal", category: "CSV Export", title: "Export CSV: Market Calendar Events", icon: "📥", action: () => window.epmExportCSV("calendar_table") },
+        { id: "csv-hol", category: "CSV Export", title: "Export CSV: 2026 Market Holidays", icon: "📥", action: () => window.epmExportCSV("holidays_table") },
+        { id: "csv-circ", category: "CSV Export", title: "Export CSV: Regulatory Circulars", icon: "📥", action: () => window.epmExportCSV("circ_table") },
+        
+        { id: "audio-toggle", category: "Audio", title: "Toggle Web Audio Chime Alerts", icon: "🔔", action: () => window.epmToggleAudio() },
+        { id: "audio-test", category: "Audio", title: "Play Test Chime Sound (880Hz -> 1320Hz)", icon: "🎵", action: () => window.epmPlayChime(true) },
+        
+        { id: "zen-cal", category: "Toolbars", title: "Toggle Calendar Action Toolbar (Zen Mode)", icon: "🛠️", action: () => window.epmToggleCalDrawer() },
+        { id: "zen-circ", category: "Toolbars", title: "Toggle Circulars Action Drawer", icon: "⚙️", action: () => window.epmToggleCircDrawer() }
+    ];
+
+    let selectedCmdIndex = 0;
+    let filteredCommands = [...COMMANDS];
+
+    window.epmOpenCommandPalette = function() {
+        const modal = document.getElementById("epm-cmd-modal-backdrop");
+        const input = document.getElementById("epm-cmd-input");
+        if (!modal) return;
+        modal.style.display = "flex";
+        if (input) {
+            input.value = "";
+            input.focus();
+        }
+        selectedCmdIndex = 0;
+        epmRenderCommands("");
+    };
+
+    window.epmCloseCommandPalette = function() {
+        const modal = document.getElementById("epm-cmd-modal-backdrop");
+        if (modal) modal.style.display = "none";
+    };
+
+    function epmRenderCommands(filter) {
+        const q = filter.toLowerCase().trim();
+        filteredCommands = COMMANDS.filter(c => 
+            c.title.toLowerCase().includes(q) || 
+            c.category.toLowerCase().includes(q)
+        );
+        selectedCmdIndex = Math.max(0, Math.min(selectedCmdIndex, filteredCommands.length - 1));
+        
+        const list = document.getElementById("epm-cmd-results");
+        if (!list) return;
+        
+        if (filteredCommands.length === 0) {
+            list.innerHTML = `<div class="epm-cmd-empty">No commands matching "<b>${filter}</b>"</div>`;
+            return;
+        }
+        
+        let html = "";
+        let currentCat = "";
+        filteredCommands.forEach((cmd, idx) => {
+            if (cmd.category !== currentCat) {
+                currentCat = cmd.category;
+                html += `<div class="epm-cmd-cat-header">${currentCat}</div>`;
+            }
+            const isSel = idx === selectedCmdIndex;
+            html += `
+                <div class="epm-cmd-item ${isSel ? 'selected' : ''}" onclick="window.epmExecuteCommand(${idx})" onmouseenter="window.epmHoverCommand(${idx})">
+                    <span class="epm-cmd-item-icon">${cmd.icon}</span>
+                    <span class="epm-cmd-item-title">${cmd.title}</span>
+                    <span class="epm-cmd-item-badge">${cmd.category}</span>
+                </div>
+            `;
+        });
+        list.innerHTML = html;
+        
+        const selEl = list.querySelector(".epm-cmd-item.selected");
+        if (selEl) selEl.scrollIntoView({ block: "nearest" });
+    }
+
+    window.epmHoverCommand = function(idx) {
+        selectedCmdIndex = idx;
+        const list = document.getElementById("epm-cmd-results");
+        if (!list) return;
+        list.querySelectorAll(".epm-cmd-item").forEach((el, i) => {
+            if (i === idx) el.classList.add("selected");
+            else el.classList.remove("selected");
+        });
+    };
+
+    window.epmExecuteCommand = function(idx) {
+        if (filteredCommands[idx]) {
+            const action = filteredCommands[idx].action;
+            window.epmCloseCommandPalette();
+            setTimeout(action, 50);
+        }
+    };
+
+    // Global Key Listener
+    window.addEventListener("keydown", function(e) {
+        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+            e.preventDefault();
+            const modal = document.getElementById("epm-cmd-modal-backdrop");
+            if (modal && modal.style.display !== "none") {
+                window.epmCloseCommandPalette();
+            } else {
+                window.epmOpenCommandPalette();
+            }
+            return;
+        }
+        
+        if (e.key === "Escape") {
+            const modal = document.getElementById("epm-cmd-modal-backdrop");
+            if (modal && modal.style.display !== "none") {
+                window.epmCloseCommandPalette();
+                return;
+            }
+            if (currentFocusedTable) {
+                window.epmExitFocus();
+                return;
+            }
+        }
+        
+        const modal = document.getElementById("epm-cmd-modal-backdrop");
+        if (modal && modal.style.display !== "none") {
+            if (e.key === "ArrowDown") {
+                e.preventDefault();
+                selectedCmdIndex = (selectedCmdIndex + 1) % filteredCommands.length;
+                epmRenderCommands(document.getElementById("epm-cmd-input").value);
+            } else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                selectedCmdIndex = (selectedCmdIndex - 1 + filteredCommands.length) % filteredCommands.length;
+                epmRenderCommands(document.getElementById("epm-cmd-input").value);
+            } else if (e.key === "Enter") {
+                e.preventDefault();
+                window.epmExecuteCommand(selectedCmdIndex);
+            }
+        }
+    });
+
+    // 10. Initialization & Observer
+    function epmInitTerminal() {
+        epmUpdateAudioUI();
+        window.epmSetGlobalDensity(currentGlobalDensity);
+        
+        if (localStorage.getItem("epm_cal_drawer_collapsed") === "true") {
+            const drawer = document.getElementById("cal_action_drawer");
+            const btn = document.getElementById("cal_drawer_toggle");
+            if (drawer) drawer.classList.add("collapsed");
+            if (btn) {
+                const s = btn.querySelector("span") || btn;
+                s.textContent = "🛠️ Action & Dispatch Toolbar: Collapsed · Click to Expand";
+            }
+        }
+        if (localStorage.getItem("epm_circ_drawer_collapsed") === "true") {
+            const drawer = document.getElementById("circ_action_drawer");
+            const btn = document.getElementById("circ_drawer_toggle");
+            if (drawer) drawer.classList.add("collapsed");
+            if (btn) {
+                const s = btn.querySelector("span") || btn;
+                s.textContent = "⚙️ Circular Actions [Collapsed] · Click to Expand";
+            }
+        }
+        
+        const savedQuery = localStorage.getItem("epm_watchlist") || "";
+        if (savedQuery) {
+            window.epmApplyWatchlist(savedQuery);
+        }
+        
+        const tabBtns = document.querySelectorAll('button[role="tab"]');
+        tabBtns.forEach((btn, idx) => {
+            btn.addEventListener("click", () => {
+                epmSyncActiveTab(idx);
+            });
+        });
+        
+        const cmdInput = document.getElementById("epm-cmd-input");
+        if (cmdInput) {
+            cmdInput.addEventListener("input", (e) => {
+                epmRenderCommands(e.target.value);
+            });
+        }
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", epmInitTerminal);
+    } else {
+        epmInitTerminal();
+    }
+    window.addEventListener("load", epmInitTerminal);
+    
+    setInterval(() => {
+        const savedQuery = localStorage.getItem("epm_watchlist");
+        if (savedQuery) window.epmApplyWatchlist(savedQuery);
+    }, 3000);
+})();
+"""
+
 
 
 # ─── Build Gradio Blocks UI ──────────────────────────────────────────────────
@@ -1838,22 +3458,7 @@ init_cal_summary, init_cal_html, init_cal_rows, init_hol_rows = get_calendar_tab
 init_circ_summary, init_circ_html, init_circ_rows = get_circulars_view()
 
 with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence Terminal", fill_width=True) as demo:
-    gr.HTML(f"""
-    <style>{CUSTOM_CSS}</style>
-    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 14px;">
-        <div>
-            <div style="font-size: 10.5px; font-weight: 700; color: #2563eb; letter-spacing: 0.1em; text-transform: uppercase;">Institutional Wire & Macro Intelligence Engine</div>
-            <div style="font-size: 20px; font-weight: 800; color: #0f172a; letter-spacing: -0.03em;">📰 EPM PRO FINANCIAL TERMINAL</div>
-        </div>
-        <div style="display: flex; gap: 16px; align-items: center; font-size: 12px; font-weight: 600;">
-            <span style="color: #059669; display: flex; align-items: center; gap: 5px;">● <span style="color: #0f172a;">SYSTEM ONLINE</span></span>
-            <span style="color: #cbd5e1;">|</span>
-            <a href="/api/calendar/ics" target="_blank" style="color: #2563eb; text-decoration: none;">📅 iCal Subscription Feed</a>
-            <span style="color: #cbd5e1;">|</span>
-            <a href="/docs" target="_blank" style="color: #2563eb; text-decoration: none;">⚡ REST API Docs</a>
-        </div>
-    </div>
-    """)
+    gr.HTML("<style>" + CUSTOM_CSS + "</style>" + TOP_NAVBAR_HTML + "<script>" + TERMINAL_CLIENT_JS + "</script>")
     status_box = gr.Markdown(value=init_status_str)
 
     with gr.Tabs():
@@ -1865,6 +3470,7 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                 gr.Markdown("### 🚨 Institutional Breaking Wire (Real-Time AI Scored)")
                 refresh_btn = gr.Button("🔄 Force Refresh & Re-Score Feeds", variant="primary", scale=0)
 
+            gr.HTML(render_table_ribbon("top_news_table", "Institutional Breaking Wire", subtitle="AI Scored ≥ 7", count_badge="Primary Catalysts"))
             top_table = gr.Dataframe(
                 headers=["Score", "Sentiment", "Impact", "Headline", "Sectors/Tickers", "AI Reasoning", "Source", "Relevance", "Time"],
                 datatype=["str", "str", "str", "markdown", "str", "str", "str", "str", "str"],
@@ -1875,6 +3481,7 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
             )
 
             gr.Markdown("### 🌐 Broad Market Secondary Stream")
+            gr.HTML(render_table_ribbon("bottom_news_table", "Broad Market Secondary Stream", subtitle="All Feeds", count_badge="Raw Wire"))
             bottom_table = gr.Dataframe(
                 headers=["Time", "Source", "Headline", "Relevance", "Sentiment", "URL"],
                 datatype=["str", "str", "markdown", "str", "str", "markdown"],
@@ -1929,21 +3536,26 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                     scale=3
                 )
 
-            with gr.Row():
-                cal_sync_btn = gr.Button("🔄 Sync 5 Markets & Timers", variant="primary", scale=1)
-                btn_sync_gcal = gr.Button("📅 Sync Google Calendar", variant="secondary", scale=1)
-                btn_push_today_photo = gr.Button("📸 Send Today's Photo Cards", variant="secondary", scale=1)
-                btn_push_tomorrow_photo = gr.Button("📸 Send Tomorrow's Photo Cards", variant="secondary", scale=1)
+            with gr.Row(elem_classes=["epm-drawer-toggle-row"]):
+                cal_drawer_toggle = gr.Button("👁️ Hide Toolbar (Zen Mode)", elem_id="cal_drawer_toggle", variant="secondary")
 
-            with gr.Row():
-                btn_push_holiday = gr.Button("🏖️ Send Next-Day Holiday Check", variant="secondary", scale=1)
-                btn_push_weekly = gr.Button("📲 Resend Weekly Sync Links", variant="secondary", scale=1)
-                btn_push_today = gr.Button("💬 Send Today's Text Snapshot", variant="secondary", scale=1)
-                btn_push_tomorrow = gr.Button("💬 Send Tomorrow's Text Snapshot", variant="secondary", scale=1)
+            with gr.Column(elem_id="cal_action_drawer", elem_classes=["epm-action-drawer"]):
+                with gr.Row():
+                    cal_sync_btn = gr.Button("🔄 Sync 5 Markets & Timers", variant="primary", scale=1)
+                    btn_sync_gcal = gr.Button("📅 Sync Google Calendar", variant="secondary", scale=1)
+                    btn_push_today_photo = gr.Button("📸 Send Today's Photo Cards", variant="secondary", scale=1)
+                    btn_push_tomorrow_photo = gr.Button("📸 Send Tomorrow's Photo Cards", variant="secondary", scale=1)
+
+                with gr.Row():
+                    btn_push_holiday = gr.Button("🏖️ Send Next-Day Holiday Check", variant="secondary", scale=1)
+                    btn_push_weekly = gr.Button("📲 Resend Weekly Sync Links", variant="secondary", scale=1)
+                    btn_push_today = gr.Button("💬 Send Today's Text Snapshot", variant="secondary", scale=1)
+                    btn_push_tomorrow = gr.Button("💬 Send Tomorrow's Text Snapshot", variant="secondary", scale=1)
 
             cal_action_msg = gr.Markdown()
 
             gr.Markdown("### 📊 Multi-Market Catalyst Schedule & Historical Outcomes")
+            gr.HTML(render_table_ribbon("calendar_table", "Multi-Market Catalyst Schedule & Historical Outcomes", subtitle="5 Bourses", count_badge="Live Timers"))
             calendar_table = gr.Dataframe(
                 headers=[
                     "Event ID",
@@ -1971,6 +3583,7 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                 calendar_visual_feed = gr.HTML(value=init_cal_html, elem_id="calendar_visual_feed")
 
             gr.Markdown("### 🏛️ 2026 Authoritative Multi-Market Trading Holidays (`NSE` · `BSE` · `MCX` · `NYSE` · `CRYPTO`)")
+            gr.HTML(render_table_ribbon("holidays_table", "2026 Authoritative Trading Holidays", subtitle="NSE · BSE · MCX · NYSE · CRYPTO", count_badge="All Sessions"))
             holidays_table = gr.Dataframe(
                 headers=[
                     "Date",
@@ -2028,6 +3641,7 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                 inputs=[in_ev_id, in_ev_mkt, in_ev_date, in_ev_time, in_ev_sym, in_ev_name, in_ev_imp, in_ev_prev, in_ev_fore, in_ev_act, in_ev_sent, in_ev_push, cal_filter, cal_market_filter],
                 outputs=[cal_action_msg, cal_info_bar, calendar_visual_feed, calendar_table]
             )
+            cal_drawer_toggle.click(None, js="() => window.epmToggleCalDrawer()")
 
         # ═══════════════════════════════════════════════════════════
         # TAB 3: Official Regulatory Circulars & Notifications Repository
@@ -2069,12 +3683,16 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                     label="Search Regulatory Repository",
                     scale=4
                 )
+                circ_drawer_toggle = gr.Button("👁️ Hide Toolbar (Zen Mode)", elem_id="circ_drawer_toggle", variant="secondary", scale=1)
+
+            with gr.Row(elem_id="circ_action_drawer", elem_classes=["epm-action-drawer"]):
                 circ_refresh_btn = gr.Button("🔄 Check & Poll Latest Circulars", variant="primary", scale=1)
                 circ_dispatch_btn = gr.Button("📲 Forward Latest Circular to Telegram", variant="secondary", scale=1)
 
             circ_action_msg = gr.Markdown()
 
             gr.Markdown("### 📑 Official Regulatory Documents Directory (Verified PDFs)")
+            gr.HTML(render_table_ribbon("circ_table", "Official Regulatory Documents Directory", subtitle="Verified PDFs", count_badge="Directives"))
             circ_table = gr.Dataframe(
                 headers=[
                     "Regulator",
@@ -2121,6 +3739,7 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                 inputs=[circ_reg_filter],
                 outputs=[circ_action_msg]
             )
+            circ_drawer_toggle.click(None, js="() => window.epmToggleCircDrawer()")
 
         # ═══════════════════════════════════════════════════════════
         # TAB 4: Portal Settings Page (Alert Channels, Google Cal & Sources)
@@ -2384,7 +4003,7 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
             </div>
             """)
 
-    refresh_btn.click(manual_refresh, outputs=[status_box, top_news_visual, top_table, bottom_table])
+    refresh_btn.click(manual_refresh, outputs=[status_box, top_news_visual, top_table, bottom_table]).then(None, js="() => window.epmPlayChime(false)")
     demo.load(get_dashboard_tables, outputs=[status_box, top_news_visual, top_table, bottom_table])
     demo.load(get_calendar_tables, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_visual_feed, calendar_table, holidays_table])
     demo.load(get_circulars_view, inputs=[circ_reg_filter, circ_imp_filter, circ_search], outputs=[circ_info_bar, circ_visual_feed, circ_table])
