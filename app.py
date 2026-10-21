@@ -1222,11 +1222,38 @@ h4 {
     color: #475569 !important;
 }
 
-/* 4. Hide Gradio Default Tab Navigation Header to prevent Duplicate Menus */
+/* 4. Complete Eradication of Gradio Tab Navigation Bar to prevent Duplicate Menus */
+.tab-wrapper,
+.tab-wrapper.svelte-11gaq1,
+.tab-container,
+.tab-container.svelte-11gaq1,
+div[role="tablist"],
+.gradio-container div[role="tablist"],
+.tabs > .tab-wrapper,
+.gradio-container .tab-wrapper,
+.tab-nav,
 .tabs > .tab-nav,
 div[data-testid="tabs"] > .tab-nav,
 .gradio-container .tab-nav {
+    height: 0px !important;
+    max-height: 0px !important;
+    min-height: 0px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    border: none !important;
+    visibility: hidden !important;
+    line-height: 0 !important;
+    font-size: 0 !important;
+}
+
+.tab-container:after,
+.tab-wrapper:after {
     display: none !important;
+    height: 0 !important;
+    border: none !important;
 }
 
 /* 5. Streamlined Action Buttons (Compact, Uniform Heights, No Clutter) */
@@ -3052,6 +3079,23 @@ TERMINAL_CLIENT_JS = r"""
             window.epmApplyWatchlist(savedQuery);
         }
         
+        function hideGradioTabs() {
+            const defaultTabs = document.querySelectorAll('.tab-wrapper, div[role="tablist"], .tab-container:not(.visually-hidden), .tab-nav');
+            defaultTabs.forEach(el => {
+                el.style.setProperty('height', '0px', 'important');
+                el.style.setProperty('max-height', '0px', 'important');
+                el.style.setProperty('min-height', '0px', 'important');
+                el.style.setProperty('padding', '0', 'important');
+                el.style.setProperty('margin', '0', 'important');
+                el.style.setProperty('opacity', '0', 'important');
+                el.style.setProperty('pointer-events', 'none', 'important');
+                el.style.setProperty('visibility', 'hidden', 'important');
+                el.style.setProperty('overflow', 'hidden', 'important');
+                el.style.setProperty('border', 'none', 'important');
+            });
+        }
+        hideGradioTabs();
+
         const tabBtns = document.querySelectorAll('button[role="tab"]');
         tabBtns.forEach((btn, idx) => {
             btn.addEventListener("click", () => {
@@ -3070,7 +3114,16 @@ TERMINAL_CLIENT_JS = r"""
     setInterval(() => {
         const savedQuery = localStorage.getItem("epm_watchlist");
         if (savedQuery) window.epmApplyWatchlist(savedQuery);
-    }, 3000);
+        
+        const defaultTabs = document.querySelectorAll('.tab-wrapper, div[role="tablist"], .tab-container:not(.visually-hidden)');
+        defaultTabs.forEach(el => {
+            if (el.offsetHeight > 0) {
+                el.style.setProperty('height', '0px', 'important');
+                el.style.setProperty('visibility', 'hidden', 'important');
+                el.style.setProperty('overflow', 'hidden', 'important');
+            }
+        });
+    }, 1500);
 })();
 """
 
@@ -3087,7 +3140,7 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
     gr.HTML("<style>" + CUSTOM_CSS + "</style>" + TOP_NAVBAR_HTML + "<script>" + TERMINAL_CLIENT_JS + "</script>")
     status_box = gr.Markdown(value=init_status_str)
 
-    with gr.Tabs():
+    with gr.Tabs(overflow_behavior="wrap"):
         # ═══════════════════════════════════════════════════════════
         # TAB 1: Live Financial Wire & Breaking Catalysts
         # ═══════════════════════════════════════════════════════════
