@@ -1,6 +1,7 @@
 import os
 import time
 import html
+import re
 import sqlite3
 import json
 from typing import Optional, List, Dict
@@ -361,6 +362,19 @@ def update_admin_settings(cfg: AdminTelegramConfig):
 
 # ─── 3. Gradio Web Interface Functions & 2035 Terminal HTML Generators ─────
 
+def clean_table_text(text: any) -> str:
+    """Removes HTML tags, unescapes entities, and collapses whitespace for crisp table display."""
+    if text is None:
+        return ""
+    # Strip HTML tags
+    clean = re.sub(r'<[^>]+>', '', str(text))
+    # Unescape HTML entities
+    clean = html.unescape(clean)
+    # Collapse multiple whitespaces/newlines to a single space
+    clean = " ".join(clean.split())
+    return clean.strip()
+
+
 def render_news_feed_html(items: List[Dict]) -> str:
     """Renders 2035 Bloomberg-style visual news feed with glowing pills and AI impact scores on pure white canvas."""
     if not items:
@@ -504,14 +518,27 @@ def get_circulars_view(regulator_filter: str = "ALL", impact_filter: str = "ALL"
             else:
                 pdf_display = "—"
             bullets = it.get("bullets", []) or []
-            bullets_text = " • ".join(bullets) if bullets else (it.get("action_takeaway") or it.get("title", "—"))
+            cleaned_bullets = [clean_table_text(b) for b in bullets if b]
+            if cleaned_bullets:
+                bullets_text = " • ".join(cleaned_bullets)
+            else:
+                bullets_text = clean_table_text(it.get("action_takeaway") or it.get("title", "—"))
+            if len(bullets_text) > 160:
+                bullets_text = bullets_text[:160] + "..."
+
+            clean_circ_title = clean_table_text(it.get("title", "—"))
+            if len(clean_circ_title) > 140:
+                clean_circ_title = clean_circ_title[:140] + "..."
+            safe_title = clean_circ_title.replace("[", "(").replace("]", ")")
+            title_display = f"[{safe_title}]({pdf_link})" if pdf_link else safe_title
+
             table_rows.append([
                 meta.get("badge", it.get("regulator", "NSE")),
-                it.get("circular_no", "—"),
-                it.get("date", "—"),
-                it.get("impact", "MEDIUM"),
-                it.get("title", "—"),
-                it.get("category", "Circular"),
+                clean_table_text(it.get("circular_no", "—")),
+                clean_table_text(it.get("date", "—")),
+                clean_table_text(it.get("impact", "MEDIUM")),
+                title_display,
+                clean_table_text(it.get("category", "Circular")),
                 bullets_text,
                 pdf_display
             ])
@@ -520,10 +547,10 @@ def get_circulars_view(regulator_filter: str = "ALL", impact_filter: str = "ALL"
             table_rows.append(["-", "-", "-", "-", "No official circulars matching current filters", "-", "-", "-"] )
 
         summary_text = (
-            f"📜 **Official Documents Indexed:** {len(items)} | "
-            f"**Active Authority:** `{regulator_filter}` | "
-            f"**Impact Filter:** `{impact_filter}` | "
-            f"**Verified Storage:** Authentic Document PDF Repository"
+            f"🏛️ **Authority Filter:** `{regulator_filter}` &nbsp;|&nbsp; "
+            f"🚨 **Impact Filter:** `{impact_filter}` &nbsp;|&nbsp; "
+            f"📜 **Official Documents Indexed:** `{len(items)}` &nbsp;|&nbsp; "
+            f"🔒 **Storage:** Verified PDF Repository"
         )
         return summary_text, visual_html, table_rows
     except Exception as e:
@@ -680,23 +707,27 @@ def get_dashboard_tables():
                 sent_badge = "⚪ NEUTRAL"
 
             sectors = ", ".join(it.get("ai_sectors", [])) if it.get("ai_sectors") else "General"
-            reasoning = it.get("ai_reasoning", "")
-            time_str = str(it.get("timestamp", ""))[:19]
-            source = it.get("source", "")
-            title = it.get("title", "")
+            sectors = clean_table_text(sectors)
+            reasoning = clean_table_text(it.get("ai_reasoning", ""))
+            if len(reasoning) > 140:
+                reasoning = reasoning[:140] + "..."
+            time_str = clean_table_text(str(it.get("timestamp", ""))[:19])
+            source = clean_table_text(it.get("source", ""))
+            title = clean_table_text(it.get("title", ""))
             link = it.get("link", "#")
 
             other_srcs = it.get("other_sources", [])
             if len(other_srcs) > 1:
-                alt_names = [s.get("source", "") for s in other_srcs if isinstance(s, dict) and s.get("source") != source]
+                alt_names = [clean_table_text(s.get("source", "")) for s in other_srcs if isinstance(s, dict) and s.get("source") != source]
                 if alt_names:
-                    source_display = f"{source} (+{len(alt_names)} wires: {', '.join(alt_names[:2])})"
+                    source_display = f"{source} (+{len(alt_names)})"
                 else:
                     source_display = source
             else:
                 source_display = source
 
-            title_link = f"[{title}]({link})" if link and link != "#" else title
+            safe_title = title.replace("[", "(").replace("]", ")")
+            title_link = f"[{safe_title}]({link})" if link and link != "#" else safe_title
 
             if relevance >= 40 or score >= 7 or impact == "HIGH":
                 top_rows.append([
@@ -727,17 +758,18 @@ def get_dashboard_tables():
         if not bottom_rows:
             bottom_rows.append(["-", "-", "No general news items in cache", "-", "-", "-"])
 
-        cal_status = "🟢 Connected" if telegram_notifier.is_calendar_configured() else "⚪ Standalone Mode (Configure in Tab 4)"
+        cal_status = "🟢 Connected" if telegram_notifier.is_calendar_configured() else "⚪ Standalone"
         status_str = (
-            f"🟢 **Engine Status:** Online | **Cached News:** {len(items)} | "
-            f"**Multi-Market Events:** {len(calendar_engine.events)} | "
-            f"**Telegram Broadcast:** {cal_status} | "
-            f"**IST Clock:** {now_ist().strftime('%H:%M:%S IST')}"
+            f"🟢 **System Engine:** `ONLINE` &nbsp;|&nbsp; "
+            f"📰 **Cached News:** `{len(items)}` &nbsp;|&nbsp; "
+            f"📅 **Multi-Market Events:** `{len(calendar_engine.events)}` &nbsp;|&nbsp; "
+            f"📡 **Telegram Broadcast:** `{cal_status}` &nbsp;|&nbsp; "
+            f"⏱️ **IST Clock:** `{now_ist().strftime('%H:%M:%S IST')}`"
         )
         news_visual_html = render_news_feed_html(items)
         return status_str, news_visual_html, top_rows, bottom_rows
     except Exception as e:
-        status_err = f"🟢 **Engine Status:** Online | Refreshed: `{now_ist().strftime('%H:%M:%S IST')}`"
+        status_err = f"🟢 **System Engine:** `ONLINE` | Refreshed: `{now_ist().strftime('%H:%M:%S IST')}`"
         empty_top = [["-", "-", "-", f"Feeds syncing: {str(e)}", "-", "-", "-", "-", "-"]]
         empty_bottom = [["-", "-", "-", "-", "-", "-"]]
         return status_err, f'<div class="epm-empty-state"><div class="epm-empty-icon">📡</div><div class="epm-empty-title">Connecting to Global Wire...</div><div class="epm-empty-sub">{str(e)}</div></div>', empty_top, empty_bottom
@@ -753,29 +785,36 @@ def get_calendar_tables(range_filter: str = "all", market_filter: str = "ALL"):
             mkt_badge = MARKET_META.get(mkt, MARKET_META["NSE"])["badge"]
             impact = ev.get("impact", "HIGH")
             imp_badge = "🔥 HIGH" if impact == "HIGH" else ("⚡ MEDIUM" if impact == "MEDIUM" else "💤 LOW")
-            linked_title = ev.get("linked_news_title", "")
+            linked_title = clean_table_text(ev.get("linked_news_title", ""))
             linked_url = ev.get("linked_news_url", "")
             if linked_title and linked_url:
-                short_title = linked_title[:60] + "..." if len(linked_title) > 60 else linked_title
+                safe_linked = linked_title.replace("[", "(").replace("]", ")")
+                short_title = safe_linked[:45] + "..." if len(safe_linked) > 45 else safe_linked
                 linked_display = f"[🔗 {short_title}]({linked_url})"
             elif linked_title:
-                linked_display = f"🔗 {linked_title[:60]}"
+                short_title = linked_title[:45] + "..." if len(linked_title) > 45 else linked_title
+                linked_display = f"🔗 {short_title}"
             else:
-                linked_display = "—"
+                gcal_url = google_calendar_manager.generate_one_click_url(ev)
+                linked_display = f"[📅 +GCal]({gcal_url})"
+
+            raw_ev_name = clean_table_text(ev.get("event", "Scheduled Release"))
+            if len(raw_ev_name) > 110:
+                raw_ev_name = raw_ev_name[:110] + "..."
 
             cal_rows.append([
-                ev.get("id", ""),
+                clean_table_text(ev.get("id", "")),
                 mkt_badge,
-                ev.get("date", ""),
-                f"{ev.get('time', '')} IST",
-                ev.get("timer", ""),
-                ev.get("symbol", ""),
-                ev.get("event", ""),
+                clean_table_text(ev.get("date", "")),
+                f"{clean_table_text(ev.get('time', ''))} IST",
+                clean_table_text(ev.get("timer", "")),
+                clean_table_text(ev.get("symbol", "")),
+                raw_ev_name,
                 imp_badge,
-                ev.get("previous", "—"),
-                ev.get("forecast", "—"),
-                ev.get("actual", "⏳ Pending"),
-                ev.get("outcome_sentiment", "⏳ PENDING"),
+                clean_table_text(ev.get("previous", "—")),
+                clean_table_text(ev.get("forecast", "—")),
+                clean_table_text(ev.get("actual", "⏳ Pending")),
+                clean_table_text(ev.get("outcome_sentiment", "⏳ PENDING")),
                 linked_display
             ])
 
@@ -786,24 +825,25 @@ def get_calendar_tables(range_filter: str = "all", market_filter: str = "ALL"):
         hol_rows = []
         for h in holidays_data:
             hol_rows.append([
-                h.get("date", ""),
-                h.get("day", ""),
-                h.get("description", ""),
-                h.get("nse_status", ""),
-                h.get("bse_status", ""),
-                h.get("mcx_status", ""),
-                h.get("nyse_status", ""),
-                h.get("crypto_status", "")
+                clean_table_text(h.get("date", "")),
+                clean_table_text(h.get("day", "")),
+                clean_table_text(h.get("description", "")),
+                clean_table_text(h.get("nse_status", "")),
+                clean_table_text(h.get("bse_status", "")),
+                clean_table_text(h.get("mcx_status", "")),
+                clean_table_text(h.get("nyse_status", "")),
+                clean_table_text(h.get("crypto_status", ""))
             ])
 
         if not hol_rows:
             hol_rows.append(["-", "-", "No upcoming holidays recorded", "-", "-", "-", "-", "-"])
 
         cal_summary = (
-            f"📅 **Displayed Events:** {len(events)} (Filter: `{market_filter}` / `{range_filter.upper()}`) | "
-            f"**Current IST Time:** `{now_ist().strftime('%Y-%m-%d %H:%M:%S IST')}` | "
-            f"**Auto Daily Dispatches:** `07:00 AM IST (Today + Holiday Check)` & `07:05 AM IST (Tomorrow)` | "
-            f"**iCal Feed:** `/api/calendar/ics`"
+            f"📊 **Market:** `{market_filter}` &nbsp;|&nbsp; "
+            f"⏳ **Filter Window:** `{range_filter.upper()}` &nbsp;|&nbsp; "
+            f"📈 **Active Events:** `{len(events)}` &nbsp;|&nbsp; "
+            f"⏱️ **IST Clock:** `{now_ist().strftime('%H:%M:%S IST')}` &nbsp;|&nbsp; "
+            f"📅 **iCal Feed:** `/api/calendar/ics`"
         )
         return cal_summary, calendar_visual_html, cal_rows, hol_rows
     except Exception as e:
@@ -1036,10 +1076,18 @@ default_wa_selected = [s["name"] for s in news_worker.sources if s.get("forward_
 # ─── Clean Modern Financial Terminal (Crisp White Theme, Uniform Typography) ──
 
 CUSTOM_CSS = """
-/* 1. Google Fonts Import: Inter (UI/Body) & JetBrains Mono (Data/Numbers/Timers) */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+/* ═══════════════════════════════════════════════════════════════════════════
+   EPM PRO INSTITUTIONAL FINANCIAL TERMINAL - ULTRA-PREMIUM 2026 WHITE THEME
+   Inspired by: Bloomberg Terminal, TradingView, Linear, Vercel
+   Design Principles:
+   1. Pure white (#ffffff) canvas with subtle light slate (#f8fafc) elevations.
+   2. Crisp, clean typography: Inter for UI/copy, JetBrains Mono for numbers/tickers.
+   3. High density layout: zero wasted space, strict 2-line clamp on text.
+   4. Micro-interactions: refined button states, crisp borders, subtle hover pills.
+   ═══════════════════════════════════════════════════════════════════════════ */
 
-/* 2. CSS Design Tokens on :root (Clean White Theme) */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
 :root {
     --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
@@ -1049,24 +1097,28 @@ CUSTOM_CSS = """
     --bg-surface-elevated: #f8fafc;
     --bg-surface-subtle: #f1f5f9;
     
+    --border-subtle: #f1f5f9;
     --border-color: #e2e8f0;
-    --border-highlight: #3b82f6;
+    --border-strong: #cbd5e1;
+    --border-focus: #2563eb;
     
     --text-primary: #0f172a;
-    --text-secondary: #475569;
+    --text-secondary: #334155;
     --text-muted: #64748b;
     
     --accent-blue: #2563eb;
+    --accent-blue-hover: #1d4ed8;
     --accent-emerald: #059669;
     --accent-amber: #d97706;
     --accent-rose: #e11d48;
     
+    --radius-xs: 4px;
     --radius-sm: 6px;
-    --radius-md: 10px;
-    --radius-lg: 14px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
 }
 
-/* 3. Global Reset & Pure White Baseline */
+/* 1. Global Reset & Pure White Baseline */
 html, body {
     width: 100% !important;
     max-width: 100vw !important;
@@ -1077,7 +1129,7 @@ html, body {
     color: var(--text-primary) !important;
     font-family: var(--font-sans) !important;
     font-size: 13px !important;
-    line-height: 1.5 !important;
+    line-height: 1.45 !important;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }
@@ -1086,7 +1138,7 @@ html, body {
     box-sizing: border-box !important;
 }
 
-/* 4. Gradio Root Layout Container (Always White) */
+/* 2. Gradio Container (Enforced Light/White Institutional Layout) */
 .gradio-container, 
 .gradio-container > .main, 
 .gradio-container > .wrap,
@@ -1095,49 +1147,61 @@ div[class*="gradio-container"],
     max-width: 100% !important;
     width: 100% !important;
     margin: 0 !important;
-    padding: 10px 24px !important;
+    padding: 8px 20px !important;
     background-color: #ffffff !important;
     color: var(--text-primary) !important;
     overflow-x: hidden !important;
 }
 
-/* 5. Headers & Status Bar */
+/* 3. Typography & Section Headers */
 h1, h2, h3, h4 {
     font-family: var(--font-sans) !important;
     color: var(--text-primary) !important;
     letter-spacing: -0.02em !important;
-    margin-block: 0.5rem 0.75rem !important;
+    margin-block: 0.4rem 0.5rem !important;
 }
 
 h1 {
     font-size: 20px !important;
+    font-weight: 800 !important;
+    color: #0f172a !important;
+}
+
+h2 {
+    font-size: 16px !important;
     font-weight: 700 !important;
     color: #0f172a !important;
-    display: flex;
-    align-items: center;
-    gap: 8px;
 }
 
 h3 {
-    font-size: 13.5px !important;
+    font-size: 13px !important;
     font-weight: 700 !important;
-    text-transform: uppercase;
+    text-transform: uppercase !important;
     letter-spacing: 0.05em !important;
-    color: #1e293b !important;
+    color: #334155 !important;
+    margin-top: 10px !important;
+    margin-bottom: 8px !important;
 }
 
-/* 6. Tabs & Navigation Bar */
+h4 {
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    color: #475569 !important;
+}
+
+/* 4. Tabs Navigation Bar (Modern Flat Institutional) */
 .tabs, .tab-nav {
     border-bottom: 2px solid #e2e8f0 !important;
     background: #ffffff !important;
-    gap: 8px !important;
+    gap: 4px !important;
+    margin-bottom: 12px !important;
 }
 
 button[role="tab"] {
     font-family: var(--font-sans) !important;
-    font-size: 13px !important;
+    font-size: 12.5px !important;
     font-weight: 600 !important;
-    padding: 10px 18px !important;
+    padding: 9px 16px !important;
     border-radius: var(--radius-sm) var(--radius-sm) 0 0 !important;
     border: none !important;
     color: #64748b !important;
@@ -1154,70 +1218,120 @@ button[role="tab"].selected {
     color: #2563eb !important;
     border-bottom: 2px solid #2563eb !important;
     background: #eff6ff !important;
+    font-weight: 700 !important;
 }
 
-/* 7. Action Buttons */
+/* 5. Streamlined Action Buttons (Compact, Uniform Heights, No Clutter) */
+button, .gr-button {
+    font-family: var(--font-sans) !important;
+    font-size: 11.5px !important;
+    font-weight: 600 !important;
+    border-radius: var(--radius-sm) !important;
+    padding: 6px 12px !important;
+    min-height: 33px !important;
+    height: 33px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
+    white-space: nowrap !important;
+    text-overflow: ellipsis !important;
+}
+
 button.primary, .gr-button-primary {
     background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
     color: #ffffff !important;
-    font-family: var(--font-sans) !important;
-    font-weight: 600 !important;
-    font-size: 12.5px !important;
     border: 1px solid #1d4ed8 !important;
-    border-radius: var(--radius-sm) !important;
-    padding: 8px 14px !important;
-    box-shadow: 0 1px 3px rgba(37, 99, 235, 0.2) !important;
-    transition: transform 0.1s ease, background 0.15s ease !important;
+    box-shadow: 0 1px 2px rgba(37, 99, 235, 0.2) !important;
 }
 
 button.primary:hover, .gr-button-primary:hover {
     background: linear-gradient(135deg, #1d4ed8, #1e40af) !important;
+    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.3) !important;
     transform: translateY(-1px);
 }
 
 button.secondary, .gr-button-secondary {
-    background: #f8fafc !important;
-    color: #1e293b !important;
-    font-family: var(--font-sans) !important;
-    font-weight: 600 !important;
-    font-size: 12px !important;
+    background: #ffffff !important;
+    color: #334155 !important;
     border: 1px solid #cbd5e1 !important;
-    border-radius: var(--radius-sm) !important;
-    padding: 8px 12px !important;
-    transition: all 0.15s ease !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02) !important;
 }
 
 button.secondary:hover, .gr-button-secondary:hover {
-    background: #e2e8f0 !important;
+    background: #f8fafc !important;
     border-color: #94a3b8 !important;
+    color: #0f172a !important;
 }
 
-/* 8. Radios, Inputs, Accordions & Forms */
-.gr-form, .form, input, textarea, select, .gr-box, .gr-panel {
+/* 6. Form Controls, Radios & Inputs */
+input, textarea, select {
     background-color: #ffffff !important;
-    border-color: #cbd5e1 !important;
+    border: 1px solid #cbd5e1 !important;
     color: #0f172a !important;
     border-radius: var(--radius-sm) !important;
     font-family: var(--font-sans) !important;
+    font-size: 12.5px !important;
+    padding: 6px 10px !important;
 }
 
 input:focus, textarea:focus, select:focus {
     border-color: #2563eb !important;
     box-shadow: 0 0 0 1px #2563eb !important;
+    outline: none !important;
 }
 
-/* 9. Professional Financial Data Tables (White Theme, High Contrast) */
+.gr-radio, fieldset {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: var(--radius-sm) !important;
+    padding: 4px 10px !important;
+}
+
+.gr-radio label, fieldset label {
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    color: #334155 !important;
+}
+
+/* 7. Accordions (Sleek Micro-Borders) */
+.gr-accordion {
+    border: 1px solid #e2e8f0 !important;
+    border-radius: var(--radius-md) !important;
+    background: #ffffff !important;
+    margin-top: 10px !important;
+    margin-bottom: 12px !important;
+    overflow: hidden !important;
+}
+
+.gr-accordion > .label-wrap {
+    background: #f8fafc !important;
+    padding: 8px 12px !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    color: #334155 !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+}
+
+.gr-accordion > .label-wrap:hover {
+    background: #f1f5f9 !important;
+    color: #0f172a !important;
+}
+
+/* 8. Institutional High-Density Data Tables */
 .table-wrap,
 .gradio-dataframe,
 div[data-testid="dataframe"],
 .table-container {
     width: 100% !important;
     max-width: 100% !important;
-    overflow-x: hidden !important;
+    overflow-x: auto !important;
     border-radius: var(--radius-md) !important;
-    border: 1px solid #cbd5e1 !important;
+    border: 1px solid #e2e8f0 !important;
     background: #ffffff !important;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02) !important;
+    margin-bottom: 12px !important;
 }
 
 table {
@@ -1230,15 +1344,16 @@ table {
 }
 
 thead th {
-    background-color: #f1f5f9 !important;
-    color: #334155 !important;
+    background-color: #f8fafc !important;
+    color: #475569 !important;
     font-family: var(--font-sans) !important;
-    font-size: 11.5px !important;
+    font-size: 11px !important;
     font-weight: 700 !important;
     text-transform: uppercase !important;
     letter-spacing: 0.05em !important;
-    padding: 9px 10px !important;
-    border-bottom: 2px solid #cbd5e1 !important;
+    padding: 7px 8px !important;
+    border-bottom: 1.5px solid #cbd5e1 !important;
+    border-right: 1px solid #f1f5f9 !important;
     white-space: normal !important;
     vertical-align: middle !important;
     position: sticky !important;
@@ -1247,72 +1362,112 @@ thead th {
 }
 
 tbody td {
-    padding: 8px 10px !important;
-    font-size: 12.5px !important;
+    padding: 5px 8px !important;
+    font-size: 12px !important;
     color: #0f172a !important;
-    border-bottom: 1px solid #e2e8f0 !important;
+    border-bottom: 1px solid #f1f5f9 !important;
+    border-right: 1px solid #f8fafc !important;
     vertical-align: middle !important;
-    line-height: 1.4 !important;
+    line-height: 1.35 !important;
     word-break: break-word !important;
     overflow-wrap: anywhere !important;
     background: #ffffff !important;
+    height: auto !important;
 }
 
 tbody tr:nth-child(even) td {
-    background-color: #f8fafc !important;
+    background-color: #fcfdfe !important;
 }
 
 tbody tr:hover td {
     background-color: #f0f7ff !important;
 }
 
-/* 10. Monospace Elements for Numbers, Dates, Timers */
+/* 9. Monospace Elements for Numbers, Dates, Timers */
 code, .timer-cell, pre {
     font-family: var(--font-mono) !important;
-    font-size: 11.5px !important;
+    font-size: 11px !important;
     background: #f1f5f9 !important;
     color: #0f172a !important;
     padding: 2px 5px !important;
     border-radius: 4px !important;
+    border: 1px solid #e2e8f0 !important;
 }
 
-/* 11. Column Allocations for Optimal Text Hierarchy */
+/* 10. Strict 2-Line Clamp for Headlines, Events, Summaries */
+#top_news_table tbody td:nth-child(4) > *,
+#top_news_table tbody td:nth-child(4) a,
+#top_news_table tbody td:nth-child(5) > *,
+#top_news_table tbody td:nth-child(6) > *,
+#bottom_news_table tbody td:nth-child(3) > *,
+#bottom_news_table tbody td:nth-child(3) a,
+#calendar_table tbody td:nth-child(7) > *,
+#calendar_table tbody td:nth-child(13) > *,
+#calendar_table tbody td:nth-child(13) a,
+#circ_table tbody td:nth-child(5) > *,
+#circ_table tbody td:nth-child(5) a,
+#circ_table tbody td:nth-child(7) > * {
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-height: 2.7em !important;
+    line-height: 1.35 !important;
+    word-break: break-word !important;
+}
 
-/* Top Priority News Table */
+#top_news_table tbody td:nth-child(4),
+#top_news_table tbody td:nth-child(5),
+#top_news_table tbody td:nth-child(6),
+#bottom_news_table tbody td:nth-child(3),
+#calendar_table tbody td:nth-child(7),
+#calendar_table tbody td:nth-child(13),
+#circ_table tbody td:nth-child(5),
+#circ_table tbody td:nth-child(7) {
+    max-height: 3.1em !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    line-height: 1.35 !important;
+}
+
+/* 11. Column Allocations for Tables */
+
+/* Top News Table */
 #top_news_table th:nth-child(1), #top_news_table td:nth-child(1) { width: 5.5% !important; text-align: center !important; font-family: var(--font-mono) !important; font-weight: 700 !important; color: #b45309 !important; }
-#top_news_table th:nth-child(2), #top_news_table td:nth-child(2) { width: 8% !important; text-align: center !important; font-weight: 600 !important; }
-#top_news_table th:nth-child(3), #top_news_table td:nth-child(3) { width: 6.5% !important; text-align: center !important; font-weight: 700 !important; }
-#top_news_table th:nth-child(4), #top_news_table td:nth-child(4) { width: 33% !important; font-weight: 600 !important; color: #0f172a !important; }
-#top_news_table th:nth-child(5), #top_news_table td:nth-child(5) { width: 11% !important; color: #475569 !important; }
-#top_news_table th:nth-child(6), #top_news_table td:nth-child(6) { width: 19% !important; color: #334155 !important; font-style: italic !important; }
-#top_news_table th:nth-child(7), #top_news_table td:nth-child(7) { width: 8% !important; font-size: 11px !important; color: #0284c7 !important; font-weight: 600 !important; }
+#top_news_table th:nth-child(2), #top_news_table td:nth-child(2) { width: 8.5% !important; text-align: center !important; font-weight: 600 !important; }
+#top_news_table th:nth-child(3), #top_news_table td:nth-child(3) { width: 7% !important; text-align: center !important; font-weight: 700 !important; }
+#top_news_table th:nth-child(4), #top_news_table td:nth-child(4) { width: 32% !important; font-weight: 600 !important; color: #0f172a !important; }
+#top_news_table th:nth-child(5), #top_news_table td:nth-child(5) { width: 11% !important; color: #475569 !important; font-size: 11.5px !important; }
+#top_news_table th:nth-child(6), #top_news_table td:nth-child(6) { width: 20% !important; color: #334155 !important; font-style: italic !important; font-size: 11.5px !important; }
+#top_news_table th:nth-child(7), #top_news_table td:nth-child(7) { width: 7% !important; font-size: 11px !important; color: #0284c7 !important; font-weight: 600 !important; }
 #top_news_table th:nth-child(8), #top_news_table td:nth-child(8) { width: 4% !important; text-align: center !important; font-family: var(--font-mono) !important; color: #475569 !important; }
 #top_news_table th:nth-child(9), #top_news_table td:nth-child(9) { width: 5% !important; text-align: center !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #64748b !important; }
 
-/* General News Wire Table */
-#bottom_news_table th:nth-child(1), #bottom_news_table td:nth-child(1) { width: 7% !important; text-align: center !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #64748b !important; }
+/* Bottom News Table */
+#bottom_news_table th:nth-child(1), #bottom_news_table td:nth-child(1) { width: 8% !important; text-align: center !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #64748b !important; }
 #bottom_news_table th:nth-child(2), #bottom_news_table td:nth-child(2) { width: 12% !important; color: #0284c7 !important; font-weight: 600 !important; }
-#bottom_news_table th:nth-child(3), #bottom_news_table td:nth-child(3) { width: 52% !important; font-weight: 500 !important; color: #0f172a !important; }
+#bottom_news_table th:nth-child(3), #bottom_news_table td:nth-child(3) { width: 56% !important; font-weight: 500 !important; color: #0f172a !important; }
 #bottom_news_table th:nth-child(4), #bottom_news_table td:nth-child(4) { width: 6% !important; text-align: center !important; font-family: var(--font-mono) !important; color: #475569 !important; }
 #bottom_news_table th:nth-child(5), #bottom_news_table td:nth-child(5) { width: 8% !important; text-align: center !important; }
-#bottom_news_table th:nth-child(6), #bottom_news_table td:nth-child(6) { width: 15% !important; word-break: break-all !important; font-size: 11px !important; color: #2563eb !important; }
+#bottom_news_table th:nth-child(6), #bottom_news_table td:nth-child(6) { width: 10% !important; text-align: center !important; font-size: 11px !important; color: #2563eb !important; }
 
-/* Multi-Market Calendar Table */
-#calendar_table th:nth-child(1), #calendar_table td:nth-child(1) { width: 6% !important; font-family: var(--font-mono) !important; font-size: 10.5px !important; color: #64748b !important; }
+/* Calendar Table */
+#calendar_table th:nth-child(1), #calendar_table td:nth-child(1) { width: 6.5% !important; font-family: var(--font-mono) !important; font-size: 10.5px !important; color: #64748b !important; text-align: center !important; }
 #calendar_table th:nth-child(2), #calendar_table td:nth-child(2) { width: 5% !important; text-align: center !important; font-weight: 600 !important; }
-#calendar_table th:nth-child(3), #calendar_table td:nth-child(3) { width: 6% !important; text-align: center !important; font-family: var(--font-mono) !important; }
-#calendar_table th:nth-child(4), #calendar_table td:nth-child(4) { width: 5% !important; text-align: center !important; font-family: var(--font-mono) !important; font-weight: 700 !important; color: #0284c7 !important; }
-#calendar_table th:nth-child(5), #calendar_table td:nth-child(5) { width: 8% !important; text-align: center !important; font-family: var(--font-mono) !important; font-weight: 700 !important; color: #d97706 !important; }
-#calendar_table th:nth-child(6), #calendar_table td:nth-child(6) { width: 8% !important; font-weight: 600 !important; color: #0f172a !important; }
-#calendar_table th:nth-child(7), #calendar_table td:nth-child(7) { width: 23% !important; font-weight: 600 !important; color: #0f172a !important; }
-#calendar_table th:nth-child(8), #calendar_table td:nth-child(8) { width: 5% !important; text-align: center !important; font-weight: 700 !important; }
+#calendar_table th:nth-child(3), #calendar_table td:nth-child(3) { width: 6% !important; text-align: center !important; font-family: var(--font-mono) !important; font-size: 11px !important; }
+#calendar_table th:nth-child(4), #calendar_table td:nth-child(4) { width: 5.5% !important; text-align: center !important; font-family: var(--font-mono) !important; font-weight: 700 !important; color: #0284c7 !important; }
+#calendar_table th:nth-child(5), #calendar_table td:nth-child(5) { width: 7.5% !important; text-align: center !important; font-family: var(--font-mono) !important; font-weight: 700 !important; color: #d97706 !important; }
+#calendar_table th:nth-child(6), #calendar_table td:nth-child(6) { width: 8.5% !important; font-weight: 700 !important; color: #0f172a !important; font-family: var(--font-mono) !important; }
+#calendar_table th:nth-child(7), #calendar_table td:nth-child(7) { width: 22% !important; font-weight: 600 !important; color: #0f172a !important; }
+#calendar_table th:nth-child(8), #calendar_table td:nth-child(8) { width: 6% !important; text-align: center !important; font-weight: 700 !important; }
 #calendar_table th:nth-child(9), #calendar_table td:nth-child(9) { width: 6% !important; text-align: right !important; font-family: var(--font-mono) !important; color: #475569 !important; }
 #calendar_table th:nth-child(10), #calendar_table td:nth-child(10) { width: 6% !important; text-align: right !important; font-family: var(--font-mono) !important; color: #475569 !important; }
-#calendar_table th:nth-child(11), #calendar_table td:nth-child(11) { width: 8% !important; text-align: right !important; font-family: var(--font-mono) !important; font-weight: 700 !important; color: #059669 !important; }
+#calendar_table th:nth-child(11), #calendar_table td:nth-child(11) { width: 7.5% !important; text-align: right !important; font-family: var(--font-mono) !important; font-weight: 700 !important; color: #059669 !important; }
 #calendar_table th:nth-child(12), #calendar_table td:nth-child(12) { width: 6% !important; text-align: center !important; font-weight: 600 !important; }
-#calendar_table th:nth-child(13), #calendar_table td:nth-child(13) { width: 8% !important; font-size: 11px !important; color: #2563eb !important; }
+#calendar_table th:nth-child(13), #calendar_table td:nth-child(13) { width: 7.5% !important; text-align: center !important; font-size: 11px !important; color: #2563eb !important; }
 
-/* Multi-Market Holidays Table */
+/* Holidays Table */
 #holidays_table th:nth-child(1), #holidays_table td:nth-child(1) { width: 8% !important; text-align: center !important; font-family: var(--font-mono) !important; }
 #holidays_table th:nth-child(2), #holidays_table td:nth-child(2) { width: 7% !important; text-align: center !important; }
 #holidays_table th:nth-child(3), #holidays_table td:nth-child(3) { width: 23% !important; font-weight: 600 !important; color: #0f172a !important; }
@@ -1322,54 +1477,46 @@ code, .timer-cell, pre {
 #holidays_table th:nth-child(7), #holidays_table td:nth-child(7) { width: 13% !important; text-align: center !important; }
 #holidays_table th:nth-child(8), #holidays_table td:nth-child(8) { width: 10% !important; text-align: center !important; }
 
-/* Ingested News Sources Table */
-#sources_table th:nth-child(1), #sources_table td:nth-child(1) { width: 16% !important; font-weight: 600 !important; color: #0f172a !important; }
-#sources_table th:nth-child(2), #sources_table td:nth-child(2) { width: 12% !important; color: #475569 !important; }
-#sources_table th:nth-child(3), #sources_table td:nth-child(3) { width: 10% !important; text-align: center !important; }
-#sources_table th:nth-child(4), #sources_table td:nth-child(4) { width: 12% !important; text-align: center !important; font-weight: 600 !important; }
-#sources_table th:nth-child(5), #sources_table td:nth-child(5) { width: 12% !important; text-align: center !important; font-weight: 600 !important; }
-#sources_table th:nth-child(6), #sources_table td:nth-child(6) { width: 38% !important; word-break: break-all !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #2563eb !important; }
-
-/* Official Regulatory Circulars & Verified PDF Directory Table */
-#circ_table th:nth-child(1), #circ_table td:nth-child(1) { width: 7% !important; text-align: center !important; font-weight: 700 !important; }
-#circ_table th:nth-child(2), #circ_table td:nth-child(2) { width: 10% !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #0f172a !important; font-weight: 600 !important; }
-#circ_table th:nth-child(3), #circ_table td:nth-child(3) { width: 7% !important; text-align: center !important; font-family: var(--font-mono) !important; color: #475569 !important; font-size: 11px !important; }
-#circ_table th:nth-child(4), #circ_table td:nth-child(4) { width: 7% !important; text-align: center !important; font-weight: 700 !important; }
-#circ_table th:nth-child(5), #circ_table td:nth-child(5) { width: 27% !important; font-weight: 600 !important; color: #0f172a !important; line-height: 1.4 !important; }
-#circ_table th:nth-child(6), #circ_table td:nth-child(6) { width: 11% !important; color: #475569 !important; font-size: 11.5px !important; }
-#circ_table th:nth-child(7), #circ_table td:nth-child(7) { width: 20% !important; color: #334155 !important; font-size: 11.5px !important; line-height: 1.45 !important; }
-#circ_table th:nth-child(8), #circ_table td:nth-child(8) { width: 11% !important; text-align: center !important; }
+/* Regulatory Circulars Table */
+#circ_table th:nth-child(1), #circ_table td:nth-child(1) { width: 6% !important; text-align: center !important; font-weight: 700 !important; }
+#circ_table th:nth-child(2), #circ_table td:nth-child(2) { width: 9% !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #0f172a !important; font-weight: 600 !important; text-align: center !important; }
+#circ_table th:nth-child(3), #circ_table td:nth-child(3) { width: 6% !important; text-align: center !important; font-family: var(--font-mono) !important; color: #475569 !important; font-size: 11px !important; }
+#circ_table th:nth-child(4), #circ_table td:nth-child(4) { width: 6% !important; text-align: center !important; font-weight: 700 !important; }
+#circ_table th:nth-child(5), #circ_table td:nth-child(5) { width: 28% !important; font-weight: 600 !important; color: #0f172a !important; line-height: 1.35 !important; }
+#circ_table th:nth-child(6), #circ_table td:nth-child(6) { width: 9% !important; color: #475569 !important; font-size: 11.5px !important; }
+#circ_table th:nth-child(7), #circ_table td:nth-child(7) { width: 27% !important; color: #334155 !important; font-size: 11.5px !important; line-height: 1.35 !important; }
+#circ_table th:nth-child(8), #circ_table td:nth-child(8) { width: 9% !important; text-align: center !important; }
 #circ_table td:nth-child(8) a {
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    padding: 5px 12px !important;
+    padding: 3px 8px !important;
     background: #2563eb !important;
     color: #ffffff !important;
-    border-radius: 6px !important;
+    border-radius: 4px !important;
     font-weight: 600 !important;
-    font-size: 11.5px !important;
+    font-size: 11px !important;
     text-decoration: none !important;
-    box-shadow: 0 1px 3px rgba(37, 99, 235, 0.25) !important;
     transition: all 0.15s ease !important;
     white-space: nowrap !important;
 }
 #circ_table td:nth-child(8) a:hover {
     background: #1d4ed8 !important;
-    box-shadow: 0 3px 6px rgba(37, 99, 235, 0.35) !important;
     transform: translateY(-1px) !important;
 }
 
 /* Hyperlinks inside data tables */
 #top_news_table td:nth-child(4) a,
-#bottom_news_table td:nth-child(3) a {
+#bottom_news_table td:nth-child(3) a,
+#circ_table td:nth-child(5) a {
     color: #0f172a !important;
     font-weight: 600 !important;
     text-decoration: none !important;
     transition: color 0.15s ease !important;
 }
 #top_news_table td:nth-child(4) a:hover,
-#bottom_news_table td:nth-child(3) a:hover {
+#bottom_news_table td:nth-child(3) a:hover,
+#circ_table td:nth-child(5) a:hover {
     color: #2563eb !important;
     text-decoration: underline !important;
 }
@@ -1385,30 +1532,30 @@ code, .timer-cell, pre {
     text-decoration: underline !important;
 }
 
-/* 12. 2035 Ultra-Futuristic Financial Intelligence Terminal Feeds */
+/* 12. Visual Card Feed Components (Inside Accordions) */
 .epm-stream-container {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
     width: 100% !important;
-    margin: 12px 0 24px 0;
+    margin: 8px 0 16px 0;
 }
 
 .epm-card {
     background: #ffffff !important;
     border: 1px solid #e2e8f0 !important;
-    border-radius: 12px !important;
-    padding: 15px 20px !important;
-    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04) !important;
+    border-radius: 8px !important;
+    padding: 12px 16px !important;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03) !important;
     transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease !important;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
 }
 
 .epm-card:hover {
-    transform: translateY(-2px) !important;
-    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06) !important;
     border-color: #cbd5e1 !important;
 }
 
@@ -1417,139 +1564,86 @@ code, .timer-cell, pre {
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
-    gap: 8px;
-    padding-bottom: 8px;
+    gap: 6px;
+    padding-bottom: 6px;
     border-bottom: 1px solid #f1f5f9;
 }
 
-.epm-meta-left {
+.epm-meta-left, .epm-meta-right {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 8px;
-}
-
-.epm-meta-right {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    gap: 6px;
 }
 
 .epm-source-chip {
     font-family: var(--font-sans) !important;
-    font-size: 11px !important;
+    font-size: 10.5px !important;
     font-weight: 700 !important;
     text-transform: uppercase !important;
-    letter-spacing: 0.04em !important;
     background: #f1f5f9 !important;
     color: #1e293b !important;
-    padding: 3px 8px !important;
-    border-radius: 5px !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
     border: 1px solid #e2e8f0 !important;
 }
 
 .epm-time-chip {
     font-family: var(--font-mono) !important;
-    font-size: 11px !important;
+    font-size: 10.5px !important;
     color: #64748b !important;
-    font-weight: 500 !important;
 }
 
 .epm-score-pill {
     font-family: var(--font-mono) !important;
-    font-size: 12px !important;
+    font-size: 11.5px !important;
     font-weight: 700 !important;
     background: #0f172a !important;
     color: #38bdf8 !important;
-    padding: 3px 10px !important;
-    border-radius: 6px !important;
-    letter-spacing: 0.02em !important;
+    padding: 2px 8px !important;
+    border-radius: 4px !important;
 }
 
 .epm-badge {
     font-family: var(--font-sans) !important;
-    font-size: 11px !important;
+    font-size: 10.5px !important;
     font-weight: 700 !important;
-    padding: 3px 8px !important;
-    border-radius: 6px !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 3px;
 }
 
-.epm-badge.impact-high {
-    background: #fff1f2 !important;
-    color: #e11d48 !important;
-    border: 1px solid #fecdd3 !important;
-}
-
-.epm-badge.impact-medium {
-    background: #f0f9ff !important;
-    color: #0284c7 !important;
-    border: 1px solid #bae6fd !important;
-}
-
-.epm-badge.impact-low {
-    background: #f8fafc !important;
-    color: #64748b !important;
-    border: 1px solid #e2e8f0 !important;
-}
-
-.epm-badge.sent-bullish {
-    background: #f0fdf4 !important;
-    color: #16a34a !important;
-    border: 1px solid #bbf7d0 !important;
-}
-
-.epm-badge.sent-bearish {
-    background: #fef2f2 !important;
-    color: #dc2626 !important;
-    border: 1px solid #fecaca !important;
-}
-
-.epm-badge.sent-neutral {
-    background: #f8fafc !important;
-    color: #475569 !important;
-    border: 1px solid #e2e8f0 !important;
-}
-
-.epm-badge.sent-pending {
-    background: #fffbeb !important;
-    color: #b45309 !important;
-    border: 1px solid #fde68a !important;
-}
+.epm-badge.impact-high { background: #fff1f2 !important; color: #e11d48 !important; border: 1px solid #fecdd3 !important; }
+.epm-badge.impact-medium { background: #f0f9ff !important; color: #0284c7 !important; border: 1px solid #bae6fd !important; }
+.epm-badge.impact-low { background: #f8fafc !important; color: #64748b !important; border: 1px solid #e2e8f0 !important; }
+.epm-badge.sent-bullish { background: #f0fdf4 !important; color: #16a34a !important; border: 1px solid #bbf7d0 !important; }
+.epm-badge.sent-bearish { background: #fef2f2 !important; color: #dc2626 !important; border: 1px solid #fecaca !important; }
+.epm-badge.sent-neutral { background: #f8fafc !important; color: #475569 !important; border: 1px solid #e2e8f0 !important; }
+.epm-badge.sent-pending { background: #fffbeb !important; color: #b45309 !important; border: 1px solid #fde68a !important; }
 
 .epm-news-title {
     font-family: var(--font-sans) !important;
-    font-size: 15px !important;
+    font-size: 14px !important;
     font-weight: 700 !important;
     color: #0f172a !important;
     text-decoration: none !important;
-    line-height: 1.45 !important;
-    display: inline-block;
+    line-height: 1.4 !important;
     transition: color 0.15s ease !important;
 }
-
-.epm-news-title:hover {
-    color: #2563eb !important;
-}
-
-.epm-link-icon {
-    font-size: 12px !important;
-    color: #94a3b8 !important;
-    margin-left: 3px !important;
-}
+.epm-news-title:hover { color: #2563eb !important; }
 
 .epm-news-reasoning {
     font-family: var(--font-sans) !important;
-    font-size: 13px !important;
+    font-size: 12.5px !important;
     color: #475569 !important;
     background: #f8fafc !important;
-    padding: 8px 12px !important;
-    border-radius: 8px !important;
+    padding: 6px 10px !important;
+    border-radius: 6px !important;
     border-left: 3px solid #cbd5e1 !important;
-    margin-top: 6px !important;
-    line-height: 1.5 !important;
+    margin-top: 5px !important;
+    line-height: 1.45 !important;
 }
 
 .epm-card-footer {
@@ -1561,63 +1655,53 @@ code, .timer-cell, pre {
     padding-top: 4px;
 }
 
-.epm-sectors-wrap {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-}
-
+.epm-sectors-wrap { display: flex; gap: 4px; flex-wrap: wrap; }
 .epm-sector-tag {
     background: #f1f5f9 !important;
     color: #334155 !important;
-    padding: 2px 7px !important;
+    padding: 2px 6px !important;
     border-radius: 4px !important;
-    font-size: 10.5px !important;
+    font-size: 10px !important;
     font-weight: 600 !important;
 }
 
-/* Calendar Card Specifics */
-.epm-cal-card {
-    border-left: 4px solid #3b82f6 !important;
+.epm-empty-state {
+    background: #ffffff !important;
+    border: 1px dashed #cbd5e1 !important;
+    border-radius: 8px !important;
+    padding: 30px 16px !important;
+    text-align: center !important;
+    color: #64748b !important;
+    margin: 10px 0 !important;
 }
-.epm-cal-card.market-nse { border-left-color: #2563eb !important; }
-.epm-cal-card.market-bse { border-left-color: #9333ea !important; }
-.epm-cal-card.market-mcx { border-left-color: #ea580c !important; }
-.epm-cal-card.market-crypto { border-left-color: #eab308 !important; }
-.epm-cal-card.market-nyse { border-left-color: #1d4ed8 !important; }
+.epm-empty-icon { font-size: 28px !important; margin-bottom: 6px; }
+.epm-empty-title { font-size: 14px !important; font-weight: 700 !important; color: #0f172a !important; margin-bottom: 2px; }
+.epm-empty-sub { font-size: 12px !important; color: #64748b !important; }
 
-.epm-cal-card.is-high-impact {
-    border-color: #fed7aa !important;
-    box-shadow: 0 2px 8px rgba(234, 88, 12, 0.06) !important;
+/* Calendar & Circulars Cards inside accordions */
+.epm-cal-card, .epm-circ-card {
+    border-left: 3px solid #2563eb !important;
 }
-
-.epm-mkt-chip {
+.epm-mkt-chip, .epm-reg-chip {
     font-family: var(--font-sans) !important;
     font-weight: 700 !important;
-    font-size: 11px !important;
-    padding: 3px 8px !important;
-    border-radius: 5px !important;
+    font-size: 10.5px !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
     background: #f1f5f9 !important;
     border: 1px solid #cbd5e1 !important;
 }
-.epm-mkt-chip.mkt-nse { color: #1e3a8a !important; }
-.epm-mkt-chip.mkt-bse { color: #581c87 !important; }
-.epm-mkt-chip.mkt-mcx { color: #9a3412 !important; }
-.epm-mkt-chip.mkt-crypto { color: #854d0e !important; }
-.epm-mkt-chip.mkt-nyse { color: #1e40af !important; }
-
 .epm-time-ist {
     font-family: var(--font-mono) !important;
-    font-size: 12px !important;
+    font-size: 11.5px !important;
     color: #0f172a !important;
 }
-
 .epm-timer-pill {
     font-family: var(--font-mono) !important;
-    font-size: 11px !important;
+    font-size: 10.5px !important;
     font-weight: 700 !important;
-    padding: 3px 8px !important;
-    border-radius: 5px !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
 }
 .timer-active { background: #fff7ed !important; color: #c2410c !important; border: 1px solid #ffedd5 !important; }
 .timer-live { background: #ecfdf5 !important; color: #047857 !important; border: 1px solid #a7f3d0 !important; }
@@ -1625,239 +1709,123 @@ code, .timer-cell, pre {
 
 .epm-gcal-btn {
     font-family: var(--font-sans) !important;
-    font-size: 11.5px !important;
+    font-size: 11px !important;
     font-weight: 600 !important;
     background: #f8fafc !important;
     color: #1d4ed8 !important;
     border: 1px solid #bfdbfe !important;
-    padding: 5px 12px !important;
-    border-radius: 6px !important;
+    padding: 4px 10px !important;
+    border-radius: 4px !important;
     text-decoration: none !important;
     transition: all 0.15s ease !important;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
 }
-.epm-gcal-btn:hover {
-    background: #eff6ff !important;
-    color: #1e40af !important;
-    border-color: #3b82f6 !important;
-}
-
-.epm-cal-title-row {
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
-    margin-bottom: 8px;
-}
-
-.epm-sym-pill {
-    font-family: var(--font-mono) !important;
-    font-size: 13px !important;
-    font-weight: 700 !important;
-    color: #0f172a !important;
-    background: #f1f5f9 !important;
-    padding: 3px 8px !important;
-    border-radius: 6px !important;
-    border: 1px solid #cbd5e1 !important;
-    white-space: nowrap;
-}
-
-.epm-cal-name {
-    font-family: var(--font-sans) !important;
-    font-size: 14.5px !important;
-    font-weight: 700 !important;
-    color: #0f172a !important;
-    line-height: 1.4 !important;
-}
+.epm-gcal-btn:hover { background: #eff6ff !important; color: #1e40af !important; }
 
 .epm-metrics-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-    gap: 8px;
-    margin-top: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 6px;
+    margin-top: 8px;
 }
-
 .epm-metric-box {
     background: #f8fafc !important;
     border: 1px solid #e2e8f0 !important;
-    border-radius: 8px !important;
-    padding: 6px 10px !important;
+    border-radius: 6px !important;
+    padding: 5px 8px !important;
     display: flex;
     flex-direction: column;
     gap: 2px;
 }
-
-.epm-actual-box {
-    background: #f0fdf4 !important;
-    border-color: #bbf7d0 !important;
-}
-
 .epm-m-label {
-    font-family: var(--font-sans) !important;
-    font-size: 9.5px !important;
+    font-size: 9px !important;
     font-weight: 700 !important;
     text-transform: uppercase !important;
     letter-spacing: 0.05em !important;
     color: #64748b !important;
 }
-
 .epm-m-val {
     font-family: var(--font-mono) !important;
-    font-size: 13px !important;
-    font-weight: 700 !important;
-    color: #0f172a !important;
-}
-
-.epm-actual-box .epm-m-val {
-    color: #15803d !important;
-}
-
-.epm-linked-news {
-    font-family: var(--font-sans) !important;
     font-size: 12px !important;
-    color: #334155 !important;
-    background: #eff6ff !important;
-    border: 1px solid #dbeafe !important;
-    padding: 6px 10px !important;
-    border-radius: 6px !important;
-    margin-top: 8px;
-}
-.epm-linked-news a {
-    color: #2563eb !important;
-    text-decoration: none !important;
-    font-weight: 600 !important;
-}
-.epm-linked-news a:hover {
-    text-decoration: underline !important;
-}
-
-.epm-empty-state {
-    background: #ffffff !important;
-    border: 1px dashed #cbd5e1 !important;
-    border-radius: 12px !important;
-    padding: 40px 20px !important;
-    text-align: center !important;
-    color: #64748b !important;
-    margin: 15px 0 !important;
-}
-.epm-empty-icon { font-size: 32px !important; margin-bottom: 8px; }
-.epm-empty-title { font-size: 15px !important; font-weight: 700 !important; color: #0f172a !important; margin-bottom: 4px; }
-.epm-empty-sub { font-size: 13px !important; color: #64748b !important; }
-
-/* ── Regulatory Circulars Card Styling (2035 Bloomberg White) ── */
-.epm-circ-card {
-    border-left: 4px solid #2563eb !important;
-    background: #ffffff !important;
-}
-.epm-circ-card.regulator-nse { border-left-color: #2563eb !important; }
-.epm-circ-card.regulator-bse { border-left-color: #9333ea !important; }
-.epm-circ-card.regulator-mcx { border-left-color: #ea580c !important; }
-.epm-circ-card.regulator-rbi { border-left-color: #047857 !important; }
-.epm-circ-card.regulator-finmin { border-left-color: #b45309 !important; }
-.epm-circ-card.regulator-fomc { border-left-color: #1e3a8a !important; }
-.epm-circ-card.regulator-nyse { border-left-color: #0f766e !important; }
-.epm-circ-card.regulator-crypto { border-left-color: #d97706 !important; }
-
-.epm-reg-chip {
-    font-family: var(--font-sans) !important;
-    font-weight: 700 !important;
-    font-size: 11px !important;
-    padding: 3px 8px !important;
-    border-radius: 5px !important;
-    background: #f1f5f9 !important;
-    border: 1px solid #cbd5e1 !important;
-}
-.epm-reg-chip.reg-nse { color: #1e3a8a !important; }
-.epm-reg-chip.reg-bse { color: #581c87 !important; }
-.epm-reg-chip.reg-mcx { color: #9a3412 !important; }
-.epm-reg-chip.reg-rbi { color: #064e3b !important; }
-.epm-reg-chip.reg-finmin { color: #78350f !important; }
-.epm-reg-chip.reg-fomc { color: #1e3a8a !important; }
-.epm-reg-chip.reg-nyse { color: #134e4a !important; }
-.epm-reg-chip.reg-crypto { color: #854d0e !important; }
-
-.epm-circ-no code {
-    font-family: var(--font-mono) !important;
-    font-size: 11px !important;
-    background: #f1f5f9 !important;
-    padding: 2px 6px !important;
-    border-radius: 4px !important;
-    border: 1px solid #e2e8f0 !important;
-    color: #0f172a !important;
-}
-
-.epm-pdf-btn {
-    font-family: var(--font-sans) !important;
-    font-size: 11.5px !important;
-    font-weight: 700 !important;
-    background: #2563eb !important;
-    color: #ffffff !important;
-    padding: 6px 14px !important;
-    border-radius: 6px !important;
-    text-decoration: none !important;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    box-shadow: 0 1px 3px rgba(37, 99, 235, 0.2) !important;
-    transition: all 0.15s ease !important;
-}
-.epm-pdf-btn:hover {
-    background: #1d4ed8 !important;
-    box-shadow: 0 3px 8px rgba(37, 99, 235, 0.35) !important;
-}
-
-.epm-circ-title {
-    font-family: var(--font-sans) !important;
-    font-size: 15px !important;
     font-weight: 700 !important;
     color: #0f172a !important;
-    line-height: 1.4 !important;
 }
 
 .epm-circ-bullets-box {
     background: #f8fafc !important;
     border: 1px solid #e2e8f0 !important;
-    border-radius: 8px !important;
-    padding: 10px 14px !important;
-    margin-top: 10px !important;
+    border-radius: 6px !important;
+    padding: 8px 12px !important;
+    margin-top: 6px !important;
 }
 .epm-circ-bullets-head {
-    font-size: 11px !important;
+    font-size: 10.5px !important;
     color: #2563eb !important;
     text-transform: uppercase !important;
-    letter-spacing: 0.04em !important;
-    margin-bottom: 6px !important;
+    font-weight: 700 !important;
+    margin-bottom: 4px !important;
 }
 .epm-circ-bullets-list {
     margin: 0 !important;
-    padding-left: 18px !important;
-    font-size: 12.5px !important;
-    color: #334155 !important;
-    line-height: 1.55 !important;
-}
-.epm-circ-bullets-list li {
-    margin-bottom: 4px !important;
-}
-
-.epm-circ-action {
-    background: #ecfdf5 !important;
-    border: 1px solid #a7f3d0 !important;
-    color: #065f46 !important;
+    padding-left: 16px !important;
     font-size: 12px !important;
-    padding: 6px 12px !important;
-    border-radius: 6px !important;
-    margin-top: 8px !important;
+    color: #334155 !important;
+    line-height: 1.45 !important;
 }
 
-.epm-circ-cat {
-    font-size: 11px !important;
-    color: #64748b !important;
+/* 13. Dedicated User Guide & Operations Manual Styling */
+.guide-container {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 4px 0 20px 0;
 }
-.epm-circ-verified {
-    font-size: 11px !important;
-    color: #059669 !important;
-    font-weight: 600 !important;
+.guide-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 16px 20px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+.guide-card h3 {
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    color: #0f172a !important;
+    margin-top: 0 !important;
+    margin-bottom: 6px !important;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.guide-badge {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: #eff6ff;
+    color: #2563eb;
+    border: 1px solid #dbeafe;
+}
+.guide-list {
+    margin: 6px 0;
+    padding-left: 18px;
+    color: #334155;
+    line-height: 1.55;
+    font-size: 12.5px;
+}
+.guide-list li {
+    margin-bottom: 5px;
+}
+.guide-pill {
+    display: inline-block;
+    padding: 1px 5px;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: #0f172a;
+    font-weight: 600;
 }
 """
 
@@ -1872,16 +1840,16 @@ init_circ_summary, init_circ_html, init_circ_rows = get_circulars_view()
 with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence Terminal", fill_width=True) as demo:
     gr.HTML(f"""
     <style>{CUSTOM_CSS}</style>
-    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 16px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 14px;">
         <div>
-            <div style="font-size: 11px; font-weight: 700; color: #2563eb; letter-spacing: 0.1em; text-transform: uppercase;">Real-Time Financial Wire & Macro Engine</div>
-            <div style="font-size: 22px; font-weight: 800; color: #0f172a; letter-spacing: -0.03em;">📰 EPM PRO FINANCIAL TERMINAL</div>
+            <div style="font-size: 10.5px; font-weight: 700; color: #2563eb; letter-spacing: 0.1em; text-transform: uppercase;">Institutional Wire & Macro Intelligence Engine</div>
+            <div style="font-size: 20px; font-weight: 800; color: #0f172a; letter-spacing: -0.03em;">📰 EPM PRO FINANCIAL TERMINAL</div>
         </div>
-        <div style="display: flex; gap: 18px; align-items: center; font-size: 12.5px; font-weight: 600;">
-            <span style="color: #059669; display: flex; align-items: center; gap: 6px;">● <span style="color: #0f172a;">SYSTEM ONLINE</span></span>
-            <span style="color: #64748b;">|</span>
+        <div style="display: flex; gap: 16px; align-items: center; font-size: 12px; font-weight: 600;">
+            <span style="color: #059669; display: flex; align-items: center; gap: 5px;">● <span style="color: #0f172a;">SYSTEM ONLINE</span></span>
+            <span style="color: #cbd5e1;">|</span>
             <a href="/api/calendar/ics" target="_blank" style="color: #2563eb; text-decoration: none;">📅 iCal Subscription Feed</a>
-            <span style="color: #64748b;">|</span>
+            <span style="color: #cbd5e1;">|</span>
             <a href="/docs" target="_blank" style="color: #2563eb; text-decoration: none;">⚡ REST API Docs</a>
         </div>
     </div>
@@ -1890,56 +1858,48 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
 
     with gr.Tabs():
         # ═══════════════════════════════════════════════════════════
-        # TAB 1: Live Stream & AI Sentiment
+        # TAB 1: Live Financial Wire & Breaking Catalysts
         # ═══════════════════════════════════════════════════════════
         with gr.TabItem("📰 Live Financial Wire & Breaking Catalysts"):
             with gr.Row():
-                refresh_btn = gr.Button("🔄 Force Refresh & Re-Score Feeds", variant="primary")
+                gr.Markdown("### 🚨 Institutional Breaking Wire (Real-Time AI Scored)")
+                refresh_btn = gr.Button("🔄 Force Refresh & Re-Score Feeds", variant="primary", scale=0)
 
-            gr.Markdown("### 🚨 2035 Live High-Impact Catalyst Feed")
-            top_news_visual = gr.HTML(value=init_news_html, elem_id="news_visual_feed")
+            top_table = gr.Dataframe(
+                headers=["Score", "Sentiment", "Impact", "Headline", "Sectors/Tickers", "AI Reasoning", "Source", "Relevance", "Time"],
+                datatype=["str", "str", "str", "markdown", "str", "str", "str", "str", "str"],
+                value=init_top_rows,
+                interactive=False,
+                wrap=True,
+                elem_id="top_news_table"
+            )
 
-            with gr.Accordion("📊 Tabular View & Data Export (Raw Feeds)", open=False):
-                gr.Markdown("#### High-Impact Filtered Table")
-                top_table = gr.Dataframe(
-                    headers=["Score", "Sentiment", "Impact", "Headline", "Sectors/Tickers", "AI Reasoning", "Source", "Relevance", "Time"],
-                    datatype=["str", "str", "str", "markdown", "str", "str", "str", "str", "str"],
-                    value=init_top_rows,
-                    interactive=False,
-                    wrap=True,
-                    elem_id="top_news_table"
-                )
+            gr.Markdown("### 🌐 Broad Market Secondary Stream")
+            bottom_table = gr.Dataframe(
+                headers=["Time", "Source", "Headline", "Relevance", "Sentiment", "URL"],
+                datatype=["str", "str", "markdown", "str", "str", "markdown"],
+                value=init_bottom_rows,
+                interactive=False,
+                wrap=True,
+                elem_id="bottom_news_table"
+            )
 
-                gr.Markdown("#### General & Broad Market Secondary Table")
-                bottom_table = gr.Dataframe(
-                    headers=["Time", "Source", "Headline", "Relevance", "Sentiment", "URL"],
-                    datatype=["str", "str", "markdown", "str", "str", "markdown"],
-                    value=init_bottom_rows,
-                    interactive=False,
-                    wrap=True,
-                    elem_id="bottom_news_table"
-                )
+            with gr.Accordion("🎴 Visual News Cards Feed (Alternative Expanded View)", open=False):
+                top_news_visual = gr.HTML(value=init_news_html, elem_id="news_visual_feed")
 
-            gr.Markdown("---")
-            gr.Markdown("### ⚡ Live AI Impact & Sentiment Tester")
-            with gr.Row():
-                test_title = gr.Textbox(label="Headline / Breaking News", placeholder="e.g. RBI unexpectedly cuts interest rates by 25 bps")
-                test_desc = gr.Textbox(label="Summary (Optional)", placeholder="Context details...")
-
-            analyze_btn = gr.Button("Analyze Headline with Gemini 2.5")
-            ai_output = gr.Markdown()
-            analyze_btn.click(test_ai_rating, inputs=[test_title, test_desc], outputs=ai_output)
+            with gr.Accordion("⚡ Live AI Impact & Sentiment Tester", open=False):
+                with gr.Row():
+                    test_title = gr.Textbox(label="Headline / Breaking News", placeholder="e.g. RBI unexpectedly cuts interest rates by 25 bps")
+                    test_desc = gr.Textbox(label="Summary (Optional)", placeholder="Context details...")
+                analyze_btn = gr.Button("Analyze Headline with Gemini 2.5", variant="primary")
+                ai_output = gr.Markdown()
+                analyze_btn.click(test_ai_rating, inputs=[test_title, test_desc], outputs=ai_output)
 
         # ═══════════════════════════════════════════════════════════
-        # TAB 2: Multi-Market Calendar, Live Timers, Outcomes & Linked News
+        # TAB 2: Multi-Market Calendar, Live Timers & Outcomes
         # ═══════════════════════════════════════════════════════════
         with gr.TabItem("📅 Market Calendar, Timers & Outcomes"):
-            gr.Markdown(
-                "### ⏱️ Multi-Market Economic & Corporate Calendar (`NSE` · `BSE` · `MCX` · `CRYPTO` · `NYSE`)\n"
-                "- **07:00 AM IST Daily:** Automatically forwards Today's complete calendar & timer snapshot as **5 separate market messages** + **Next-Day Trading Holiday Alert** (1 day before any holiday).\n"
-                "- **07:05 AM IST Daily:** Automatically forwards Tomorrow's lined-up events snapshot as **5 separate market messages**.\n"
-                "- **Real-Time Unfolding:** Automatically forwards individual event outcomes & linked news as soon as results unfold."
-            )
+            gr.Markdown("### ⏱️ Multi-Market Economic & Corporate Schedule")
             cal_info_bar = gr.Markdown(value=init_cal_summary)
 
             with gr.Row():
@@ -1970,49 +1930,67 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                 )
 
             with gr.Row():
-                cal_sync_btn = gr.Button("🔄 Sync All 5 Markets & Refresh Timers", variant="primary", scale=1)
-                btn_sync_gcal = gr.Button("📅 Sync to Google Calendar (1h Alert)", variant="secondary", scale=1)
-                btn_push_today_photo = gr.Button("📸 Send Today's Infographic Cards (5 Regulators)", variant="primary", scale=1)
-                btn_push_tomorrow_photo = gr.Button("📸 Send Tomorrow's Infographic Cards (5 Regulators)", variant="secondary", scale=1)
-                btn_push_holiday = gr.Button("🏖️ Send Next-Day Holiday Alert", variant="secondary", scale=1)
+                cal_sync_btn = gr.Button("🔄 Sync 5 Markets & Timers", variant="primary", scale=1)
+                btn_sync_gcal = gr.Button("📅 Sync Google Calendar", variant="secondary", scale=1)
+                btn_push_today_photo = gr.Button("📸 Send Today's Photo Cards", variant="secondary", scale=1)
+                btn_push_tomorrow_photo = gr.Button("📸 Send Tomorrow's Photo Cards", variant="secondary", scale=1)
 
             with gr.Row():
-                btn_push_weekly = gr.Button("📲 Resend Complete Weekly Calendar Sync Links to Telegram (Apple & Google)", variant="primary", scale=2)
-                btn_push_today = gr.Button("💬 Send Today's Text Snapshot (5 Markets)", variant="secondary", scale=1)
-                btn_push_tomorrow = gr.Button("💬 Send Tomorrow's Text Snapshot (5 Markets)", variant="secondary", scale=1)
+                btn_push_holiday = gr.Button("🏖️ Send Next-Day Holiday Check", variant="secondary", scale=1)
+                btn_push_weekly = gr.Button("📲 Resend Weekly Sync Links", variant="secondary", scale=1)
+                btn_push_today = gr.Button("💬 Send Today's Text Snapshot", variant="secondary", scale=1)
+                btn_push_tomorrow = gr.Button("💬 Send Tomorrow's Text Snapshot", variant="secondary", scale=1)
 
             cal_action_msg = gr.Markdown()
 
-            gr.Markdown("### 📡 2035 Multi-Market Catalysts & Live Countdown Feed")
-            calendar_visual_feed = gr.HTML(value=init_cal_html, elem_id="calendar_visual_feed")
+            gr.Markdown("### 📊 Multi-Market Catalyst Schedule & Historical Outcomes")
+            calendar_table = gr.Dataframe(
+                headers=[
+                    "Event ID",
+                    "Market",
+                    "Date",
+                    "Time (IST)",
+                    "⏱ Live Timer",
+                    "Asset / Symbol",
+                    "Market Event / Corporate Release",
+                    "Impact",
+                    "Previous",
+                    "Forecast",
+                    "🏁 Actual / Outcome",
+                    "📊 Verdict",
+                    "🔗 Linked News / GCal"
+                ],
+                datatype=["str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "markdown"],
+                value=init_cal_rows,
+                interactive=False,
+                wrap=True,
+                elem_id="calendar_table"
+            )
 
-            with gr.Accordion("📊 Raw Calendar Data Table & Historical Metrics", open=False):
-                calendar_table = gr.Dataframe(
-                    headers=[
-                        "Event ID",
-                        "Market",
-                        "Date",
-                        "Time (IST)",
-                        "⏱ Live Timer",
-                        "Asset / Symbol",
-                        "Market Event / Corporate Release",
-                        "Impact",
-                        "Previous",
-                        "Forecast",
-                        "🏁 Actual / Outcome",
-                        "📊 Verdict",
-                        "🔗 Linked Breaking News"
-                    ],
-                    datatype=["str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "markdown"],
-                    value=init_cal_rows,
-                    interactive=False,
-                    wrap=True,
-                    elem_id="calendar_table"
-                )
+            with gr.Accordion("🎴 Visual Catalyst Countdown Feed (Cards View)", open=False):
+                calendar_visual_feed = gr.HTML(value=init_cal_html, elem_id="calendar_visual_feed")
 
-            gr.Markdown("---")
-            with gr.Accordion("✏️ Add Custom Calendar Event or Record / Update Official Outcome Manually", open=False):
-                gr.Markdown("Enter an existing **Event ID** from the table above to update its outcome (e.g. Reliance Result), or leave Event ID blank to create a new scheduled event:")
+            gr.Markdown("### 🏛️ 2026 Authoritative Multi-Market Trading Holidays (`NSE` · `BSE` · `MCX` · `NYSE` · `CRYPTO`)")
+            holidays_table = gr.Dataframe(
+                headers=[
+                    "Date",
+                    "Day",
+                    "Holiday / Occasion",
+                    "🇮🇳 NSE Status",
+                    "🇮🇳 BSE Status",
+                    "⛽ MCX Status (Morning / Evening)",
+                    "🇺🇸 NYSE Status (EST / IST)",
+                    "₿ Crypto Status"
+                ],
+                datatype=["str", "str", "str", "str", "str", "str", "str", "str"],
+                value=init_hol_rows,
+                interactive=False,
+                wrap=True,
+                elem_id="holidays_table"
+            )
+
+            with gr.Accordion("✏️ Record Event Outcome Manually or Add Custom Event", open=False):
+                gr.Markdown("Enter an existing **Event ID** to update its outcome (e.g. `nse_reliance_res`), or leave blank to log a new scheduled release:")
                 with gr.Row():
                     in_ev_id = gr.Textbox(label="Event ID (Optional for new)", placeholder="e.g. nse_reliance_res_2026-10-09")
                     in_ev_mkt = gr.Dropdown(choices=["NSE", "BSE", "MCX", "CRYPTO", "NYSE"], value="NSE", label="Market")
@@ -2032,28 +2010,8 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                         scale=1
                     )
                 with gr.Row():
-                    in_ev_push = gr.Checkbox(value=True, label="Immediately forward this Individual Market Event & Outcome to the Calendar Telegram Channel")
+                    in_ev_push = gr.Checkbox(value=True, label="Immediately forward this Individual Event & Outcome to the Calendar Telegram Channel")
                     save_ev_btn = gr.Button("💾 Save Event / Outcome & Dispatch Market Update", variant="primary")
-
-            gr.Markdown("---")
-            gr.Markdown("### 🏛️ 2026 Authoritative Multi-Market Trading Holidays (`NSE` · `BSE` · `MCX` · `NYSE` · `CRYPTO`)")
-            holidays_table = gr.Dataframe(
-                headers=[
-                    "Date",
-                    "Day",
-                    "Holiday / Occasion",
-                    "🇮🇳 NSE Status",
-                    "🇮🇳 BSE Status",
-                    "⛽ MCX Status (Morning / Evening)",
-                    "🇺🇸 NYSE Status (EST / IST)",
-                    "₿ Crypto Status"
-                ],
-                datatype=["str", "str", "str", "str", "str", "str", "str", "str"],
-                value=init_hol_rows,
-                interactive=False,
-                wrap=True,
-                elem_id="holidays_table"
-            )
 
             cal_filter.change(get_calendar_tables, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_visual_feed, calendar_table, holidays_table])
             cal_market_filter.change(get_calendar_tables, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_visual_feed, calendar_table, holidays_table])
@@ -2075,12 +2033,7 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
         # TAB 3: Official Regulatory Circulars & Notifications Repository
         # ═══════════════════════════════════════════════════════════
         with gr.TabItem("📜 Regulatory Circulars & Official PDFs"):
-            gr.Markdown(
-                "### 🏛️ Official Regulatory Circulars & Notifications Repository\n"
-                "- **Authentic Document-Backed Feeds:** Ingests official publications directly from **NSE**, **BSE**, **MCX**, **RBI**, **Ministry of Finance (FinMin)**, **FOMC / Fed**, **NYSE / SEC**, and **Crypto**.\n"
-                "- **AI Executive Summaries (3-5 Bullets):** Instantly distills regulatory compliance requirements, margin obligations, and market risk impact.\n"
-                "- **Native PDF Link Access:** Every release provides a direct 1-click link to view or download the authentic official document."
-            )
+            gr.Markdown("### 🏛️ Official Regulatory Circulars & Verified Document Repository")
             circ_info_bar = gr.Markdown(value=init_circ_summary)
 
             with gr.Row():
@@ -2121,7 +2074,7 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
 
             circ_action_msg = gr.Markdown()
 
-            gr.Markdown("### 📑 Official Regulatory Documents & Verified PDF Directory")
+            gr.Markdown("### 📑 Official Regulatory Documents Directory (Verified PDFs)")
             circ_table = gr.Dataframe(
                 headers=[
                     "Regulator",
@@ -2140,9 +2093,8 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                 elem_id="circ_table"
             )
 
-            gr.Markdown("---")
-            gr.Markdown("### 📡 Verified Regulatory Stream & AI 3-5 Bullets Breakdown")
-            circ_visual_feed = gr.HTML(value=init_circ_html, elem_id="circ_visual_feed")
+            with gr.Accordion("🎴 Visual Regulatory Stream & AI Breakdown Cards", open=False):
+                circ_visual_feed = gr.HTML(value=init_circ_html, elem_id="circ_visual_feed")
 
             circ_reg_filter.change(
                 get_circulars_view,
@@ -2347,6 +2299,90 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                 inputs=[tg_checkboxes, wa_checkboxes, min_score_slider],
                 outputs=[rules_status, sources_table]
             )
+
+        # ═══════════════════════════════════════════════════════════
+        # TAB 5: User Guide & Operations Manual (Dedicated Help Hub)
+        # ═══════════════════════════════════════════════════════════
+        with gr.TabItem("❓ User Guide & Operations Manual"):
+            gr.HTML("""
+            <div class="guide-container">
+                <div class="guide-card">
+                    <h3><span>🌅</span> Automated Morning Telegram Dispatches (IST Schedule)</h3>
+                    <ul class="guide-list">
+                        <li><span class="guide-pill">07:00 AM IST Daily</span> &nbsp;—&nbsp; Automatically forwards <b>Today's Complete Multi-Market Calendar snapshot</b> as <b>5 separate messages</b> (<span class="guide-badge">NSE</span>, <span class="guide-badge">BSE</span>, <span class="guide-badge">MCX</span>, <span class="guide-badge">CRYPTO</span>, <span class="guide-badge">NYSE</span>) directly into the designated Calendar channel, complete with countdown timers, previous consensus figures, and 1-click Google Calendar links.</li>
+                        <li><span class="guide-pill">07:00 AM IST Daily (Holiday Check)</span> &nbsp;—&nbsp; Evaluates upcoming calendar schedules 24 hours in advance and auto-forwards a <b>Next-Day Trading Holiday Alert</b> across all 5 major bourses whenever a session closure or evening trading break is detected.</li>
+                        <li><span class="guide-pill">07:05 AM IST Daily</span> &nbsp;—&nbsp; Automatically forwards <b>Tomorrow's Lined-Up Events snapshot</b> as 5 separate market messages, giving portfolio managers early visibility into upcoming catalysts.</li>
+                        <li><span class="guide-pill">Friday 07:00 AM IST</span> &nbsp;—&nbsp; Forwards the universal 1-click <b>Weekly Calendar Sync Links</b> (Apple Calendar `.ics` & Google Calendar) to sync the entire following week with one tap.</li>
+                    </ul>
+                </div>
+
+                <div class="guide-card">
+                    <h3><span>⚡</span> Real-Time Unfolding Outcomes & Timer Triggers</h3>
+                    <ul class="guide-list">
+                        <li><b>T-15m Live Countdown Alerts:</b> Automatically notifies traders 15 minutes before high-impact economic releases (e.g. US CPI, RBI MPC Rate Decisions, Non-Farm Payrolls) to prepare for intraday volatility.</li>
+                        <li><b>Live Outcome Dispatches:</b> When official figures unfold, the engine immediately calculates <span class="guide-pill">Actual vs Forecast vs Previous</span> and computes the institutional market verdict (<span style="color:#16a34a; font-weight:700;">🟢 BULLISH</span>, <span style="color:#dc2626; font-weight:700;">🔴 BEARISH</span>, or <span style="color:#475569; font-weight:700;">⚪ NEUTRAL</span>).</li>
+                        <li><b>Linked Wire Intelligence:</b> As soon as breaking news hits the wire covering a scheduled catalyst (e.g. Reliance Q2 earnings report), the event row automatically binds a direct link to the verified article.</li>
+                    </ul>
+                </div>
+
+                <div class="guide-card">
+                    <h3><span>🌐</span> Multi-Market Institutional Coverage</h3>
+                    <ul class="guide-list">
+                        <li><b>🇮🇳 NSE & BSE:</b> Nifty 50 constituents, Bank Nifty, quarterly earnings releases, board meetings, dividend ex-dates, and F&O contract expiries.</li>
+                        <li><b>⛽ MCX:</b> Crude Oil inventories, Natural Gas storage releases, Gold & Silver delivery contracts, and morning/evening trading session schedules.</li>
+                        <li><b>₿ CRYPTO:</b> Bitcoin halving schedules, ETF net flow disclosures, protocol upgrades, and key macroeconomic digital asset triggers.</li>
+                        <li><b>🇺🇸 NYSE & NASDAQ:</b> Federal Reserve FOMC interest rate meetings, Jackson Hole speeches, US CPI/PPI inflation prints, and US corporate mega-cap earnings.</li>
+                    </ul>
+                </div>
+
+                <div class="guide-card">
+                    <h3><span>📜</span> Authentic Document-Backed Regulatory Circulars</h3>
+                    <ul class="guide-list">
+                        <li><b>Verified Ingestion:</b> Continuously polls official repositories: <span class="guide-badge">NSE</span>, <span class="guide-badge">BSE</span>, <span class="guide-badge">MCX</span>, <span class="guide-badge">RBI</span>, <span class="guide-badge">FINMIN</span>, <span class="guide-badge">FOMC</span>, <span class="guide-badge">NYSE</span>, and <span class="guide-badge">CRYPTO</span>.</li>
+                        <li><b>AI Executive Summaries (3-5 Bullets):</b> Distills legal and regulatory jargon into crisp, actionable directives covering margin requirements, circuit filter revisions, and operational compliance.</li>
+                        <li><b>Native PDF Direct Access:</b> Every release features a verified 1-click link directly to the official PDF file stored in authentic regulator archives.</li>
+                    </ul>
+                </div>
+
+                <div class="guide-card">
+                    <h3><span>🧠</span> AI Impact & Sentiment Engine (Gemini 2.5 Architecture)</h3>
+                    <ul class="guide-list">
+                        <li><b>0-10 Impact Rating:</b> News items scored ≥ 7 or categorized as High Impact are automatically promoted to the Primary Wire table and eligible for instant Telegram push alerts.</li>
+                        <li><b>Directional Verdict:</b> Analyzes the macro implications of breaking headlines to classify market sentiment into Bullish, Bearish, or Neutral.</li>
+                        <li><b>Sector & Ticker Tagging:</b> Maps news events directly to impacted industrial sectors (e.g., Banking, Auto, IT, Energy, Commodities) and primary stock tickers.</li>
+                    </ul>
+                </div>
+
+                <div class="guide-card">
+                    <h3><span>📲</span> Calendar Subscriptions & 1-Click Sync</h3>
+                    <ul class="guide-list">
+                        <li><b>Universal iCal Subscription Feed:</b> Connect your Apple Calendar, Outlook, or Thunderbird using the dynamic subscription endpoint: <span class="guide-pill">/api/calendar/ics</span>. All 5 markets update automatically.</li>
+                        <li><b>Google Calendar Direct Sync:</b> One-click sync buttons in the terminal and on event rows instantly create calendar events with automated <b>60-minute alarm notifications</b>.</li>
+                        <li><b>Service Account Background Daemon:</b> For enterprise teams, configure Google Cloud Service Account credentials in Tab 4 for continuous headless sync.</li>
+                    </ul>
+                </div>
+
+                <div class="guide-card">
+                    <h3><span>📊</span> High-Density Institutional Table Navigation (2-Row Clamp)</h3>
+                    <ul class="guide-list">
+                        <li><b>Max 2-Row Line Clamping:</b> All table cells strictly clamp long headlines, event titles, and AI summaries to at most 2 rows with clean ellipsis (<span class="guide-pill">-webkit-line-clamp: 2</span>). This increases visible screen information density by <b>75%</b> and eliminates excessive vertical scrolling.</li>
+                        <li><b>Structured Companion Columns:</b> Complementary attributes (Score, Sentiment, Tickers, AI Reasoning, Source, Timestamps) are placed side-by-side in dedicated columns.</li>
+                        <li><b>Alternative Expanded Card Views:</b> When you wish to read entire paragraphs or explore full cards, toggle the <span class="guide-pill">🎴 Visual Feed</span> accordion available in each tab.</li>
+                    </ul>
+                </div>
+
+                <div class="guide-card">
+                    <h3><span>⚡</span> REST API & Developer Integration Reference</h3>
+                    <ul class="guide-list">
+                        <li><span class="guide-pill">GET /api/news</span> &nbsp;—&nbsp; Returns high-speed cached news items with AI scores, sector tags, and relevance ratings.</li>
+                        <li><span class="guide-pill">GET /api/calendar</span> &nbsp;—&nbsp; Returns enriched multi-market events, live timers, and unfolded outcomes.</li>
+                        <li><span class="guide-pill">GET /api/calendar/ics</span> &nbsp;—&nbsp; RFC 5545 compliant iCalendar feed compatible with Apple, Google, and Microsoft platforms.</li>
+                        <li><span class="guide-pill">GET /api/circulars</span> &nbsp;—&nbsp; Indexed regulatory circulars, AI 3-5 bullet points, and verified PDF links.</li>
+                        <li><span class="guide-pill">GET /docs</span> &nbsp;—&nbsp; Complete OpenAPI / Swagger interactive documentation and API sandbox.</li>
+                    </ul>
+                </div>
+            </div>
+            """)
 
     refresh_btn.click(manual_refresh, outputs=[status_box, top_news_visual, top_table, bottom_table])
     demo.load(get_dashboard_tables, outputs=[status_box, top_news_visual, top_table, bottom_table])
