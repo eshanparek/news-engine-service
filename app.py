@@ -1222,36 +1222,11 @@ h4 {
     color: #475569 !important;
 }
 
-/* 4. Tabs Navigation Bar (Modern Flat Institutional) */
-.tabs, .tab-nav {
-    border-bottom: 2px solid #e2e8f0 !important;
-    background: #ffffff !important;
-    gap: 4px !important;
-    margin-bottom: 12px !important;
-}
-
-button[role="tab"] {
-    font-family: var(--font-sans) !important;
-    font-size: 12.5px !important;
-    font-weight: 600 !important;
-    padding: 9px 16px !important;
-    border-radius: var(--radius-sm) var(--radius-sm) 0 0 !important;
-    border: none !important;
-    color: #64748b !important;
-    background: transparent !important;
-    transition: all 0.15s ease-in-out !important;
-}
-
-button[role="tab"]:hover {
-    color: #0f172a !important;
-    background: #f8fafc !important;
-}
-
-button[role="tab"].selected {
-    color: #2563eb !important;
-    border-bottom: 2px solid #2563eb !important;
-    background: #eff6ff !important;
-    font-weight: 700 !important;
+/* 4. Hide Gradio Default Tab Navigation Header to prevent Duplicate Menus */
+.tabs > .tab-nav,
+div[data-testid="tabs"] > .tab-nav,
+.gradio-container .tab-nav {
+    display: none !important;
 }
 
 /* 5. Streamlined Action Buttons (Compact, Uniform Heights, No Clutter) */
@@ -3039,6 +3014,7 @@ TERMINAL_CLIENT_JS = r"""
         localStorage.setItem("epm_circ_drawer_collapsed", isCollapsed ? "true" : "false");
     };
 
+    window.addEventListener("keydown", function(e) {
         if (e.key === "Escape") {
             if (currentFocusedTable) {
                 window.epmExitFocus();
