@@ -3687,8 +3687,16 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
     demo.load(get_calendar_tables, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_visual_feed, calendar_table, holidays_table])
     demo.load(get_circulars_view, inputs=[circ_reg_filter, circ_imp_filter, circ_search], outputs=[circ_info_bar, circ_visual_feed, circ_table])
 
-# Mount Gradio UI inside FastAPI with full-width responsive CSS
-app = gr.mount_gradio_app(app, demo, path="/", theme=gr.themes.Soft(), css=CUSTOM_CSS, head=f"<style>{CUSTOM_CSS}</style>")
+# Mount Gradio UI inside FastAPI with full-width responsive CSS and Terminal Engine JS
+app = gr.mount_gradio_app(
+    app,
+    demo,
+    path="/",
+    theme=gr.themes.Soft(),
+    css=CUSTOM_CSS,
+    head=f"<style>{CUSTOM_CSS}</style><script>{TERMINAL_CLIENT_JS}</script>",
+    js=TERMINAL_CLIENT_JS
+)
 
 if __name__ == "__main__":
     import uvicorn
