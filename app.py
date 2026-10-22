@@ -1870,39 +1870,37 @@ code, .timer-cell, pre {
     z-index: 1000 !important;
     background: #ffffff !important;
     border-bottom: 1px solid #e2e8f0 !important;
-    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04) !important;
-    margin: -8px -20px 14px -20px !important;
-    padding: 8px 20px 8px 20px !important;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04) !important;
+    margin: -8px -20px 4px -20px !important;
+    padding: 3px 14px 4px 14px !important;
 }
 
-.epm-nav-main-row {
+/* Row 1: Brand Cluster, Live Telemetry & Macro Ticker Strip */
+.epm-nav-row-1 {
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
-    gap: 12px !important;
-    flex-wrap: wrap !important;
+    gap: 10px !important;
+    flex-wrap: nowrap !important;
+    height: 26px !important;
+    line-height: 26px !important;
+    overflow: hidden !important;
 }
 
-.epm-nav-brand {
+.epm-nav-brand-cluster {
     display: flex !important;
     align-items: center !important;
-    gap: 8px !important;
+    gap: 6px !important;
     flex-shrink: 0 !important;
 }
 
 .epm-nav-logo {
-    font-size: 18px !important;
-}
-
-.epm-nav-title-group {
-    display: flex !important;
-    align-items: baseline !important;
-    gap: 6px !important;
+    font-size: 15px !important;
 }
 
 .epm-nav-title {
     font-family: var(--font-sans) !important;
-    font-size: 15px !important;
+    font-size: 13.5px !important;
     font-weight: 800 !important;
     color: #0f172a !important;
     letter-spacing: -0.02em !important;
@@ -1910,23 +1908,31 @@ code, .timer-cell, pre {
 
 .epm-nav-version {
     font-family: var(--font-mono) !important;
-    font-size: 9.5px !important;
+    font-size: 9px !important;
     font-weight: 700 !important;
     color: #2563eb !important;
     background: #eff6ff !important;
     border: 1px solid #bfdbfe !important;
-    padding: 1px 5px !important;
-    border-radius: 4px !important;
+    padding: 0 4px !important;
+    border-radius: 3px !important;
+    height: 16px !important;
+    line-height: 14px !important;
 }
 
-.epm-nav-status {
-    display: flex !important;
+.epm-nav-status-badge {
+    display: inline-flex !important;
     align-items: center !important;
-    gap: 5px !important;
-    padding: 2px 7px !important;
+    gap: 4px !important;
+    padding: 0 5px !important;
+    height: 16px !important;
+    line-height: 14px !important;
     background: #f0fdf4 !important;
     border: 1px solid #bbf7d0 !important;
-    border-radius: 4px !important;
+    border-radius: 3px !important;
+    font-family: var(--font-mono) !important;
+    font-size: 9px !important;
+    font-weight: 700 !important;
+    color: #16a34a !important;
 }
 
 .epm-live-dot {
@@ -1945,43 +1951,55 @@ code, .timer-cell, pre {
     100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
 }
 
-.epm-status-text {
-    font-family: var(--font-mono) !important;
-    font-size: 10px !important;
-    font-weight: 700 !important;
-    color: #16a34a !important;
-    letter-spacing: 0.05em !important;
-}
-
-.epm-active-tab-wrap {
+.epm-nav-telemetry {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
     margin-left: 4px !important;
 }
 
-.epm-active-tab-pill {
-    font-family: var(--font-sans) !important;
-    font-size: 11px !important;
-    font-weight: 700 !important;
-    color: #1e293b !important;
+.epm-telem-pill {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 2px !important;
+    height: 18px !important;
+    line-height: 16px !important;
+    padding: 0 5px !important;
     background: #f8fafc !important;
-    border: 1px solid #cbd5e1 !important;
-    padding: 2px 8px !important;
-    border-radius: 4px !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 3px !important;
+    font-family: var(--font-mono) !important;
+    font-size: 9.5px !important;
+    color: #475569 !important;
     white-space: nowrap !important;
+}
+
+.epm-telem-pill b {
+    color: #0f172a !important;
+    font-weight: 700 !important;
+}
+
+.epm-telem-online {
+    background: #f0fdf4 !important;
+    border-color: #bbf7d0 !important;
+    color: #16a34a !important;
+    font-weight: 700 !important;
 }
 
 /* Macro Telemetry Strip */
 .epm-telemetry-strip {
     display: flex !important;
     align-items: center !important;
-    gap: 8px !important;
+    gap: 6px !important;
     overflow-x: auto !important;
     scrollbar-width: none !important;
     background: #f8fafc !important;
     border: 1px solid #e2e8f0 !important;
-    border-radius: 6px !important;
-    padding: 4px 10px !important;
-    flex: 1 1 auto !important;
-    max-width: 820px !important;
+    border-radius: 4px !important;
+    padding: 0 8px !important;
+    height: 20px !important;
+    line-height: 18px !important;
+    flex: 0 1 auto !important;
 }
 
 .epm-telemetry-strip::-webkit-scrollbar {
@@ -1991,9 +2009,9 @@ code, .timer-cell, pre {
 .epm-ticker-item {
     display: flex !important;
     align-items: center !important;
-    gap: 5px !important;
+    gap: 4px !important;
     font-family: var(--font-mono) !important;
-    font-size: 11px !important;
+    font-size: 10px !important;
     white-space: nowrap !important;
     cursor: default !important;
 }
@@ -2001,7 +2019,7 @@ code, .timer-cell, pre {
 .epm-ticker-sym {
     font-weight: 700 !important;
     color: #475569 !important;
-    font-size: 10px !important;
+    font-size: 9.5px !important;
 }
 
 .epm-ticker-val {
@@ -2014,9 +2032,9 @@ code, .timer-cell, pre {
     color: #16a34a !important;
     background: #f0fdf4 !important;
     border: 1px solid #bbf7d0 !important;
-    padding: 1px 4px !important;
-    border-radius: 3px !important;
-    font-size: 9.5px !important;
+    padding: 0 3px !important;
+    border-radius: 2px !important;
+    font-size: 9px !important;
 }
 
 .epm-ticker-chg.down {
@@ -2024,23 +2042,89 @@ code, .timer-cell, pre {
     color: #dc2626 !important;
     background: #fef2f2 !important;
     border: 1px solid #fecaca !important;
-    padding: 1px 4px !important;
-    border-radius: 3px !important;
-    font-size: 9.5px !important;
+    padding: 0 3px !important;
+    border-radius: 2px !important;
+    font-size: 9px !important;
 }
 
 .epm-ticker-divider {
     width: 1px !important;
-    height: 12px !important;
+    height: 10px !important;
     background: #cbd5e1 !important;
+}
+
+/* Row 2: Unified Navigation Tabs + Controls on ONE line */
+.epm-nav-row-2 {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    flex-wrap: nowrap !important;
+    padding-top: 3px !important;
+    margin-top: 3px !important;
+    border-top: 1px solid #f1f5f9 !important;
+    height: 27px !important;
+    line-height: 27px !important;
+}
+
+.epm-quick-tabs-container {
+    display: flex !important;
+    gap: 4px !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+}
+
+.epm-tab-pill {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    height: 23px !important;
+    padding: 0 8px !important;
+    font-family: var(--font-sans) !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    border-radius: 12px !important;
+    border: 1px solid #e2e8f0 !important;
+    background: #ffffff !important;
+    color: #475569 !important;
+    cursor: pointer !important;
+    transition: all 0.12s ease !important;
+    white-space: nowrap !important;
+}
+
+.epm-tab-pill:hover {
+    background: #f8fafc !important;
+    color: #0f172a !important;
+    border-color: #cbd5e1 !important;
+}
+
+.epm-tab-pill.active {
+    background: #ffffff !important;
+    color: #1d4ed8 !important;
+    border: 1.5px solid #2563eb !important;
+    box-shadow: 0 1px 3px rgba(37, 99, 235, 0.12), 0 0 0 2px rgba(37, 99, 235, 0.16) !important;
+    font-weight: 700 !important;
+}
+
+.epm-tab-pill.active *,
+.epm-tab-pill.active span,
+.epm-tab-pill.active .epm-tab-pill-icon {
+    color: #1d4ed8 !important;
+    font-weight: 700 !important;
+}
+
+.epm-tab-pill.active:hover {
+    background: #f8faff !important;
+    border-color: #1d4ed8 !important;
 }
 
 /* Top Nav Controls Right */
 .epm-nav-controls {
     display: flex !important;
     align-items: center !important;
-    gap: 6px !important;
+    gap: 4px !important;
     flex-shrink: 0 !important;
+    flex-wrap: nowrap !important;
 }
 
 .epm-nav-search-wrap {
@@ -2050,10 +2134,10 @@ code, .timer-cell, pre {
 }
 
 #epm-watchlist-input {
-    width: 145px !important;
-    height: 28px !important;
-    font-size: 11px !important;
-    padding: 2px 24px 2px 22px !important;
+    width: 120px !important;
+    height: 23px !important;
+    font-size: 10.5px !important;
+    padding: 1px 18px 1px 18px !important;
     border: 1px solid #cbd5e1 !important;
     border-radius: 4px !important;
     background: #ffffff !important;
@@ -2062,7 +2146,7 @@ code, .timer-cell, pre {
 }
 
 #epm-watchlist-input:focus {
-    width: 195px !important;
+    width: 160px !important;
     border-color: #2563eb !important;
     box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12) !important;
     outline: none !important;
@@ -2070,18 +2154,18 @@ code, .timer-cell, pre {
 
 .epm-nav-search-icon {
     position: absolute !important;
-    left: 6px !important;
-    font-size: 10.5px !important;
+    left: 5px !important;
+    font-size: 10px !important;
     pointer-events: none !important;
     color: #94a3b8 !important;
 }
 
 .epm-watchlist-clear-btn {
     position: absolute !important;
-    right: 6px !important;
+    right: 5px !important;
     background: transparent !important;
     border: none !important;
-    font-size: 10px !important;
+    font-size: 9px !important;
     color: #94a3b8 !important;
     cursor: pointer !important;
     padding: 0 !important;
@@ -2093,13 +2177,13 @@ code, .timer-cell, pre {
 
 .epm-watchlist-badge {
     position: absolute !important;
-    right: 20px !important;
+    right: 18px !important;
     font-family: var(--font-mono) !important;
-    font-size: 9px !important;
+    font-size: 8.5px !important;
     background: #2563eb !important;
     color: #ffffff !important;
-    padding: 1px 4px !important;
-    border-radius: 3px !important;
+    padding: 0 3px !important;
+    border-radius: 2px !important;
     font-weight: 700 !important;
     white-space: nowrap !important;
 }
@@ -2107,18 +2191,18 @@ code, .timer-cell, pre {
 .epm-top-btn {
     display: inline-flex !important;
     align-items: center !important;
-    gap: 5px !important;
-    height: 28px !important;
-    padding: 0 8px !important;
+    gap: 3px !important;
+    height: 23px !important;
+    padding: 0 6px !important;
     font-family: var(--font-sans) !important;
-    font-size: 11px !important;
+    font-size: 10.5px !important;
     font-weight: 600 !important;
     border-radius: 4px !important;
     border: 1px solid #cbd5e1 !important;
     background: #ffffff !important;
     color: #334155 !important;
     cursor: pointer !important;
-    transition: all 0.15s ease !important;
+    transition: all 0.12s ease !important;
     white-space: nowrap !important;
 }
 
@@ -2154,25 +2238,28 @@ code, .timer-cell, pre {
 
 .epm-kbd-badge {
     font-family: var(--font-mono) !important;
-    font-size: 9.5px !important;
+    font-size: 9px !important;
     background: #334155 !important;
     color: #38bdf8 !important;
-    padding: 1px 4px !important;
-    border-radius: 3px !important;
+    padding: 0 3px !important;
+    border-radius: 2px !important;
     font-weight: 700 !important;
 }
 
 .epm-nav-link {
     font-family: var(--font-sans) !important;
-    font-size: 11px !important;
+    font-size: 10.5px !important;
     font-weight: 600 !important;
     color: #2563eb !important;
     text-decoration: none !important;
-    padding: 4px 7px !important;
+    padding: 1px 6px !important;
+    height: 23px !important;
+    line-height: 19px !important;
+    box-sizing: border-box !important;
     border-radius: 4px !important;
     background: #eff6ff !important;
     border: 1px solid #dbeafe !important;
-    transition: all 0.15s ease !important;
+    transition: all 0.12s ease !important;
     white-space: nowrap !important;
 }
 
@@ -2181,66 +2268,19 @@ code, .timer-cell, pre {
     color: #1d4ed8 !important;
 }
 
-/* Row 2: Quick Tab Switcher Pills */
-.epm-nav-tabs-row {
-    padding-top: 6px !important;
-    border-top: 1px solid #f1f5f9 !important;
-    margin-top: 6px !important;
-    display: flex !important;
-    align-items: center !important;
+/* 15. Hidden Telemetry Elements & Zero-Height Subheaders */
+#epm-status-box, #cal_info_bar, #circ_info_bar, #cal_action_msg:empty, #circ_action_msg:empty {
+    display: none !important;
+    height: 0 !important;
+    max-height: 0 !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    overflow: hidden !important;
 }
 
-.epm-quick-tabs-container {
-    display: flex !important;
-    gap: 6px !important;
-    align-items: center !important;
-    flex-wrap: wrap !important;
-}
-
-.epm-tab-pill {
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 5px !important;
-    height: 25px !important;
-    padding: 0 10px !important;
-    font-family: var(--font-sans) !important;
-    font-size: 11.5px !important;
-    font-weight: 600 !important;
-    border-radius: 13px !important;
-    border: 1px solid #e2e8f0 !important;
-    background: #ffffff !important;
-    color: #475569 !important;
-    cursor: pointer !important;
-    transition: all 0.15s ease !important;
-}
-
-.epm-tab-pill:hover {
-    background: #f8fafc !important;
-    color: #0f172a !important;
-    border-color: #cbd5e1 !important;
-}
-
-.epm-tab-pill.active {
-    background: #ffffff !important;
-    color: #1d4ed8 !important;
-    border: 1.5px solid #2563eb !important;
-    box-shadow: 0 1px 3px rgba(37, 99, 235, 0.12), 0 0 0 2px rgba(37, 99, 235, 0.16) !important;
-    font-weight: 700 !important;
-}
-
-.epm-tab-pill.active *,
-.epm-tab-pill.active span,
-.epm-tab-pill.active .epm-tab-pill-icon {
-    color: #1d4ed8 !important;
-    font-weight: 700 !important;
-}
-
-.epm-tab-pill.active:hover {
-    background: #f8faff !important;
-    border-color: #1d4ed8 !important;
-}
-
-/* 15. Action Drawers (Zen Mode Smooth CSS Animation) */
+/* 16. Action Drawers (Zen Mode Smooth CSS Animation) */
 .epm-action-drawer {
     transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease, margin 0.3s ease, padding 0.3s ease !important;
     max-height: 500px !important;
@@ -2250,6 +2290,7 @@ code, .timer-cell, pre {
 
 .epm-action-drawer.collapsed {
     max-height: 0 !important;
+    height: 0 !important;
     opacity: 0 !important;
     padding-top: 0 !important;
     padding-bottom: 0 !important;
@@ -2258,24 +2299,29 @@ code, .timer-cell, pre {
     overflow: hidden !important;
     pointer-events: none !important;
     border: none !important;
+    display: none !important;
 }
 
 .epm-drawer-toggle-row {
-    margin-bottom: 6px !important;
+    margin-bottom: 4px !important;
 }
 
 #cal_drawer_toggle, #circ_drawer_toggle {
     font-family: var(--font-sans) !important;
-    font-size: 11.5px !important;
+    font-size: 10.5px !important;
     font-weight: 600 !important;
     border-radius: 4px !important;
-    margin-bottom: 6px !important;
-    width: 100% !important;
+    margin: 0 !important;
+    height: 24px !important;
+    min-height: 24px !important;
+    padding: 0 8px !important;
     background: #f8fafc !important;
     border: 1px dashed #cbd5e1 !important;
     color: #334155 !important;
     cursor: pointer !important;
     transition: all 0.15s ease !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
 }
 
 #cal_drawer_toggle:hover, #circ_drawer_toggle:hover {
@@ -2284,7 +2330,7 @@ code, .timer-cell, pre {
     color: #0f172a !important;
 }
 
-/* 16. Table Header Ribbons & Multi-Density Engine */
+/* 17. Table Header Ribbons & Multi-Density Engine */
 .epm-table-ribbon {
     display: flex !important;
     align-items: center !important;
@@ -2292,58 +2338,59 @@ code, .timer-cell, pre {
     background: #f8fafc !important;
     border: 1px solid #e2e8f0 !important;
     border-bottom: none !important;
-    border-radius: 6px 6px 0 0 !important;
-    padding: 6px 12px !important;
-    margin-top: 14px !important;
+    border-radius: 4px 4px 0 0 !important;
+    padding: 2px 8px !important;
+    margin-top: 4px !important;
     margin-bottom: 0 !important;
-    min-height: 38px !important;
-    gap: 8px !important;
-    flex-wrap: wrap !important;
+    min-height: 28px !important;
+    height: 28px !important;
+    gap: 6px !important;
+    flex-wrap: nowrap !important;
 }
 
 .epm-ribbon-left {
     display: flex !important;
     align-items: center !important;
-    gap: 8px !important;
-    flex-wrap: wrap !important;
+    gap: 6px !important;
+    flex-wrap: nowrap !important;
 }
 
 .epm-ribbon-bullet {
     color: #2563eb !important;
-    font-size: 10px !important;
+    font-size: 9px !important;
 }
 
 .epm-ribbon-title {
     font-family: var(--font-sans) !important;
-    font-size: 12px !important;
+    font-size: 11.5px !important;
     font-weight: 700 !important;
     color: #0f172a !important;
     text-transform: uppercase !important;
-    letter-spacing: 0.04em !important;
+    letter-spacing: 0.03em !important;
 }
 
 .epm-ribbon-badge {
     font-family: var(--font-sans) !important;
-    font-size: 10px !important;
+    font-size: 9.5px !important;
     font-weight: 600 !important;
     color: #2563eb !important;
     background: #eff6ff !important;
     border: 1px solid #bfdbfe !important;
-    padding: 1px 6px !important;
-    border-radius: 4px !important;
+    padding: 0 5px !important;
+    border-radius: 3px !important;
 }
 
 .epm-ribbon-count {
     font-family: var(--font-mono) !important;
-    font-size: 10.5px !important;
+    font-size: 9.5px !important;
     color: #64748b !important;
 }
 
 .epm-ribbon-controls {
     display: flex !important;
     align-items: center !important;
-    gap: 6px !important;
-    flex-wrap: wrap !important;
+    gap: 4px !important;
+    flex-wrap: nowrap !important;
 }
 
 .epm-density-group {
@@ -2352,28 +2399,29 @@ code, .timer-cell, pre {
     gap: 2px !important;
     background: #ffffff !important;
     border: 1px solid #cbd5e1 !important;
-    border-radius: 4px !important;
-    padding: 2px 4px !important;
+    border-radius: 3px !important;
+    padding: 1px 3px !important;
+    height: 22px !important;
 }
 
 .epm-control-label {
     font-family: var(--font-sans) !important;
-    font-size: 9.5px !important;
+    font-size: 9px !important;
     font-weight: 700 !important;
     color: #64748b !important;
     text-transform: uppercase !important;
-    margin-right: 3px !important;
+    margin-right: 2px !important;
 }
 
 .epm-density-btn {
     border: none !important;
     background: transparent !important;
     font-family: var(--font-sans) !important;
-    font-size: 10.5px !important;
+    font-size: 9.5px !important;
     font-weight: 600 !important;
     color: #475569 !important;
-    padding: 2px 6px !important;
-    border-radius: 3px !important;
+    padding: 1px 4px !important;
+    border-radius: 2px !important;
     cursor: pointer !important;
     transition: all 0.12s ease !important;
 }
@@ -2391,16 +2439,16 @@ code, .timer-cell, pre {
 .epm-ribbon-btn {
     display: inline-flex !important;
     align-items: center !important;
-    gap: 4px !important;
-    height: 25px !important;
-    padding: 0 8px !important;
+    gap: 3px !important;
+    height: 22px !important;
+    padding: 0 6px !important;
     font-family: var(--font-sans) !important;
-    font-size: 10.5px !important;
+    font-size: 10px !important;
     font-weight: 600 !important;
     color: #334155 !important;
     background: #ffffff !important;
     border: 1px solid #cbd5e1 !important;
-    border-radius: 4px !important;
+    border-radius: 3px !important;
     cursor: pointer !important;
     transition: all 0.12s ease !important;
 }
@@ -2412,11 +2460,127 @@ code, .timer-cell, pre {
 }
 
 .epm-collapse-btn {
-    width: 25px !important;
+    width: 22px !important;
     padding: 0 !important;
     justify-content: center !important;
-    font-size: 13px !important;
+    font-size: 12px !important;
     font-weight: 700 !important;
+}
+
+/* Tab 1 Header Strip */
+#tab1_header_strip {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    margin-top: 4px !important;
+    margin-bottom: 0 !important;
+}
+
+#tab1_header_strip .epm-table-ribbon {
+    flex: 1 1 auto !important;
+    margin-top: 0 !important;
+}
+
+#tab1_refresh_btn {
+    height: 28px !important;
+    min-height: 28px !important;
+    font-size: 11px !important;
+    padding: 0 10px !important;
+    margin: 0 !important;
+    border-radius: 4px !important;
+    font-weight: 600 !important;
+    white-space: nowrap !important;
+}
+
+/* Tab 2 & Tab 3 Ultra-Compact Filter Rows */
+#cal_filters_row, #circ_filters_row {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    margin: 3px 0 !important;
+    padding: 0 !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    min-height: 28px !important;
+}
+
+#cal_filters_row .gradio-radio, #circ_filters_row .gradio-radio {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+#cal_filters_row .gradio-radio > label, #circ_filters_row .gradio-radio > label,
+#cal_filters_row .gradio-radio > .block-title, #circ_filters_row .gradio-radio > .block-title {
+    display: none !important;
+}
+
+#cal_filters_row .wrap, #circ_filters_row .wrap {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 3px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    flex-wrap: nowrap !important;
+}
+
+#cal_filters_row .wrap label, #circ_filters_row .wrap label {
+    display: inline-flex !important;
+    align-items: center !important;
+    height: 24px !important;
+    padding: 0 7px !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 12px !important;
+    background: #ffffff !important;
+    font-size: 10.5px !important;
+    font-weight: 600 !important;
+    color: #475569 !important;
+    cursor: pointer !important;
+    margin: 0 !important;
+    transition: all 0.12s ease !important;
+    white-space: nowrap !important;
+}
+
+#cal_filters_row .wrap label:hover, #circ_filters_row .wrap label:hover {
+    background: #f1f5f9 !important;
+    color: #0f172a !important;
+    border-color: #94a3b8 !important;
+}
+
+#cal_filters_row .wrap label:has(input:checked), #circ_filters_row .wrap label:has(input:checked) {
+    background: #ffffff !important;
+    color: #1d4ed8 !important;
+    border: 1.5px solid #2563eb !important;
+    box-shadow: 0 1px 2px rgba(37, 99, 235, 0.12) !important;
+    font-weight: 700 !important;
+}
+
+#cal_filters_row .wrap input[type="radio"], #circ_filters_row .wrap input[type="radio"] {
+    display: none !important;
+}
+
+#circ_filters_row .gradio-textbox {
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: 24px !important;
+    flex: 1 1 auto !important;
+}
+
+#circ_filters_row .gradio-textbox label,
+#circ_filters_row .gradio-textbox .block-title {
+    display: none !important;
+}
+
+#circ_filters_row .gradio-textbox input {
+    height: 24px !important;
+    padding: 1px 8px !important;
+    font-size: 11px !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 4px !important;
 }
 
 /* Table container styling directly under ribbon */
@@ -2596,25 +2760,29 @@ tbody tr.epm-highlight-row td:first-child {
 
 TOP_NAVBAR_HTML = """
 <div id="epm-top-navbar" class="epm-top-navbar">
-    <!-- Row 1: Brand, Telemetry, Controls -->
-    <div class="epm-nav-main-row">
-        <!-- Brand Identity -->
-        <div class="epm-nav-brand">
+    <!-- Row 1: Brand Identity, Live Telemetry & Macro Ticker Strip -->
+    <div class="epm-nav-row-1">
+        <!-- Brand Cluster & Compact System Telemetry -->
+        <div class="epm-nav-brand-cluster">
             <span class="epm-nav-logo">📰</span>
-            <div class="epm-nav-title-group">
-                <span class="epm-nav-title">EPM PRO</span>
-                <span class="epm-nav-version">TERMINAL v3.0</span>
-            </div>
-            <div class="epm-nav-status">
+            <span class="epm-nav-title">EPM PRO</span>
+            <span class="epm-nav-version">v3.0</span>
+            <div class="epm-nav-status-badge">
                 <span class="epm-live-dot"></span>
-                <span class="epm-status-text">LIVE WIRE</span>
+                <span>LIVE</span>
             </div>
-            <div class="epm-active-tab-wrap">
-                <span id="epm-active-tab-indicator" class="epm-active-tab-pill">📰 LIVE FINANCIAL WIRE</span>
+            <!-- High-Density Inline System Telemetry -->
+            <div class="epm-nav-telemetry">
+                <span class="epm-telem-pill epm-telem-online" title="System Engine Online">🟢 ONLINE</span>
+                <span class="epm-telem-pill" title="Cached Live News Catalysts">📰 <b id="epm-hdr-news">88</b></span>
+                <span class="epm-telem-pill" title="5-Market Scheduled Events">📅 <b id="epm-hdr-cal">872</b></span>
+                <span class="epm-telem-pill" title="Official Regulatory Circulars">📜 <b id="epm-hdr-circ">23</b></span>
+                <span class="epm-telem-pill" title="Telegram Forwarder Status">📡 <b id="epm-hdr-tg">TG OK</b></span>
+                <span class="epm-telem-pill" title="Current Time (IST)">⏱️ <b id="epm-hdr-ist">12:50 IST</b></span>
             </div>
         </div>
 
-        <!-- Live Macro Telemetry Ribbon -->
+        <!-- Live Macro Ticker Ribbon -->
         <div class="epm-telemetry-strip" id="epm-telemetry-ticker">
             <div class="epm-ticker-item" title="Nifty 50 Index (NSE)">
                 <span class="epm-ticker-sym">NIFTY 50</span>
@@ -2635,7 +2803,7 @@ TOP_NAVBAR_HTML = """
             </div>
             <div class="epm-ticker-divider"></div>
             <div class="epm-ticker-item" title="Brent Crude Oil Spot ($/bbl)">
-                <span class="epm-ticker-sym">BRENT CRUDE</span>
+                <span class="epm-ticker-sym">BRENT</span>
                 <span class="epm-ticker-val">$74.20</span>
                 <span class="epm-ticker-chg up">▲ +0.54%</span>
             </div>
@@ -2658,14 +2826,41 @@ TOP_NAVBAR_HTML = """
                 <span class="epm-ticker-chg up">▲ +0.12%</span>
             </div>
         </div>
+    </div>
 
-        <!-- Navbar Controls Right -->
+    <!-- Row 2: Unified Navigation Tabs (Left) + Quick Utilities (Right) on ONE line -->
+    <div class="epm-nav-row-2">
+        <!-- 5 Page Navigation Tabs -->
+        <div class="epm-quick-tabs-container">
+            <button type="button" class="epm-tab-pill active" onclick="window.epmSwitchTab(0, this)">
+                <span class="epm-tab-pill-icon">📰</span>
+                <span>Live Wire</span>
+            </button>
+            <button type="button" class="epm-tab-pill" onclick="window.epmSwitchTab(1, this)">
+                <span class="epm-tab-pill-icon">📅</span>
+                <span>Market Calendar</span>
+            </button>
+            <button type="button" class="epm-tab-pill" onclick="window.epmSwitchTab(2, this)">
+                <span class="epm-tab-pill-icon">📜</span>
+                <span>Regulatory Circulars</span>
+            </button>
+            <button type="button" class="epm-tab-pill" onclick="window.epmSwitchTab(3, this)">
+                <span class="epm-tab-pill-icon">⚙️</span>
+                <span>Settings Hub</span>
+            </button>
+            <button type="button" class="epm-tab-pill" onclick="window.epmSwitchTab(4, this)">
+                <span class="epm-tab-pill-icon">❓</span>
+                <span>User Guide</span>
+            </button>
+        </div>
+
+        <!-- Quick Utilities & Actions -->
         <div class="epm-nav-controls">
             <!-- Watchlist Highlighter Input -->
             <div class="epm-nav-search-wrap" title="Highlight table rows matching keywords/tickers">
                 <span class="epm-nav-search-icon">🔍</span>
                 <input id="epm-watchlist-input" type="text" placeholder="Highlight Ticker..." oninput="window.epmApplyWatchlist(this.value)">
-                <span id="epm-watchlist-count" class="epm-watchlist-badge" style="display:none;">0 matches</span>
+                <span id="epm-watchlist-count" class="epm-watchlist-badge" style="display:none;">0</span>
                 <button type="button" class="epm-watchlist-clear-btn" onclick="window.epmClearWatchlist()" title="Clear highlighter">✕</button>
             </div>
 
@@ -2684,32 +2879,6 @@ TOP_NAVBAR_HTML = """
             <!-- Quick Resource Links -->
             <a href="/api/calendar/ics" target="_blank" class="epm-nav-link" title="RFC-5545 iCalendar Subscription Feed">📅 iCal</a>
             <a href="/docs" target="_blank" class="epm-nav-link" title="OpenAPI / Swagger REST API Docs">⚡ API</a>
-        </div>
-    </div>
-
-    <!-- Row 2: Quick Tab Switcher Pills -->
-    <div class="epm-nav-tabs-row">
-        <div class="epm-quick-tabs-container">
-            <button type="button" class="epm-tab-pill active" onclick="window.epmSwitchTab(0, this)">
-                <span class="epm-tab-pill-icon">📰</span>
-                <span>Live Wire</span>
-            </button>
-            <button type="button" class="epm-tab-pill" onclick="window.epmSwitchTab(1, this)">
-                <span class="epm-tab-pill-icon">📅</span>
-                <span>Market Calendar</span>
-            </button>
-            <button type="button" class="epm-tab-pill" onclick="window.epmSwitchTab(2, this)">
-                <span class="epm-tab-pill-icon">📜</span>
-                <span>Regulatory Circulars</span>
-            </button>
-            <button type="button" class="epm-tab-pill" onclick="window.epmSwitchTab(3, this)">
-                <span class="epm-tab-pill-icon">⚙️</span>
-                <span>Settings & Integrations</span>
-            </button>
-            <button type="button" class="epm-tab-pill" onclick="window.epmSwitchTab(4, this)">
-                <span class="epm-tab-pill-icon">❓</span>
-                <span>User Guide</span>
-            </button>
         </div>
     </div>
 </div>
@@ -3037,7 +3206,7 @@ TERMINAL_CLIENT_JS = r"""
         const isCollapsed = drawer.classList.toggle("collapsed");
         if (btn) {
             const btnSpan = btn.querySelector("span") || btn;
-            btnSpan.textContent = isCollapsed ? "🛠️ Action & Dispatch Toolbar: Collapsed · Click to Expand" : "👁️ Hide Toolbar (Zen Mode)";
+            btnSpan.textContent = isCollapsed ? "🛠️ Tools (Expand)" : "✕ Hide Tools";
         }
         localStorage.setItem("epm_cal_drawer_collapsed", isCollapsed ? "true" : "false");
     };
@@ -3049,10 +3218,41 @@ TERMINAL_CLIENT_JS = r"""
         const isCollapsed = drawer.classList.toggle("collapsed");
         if (btn) {
             const btnSpan = btn.querySelector("span") || btn;
-            btnSpan.textContent = isCollapsed ? "⚙️ Circular Actions [Collapsed] · Click to Expand" : "👁️ Hide Toolbar (Zen Mode)";
+            btnSpan.textContent = isCollapsed ? "🛠️ Tools (Expand)" : "✕ Hide Tools";
         }
         localStorage.setItem("epm_circ_drawer_collapsed", isCollapsed ? "true" : "false");
     };
+
+    // 9. IST Clock & Status Telemetry Sync Engine
+    function updateISTClock() {
+        try {
+            const now = new Date();
+            const options = { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
+            const istStr = new Intl.DateTimeFormat([], options).format(now);
+            const clockEl = document.getElementById("epm-hdr-ist");
+            if (clockEl) clockEl.textContent = istStr + " IST";
+        } catch(e) {}
+    }
+    setInterval(updateISTClock, 1000);
+
+    function syncTelemetryFromStatusBox() {
+        const box = document.getElementById("epm-status-box");
+        if (!box) return;
+        const txt = box.textContent || "";
+        const mNews = txt.match(/Cached News:\s*(\d+)/i);
+        if (mNews && document.getElementById("epm-hdr-news")) {
+            document.getElementById("epm-hdr-news").textContent = mNews[1];
+        }
+        const mCal = txt.match(/Multi-Market Events:\s*(\d+)/i);
+        if (mCal && document.getElementById("epm-hdr-cal")) {
+            document.getElementById("epm-hdr-cal").textContent = mCal[1];
+        }
+        const mCirc = txt.match(/Regulatory Circulars:\s*(\d+)/i);
+        if (mCirc && document.getElementById("epm-hdr-circ")) {
+            document.getElementById("epm-hdr-circ").textContent = mCirc[1];
+        }
+    }
+    setInterval(syncTelemetryFromStatusBox, 2000);
 
     window.addEventListener("keydown", function(e) {
         if (e.key === "Escape") {
@@ -3067,24 +3267,26 @@ TERMINAL_CLIENT_JS = r"""
     function epmInitTerminal() {
         epmUpdateAudioUI();
         window.epmSetGlobalDensity(currentGlobalDensity);
+        updateISTClock();
+        syncTelemetryFromStatusBox();
         
-        if (localStorage.getItem("epm_cal_drawer_collapsed") === "true") {
-            const drawer = document.getElementById("cal_action_drawer");
-            const btn = document.getElementById("cal_drawer_toggle");
-            if (drawer) drawer.classList.add("collapsed");
-            if (btn) {
-                const s = btn.querySelector("span") || btn;
-                s.textContent = "🛠️ Action & Dispatch Toolbar: Collapsed · Click to Expand";
-            }
+        // Default action drawers to collapsed for ultra-compact vertical footprint
+        const calCollapsed = localStorage.getItem("epm_cal_drawer_collapsed") !== "false";
+        const cDrawer = document.getElementById("cal_action_drawer");
+        const cBtn = document.getElementById("cal_drawer_toggle");
+        if (cDrawer && calCollapsed) cDrawer.classList.add("collapsed");
+        if (cBtn) {
+            const s = cBtn.querySelector("span") || cBtn;
+            s.textContent = calCollapsed ? "🛠️ Tools (Expand)" : "✕ Hide Tools";
         }
-        if (localStorage.getItem("epm_circ_drawer_collapsed") === "true") {
-            const drawer = document.getElementById("circ_action_drawer");
-            const btn = document.getElementById("circ_drawer_toggle");
-            if (drawer) drawer.classList.add("collapsed");
-            if (btn) {
-                const s = btn.querySelector("span") || btn;
-                s.textContent = "⚙️ Circular Actions [Collapsed] · Click to Expand";
-            }
+        
+        const circCollapsed = localStorage.getItem("epm_circ_drawer_collapsed") !== "false";
+        const crDrawer = document.getElementById("circ_action_drawer");
+        const crBtn = document.getElementById("circ_drawer_toggle");
+        if (crDrawer && circCollapsed) crDrawer.classList.add("collapsed");
+        if (crBtn) {
+            const s = crBtn.querySelector("span") || crBtn;
+            s.textContent = circCollapsed ? "🛠️ Tools (Expand)" : "✕ Hide Tools";
         }
         
         const savedQuery = localStorage.getItem("epm_watchlist") || "";
@@ -3151,18 +3353,17 @@ init_circ_summary, init_circ_html, init_circ_rows = get_circulars_view()
 
 with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence Terminal", fill_width=True) as demo:
     gr.HTML("<style>" + CUSTOM_CSS + "</style>" + TOP_NAVBAR_HTML + "<script>" + TERMINAL_CLIENT_JS + "</script>")
-    status_box = gr.Markdown(value=init_status_str)
+    status_box = gr.Markdown(value=init_status_str, elem_id="epm-status-box")
 
     with gr.Tabs(overflow_behavior="wrap"):
         # ═══════════════════════════════════════════════════════════
         # TAB 1: Live Financial Wire & Breaking Catalysts
         # ═══════════════════════════════════════════════════════════
         with gr.TabItem("📰 Live Financial Wire & Breaking Catalysts"):
-            with gr.Row():
-                gr.Markdown("### 🚨 Institutional Breaking Wire (Real-Time AI Scored)")
-                refresh_btn = gr.Button("🔄 Force Refresh & Re-Score Feeds", variant="primary", scale=0)
+            with gr.Row(elem_id="tab1_header_strip"):
+                gr.HTML(render_table_ribbon("top_news_table", "Institutional Breaking Wire", subtitle="AI Scored ≥ 7", count_badge="Primary Catalysts"))
+                refresh_btn = gr.Button("🔄 Force Refresh Feeds", variant="primary", elem_id="tab1_refresh_btn", scale=0)
 
-            gr.HTML(render_table_ribbon("top_news_table", "Institutional Breaking Wire", subtitle="AI Scored ≥ 7", count_badge="Primary Catalysts"))
             top_table = gr.Dataframe(
                 headers=["Score", "Sentiment", "Impact", "Headline", "Sectors/Tickers", "AI Reasoning", "Source", "Relevance", "Time"],
                 datatype=["str", "str", "str", "markdown", "str", "str", "str", "str", "str"],
@@ -3172,7 +3373,6 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                 elem_id="top_news_table"
             )
 
-            gr.Markdown("### 🌐 Broad Market Secondary Stream")
             gr.HTML(render_table_ribbon("bottom_news_table", "Broad Market Secondary Stream", subtitle="All Feeds", count_badge="Raw Wire"))
             bottom_table = gr.Dataframe(
                 headers=["Time", "Source", "Headline", "Relevance", "Sentiment", "URL"],
@@ -3198,13 +3398,12 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
         # TAB 2: Multi-Market Calendar, Live Timers & Outcomes
         # ═══════════════════════════════════════════════════════════
         with gr.TabItem("📅 Market Calendar, Timers & Outcomes"):
-            gr.Markdown("### ⏱️ Multi-Market Economic & Corporate Schedule")
-            cal_info_bar = gr.Markdown(value=init_cal_summary)
+            cal_info_bar = gr.Markdown(value=init_cal_summary, elem_id="cal_info_bar")
 
-            with gr.Row():
+            with gr.Row(elem_id="cal_filters_row"):
                 cal_market_filter = gr.Radio(
                     choices=[
-                        ("🌐 All 5 Markets", "ALL"),
+                        ("🌐 ALL", "ALL"),
                         ("🇮🇳 NSE", "NSE"),
                         ("🇮🇳 BSE", "BSE"),
                         ("⛽ MCX", "MCX"),
@@ -3212,26 +3411,26 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                         ("🇺🇸 NYSE", "NYSE")
                     ],
                     value="ALL",
-                    label="Filter by Market",
+                    label="",
+                    show_label=False,
                     scale=3
                 )
                 cal_filter = gr.Radio(
                     choices=[
                         ("All Scheduled", "all"),
-                        ("Today's Events (7:00 AM)", "today"),
-                        ("Tomorrow's Events (7:05 AM)", "tomorrow"),
-                        ("Next 7 Days", "week"),
-                        ("Upcoming Only (Active Timer)", "upcoming")
+                        ("Today (7 AM)", "today"),
+                        ("Tomorrow (7 AM)", "tomorrow"),
+                        ("7 Days", "week"),
+                        ("Active Timers", "upcoming")
                     ],
                     value="all",
-                    label="Filter by Time Window",
+                    label="",
+                    show_label=False,
                     scale=3
                 )
+                cal_drawer_toggle = gr.Button("🛠️ Tools (Expand)", elem_id="cal_drawer_toggle", variant="secondary", scale=0)
 
-            with gr.Row(elem_classes=["epm-drawer-toggle-row"]):
-                cal_drawer_toggle = gr.Button("👁️ Hide Toolbar (Zen Mode)", elem_id="cal_drawer_toggle", variant="secondary")
-
-            with gr.Column(elem_id="cal_action_drawer", elem_classes=["epm-action-drawer"]):
+            with gr.Column(elem_id="cal_action_drawer", elem_classes=["epm-action-drawer", "collapsed"]):
                 with gr.Row():
                     cal_sync_btn = gr.Button("🔄 Sync 5 Markets & Timers", variant="primary", scale=1)
                     btn_sync_gcal = gr.Button("📅 Sync Google Calendar", variant="secondary", scale=1)
@@ -3244,9 +3443,8 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                     btn_push_today = gr.Button("💬 Send Today's Text Snapshot", variant="secondary", scale=1)
                     btn_push_tomorrow = gr.Button("💬 Send Tomorrow's Text Snapshot", variant="secondary", scale=1)
 
-            cal_action_msg = gr.Markdown()
+            cal_action_msg = gr.Markdown(elem_id="cal_action_msg")
 
-            gr.Markdown("### 📊 Multi-Market Catalyst Schedule & Historical Outcomes")
             gr.HTML(render_table_ribbon("calendar_table", "Multi-Market Catalyst Schedule & Historical Outcomes", subtitle="5 Bourses", count_badge="Live Timers"))
             calendar_table = gr.Dataframe(
                 headers=[
@@ -3274,7 +3472,6 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
             with gr.Accordion("🎴 Visual Catalyst Countdown Feed (Cards View)", open=False):
                 calendar_visual_feed = gr.HTML(value=init_cal_html, elem_id="calendar_visual_feed")
 
-            gr.Markdown("### 🏛️ 2026 Authoritative Multi-Market Trading Holidays (`NSE` · `BSE` · `MCX` · `NYSE` · `CRYPTO`)")
             gr.HTML(render_table_ribbon("holidays_table", "2026 Authoritative Trading Holidays", subtitle="NSE · BSE · MCX · NYSE · CRYPTO", count_badge="All Sessions"))
             holidays_table = gr.Dataframe(
                 headers=[
@@ -3339,51 +3536,49 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
         # TAB 3: Official Regulatory Circulars & Notifications Repository
         # ═══════════════════════════════════════════════════════════
         with gr.TabItem("📜 Regulatory Circulars & Official PDFs"):
-            gr.Markdown("### 🏛️ Official Regulatory Circulars & Verified Document Repository")
-            circ_info_bar = gr.Markdown(value=init_circ_summary)
+            circ_info_bar = gr.Markdown(value=init_circ_summary, elem_id="circ_info_bar")
 
-            with gr.Row():
+            with gr.Row(elem_id="circ_filters_row"):
                 circ_reg_filter = gr.Radio(
                     choices=[
-                        ("🌐 All Regulators", "ALL"),
+                        ("🌐 ALL", "ALL"),
                         ("🇮🇳 NSE", "NSE"),
                         ("🇮🇳 BSE", "BSE"),
                         ("⛽ MCX", "MCX"),
                         ("🏛️ RBI", "RBI"),
                         ("🇮🇳 FINMIN", "FINMIN"),
                         ("🇺🇸 FOMC", "FOMC"),
-                        ("🇺🇸 NYSE", "NYSE"),
-                        ("₿ CRYPTO", "CRYPTO")
+                        ("🇺🇸 NYSE", "NYSE")
                     ],
                     value="ALL",
-                    label="Filter by Regulatory Authority",
+                    label="",
+                    show_label=False,
                     scale=4
                 )
                 circ_imp_filter = gr.Radio(
                     choices=[
-                        ("All Releases", "ALL"),
-                        ("🚨 Critical / High Impact Only", "HIGH")
+                        ("All", "ALL"),
+                        ("🚨 High Impact", "HIGH")
                     ],
                     value="ALL",
-                    label="Filter by Impact Level",
+                    label="",
+                    show_label=False,
+                    scale=1
+                )
+                circ_search = gr.Textbox(
+                    placeholder="Search circulars / keywords...",
+                    label="",
+                    show_label=False,
                     scale=2
                 )
+                circ_drawer_toggle = gr.Button("🛠️ Tools (Expand)", elem_id="circ_drawer_toggle", variant="secondary", scale=0)
 
-            with gr.Row():
-                circ_search = gr.Textbox(
-                    placeholder="Search circulars by subject, keyword (e.g. margin, circuit, repo, expiry) or reference number...",
-                    label="Search Regulatory Repository",
-                    scale=4
-                )
-                circ_drawer_toggle = gr.Button("👁️ Hide Toolbar (Zen Mode)", elem_id="circ_drawer_toggle", variant="secondary", scale=1)
-
-            with gr.Row(elem_id="circ_action_drawer", elem_classes=["epm-action-drawer"]):
+            with gr.Row(elem_id="circ_action_drawer", elem_classes=["epm-action-drawer", "collapsed"]):
                 circ_refresh_btn = gr.Button("🔄 Check & Poll Latest Circulars", variant="primary", scale=1)
                 circ_dispatch_btn = gr.Button("📲 Forward Latest Circular to Telegram", variant="secondary", scale=1)
 
-            circ_action_msg = gr.Markdown()
+            circ_action_msg = gr.Markdown(elem_id="circ_action_msg")
 
-            gr.Markdown("### 📑 Official Regulatory Documents Directory (Verified PDFs)")
             gr.HTML(render_table_ribbon("circ_table", "Official Regulatory Documents Directory", subtitle="Verified PDFs", count_badge="Directives"))
             circ_table = gr.Dataframe(
                 headers=[
@@ -3437,10 +3632,7 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
         # TAB 4: Portal Settings Page (Alert Channels, Google Cal & Sources)
         # ═══════════════════════════════════════════════════════════
         with gr.TabItem("⚙️ Portal Settings & Integrations"):
-            gr.Markdown("## ⚙️ System Settings & External Integrations Hub")
-            gr.Markdown(
-                "Manage all credentials, automated dispatch frequencies, Google Calendar synchronization, and connected market news wires for the portal."
-            )
+            gr.Markdown("### ⚙️ System Settings & External Integrations Hub", elem_id="settings_hdr")
 
             with gr.Row():
                 with gr.Column():
