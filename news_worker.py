@@ -578,12 +578,6 @@ class NewsEngineWorker:
         with self.lock:
             if hid in self.alerted_hashes or is_hash_in_db(hid):
                 return
-            
-            # Semantic cross-wire duplicate suppression
-            is_dup, master = semantic_clusterer.check_duplicate_or_cluster(item)
-            if is_dup:
-                logger.info(f"Suppressed cross-wire duplicate story: '{item.get('title')[:60]}' (Clustered with '{master.get('title')[:60]}')")
-                return
 
             self.alerted_hashes.add(hid)
             record_hash_in_db(hid, item.get("title", ""))

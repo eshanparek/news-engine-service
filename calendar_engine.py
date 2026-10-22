@@ -2027,7 +2027,7 @@ class MarketCalendarEngine:
                         self.outcome_alerted.add(eid)
                         self._save_state()
                         ev_copy = dict(ev)
-                        if self.initial_boot_complete and is_benchmark_event(ev_copy):
+                        if getattr(telegram_notifier, "alert_on_linked_news", False) and self.initial_boot_complete and is_benchmark_event(ev_copy):
                             formatted_msg = self.format_single_event_message(ev_copy, alert_type="LINKED_NEWS")
                             threading.Thread(
                                 target=telegram_notifier.send_calendar_alert,
@@ -2035,7 +2035,7 @@ class MarketCalendarEngine:
                                 daemon=True
                             ).start()
                         else:
-                            logger.debug(f"Silenced non-benchmark live outcome alert for {eid}")
+                            logger.debug(f"Silenced non-benchmark or disabled live outcome alert for {eid}")
 
             if not matched_any:
                 is_result_headline = any(
@@ -2086,7 +2086,7 @@ class MarketCalendarEngine:
                             self.events[dyn_id] = new_ev
                             self.outcome_alerted.add(dyn_id)
                             self._save_state()
-                            if self.initial_boot_complete:
+                            if getattr(telegram_notifier, "alert_on_linked_news", False) and self.initial_boot_complete:
                                 formatted_msg = self.format_single_event_message(new_ev, alert_type="LINKED_NEWS")
                                 threading.Thread(
                                     target=telegram_notifier.send_calendar_alert,
@@ -2237,7 +2237,7 @@ class MarketCalendarEngine:
             timer_str, status_code, diff_sec = self.compute_event_timer(ev)
 
             # A. T-15 Minute Countdown Alert (0 < diff_sec <= 900) - Benchmark High-Impact Events Only!
-            if 0 < diff_sec <= 900 and eid not in self.countdown_alerted:
+            if getattr(telegram_notifier, "alert_on_countdown", False) and 0 < diff_sec <= 900 and eid not in self.countdown_alerted:
                 self.countdown_alerted.add(eid)
                 self._save_state()
                 if is_benchmark_event(ev):
@@ -2249,7 +2249,7 @@ class MarketCalendarEngine:
             # B. Individual Event Unfolded / Outcome Released Alert - Benchmark High-Impact Events Only!
             actual = str(ev.get("actual", "⏳ Pending"))
             has_actual = not actual.startswith("⏳") and actual != ""
-            if has_actual and ev.get("date") == today_str and eid not in self.outcome_alerted:
+            if getattr(telegram_notifier, "alert_on_outcome", False) and has_actual and ev.get("date") == today_str and eid not in self.outcome_alerted:
                 self.outcome_alerted.add(eid)
                 self._save_state()
                 if is_benchmark_event(ev):

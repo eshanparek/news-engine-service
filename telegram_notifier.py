@@ -2,6 +2,7 @@ import os
 import re
 import json
 import time
+import html
 import logging
 import threading
 import requests
@@ -34,15 +35,15 @@ class TelegramNotifier:
         self.calendar_chat_id = os.getenv("CALENDAR_TELEGRAM_CHAT_ID", "").strip()
         self.calendar_enabled = os.getenv("ENABLE_CALENDAR_ALERTS", "true").lower() == "true"
 
-        # Granular Calendar Automation Toggles
-        self.alert_on_countdown = True         # T-15m reminder alert per event
-        self.alert_on_outcome = True           # Individual event outcome / unfolding alert
-        self.alert_on_linked_news = True       # Individual event linked breaking news alert
-        self.auto_daily_today_7am = True       # 7:00 AM IST Today's complete snapshot (5 separate market msgs)
-        self.auto_daily_tomorrow_705am = True  # 7:05 AM IST Tomorrow's lined-up snapshot (5 separate market msgs)
-        self.auto_holiday_7am = True           # 7:00 AM IST Next-day trading holiday alert
-        self.auto_weekly_fri_7am = True        # Friday 07:00 AM IST Weekly Calendar Sync Link
-        self.auto_circulars_tg = True          # Auto-forward high impact official regulatory circulars
+        # Granular Calendar Automation Toggles - strictly 7:00 AM daily snapshot only
+        self.alert_on_countdown = False        # Disabled: No countdown spam
+        self.alert_on_outcome = False          # Disabled: No individual outcome spam
+        self.alert_on_linked_news = False      # Disabled: No linked news calendar alerts
+        self.auto_daily_today_7am = True       # Enabled: 07:00 AM IST Today's complete snapshot
+        self.auto_daily_tomorrow_705am = False # Disabled: Daily 7 AM only
+        self.auto_holiday_7am = True           # Enabled: 07:00 AM IST Next-day trading holiday alert
+        self.auto_weekly_fri_7am = False       # Disabled: No weekly blast
+        self.auto_circulars_tg = False         # Disabled: Circulars separate
         self.send_as_photos = True             # Deliver morning calendar as high-definition infographic photos
         self.public_app_url = os.getenv("PUBLIC_APP_URL", "").strip()
         self._send_lock = threading.Lock()
@@ -78,22 +79,38 @@ class TelegramNotifier:
                     self.calendar_enabled = bool(data["calendar_enabled"])
                 if "alert_on_countdown" in data:
                     self.alert_on_countdown = bool(data["alert_on_countdown"])
+                else:
+                    self.alert_on_countdown = False
                 if "alert_on_outcome" in data:
                     self.alert_on_outcome = bool(data["alert_on_outcome"])
+                else:
+                    self.alert_on_outcome = False
                 if "alert_on_linked_news" in data:
                     self.alert_on_linked_news = bool(data["alert_on_linked_news"])
+                else:
+                    self.alert_on_linked_news = False
                 if "auto_daily_today_7am" in data:
                     self.auto_daily_today_7am = bool(data["auto_daily_today_7am"])
+                else:
+                    self.auto_daily_today_7am = True
                 if "auto_daily_tomorrow_705am" in data:
                     self.auto_daily_tomorrow_705am = bool(data["auto_daily_tomorrow_705am"])
+                else:
+                    self.auto_daily_tomorrow_705am = False
                 if "auto_holiday_7am" in data:
                     self.auto_holiday_7am = bool(data["auto_holiday_7am"])
+                else:
+                    self.auto_holiday_7am = True
                 if "auto_circulars_tg" in data:
                     self.auto_circulars_tg = bool(data["auto_circulars_tg"])
+                else:
+                    self.auto_circulars_tg = False
                 if "auto_weekly_fri_7am" in data:
                     self.auto_weekly_fri_7am = bool(data["auto_weekly_fri_7am"])
                 elif "auto_weekly_mon_7am" in data:
                     self.auto_weekly_fri_7am = bool(data["auto_weekly_mon_7am"])
+                else:
+                    self.auto_weekly_fri_7am = False
                 if "send_as_photos" in data:
                     self.send_as_photos = bool(data["send_as_photos"])
                 if data.get("public_app_url"):
@@ -110,16 +127,16 @@ class TelegramNotifier:
         calendar_bot_token: str,
         calendar_chat_id: str,
         calendar_enabled: bool,
-        alert_on_countdown: bool = True,
-        alert_on_outcome: bool = True,
-        alert_on_linked_news: bool = True,
+        alert_on_countdown: bool = False,
+        alert_on_outcome: bool = False,
+        alert_on_linked_news: bool = False,
         auto_daily_today_7am: bool = True,
-        auto_daily_tomorrow_705am: bool = True,
+        auto_daily_tomorrow_705am: bool = False,
         auto_holiday_7am: bool = True,
         send_as_photos: bool = True,
         public_app_url: str = "",
-        auto_weekly_fri_7am: bool = True,
-        auto_circulars_tg: bool = True
+        auto_weekly_fri_7am: bool = False,
+        auto_circulars_tg: bool = False
     ) -> Dict:
         if news_bot_token.strip():
             self.bot_token = news_bot_token.strip()
@@ -252,6 +269,20 @@ class TelegramNotifier:
                                 pass
                             logger.warning(f"Telegram Rate Limit (429): backing off for {retry_after + 1}s (attempt {attempt + 1}/3)...")
                             time.sleep(retry_after + 1)
+                        elif resp.status_code == 400 and "can't parse entities" in resp.text.lower():
+                            logger.warning(f"Telegram HTML parse error: {resp.text[:120]}, retrying without HTML formatting...")
+                            plain_payload = dict(payload)
+                            plain_payload.pop("parse_mode", None)
+                            plain_payload["text"] = re.sub(r'<[^>]+>', '', part_text)
+                            resp_plain = requests.post(url, json=plain_payload, timeout=12)
+                            if resp_plain.status_code == 200:
+                                sent_ok = True
+                                break
+                            else:
+                                err_msg = resp_plain.text[:160]
+                                logger.warning(f"Telegram plain fallback error ({resp_plain.status_code}): {err_msg}")
+                                last_err = f"HTTP {resp_plain.status_code}: {err_msg}"
+                                break
                         else:
                             err_msg = resp.text[:160]
                             logger.warning(f"Telegram API error ({resp.status_code}): {err_msg}")
@@ -363,6 +394,7 @@ class TelegramNotifier:
 
     def send_news_alert(self, news: Dict) -> bool:
         if not self.enabled or not self.is_configured():
+            logger.warning(f"[Telegram] News alert skipped: enabled={self.enabled}, bot_token={'SET' if self.bot_token else 'EMPTY'}, chat_id={'SET' if self.chat_id else 'EMPTY'}")
             return False
 
         ai_score = news.get("ai_score", 5)
@@ -384,7 +416,10 @@ class TelegramNotifier:
         else:
             sentiment_label = "⚪ NEUTRAL"
 
-        sectors_str = ", ".join(ai_sectors) if ai_sectors else "Broad Market"
+        safe_sectors = html.escape(", ".join(ai_sectors) if ai_sectors else "Broad Market")
+        safe_title = html.escape(title)
+        safe_source = html.escape(source)
+        safe_reasoning = html.escape(ai_reasoning) if ai_reasoning else ""
 
         if is_high_impact:
             header = (
@@ -399,20 +434,24 @@ class TelegramNotifier:
             )
             score_line = f"🤖 <b>AI Impact Score:</b> {ai_score}/10"
 
-        context_block = f"\n💡 <b>Analysis:</b> <i>{ai_reasoning}</i>" if ai_reasoning else ""
+        context_block = f"\n💡 <b>Analysis:</b> <i>{safe_reasoning}</i>" if safe_reasoning else ""
 
         text = (
             f"{header}\n\n"
-            f"<b>{title}</b>\n\n"
+            f"<b>{safe_title}</b>\n\n"
             f"{score_line}\n"
             f"📊 <b>Sentiment:</b> {sentiment_label}\n"
-            f"🎯 <b>Affected:</b> {sectors_str}"
+            f"🎯 <b>Affected:</b> {safe_sectors}"
             f"{context_block}\n\n"
-            f"🏛 <b>Source:</b> {source} | <b>Relevance:</b> {relevance}%\n"
+            f"🏛 <b>Source:</b> {safe_source} | <b>Relevance:</b> {relevance}%\n"
             f"🔗 <a href='{link}'>Read Full Article</a>"
         )
 
-        ok, _ = self._send_raw_html(self.bot_token, self.chat_id, text, preview=True)
+        ok, err = self._send_raw_html(self.bot_token, self.chat_id, text, preview=True)
+        if ok:
+            logger.info(f"[Telegram] News alert successfully delivered: '{title[:50]}'")
+        else:
+            logger.error(f"[Telegram] News alert delivery failed ({err}): '{title[:50]}'")
         return ok
 
     def send_calendar_alert(self, event: Dict, alert_type: str = "OUTCOME", formatted_html: Optional[str] = None) -> bool:

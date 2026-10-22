@@ -955,8 +955,8 @@ def save_admin_telegram_settings(
     auto_hol_7am: bool,
     send_photos: bool = True,
     public_url: str = "",
-    auto_weekly_fri7am: bool = True,
-    auto_circulars_tg: bool = True
+    auto_weekly_fri7am: bool = False,
+    auto_circulars_tg: bool = False
 ):
     telegram_notifier.save_admin_settings(
         news_bot_token=news_token,
@@ -2221,10 +2221,23 @@ code, .timer-cell, pre {
 }
 
 .epm-tab-pill.active {
-    background: #0f172a !important;
-    color: #ffffff !important;
-    border-color: #0f172a !important;
+    background: #ffffff !important;
+    color: #1d4ed8 !important;
+    border: 1.5px solid #2563eb !important;
+    box-shadow: 0 1px 3px rgba(37, 99, 235, 0.12), 0 0 0 2px rgba(37, 99, 235, 0.16) !important;
     font-weight: 700 !important;
+}
+
+.epm-tab-pill.active *,
+.epm-tab-pill.active span,
+.epm-tab-pill.active .epm-tab-pill-icon {
+    color: #1d4ed8 !important;
+    font-weight: 700 !important;
+}
+
+.epm-tab-pill.active:hover {
+    background: #f8faff !important;
+    border-color: #1d4ed8 !important;
 }
 
 /* 15. Action Drawers (Zen Mode Smooth CSS Animation) */
@@ -3481,11 +3494,11 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                     )
                     adm_auto_weekly_fri7am = gr.Checkbox(
                         label="🗓️ Friday 07:00 AM IST — Auto-Forward Complete Upcoming Week Calendar Link (Apple & Google)",
-                        value=getattr(telegram_notifier, "auto_weekly_fri_7am", True)
+                        value=getattr(telegram_notifier, "auto_weekly_fri_7am", False)
                     )
                     adm_auto_circulars = gr.Checkbox(
                         label="📜 Auto-Forward Critical Regulatory Circulars (NSE, BSE, MCX, RBI, FinMin, FOMC, NYSE, Crypto) with 3-5 Bullets & PDF Link",
-                        value=getattr(telegram_notifier, "auto_circulars_tg", True)
+                        value=getattr(telegram_notifier, "auto_circulars_tg", False)
                     )
                     adm_send_as_photos = gr.Checkbox(
                         label="📸 Deliver Morning Calendar Snapshots as Infographic Photo Cards (Details rendered directly in image)",
