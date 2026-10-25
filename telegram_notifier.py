@@ -447,11 +447,52 @@ class TelegramNotifier:
             f"🔗 <a href='{link}'>Read Full Article</a>"
         )
 
-        ok, err = self._send_raw_html(self.bot_token, self.chat_id, text, preview=True)
+        # Generate Publication-Grade News Graphic Card
+        card_bytes = None
+        try:
+            from news_card_generator import news_card_generator
+            card_bytes = news_card_generator.render_news_card(news)
+        except Exception as e:
+            logger.warning(f"[News Card] Could not render graphic card: {e}")
+
+        # Check if News should be dispatched as Graphic Photos
+        send_as_photo = getattr(self, "send_news_as_photos", True)
+        ok = False
+        err = ""
+
+        if send_as_photo and card_bytes:
+            photo_caption = (
+                f"<b>{safe_title}</b>\n\n"
+                f"{score_line} | {sentiment_label}\n"
+                f"🎯 <b>Affected:</b> {safe_sectors}\n"
+                f"🏛 <b>Source:</b> {safe_source} | 🔗 <a href='{link}'>Read Article</a>"
+            )
+            ok, err = self.send_photo(self.bot_token, self.chat_id, card_bytes, photo_caption)
+            if ok:
+                logger.info(f"[Telegram] News photo card delivered: '{title[:50]}'")
+            else:
+                logger.warning(f"[Telegram] Photo card failed ({err}), falling back to text...")
+                ok, err = self._send_raw_html(self.bot_token, self.chat_id, text, preview=True)
+        else:
+            ok, err = self._send_raw_html(self.bot_token, self.chat_id, text, preview=True)
+
         if ok:
             logger.info(f"[Telegram] News alert successfully delivered: '{title[:50]}'")
         else:
             logger.error(f"[Telegram] News alert delivery failed ({err}): '{title[:50]}'")
+
+        # Omnichannel Parallel Social Broadcast (Instagram, Twitter, Discord)
+        if card_bytes:
+            try:
+                from social_publisher import social_publisher
+                threading.Thread(
+                    target=social_publisher.broadcast_news_all_channels,
+                    args=(news, card_bytes),
+                    daemon=True
+                ).start()
+            except Exception as ex:
+                logger.warning(f"[Omnichannel] Broadcast trigger error: {ex}")
+
         return ok
 
     def send_calendar_alert(self, event: Dict, alert_type: str = "OUTCOME", formatted_html: Optional[str] = None) -> bool:

@@ -1900,7 +1900,21 @@ class MarketCalendarEngine:
         if not photo_items:
             return False, "Failed to render any market calendar photo cards."
 
-        return telegram_notifier.send_calendar_photos_batch(photo_items)
+        tg_res = telegram_notifier.send_calendar_photos_batch(photo_items)
+
+        # Omnichannel Social Media Dispatch (Instagram, Twitter, Discord)
+        try:
+            from social_publisher import social_publisher
+            for png_bytes, cap in photo_items:
+                threading.Thread(
+                    target=social_publisher.broadcast_calendar_card,
+                    args=(mkt, target_date, png_bytes),
+                    daemon=True
+                ).start()
+        except Exception as e:
+            logger.warning(f"[Omnichannel] Calendar social broadcast error: {e}")
+
+        return tg_res
 
     def dispatch_all_markets_today_photo_snapshot(self) -> tuple[bool, str]:
         """Builds and sends 5 separate visual infographic photo cards (NSE, BSE, MCX, CRYPTO, NYSE) to Telegram."""

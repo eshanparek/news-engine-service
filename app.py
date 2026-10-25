@@ -7,7 +7,7 @@ import json
 from typing import Optional, List, Dict
 from datetime import datetime
 from fastapi import FastAPI, Query, BackgroundTasks
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -22,6 +22,8 @@ from whatsapp_notifier import whatsapp_notifier
 from calendar_engine import calendar_engine, now_ist, MARKETS_ORDER, MARKET_META
 from google_calendar_manager import google_calendar_manager
 from circular_engine import circular_engine, REGULATORS, REGULATOR_META
+from social_publisher import social_publisher, MEDIA_DIR
+from news_card_generator import news_card_generator
 
 # 1. Start Background Scraper, Scorer & Multi-Market Calendar Timer Daemons
 news_worker.start()
@@ -44,6 +46,16 @@ app.add_middleware(
 )
 
 START_TIME = time.time()
+
+
+@app.get("/api/media/{filename}")
+async def serve_media(filename: str):
+    """Serves high-contrast 1080x1350 financial infographic cards for Instagram Meta Graph API and external social networks."""
+    safe_fn = os.path.basename(filename)
+    path = os.path.join(MEDIA_DIR, safe_fn)
+    if os.path.exists(path):
+        return FileResponse(path, media_type="image/png")
+    return PlainTextResponse("Media card not found", status_code=404)
 
 
 class NewsItem(BaseModel):
@@ -1011,6 +1023,78 @@ def trigger_test_telegram(target_channel: str):
     if ok:
         return f"✅ **Test alert delivered to {target_channel.upper()} Telegram channel!**"
     return f"❌ **Test alert failed for {target_channel.upper()} channel:** {detail}"
+
+
+def save_social_media_settings(
+    ig_en: bool,
+    ig_acc: str,
+    ig_token: str,
+    tw_en: bool,
+    tw_key: str,
+    tw_sec: str,
+    tw_tok: str,
+    tw_tsec: str,
+    tw_min: int,
+    dc_en: bool,
+    dc_wh: str,
+    news_photos: bool,
+    pub_url: str
+):
+    social_publisher.save_settings(
+        instagram_enabled=ig_en,
+        instagram_account_id=ig_acc,
+        instagram_access_token=ig_token,
+        twitter_enabled=tw_en,
+        twitter_api_key=tw_key,
+        twitter_api_secret=tw_sec,
+        twitter_access_token=tw_tok,
+        twitter_access_secret=tw_tsec,
+        twitter_min_score=tw_min,
+        discord_enabled=dc_en,
+        discord_webhook_url=dc_wh,
+        send_news_as_photos=news_photos,
+        public_app_url=pub_url
+    )
+    telegram_notifier.send_news_as_photos = news_photos
+    ig_status = "🟢 Enabled" if ig_en else "⚪ Disabled"
+    tw_status = "🟢 Enabled" if tw_en else "⚪ Disabled"
+    dc_status = "🟢 Enabled" if dc_en else "⚪ Disabled"
+    mode = "Graphic Infographic Cards 🖼️" if news_photos else "Plain Text 💬"
+    return (
+        f"✅ **Omnichannel Social Media Settings Saved!**\n\n"
+        f"• **Instagram Meta Graph API:** {ig_status} (ID: `{ig_acc or 'None'}`)\n"
+        f"• **X / Twitter API v2:** {tw_status} (Min Score: `{tw_min}/10`)\n"
+        f"• **Discord Webhook:** {dc_status}\n"
+        f"• **Visual Format:** `{mode}`\n"
+        f"• **Public Image Server URL:** `{social_publisher.get_public_url()}`"
+    )
+
+
+def trigger_test_social(platform: str):
+    sample = {
+        "title": "RBI Unexpectedly Cuts Repo Rate by 25 bps; Injects Rs. 1.2 Lakh Cr Liquidity",
+        "ai_score": 9,
+        "ai_sentiment": "BULLISH",
+        "ai_impact": "HIGH",
+        "ai_sectors": ["Banking", "NBFC", "Auto", "Real Estate"],
+        "ai_reasoning": "Off-cycle monetary easing to accelerate credit growth and expand banking net interest margins.",
+        "source": "EPM Pro Institutional Wire",
+        "timestamp": now_ist().strftime("%Y-%m-%d %H:%M IST")
+    }
+    card_bytes = news_card_generator.render_news_card(sample)
+    if platform == "instagram":
+        caption = social_publisher.format_social_caption(sample)
+        ok, msg = social_publisher.post_to_instagram(card_bytes, caption)
+        return f"📸 **Instagram Test Post:** {'✅ ' if ok else '❌ '} {msg}"
+    elif platform == "twitter":
+        text = social_publisher.format_twitter_text(sample)
+        ok, msg = social_publisher.post_to_twitter(card_bytes, text)
+        return f"🐦 **Twitter Test Tweet:** {'✅ ' if ok else '❌ '} {msg}"
+    elif platform == "discord":
+        desc = sample.get("ai_reasoning", "")
+        ok, msg = social_publisher.post_to_discord(card_bytes, sample["title"], desc, 0x10b981)
+        return f"🎮 **Discord Test Embed:** {'✅ ' if ok else '❌ '} {msg}"
+    return "Unknown platform"
 
 
 def get_sources_table():
@@ -3771,6 +3855,106 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                 outputs=[gcal_admin_status]
             )
             sync_gcal_admin_btn.click(trigger_sync_google_cal, outputs=[gcal_admin_status])
+
+            gr.Markdown("---")
+            gr.Markdown("### 📸 Omnichannel Social Media Auto-Broadcasting Hub (Instagram, X / Twitter & Discord)")
+            gr.Markdown(
+                "Directly publishes publication-grade **1080×1350 financial infographic cards** (Finshots/Bloomberg style) and morning multi-market calendar snapshots to **Instagram, X / Twitter, and Discord** via official APIs."
+            )
+            with gr.Row():
+                with gr.Column():
+                    gr.Markdown("#### 📸 Instagram Integration (Meta Graph API)")
+                    adm_ig_enabled = gr.Checkbox(
+                        label="Enable Instagram Auto-Posting (Visual Cards & Captions)",
+                        value=social_publisher.instagram_enabled
+                    )
+                    adm_ig_account_id = gr.Textbox(
+                        label="Instagram Business / Creator Account ID",
+                        value=social_publisher.instagram_account_id,
+                        placeholder="e.g. 17841400000000000"
+                    )
+                    adm_ig_token = gr.Textbox(
+                        label="Meta Graph API Access Token",
+                        value=social_publisher.instagram_access_token,
+                        type="password",
+                        placeholder="Paste long-lived Meta Page/IG Token..."
+                    )
+                    test_ig_btn = gr.Button("📸 Send Test 1080×1350 Card to Instagram")
+
+                    gr.Markdown("#### 🎮 Discord Webhook Integration")
+                    adm_discord_enabled = gr.Checkbox(
+                        label="Enable Discord Channel Alerts",
+                        value=social_publisher.discord_enabled
+                    )
+                    adm_discord_webhook = gr.Textbox(
+                        label="Discord Webhook URL",
+                        value=social_publisher.discord_webhook_url,
+                        placeholder="https://discord.com/api/webhooks/..."
+                    )
+                    test_discord_btn = gr.Button("🎮 Send Test Rich Embed to Discord")
+
+                with gr.Column():
+                    gr.Markdown("#### 🐦 X / Twitter API v2 (Direct Integration)")
+                    adm_twitter_enabled = gr.Checkbox(
+                        label="Enable X / Twitter Auto-Tweeting (Card + $Cashtags)",
+                        value=social_publisher.twitter_enabled
+                    )
+                    adm_tw_api_key = gr.Textbox(
+                        label="API Key (Consumer Key)",
+                        value=social_publisher.twitter_api_key,
+                        placeholder="Twitter App API Key..."
+                    )
+                    adm_tw_api_secret = gr.Textbox(
+                        label="API Key Secret",
+                        value=social_publisher.twitter_api_secret,
+                        type="password",
+                        placeholder="Twitter App API Key Secret..."
+                    )
+                    adm_tw_token = gr.Textbox(
+                        label="Access Token",
+                        value=social_publisher.twitter_access_token,
+                        placeholder="OAuth Access Token..."
+                    )
+                    adm_tw_secret = gr.Textbox(
+                        label="Access Token Secret",
+                        value=social_publisher.twitter_access_secret,
+                        type="password",
+                        placeholder="OAuth Access Token Secret..."
+                    )
+                    adm_tw_min_score = gr.Slider(
+                        minimum=5, maximum=10, step=1,
+                        label="Minimum AI Score to Tweet (Recommended: 8 - Stays within 1,500/mo Free Tier)",
+                        value=social_publisher.twitter_min_score
+                    )
+                    test_tw_btn = gr.Button("🐦 Send Test Tweet with Image Card")
+
+                    gr.Markdown("#### 🖼️ Image-Only Visual Dispatch Mode")
+                    adm_news_photos = gr.Checkbox(
+                        label="Deliver News as Graphic Infographic Cards instead of plain text across Telegram & all channels",
+                        value=social_publisher.send_news_as_photos
+                    )
+                    adm_social_pub_url = gr.Textbox(
+                        label="Public Image Server URL (For Meta/Instagram to fetch card images)",
+                        value=social_publisher.get_public_url(),
+                        placeholder="https://p01--news-engine-service--dkhqtlpvx6bh.code.run"
+                    )
+
+            save_social_btn = gr.Button("💾 Save Omnichannel Social Media Settings", variant="primary")
+            social_admin_status = gr.Markdown()
+
+            save_social_btn.click(
+                save_social_media_settings,
+                inputs=[
+                    adm_ig_enabled, adm_ig_account_id, adm_ig_token,
+                    adm_twitter_enabled, adm_tw_api_key, adm_tw_api_secret, adm_tw_token, adm_tw_secret, adm_tw_min_score,
+                    adm_discord_enabled, adm_discord_webhook,
+                    adm_news_photos, adm_social_pub_url
+                ],
+                outputs=[social_admin_status]
+            )
+            test_ig_btn.click(lambda: trigger_test_social("instagram"), outputs=[social_admin_status])
+            test_tw_btn.click(lambda: trigger_test_social("twitter"), outputs=[social_admin_status])
+            test_discord_btn.click(lambda: trigger_test_social("discord"), outputs=[social_admin_status])
 
             gr.Markdown("---")
             gr.Markdown("### 📡 Connected News Sources & Selective Forwarding Rules")

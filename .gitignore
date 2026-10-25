@@ -8,3 +8,4 @@ venv/
 admin_settings.json
 calendar_state.json
 sources_config.json
+assets/media_cache/
