@@ -69,6 +69,7 @@ class NewsCardGenerator:
         self.font_bold = None
         self.font_tag = None
         self.font_footer = None
+        self.font_micro = None
 
         for path in font_paths:
             if os.path.exists(path):
@@ -80,6 +81,7 @@ class NewsCardGenerator:
                     self.font_bold = ImageFont.truetype(path, 25)
                     self.font_tag = ImageFont.truetype(path, 17)
                     self.font_footer = ImageFont.truetype(path, 15)
+                    self.font_micro = ImageFont.truetype(path, 11)
                     logger.info(f"Loaded TTF font for news cards: {path}")
                     break
                 except Exception as e:
@@ -95,6 +97,7 @@ class NewsCardGenerator:
             self.font_bold = def_f
             self.font_tag = def_f
             self.font_footer = def_f
+            self.font_micro = def_f
 
     def _wrap_text(self, draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont, max_width: int) -> List[str]:
         words = text.split()
@@ -307,13 +310,13 @@ class NewsCardGenerator:
         draw.rounded_rectangle(term_badge_rect, radius=6, fill=(2, 6, 23), outline=(37, 99, 235), width=1)
         draw.text((width - 325, footer_top + 23), "POWERED BY EPM PRO TERMINAL", fill=(96, 165, 250), font=self.font_footer)
 
-        # Mandatory Notifier / Disclaimer across very bottom
-        draw.rectangle([(0, height - 34), (width, height)], fill=(2, 6, 23))
-        draw.line([(0, height - 34), (width, height - 34)], fill=(30, 41, 59), width=1)
+        # Mandatory Microprint Notifier / Disclaimer across very bottom (readable on pinch & zoom)
+        draw.rectangle([(0, height - 24), (width, height)], fill=(2, 6, 23))
+        draw.line([(0, height - 24), (width, height - 24)], fill=(30, 41, 59), width=1)
         disclaimer_text = "Global News Feed Room is Powered by EPMC Pvt. Ltd."
-        d_bbox = draw.textbbox((0, 0), disclaimer_text, font=self.font_bold)
+        d_bbox = draw.textbbox((0, 0), disclaimer_text, font=self.font_micro)
         d_w = d_bbox[2] - d_bbox[0]
-        draw.text(((width - d_w) // 2, height - 26), disclaimer_text, fill=(226, 232, 240), font=self.font_bold)
+        draw.text(((width - d_w) // 2, height - 18), disclaimer_text, fill=(100, 116, 139), font=self.font_micro)
 
         # Output to PNG bytes
         buffer = io.BytesIO()

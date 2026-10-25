@@ -402,13 +402,13 @@ class CalendarCardGenerator:
         draw.text((45, current_y + 18), f"EPM Pro Multi-Market Intelligence Engine  •  Verified Output at {dispatched_time}", fill=(148, 163, 184), font=self.font_small)
         draw.text((width - 420, current_y + 18), "• Synchronized with Google Calendar (60m Prior Alarms)", fill=(37, 99, 235), font=self.font_bold)
 
-        # Mandatory Bottom Notifier / Disclaimer across very bottom
-        draw.rectangle([(0, total_height - 34), (width, total_height)], fill=(15, 23, 42))
-        draw.line([(0, total_height - 34), (width, total_height - 34)], fill=theme["accent"], width=2)
+        # Mandatory Bottom Microprint Notifier / Disclaimer (readable on pinch & zoom)
+        draw.rectangle([(0, total_height - 24), (width, total_height)], fill=(15, 23, 42))
+        draw.line([(0, total_height - 24), (width, total_height - 24)], fill=theme["accent"], width=1)
         disclaimer_text = "Global News Feed Room is Powered by EPMC Pvt. Ltd."
-        d_bbox = draw.textbbox((0, 0), disclaimer_text, font=self.font_bold)
+        d_bbox = draw.textbbox((0, 0), disclaimer_text, font=self.font_micro)
         d_w = d_bbox[2] - d_bbox[0]
-        draw.text(((width - d_w) // 2, total_height - 26), disclaimer_text, fill=(241, 245, 249), font=self.font_bold)
+        draw.text(((width - d_w) // 2, total_height - 18), disclaimer_text, fill=(148, 163, 184), font=self.font_micro)
 
         # Export to optimized PNG buffer
         buf = io.BytesIO()
