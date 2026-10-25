@@ -122,7 +122,7 @@ class CalendarCardGenerator:
         for path in font_paths:
             if os.path.exists(path):
                 try:
-                    self.font_title = ImageFont.truetype(path, 23)
+                    self.font_title = ImageFont.truetype(path, 26)
                     self.font_header = ImageFont.truetype(path, 21)
                     self.font_sub = ImageFont.truetype(path, 15)
                     self.font_bold = ImageFont.truetype(path, 15)
@@ -190,7 +190,7 @@ class CalendarCardGenerator:
         theme = MARKET_THEMES.get(mkt, MARKET_THEMES["NSE"])
 
         width = 1200
-        header_height = 205
+        header_height = 140
         holiday_height = 110 if (holiday_info and page_num == 1) else 0
         stats_ribbon_height = 54
 
@@ -204,7 +204,7 @@ class CalendarCardGenerator:
 
         events_block_height = max(len(page_events) * event_row_height + 85, 200)
         nav_banner_height = 54 if total_pages > 1 else 0
-        footer_height = 96
+        footer_height = 34
         total_height = header_height + holiday_height + stats_ribbon_height + events_block_height + nav_banner_height + footer_height
 
         # Base Canvas: Pure crisp white background (#FFFFFF)
@@ -218,44 +218,43 @@ class CalendarCardGenerator:
         # Bottom Accent neon bar
         draw.rectangle([(0, header_height - 4), (width, header_height)], fill=theme["accent"])
 
-        # Title and Subtitles
+        # Format requested heading: "Calendar for the (date) and (Day)"
         try:
             dt_obj = datetime.strptime(target_date, "%Y-%m-%d")
-            date_formatted = dt_obj.strftime("%A, %d %B %Y").upper()
+            date_str = dt_obj.strftime("%d %b %Y")
+            day_str = dt_obj.strftime("%A")
+            header_heading = f"Calendar for the {date_str} and {day_str}"
         except Exception:
-            date_formatted = target_date
-
-        report_label = "DAILY SCHEDULE & TIMERS" if mode == "TODAY" else "TOMORROW'S SCHEDULE"
+            header_heading = f"Calendar for the {target_date}"
 
         # Market Badge Pill (Eliminates flag emoji tofu boxes)
-        badge_w = 80
-        draw.rounded_rectangle([(45, 26), (45 + badge_w, 64)], radius=6, fill=theme["accent"])
-        draw.text((58, 33), theme["badge"], fill=(255, 255, 255), font=self.font_bold)
+        badge_w = 75
+        draw.rounded_rectangle([(45, 24), (45 + badge_w, 62)], radius=6, fill=theme["accent"])
+        draw.text((58, 31), theme["badge"], fill=(255, 255, 255), font=self.font_bold)
 
-        # Title (Strictly bounded so it never collides with capsule)
-        draw.text((45 + badge_w + 14, 32), clean_text_for_image(theme["title"]), fill=(255, 255, 255), font=self.font_title)
-        draw.text((45, 102), f"Scope: {clean_text_for_image(theme['scope'])}", fill=(203, 213, 225), font=self.font_sub)
-        draw.text((45, 130), f"Trading Hours: {theme['hours']}   |   Timezone: Indian Standard Time (IST)", fill=(148, 163, 184), font=self.font_small)
+        # Header Site Heading: "Calendar for the (date) and (Day)"
+        draw.text((45 + badge_w + 14, 28), header_heading, fill=(255, 255, 255), font=self.font_title)
+        draw.text((45, 78), f"Market: {clean_text_for_image(theme['title'])}   |   Scope: {clean_text_for_image(theme['scope'])}", fill=(203, 213, 225), font=self.font_sub)
+        draw.text((45, 104), f"Trading Hours: {theme['hours']}   |   Timezone: Indian Standard Time (IST)", fill=(148, 163, 184), font=self.font_small)
 
         # Top Right Corner: Global News Feed Room Broadcast TV Bug Logo
         if getattr(self, "logo_img", None):
-            logo_size = 88
+            logo_size = 80
             logo_resized = self.logo_img.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
             logo_x = width - 45 - logo_size
-            logo_y = 20
+            logo_y = 12
             img.paste(logo_resized, (logo_x, logo_y), mask=logo_resized)
             capsule_right = logo_x - 14
         else:
             capsule_right = width - 45
 
-        # Date & Page Capsule (Top Right, beside Logo)
+        # Clean Schedule & Page Capsule (Top Right, beside Logo)
         mode_pill_bg = (30, 41, 59)
-        capsule_w = 330
+        capsule_w = 240
         capsule_left = capsule_right - capsule_w
-        draw.rounded_rectangle([(capsule_left, 24), (capsule_right, 86)], radius=8, fill=mode_pill_bg, outline=theme["accent"], width=2)
-        draw.text((capsule_left + 14, 33), f"REPORT: {report_label}", fill=(255, 255, 255), font=self.font_bold)
-        page_suffix = f"  |  PG {page_num}/{total_pages}" if total_pages > 1 else ""
-        draw.text((capsule_left + 14, 57), f"DATE: {date_formatted}{page_suffix}", fill=(147, 197, 253), font=self.font_small)
+        draw.rounded_rectangle([(capsule_left, 24), (capsule_right, 62)], radius=6, fill=mode_pill_bg, outline=theme["accent"], width=1)
+        page_suffix = f" | PG {page_num}/{total_pages}" if total_pages > 1 else ""
+        draw.text((capsule_left + 16, 33), f"DAILY SCHEDULE{page_suffix}", fill=(255, 255, 255), font=self.font_bold)
 
         current_y = header_height
 
@@ -396,19 +395,13 @@ class CalendarCardGenerator:
                 draw.text((width - 340, current_y + 12), "Complete Ledger Verified on EPM Pro", fill=(71, 85, 105), font=self.font_small)
             current_y += 54
 
-        # ── 7. Futuristic Terminal Footer ──
-        draw.line([(40, current_y + 8), (width - 40, current_y + 8)], fill=(226, 232, 240), width=1)
-        dispatched_time = datetime.now().strftime("%d %b %Y, %H:%M:%S IST")
-        draw.text((45, current_y + 18), f"EPM Pro Multi-Market Intelligence Engine  •  Verified Output at {dispatched_time}", fill=(148, 163, 184), font=self.font_small)
-        draw.text((width - 420, current_y + 18), "• Synchronized with Google Calendar (60m Prior Alarms)", fill=(37, 99, 235), font=self.font_bold)
-
-        # Mandatory Bottom Microprint Notifier / Disclaimer (readable on pinch & zoom)
-        draw.rectangle([(0, total_height - 24), (width, total_height)], fill=(15, 23, 42))
-        draw.line([(0, total_height - 24), (width, total_height - 24)], fill=theme["accent"], width=1)
+        # ── 7. Minimalist Bottom Microprint Strip (readable on pinch & zoom) ──
+        draw.rectangle([(0, total_height - 34), (width, total_height)], fill=(15, 23, 42))
+        draw.line([(0, total_height - 34), (width, total_height - 34)], fill=theme["accent"], width=1)
         disclaimer_text = "Global News Feed Room is Powered by EPMC Pvt. Ltd."
         d_bbox = draw.textbbox((0, 0), disclaimer_text, font=self.font_micro)
         d_w = d_bbox[2] - d_bbox[0]
-        draw.text(((width - d_w) // 2, total_height - 18), disclaimer_text, fill=(148, 163, 184), font=self.font_micro)
+        draw.text(((width - d_w) // 2, total_height - 23), disclaimer_text, fill=(148, 163, 184), font=self.font_micro)
 
         # Export to optimized PNG buffer
         buf = io.BytesIO()

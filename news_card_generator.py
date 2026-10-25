@@ -170,9 +170,8 @@ class NewsCardGenerator:
         # Accent Border Strip
         draw.rectangle([(0, 96), (width, 100)], fill=accent_color)
 
-        # Brand Logo & Masthead on Left
-        draw.text((50, 34), "EPM PRO", fill=(255, 255, 255), font=self.font_headline)
-        draw.text((255, 43), "INSTITUTIONAL FINANCIAL WIRE", fill=(148, 163, 184), font=self.font_masthead)
+        # Header Site Heading on Left
+        draw.text((50, 32), "NEWS BULLETIN", fill=(255, 255, 255), font=self.font_headline)
 
         # Top Right Corner: Global News Feed Room Broadcast TV Bug Logo
         if getattr(self, "logo_img", None):
@@ -298,25 +297,14 @@ class NewsCardGenerator:
             if tag_x > width - 150:
                 break
 
-        # ── 6. Bottom Footer & Verification Strip (1230 to 1350px) ──
-        footer_top = height - 100
-        draw.rectangle([(0, footer_top), (width, height)], fill=(15, 23, 42))
-        draw.rectangle([(0, footer_top), (width, footer_top + 2)], fill=(30, 41, 59))
-
-        draw.text((50, footer_top + 14), f"SOURCE: {source.upper()} | VERIFIED MARKET FEED", fill=(148, 163, 184), font=self.font_footer)
-        draw.text((50, footer_top + 36), "NOT INVESTMENT ADVICE | FOR INFORMATIONAL TRADING PURPOSES ONLY", fill=(100, 116, 139), font=self.font_footer)
-
-        term_badge_rect = [(width - 340, footer_top + 14), (width - 50, footer_top + 50)]
-        draw.rounded_rectangle(term_badge_rect, radius=6, fill=(2, 6, 23), outline=(37, 99, 235), width=1)
-        draw.text((width - 325, footer_top + 23), "POWERED BY EPM PRO TERMINAL", fill=(96, 165, 250), font=self.font_footer)
-
-        # Mandatory Microprint Notifier / Disclaimer across very bottom (readable on pinch & zoom)
-        draw.rectangle([(0, height - 24), (width, height)], fill=(2, 6, 23))
-        draw.line([(0, height - 24), (width, height - 24)], fill=(30, 41, 59), width=1)
+        # ── 6. Minimalist Bottom Microprint Strip (readable on pinch & zoom) ──
+        footer_h = 32
+        draw.rectangle([(0, height - footer_h), (width, height)], fill=(15, 23, 42))
+        draw.line([(0, height - footer_h), (width, height - footer_h)], fill=(30, 41, 59), width=1)
         disclaimer_text = "Global News Feed Room is Powered by EPMC Pvt. Ltd."
         d_bbox = draw.textbbox((0, 0), disclaimer_text, font=self.font_micro)
         d_w = d_bbox[2] - d_bbox[0]
-        draw.text(((width - d_w) // 2, height - 18), disclaimer_text, fill=(100, 116, 139), font=self.font_micro)
+        draw.text(((width - d_w) // 2, height - 21), disclaimer_text, fill=(100, 116, 139), font=self.font_micro)
 
         # Output to PNG bytes
         buffer = io.BytesIO()
