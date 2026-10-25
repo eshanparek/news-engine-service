@@ -30,6 +30,23 @@ class NewsCardGenerator:
     """
     def __init__(self):
         self._init_fonts()
+        self._init_logo()
+
+    def _init_logo(self):
+        """Loads and prepares the official Global News Feed Room circular broadcast logo."""
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        logo_path = os.path.join(base_dir, "assets", "global_news_feed_room_logo.png")
+        if not os.path.exists(logo_path):
+            logo_path = "assets/global_news_feed_room_logo.png"
+        if os.path.exists(logo_path):
+            try:
+                self.logo_img = Image.open(logo_path).convert("RGBA")
+                logger.info(f"Loaded Global News Feed Room logo for news cards: {logo_path}")
+            except Exception as e:
+                logger.warning(f"Could not load news logo from {logo_path}: {e}")
+                self.logo_img = None
+        else:
+            self.logo_img = None
 
     def _init_fonts(self):
         base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -145,22 +162,34 @@ class NewsCardGenerator:
         img = Image.new("RGB", (width, height), color=(9, 13, 22))
         draw = ImageDraw.Draw(img)
 
-        # ── 1. Top Masthead Bar (0 to 110px) ──
+        # ── 1. Top Masthead Bar (0 to 100px) ──
         draw.rectangle([(0, 0), (width, 100)], fill=(15, 23, 42))
         # Accent Border Strip
         draw.rectangle([(0, 96), (width, 100)], fill=accent_color)
 
-        # Brand Logo & Masthead
+        # Brand Logo & Masthead on Left
         draw.text((50, 34), "EPM PRO", fill=(255, 255, 255), font=self.font_headline)
-        draw.text((230, 42), "INSTITUTIONAL FINANCIAL WIRE", fill=(148, 163, 184), font=self.font_masthead)
+        draw.text((255, 43), "INSTITUTIONAL FINANCIAL WIRE", fill=(148, 163, 184), font=self.font_masthead)
 
-        # Clean Time Pill on Right
+        # Top Right Corner: Global News Feed Room Broadcast TV Bug Logo
+        if getattr(self, "logo_img", None):
+            logo_size = 80
+            logo_resized = self.logo_img.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
+            logo_x = width - 50 - logo_size
+            logo_y = 10
+            img.paste(logo_resized, (logo_x, logo_y), mask=logo_resized)
+            time_right = logo_x - 16
+        else:
+            time_right = width - 50
+
+        # Clean Time Pill to the left of the Logo
         clock_clean = clean_text_for_image(str(timestamp))
         if len(clock_clean) > 22:
             clock_clean = clock_clean[:22]
-        time_rect = [(width - 320, 28), (width - 50, 72)]
+        time_pill_w = 260
+        time_rect = [(time_right - time_pill_w, 28), (time_right, 72)]
         draw.rounded_rectangle(time_rect, radius=6, fill=(30, 41, 59), outline=(51, 65, 85), width=1)
-        draw.text((width - 305, 38), f"LIVE WIRE | {clock_clean}", fill=(203, 213, 225), font=self.font_tag)
+        draw.text((time_right - time_pill_w + 14, 38), f"LIVE WIRE | {clock_clean}", fill=(203, 213, 225), font=self.font_tag)
 
         # ── 2. Impact & Category Banner (120 to 190px) ──
         current_y = 130
@@ -266,16 +295,25 @@ class NewsCardGenerator:
             if tag_x > width - 150:
                 break
 
-        # ── 6. Bottom Footer & Verification Strip (1240 to 1350px) ──
-        draw.rectangle([(0, height - 90), (width, height)], fill=(15, 23, 42))
-        draw.rectangle([(0, height - 90), (width, height - 88)], fill=(30, 41, 59))
+        # ── 6. Bottom Footer & Verification Strip (1230 to 1350px) ──
+        footer_top = height - 100
+        draw.rectangle([(0, footer_top), (width, height)], fill=(15, 23, 42))
+        draw.rectangle([(0, footer_top), (width, footer_top + 2)], fill=(30, 41, 59))
 
-        draw.text((50, height - 60), f"SOURCE: {source.upper()} | VERIFIED MARKET FEED", fill=(148, 163, 184), font=self.font_footer)
-        draw.text((50, height - 38), "NOT INVESTMENT ADVICE | FOR INFORMATIONAL TRADING PURPOSES ONLY", fill=(100, 116, 139), font=self.font_footer)
+        draw.text((50, footer_top + 14), f"SOURCE: {source.upper()} | VERIFIED MARKET FEED", fill=(148, 163, 184), font=self.font_footer)
+        draw.text((50, footer_top + 36), "NOT INVESTMENT ADVICE | FOR INFORMATIONAL TRADING PURPOSES ONLY", fill=(100, 116, 139), font=self.font_footer)
 
-        term_badge_rect = [(width - 340, height - 65), (width - 50, height - 25)]
+        term_badge_rect = [(width - 340, footer_top + 14), (width - 50, footer_top + 50)]
         draw.rounded_rectangle(term_badge_rect, radius=6, fill=(2, 6, 23), outline=(37, 99, 235), width=1)
-        draw.text((width - 325, height - 52), "POWERED BY EPM PRO TERMINAL", fill=(96, 165, 250), font=self.font_footer)
+        draw.text((width - 325, footer_top + 23), "POWERED BY EPM PRO TERMINAL", fill=(96, 165, 250), font=self.font_footer)
+
+        # Mandatory Notifier / Disclaimer across very bottom
+        draw.rectangle([(0, height - 34), (width, height)], fill=(2, 6, 23))
+        draw.line([(0, height - 34), (width, height - 34)], fill=(30, 41, 59), width=1)
+        disclaimer_text = "Global News Feed Room is Powered by EPMC Pvt. Ltd."
+        d_bbox = draw.textbbox((0, 0), disclaimer_text, font=self.font_bold)
+        d_w = d_bbox[2] - d_bbox[0]
+        draw.text(((width - d_w) // 2, height - 26), disclaimer_text, fill=(226, 232, 240), font=self.font_bold)
 
         # Output to PNG bytes
         buffer = io.BytesIO()

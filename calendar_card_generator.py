@@ -78,6 +78,23 @@ class CalendarCardGenerator:
     """
     def __init__(self):
         self._init_fonts()
+        self._init_logo()
+
+    def _init_logo(self):
+        """Loads and prepares the official Global News Feed Room circular broadcast logo."""
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        logo_path = os.path.join(base_dir, "assets", "global_news_feed_room_logo.png")
+        if not os.path.exists(logo_path):
+            logo_path = "assets/global_news_feed_room_logo.png"
+        if os.path.exists(logo_path):
+            try:
+                self.logo_img = Image.open(logo_path).convert("RGBA")
+                logger.info(f"Loaded Global News Feed Room logo for calendar: {logo_path}")
+            except Exception as e:
+                logger.warning(f"Could not load calendar logo from {logo_path}: {e}")
+                self.logo_img = None
+        else:
+            self.logo_img = None
 
     def _init_fonts(self):
         """Loads bundled or system TrueType fonts for ultra-crisp high-DPI rendering."""
@@ -105,10 +122,10 @@ class CalendarCardGenerator:
         for path in font_paths:
             if os.path.exists(path):
                 try:
-                    self.font_title = ImageFont.truetype(path, 30)
+                    self.font_title = ImageFont.truetype(path, 23)
                     self.font_header = ImageFont.truetype(path, 21)
                     self.font_sub = ImageFont.truetype(path, 15)
-                    self.font_bold = ImageFont.truetype(path, 16)
+                    self.font_bold = ImageFont.truetype(path, 15)
                     self.font_body = ImageFont.truetype(path, 14)
                     self.font_mono = ImageFont.truetype(path, 15)
                     self.font_small = ImageFont.truetype(path, 12)
@@ -187,7 +204,7 @@ class CalendarCardGenerator:
 
         events_block_height = max(len(page_events) * event_row_height + 85, 200)
         nav_banner_height = 54 if total_pages > 1 else 0
-        footer_height = 70
+        footer_height = 96
         total_height = header_height + holiday_height + stats_ribbon_height + events_block_height + nav_banner_height + footer_height
 
         # Base Canvas: Pure crisp white background (#FFFFFF)
@@ -208,25 +225,37 @@ class CalendarCardGenerator:
         except Exception:
             date_formatted = target_date
 
-        report_label = "OFFICIAL DAILY SCHEDULE & TIMERS" if mode == "TODAY" else "TOMORROW'S LINED-UP SCHEDULE"
+        report_label = "DAILY SCHEDULE & TIMERS" if mode == "TODAY" else "TOMORROW'S SCHEDULE"
 
         # Market Badge Pill (Eliminates flag emoji tofu boxes)
         badge_w = 80
         draw.rounded_rectangle([(45, 26), (45 + badge_w, 64)], radius=6, fill=theme["accent"])
         draw.text((58, 33), theme["badge"], fill=(255, 255, 255), font=self.font_bold)
 
-        # Title
-        draw.text((45 + badge_w + 14, 28), clean_text_for_image(theme["title"]), fill=(255, 255, 255), font=self.font_title)
-        draw.text((45, 80), f"Scope: {clean_text_for_image(theme['scope'])}", fill=(203, 213, 225), font=self.font_sub)
-        draw.text((45, 110), f"Trading Hours: {theme['hours']}   |   Timezone: Indian Standard Time (IST)", fill=(148, 163, 184), font=self.font_small)
+        # Title (Strictly bounded so it never collides with capsule)
+        draw.text((45 + badge_w + 14, 32), clean_text_for_image(theme["title"]), fill=(255, 255, 255), font=self.font_title)
+        draw.text((45, 102), f"Scope: {clean_text_for_image(theme['scope'])}", fill=(203, 213, 225), font=self.font_sub)
+        draw.text((45, 130), f"Trading Hours: {theme['hours']}   |   Timezone: Indian Standard Time (IST)", fill=(148, 163, 184), font=self.font_small)
 
-        # Date & Page Capsule (Top Right)
+        # Top Right Corner: Global News Feed Room Broadcast TV Bug Logo
+        if getattr(self, "logo_img", None):
+            logo_size = 88
+            logo_resized = self.logo_img.resize((logo_size, logo_size), Image.Resampling.LANCZOS)
+            logo_x = width - 45 - logo_size
+            logo_y = 20
+            img.paste(logo_resized, (logo_x, logo_y), mask=logo_resized)
+            capsule_right = logo_x - 14
+        else:
+            capsule_right = width - 45
+
+        # Date & Page Capsule (Top Right, beside Logo)
         mode_pill_bg = (30, 41, 59)
-        capsule_w = 410
-        draw.rounded_rectangle([(width - capsule_w - 45, 24), (width - 45, 88)], radius=8, fill=mode_pill_bg, outline=theme["accent"], width=2)
-        draw.text((width - capsule_w - 30, 32), f"REPORT: {report_label}", fill=(255, 255, 255), font=self.font_bold)
-        page_suffix = f"  |  PAGE {page_num} OF {total_pages}" if total_pages > 1 else ""
-        draw.text((width - capsule_w - 30, 58), f"DATE: {date_formatted}{page_suffix}", fill=(147, 197, 253), font=self.font_small)
+        capsule_w = 330
+        capsule_left = capsule_right - capsule_w
+        draw.rounded_rectangle([(capsule_left, 24), (capsule_right, 86)], radius=8, fill=mode_pill_bg, outline=theme["accent"], width=2)
+        draw.text((capsule_left + 14, 33), f"REPORT: {report_label}", fill=(255, 255, 255), font=self.font_bold)
+        page_suffix = f"  |  PG {page_num}/{total_pages}" if total_pages > 1 else ""
+        draw.text((capsule_left + 14, 57), f"DATE: {date_formatted}{page_suffix}", fill=(147, 197, 253), font=self.font_small)
 
         current_y = header_height
 
@@ -368,10 +397,18 @@ class CalendarCardGenerator:
             current_y += 54
 
         # ── 7. Futuristic Terminal Footer ──
-        draw.line([(40, current_y + 10), (width - 40, current_y + 10)], fill=(226, 232, 240), width=1)
+        draw.line([(40, current_y + 8), (width - 40, current_y + 8)], fill=(226, 232, 240), width=1)
         dispatched_time = datetime.now().strftime("%d %b %Y, %H:%M:%S IST")
-        draw.text((45, current_y + 24), f"EPM Pro Multi-Market Intelligence Engine  •  Verified Output at {dispatched_time}", fill=(148, 163, 184), font=self.font_small)
-        draw.text((width - 420, current_y + 24), "• Synchronized with Google Calendar (60m Prior Alarms)", fill=(37, 99, 235), font=self.font_bold)
+        draw.text((45, current_y + 18), f"EPM Pro Multi-Market Intelligence Engine  •  Verified Output at {dispatched_time}", fill=(148, 163, 184), font=self.font_small)
+        draw.text((width - 420, current_y + 18), "• Synchronized with Google Calendar (60m Prior Alarms)", fill=(37, 99, 235), font=self.font_bold)
+
+        # Mandatory Bottom Notifier / Disclaimer across very bottom
+        draw.rectangle([(0, total_height - 34), (width, total_height)], fill=(15, 23, 42))
+        draw.line([(0, total_height - 34), (width, total_height - 34)], fill=theme["accent"], width=2)
+        disclaimer_text = "Global News Feed Room is Powered by EPMC Pvt. Ltd."
+        d_bbox = draw.textbbox((0, 0), disclaimer_text, font=self.font_bold)
+        d_w = d_bbox[2] - d_bbox[0]
+        draw.text(((width - d_w) // 2, total_height - 26), disclaimer_text, fill=(241, 245, 249), font=self.font_bold)
 
         # Export to optimized PNG buffer
         buf = io.BytesIO()
