@@ -32,22 +32,22 @@ MARGIN_BOTTOM = 38
 USABLE_WIDTH = PAGE_WIDTH - (MARGIN_LEFT + MARGIN_RIGHT) # ~801.89 pt
 
 # Column Widths Budget (Total = ~802 pt)
-# Matching user spreadsheet:
+# Matching user spreadsheet with shortened taxonomy optimizations:
 COL_WIDTHS = [
     20,  # 0: #
     44,  # 1: Time (IST)
-    44,  # 2: Day
-    72,  # 3: Event Type
-    40,  # 4: Country
-    48,  # 5: Regulator / Issuer
-    52,  # 6: Sector
-    162, # 7: Event
-    46,  # 8: Impact (1-5)
-    50,  # 9: Previous Related Data
-    50,  # 10: Consensus / Forecast
-    45,  # 11: Sentiment
-    130, # 12: AI Reasoning
-    40   # 13: Source
+    32,  # 2: Day (Mon, Tue, Wed...)
+    68,  # 3: Event Type (Earning Cal., Corp. Board Meet...)
+    38,  # 4: Country
+    46,  # 5: Regulator / Issuer
+    50,  # 6: Sector
+    184, # 7: Event (Expanded)
+    42,  # 8: Impact (1-5)
+    48,  # 9: Previous Related Data
+    48,  # 10: Consensus / Forecast
+    42,  # 11: Sentiment
+    150, # 12: AI Reasoning (Expanded)
+    38   # 13: Source
 ]
 
 # Scaling to fit exactly USABLE_WIDTH = 801.89 pt
@@ -253,67 +253,76 @@ class CalendarPDFEngine:
         )
 
     def _classify_event_type(self, ev: Dict) -> str:
-        """Categorizes raw events into user's canonical event taxonomy."""
+        """Categorizes raw events into user's canonical compact event taxonomy."""
         name = str(ev.get("event", "")).upper()
         cat = str(ev.get("category", "")).upper()
         purpose = str(ev.get("purpose", "")).upper()
         full = f"{name} {cat} {purpose}"
 
-        # 1. Trading Holiday (strictly when market is closed or category is holiday)
+        # 1. Special Session (Diwali Muhurat Trading / US Black Friday Early Close)
+        if ev.get("is_special_session") is True or "MUHURAT" in full or "SPECIAL SESSION" in full:
+            return "Special Session"
+
+        # 2. Trading Holiday (strictly when market is closed or category is holiday)
         if ev.get("is_holiday") is True or cat == "HOLIDAY" or "TRADING HOLIDAY" in cat or "MARKET CLOSED" in full:
             return "Holiday"
 
-        # 2. Earnings / Financial Results (Prominent Green Link)
+        # 3. Earnings / Financial Results (Prominent Green Link)
         if any(w in full for w in ["EARNING", "FINANCIAL RESULT", "QUARTERLY RESULT", "Q1", "Q2", "Q3", "Q4", "AUDITED", "UNAUDITED"]) or ("RESULT" in full and "BOARD" not in full):
-            return "Earning Calender"
+            return "Earning Cal."
 
-        # 3. Dividend (Interim / Final / Special)
+        # 4. Dividend (Interim / Final / Special)
         if "DIVIDEND" in full:
-            return "corporate calender Dividend - Interim"
+            return "Corp. Dividend"
 
-        # 4. AGM / EGM
+        # 5. AGM / EGM
         if any(w in full for w in ["AGM", "EGM", "ANNUAL GENERAL", "EXTRAORDINARY GENERAL"]):
-            return "corporate calender AGM-EGM"
+            return "Corp. AGM-EGM"
 
-        # 5. IPO
+        # 6. IPO
         if "IPO" in full and any(w in full for w in ["LISTING", "LIST"]):
             return "IPO Listing"
         if any(w in full for w in ["IPO", "DRHP", "DRAFT FILING"]):
             return "IPO draft Filing"
 
-        # 6. NFO (Mutual Funds)
+        # 7. NFO (Mutual Funds)
         if any(w in full for w in ["NFO", "NEW FUND OFFER", "MUTUAL FUND"]):
             return "NFO"
 
-        # 7. Board Meeting (check if purpose is results)
+        # 8. Board Meeting (check if purpose is results)
         if "BOARD" in full and any(w in full for w in ["MEET", "INTIMAT", "OUTCOME"]):
             if any(w in full for w in ["FINANCIAL", "RESULT", "ACCOUNTS"]):
-                return "Earning Calender"
-            return "corporate calender Board Meeting"
+                return "Earning Cal."
+            return "Corp. Board Meet"
 
-        # 8. Macro / Economic Calendar
+        # 9. Macro / Economic Calendar
         if any(w in full for w in ["CPI", "GDP", "PMI", "INFLATION", "FOMC", "RATE", "PAYROLLS", "FED", "RBI", "RESERVES", "TRADE", "MACRO", "MONETARY", "CFTC", "UNEMPLOYMENT", "RETAIL SALES"]):
-            return "Economic Calender"
+            return "Econ Cal."
 
-        # 9. Corporate Actions
+        # 10. Corporate Actions
         if "BONUS" in full:
-            return "corporate calender Bonus"
+            return "Corp. Bonus"
         if "SPLIT" in full:
-            return "corporate calender Stock Split"
+            return "Corp. Stock Split"
         if "BUYBACK" in full:
-            return "corporate calender Buyback"
+            return "Corp. Buyback"
 
         # Fallback
         if any(mkt in str(ev.get("market", "")).upper() for mkt in ["NSE", "BSE"]):
-            return "corporate calender Board Meeting"
-        return "Economic Calender"
+            return "Corp. Board Meet"
+        return "Econ Cal."
 
     def _infer_country_and_regulator(self, ev: Dict) -> Tuple[str, str]:
         mkt = str(ev.get("market", "NSE")).upper()
         sym = str(ev.get("symbol", "")).upper()
         name = str(ev.get("event", "")).upper()
 
-        if mkt in ("NSE", "BSE", "MCX"):
+        if ev.get("is_special_session") or ev.get("is_holiday"):
+            if mkt == "NYSE":
+                return "USA", "NYSE / SEC"
+            return "INDIA", "NSE, BSE, MCX"
+
+        if mkt in ("NSE", "BSE", "MCX", "MULTI"):
             country = "INDIA"
             if "RBI" in name or "REPO" in name or "MPC" in name or "FOREX" in name or "RESERVES" in name:
                 regulator = "RBI"
@@ -342,6 +351,10 @@ class CalendarPDFEngine:
         cat = str(ev.get("category", "")).upper()
         full = f"{sym} {name} {cat}"
 
+        if ev.get("is_holiday") or "HOLIDAY" in full:
+            return "All Markets"
+        if ev.get("is_special_session") or "MUHURAT" in full or "SPECIAL SESSION" in full:
+            return "Equities & F&O"
         if any(w in full for w in ["PHARMA", "LAB", "HEALTH", "DIVIS", "SUNPHARMA", "DRREDDY", "CIPLA", "BIOCON", "LUPIN", "AUROPHARMA"]):
             return "Pharma"
         if any(w in full for w in ["CHEMICAL", "PIDILITE", "AARTI", "TATACHEM", "DEEPAK", "ATUL", "SRF", "CAMLIN", "FLUORO"]):
@@ -429,24 +442,32 @@ class CalendarPDFEngine:
         return "Neutral", self.style_cell
 
     def _build_ai_reasoning(self, ev: Dict) -> str:
-        name = ev.get("event", "")
-        sym = ev.get("symbol", "")
+        name = str(ev.get("event", "")).upper()
+        sym = str(ev.get("symbol", "")).upper()
         sec = self._infer_sector(ev)
         imp = ev.get("impact", "MEDIUM")
 
-        if "PMI" in name.upper():
-            return "Macro manufacturing expansion gauge; guides quarterly industrial GDP trajectory."
-        elif "RESULT" in name.upper() or "EARNING" in name.upper():
-            return f"Quarterly operational earnings announcement; triggers institutional repricing in {sec}."
-        elif "DIVIDEND" in name.upper():
-            return "Cash outflow & yield adjustment; impact on trading book valuation multiples."
-        elif "BOARD" in name.upper():
-            return "Strategic management governance; capital allocation decisions & capex approval."
-        elif "HOLIDAY" in name.upper():
-            return "Cash and derivatives clearing settled on next active trading cycle."
-        elif "RESERVES" in name.upper():
-            return "Foreign exchange buffer metrics; FX liquidity and domestic rupee stability indicator."
-        return f"Scheduled {imp.lower()}-impact market catalyst monitored by multi-market institutional desks."
+        if "MUHURAT" in name or ev.get("is_special_session"):
+            res = "Auspicious festive evening session for Samvat 2083; token buying across insti. & retail desks."
+        elif "HOLIDAY" in name or ev.get("is_holiday"):
+            res = "Official trading holiday; cash & derivative settlement deferred to next active cycle."
+        elif "PMI" in name:
+            res = "Macro manufacturing expansion gauge; guides quat. industrial GDP trajectory."
+        elif "RESULT" in name or "EARNING" in name:
+            res = f"Quat. operational earnings announcement; triggers insti. repricing in {sec}."
+        elif "DIVIDEND" in name:
+            res = "Cash outflow & yield adjustment; impact on trading book valuation multiples."
+        elif "BOARD" in name:
+            res = "Strategic management governance; capital allocation decisions & capex approval."
+        elif "RESERVES" in name:
+            res = "Foreign exchange buffer metrics; FX liquidity and domestic rupee stability indicator."
+        else:
+            res = f"Scheduled {imp.lower()}-impact market catalyst monitored by multi-market insti. desks."
+
+        # Ensure user abbreviations: Quat. and Insti.
+        res = res.replace("Quarterly", "Quat.").replace("quarterly", "Quat.")
+        res = res.replace("institutional", "insti.").replace("Institutional", "Insti.")
+        return res
 
     def build_pdf_flowables(self, events: List[Dict], title: str, subtitle: str) -> List:
         """
@@ -479,7 +500,7 @@ class CalendarPDFEngine:
 
             try:
                 dt_obj = datetime.strptime(date_str, "%Y-%m-%d")
-                day_name = dt_obj.strftime("%A")
+                day_name = dt_obj.strftime("%a") # Shortened: Sun, Mon, Tue, Wed, Thu, Fri, Sat
                 formatted_date = dt_obj.strftime("%d %B %Y")
             except Exception:
                 day_name = "Day"
@@ -551,9 +572,10 @@ class CalendarPDFEngine:
 
                 # Event type paragraph styling
                 is_holiday = (ev_type == "Holiday")
-                is_earning = (ev_type == "Earning Calender")
-                is_economic = (ev_type == "Economic Calender")
-                ev_type_style = self.style_holiday if is_holiday else (
+                is_special = (ev_type == "Special Session")
+                is_earning = (ev_type == "Earning Cal.")
+                is_economic = (ev_type == "Econ Cal.")
+                ev_type_style = self.style_holiday if (is_holiday or is_special) else (
                     self.style_cell_event_type if (is_earning or is_economic) else self.style_cell_bold
                 )
 
@@ -757,32 +779,32 @@ class CalendarPDFEngine:
                     "date": d_str, "time": "10:30", "market": "NSE", "symbol": "NSE:HSBCPMI",
                     "event": "HSBC Manufacturing PMI Final Release", "impact": "MEDIUM",
                     "previous": "55.1", "forecast": "54.7", "outcome_sentiment": "BEARISH",
-                    "category": "Economic Calender"
+                    "category": "Econ Cal."
                 })
                 evs.append({
                     "date": d_str, "time": "14:00", "market": "NSE", "symbol": "NSE:DIVISLAB",
-                    "event": "Divis Laboratories Quarterly Financial Results & Press Briefing", "impact": "HIGH",
+                    "event": "Divis Laboratories Quat. Financial Results & Press Briefing", "impact": "HIGH",
                     "previous": "5000 Cr", "forecast": "9000 Cr", "outcome_sentiment": "BULLISH",
-                    "category": "Earning Calender"
+                    "category": "Earning Cal."
                 })
                 evs.append({
                     "date": d_str, "time": "16:00", "market": "BSE", "symbol": "BSE:RELIANCE",
                     "event": "Corporate AGM & Strategic Shareholder Voting", "impact": "MEDIUM",
                     "previous": "—", "forecast": "—", "outcome_sentiment": "NEUTRAL",
-                    "category": "corporate calender AGM-EGM"
+                    "category": "Corp. AGM-EGM"
                 })
             elif weekday == 1: # Tuesday
                 evs.append({
                     "date": d_str, "time": "11:00", "market": "BSE", "symbol": "BSE:PIDILITIND",
                     "event": "Pidilite Industries Dividend Announcement & Board Meeting", "impact": "HIGH",
                     "previous": "Rs. 5.00", "forecast": "Rs. 3.00", "outcome_sentiment": "BEARISH",
-                    "category": "corporate calender Dividend - Interim"
+                    "category": "Corp. Dividend"
                 })
                 evs.append({
                     "date": d_str, "time": "19:30", "market": "NYSE", "symbol": "USA:JOLTS",
                     "event": "US JOLTS Job Openings Macro Release", "impact": "MEDIUM",
                     "previous": "7.67M", "forecast": "7.98M", "outcome_sentiment": "NEUTRAL",
-                    "category": "Economic Calender"
+                    "category": "Econ Cal."
                 })
             elif weekday == 2: # Wednesday
                 evs.append({
@@ -816,27 +838,27 @@ class CalendarPDFEngine:
                     "date": d_str, "time": "17:00", "market": "NSE", "symbol": "RBI:FOREX",
                     "event": "Reserve Bank of India Foreign Exchange Reserves Weekly Stat", "impact": "HIGH",
                     "previous": "$690.4B", "forecast": "$692.1B", "outcome_sentiment": "BULLISH",
-                    "category": "Economic Calender"
+                    "category": "Econ Cal."
                 })
             elif weekday == 5: # Saturday
                 evs.append({
                     "date": d_str, "time": "11:00", "market": "BSE", "symbol": "BSE:HDFCBANK",
                     "event": "Audit Committee & Investor Interaction Call", "impact": "LOW",
                     "previous": "—", "forecast": "—", "outcome_sentiment": "NEUTRAL",
-                    "category": "corporate calender Board Meeting"
+                    "category": "Corp. Board Meet"
                 })
             elif weekday == 6: # Sunday
                 evs.append({
                     "date": d_str, "time": "18:00", "market": "MCX", "symbol": "MCX:OPEC",
                     "event": "OPEC+ Ministerial Energy Quota & Macro Strategy Review", "impact": "HIGH",
                     "previous": "Production Cap", "forecast": "Roll-over", "outcome_sentiment": "NEUTRAL",
-                    "category": "Economic Calender"
+                    "category": "Econ Cal."
                 })
                 evs.append({
                     "date": d_str, "time": "20:00", "market": "CRYPTO", "symbol": "CRYPTO:DERIVATIVES",
                     "event": "Weekly Crypto Derivative Settlement & Liquidity Protocol Update", "impact": "LOW",
                     "previous": "—", "forecast": "—", "outcome_sentiment": "NEUTRAL",
-                    "category": "Economic Calender"
+                    "category": "Econ Cal."
                 })
 
             d += timedelta(days=1)
@@ -861,39 +883,39 @@ class CalendarPDFEngine:
                         "date": d_str, "time": "10:30", "market": "NSE", "symbol": "NSE:MACRO",
                         "event": "India Wholesale Price Index (WPI) Inflation & Manufacturing Trade Balance",
                         "impact": "HIGH", "previous": "1.84%", "forecast": "1.92%", "outcome_sentiment": "NEUTRAL",
-                        "category": "Economic Calender"
+                        "category": "Econ Cal."
                     })
                     additional_evs.append({
                         "date": d_str, "time": "16:00", "market": "BSE", "symbol": "BSE:BOARD",
-                        "event": "Quarterly Financial Performance Review & Strategic Intimation",
+                        "event": "Quat. Financial Performance Review & Strategic Intimation",
                         "impact": "MEDIUM", "previous": "Scheduled Filing", "forecast": "Financial Results",
-                        "outcome_sentiment": "BULLISH", "category": "Earning Calender"
+                        "outcome_sentiment": "BULLISH", "category": "Earning Cal."
                     })
                 elif w == 1: # Tuesday
                     additional_evs.append({
                         "date": d_str, "time": "19:00", "market": "NYSE", "symbol": "USA:RETAIL",
                         "event": "US Retail Sales & Core Industrial Production Index",
                         "impact": "HIGH", "previous": "0.4%", "forecast": "0.3%", "outcome_sentiment": "BULLISH",
-                        "category": "Economic Calender"
+                        "category": "Econ Cal."
                     })
                     additional_evs.append({
                         "date": d_str, "time": "15:00", "market": "NSE", "symbol": "NSE:DIVIDEND",
                         "event": "Interim Dividend Record Date & Corporate Capital Allocation",
                         "impact": "MEDIUM", "previous": "—", "forecast": "Dividend Payout", "outcome_sentiment": "NEUTRAL",
-                        "category": "corporate calender Dividend - Interim"
+                        "category": "Corp. Dividend"
                     })
                 elif w == 2: # Wednesday
                     additional_evs.append({
                         "date": d_str, "time": "20:00", "market": "MCX", "symbol": "MCX:CRUDEOIL",
                         "event": "EIA Weekly Crude Oil & Distillate Strategic Petroleum Reserves Inventory",
                         "impact": "HIGH", "previous": "-2.1M bbl", "forecast": "+1.2M bbl", "outcome_sentiment": "BEARISH",
-                        "category": "Economic Calender"
+                        "category": "Econ Cal."
                     })
                     additional_evs.append({
                         "date": d_str, "time": "23:30", "market": "NYSE", "symbol": "FED:FOMC",
                         "event": "Federal Reserve FOMC Meeting Minutes & Policy Guidance",
                         "impact": "HIGH", "previous": "5.00%", "forecast": "4.75%", "outcome_sentiment": "NEUTRAL",
-                        "category": "Economic Calender"
+                        "category": "Econ Cal."
                     })
                 elif w == 3: # Thursday
                     if day_num in (26, 27):
@@ -908,60 +930,60 @@ class CalendarPDFEngine:
                             "date": d_str, "time": "19:00", "market": "NYSE", "symbol": "USA:JOBLESS",
                             "event": "US Initial Jobless Claims & Continuing Unemployment Filings",
                             "impact": "HIGH", "previous": "216K", "forecast": "220K", "outcome_sentiment": "NEUTRAL",
-                            "category": "Economic Calender"
+                            "category": "Econ Cal."
                         })
                     additional_evs.append({
                         "date": d_str, "time": "15:30", "market": "NSE", "symbol": "NSE:DERIVATIVES",
                         "event": "Monthly Index & Stock Options/Futures Expiry Settlement",
                         "impact": "HIGH", "previous": "—", "forecast": "Contract Settlement", "outcome_sentiment": "NEUTRAL",
-                        "category": "Economic Calender"
+                        "category": "Econ Cal."
                     })
                 elif w == 4: # Friday
                     additional_evs.append({
                         "date": d_str, "time": "17:00", "market": "NSE", "symbol": "RBI:FOREX",
                         "event": "Reserve Bank of India Foreign Exchange Reserves Weekly Stat",
                         "impact": "HIGH", "previous": "$690.4B", "forecast": "$692.1B", "outcome_sentiment": "BULLISH",
-                        "category": "Economic Calender"
+                        "category": "Econ Cal."
                     })
                     if day_num >= 27:
                         additional_evs.append({
                             "date": d_str, "time": "17:30", "market": "NSE", "symbol": "INDIA:GDP",
-                            "event": "India Quarterly GDP Growth & Infrastructure 8-Core Industries Output",
+                            "event": "India Quat. GDP Growth & Infrastructure 8-Core Industries Output",
                             "impact": "HIGH", "previous": "6.7%", "forecast": "7.0%", "outcome_sentiment": "BULLISH",
-                            "category": "Economic Calender"
+                            "category": "Econ Cal."
                         })
                     else:
                         additional_evs.append({
                             "date": d_str, "time": "20:00", "market": "NYSE", "symbol": "GLOBAL:PMI",
                             "event": "S&P Global Flash Composite & Services PMI Survey",
                             "impact": "MEDIUM", "previous": "54.1", "forecast": "53.8", "outcome_sentiment": "NEUTRAL",
-                            "category": "Economic Calender"
+                            "category": "Econ Cal."
                         })
                 elif w == 5: # Saturday
                     additional_evs.append({
                         "date": d_str, "time": "11:00", "market": "BSE", "symbol": "BSE:AUDIT",
-                        "event": "Quarterly Financial Audit Filings & Strategic Corporate Intimation",
+                        "event": "Quat. Financial Audit Filings & Strategic Corporate Intimation",
                         "impact": "LOW", "previous": "—", "forecast": "Statutory Disclosures", "outcome_sentiment": "NEUTRAL",
-                        "category": "corporate calender Board Meeting"
+                        "category": "Corp. Board Meet"
                     })
                     additional_evs.append({
                         "date": d_str, "time": "18:00", "market": "CRYPTO", "symbol": "CRYPTO:WEEKLY",
                         "event": "Global Crypto Derivative Expiry & Weekly Macro Liquidity Reconciliation",
                         "impact": "LOW", "previous": "—", "forecast": "Weekly Settlement", "outcome_sentiment": "NEUTRAL",
-                        "category": "Economic Calender"
+                        "category": "Econ Cal."
                     })
                 elif w == 6: # Sunday
                     additional_evs.append({
                         "date": d_str, "time": "18:00", "market": "MCX", "symbol": "MCX:OPEC",
                         "event": "OPEC+ Ministerial Joint Monitoring Committee & Energy Quota Outlook",
                         "impact": "HIGH", "previous": "Production Quota", "forecast": "Supply Roll-over", "outcome_sentiment": "NEUTRAL",
-                        "category": "Economic Calender"
+                        "category": "Econ Cal."
                     })
                     additional_evs.append({
                         "date": d_str, "time": "20:00", "market": "CRYPTO", "symbol": "CRYPTO:ONCHAIN",
                         "event": "Global Crypto Protocol Upgrades & Network Hard Fork Intimations",
                         "impact": "LOW", "previous": "—", "forecast": "—", "outcome_sentiment": "NEUTRAL",
-                        "category": "Economic Calender"
+                        "category": "Econ Cal."
                     })
             d += timedelta(days=1)
         

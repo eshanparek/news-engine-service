@@ -2312,6 +2312,105 @@ class MarketCalendarEngine:
     #  TABLE & API QUERY HELPERS
     # ─────────────────────────────────────────────────────────────
 
+    def _get_holiday_events(self) -> List[Dict]:
+        """
+        Synthesizes authoritative trading holidays and special/half-day sessions
+        across NSE, BSE, MCX, NYSE, and CRYPTO as first-class calendar events.
+        """
+        holiday_events = []
+        snap = self.get_holiday_snapshot().get("comparison", [])
+        for h in snap:
+            d = h.get("date", "")
+            if not d:
+                continue
+            desc = h.get("description", "")
+            nse_st = str(h.get("nse_status", ""))
+            bse_st = str(h.get("bse_status", ""))
+            mcx_st = str(h.get("mcx_status", ""))
+            nyse_st = str(h.get("nyse_status", ""))
+
+            # 1. Special Muhurat Trading Session (Diwali Laxmi Pujan)
+            if "muhurat" in desc.lower() or "muhurat" in nse_st.lower():
+                holiday_events.append({
+                    "id": f"special_session_muhurat_{d}",
+                    "market": "NSE",
+                    "date": d,
+                    "time": "18:15:00",
+                    "symbol": "🇮🇳 ALL MARKETS / SEBI",
+                    "category": "Special Session",
+                    "event": "Diwali Laxmi Pujan — Special Muhurat Trading Session (Evening: 18:15–19:15 IST)",
+                    "impact": "VERY HIGH",
+                    "previous": "Annual Session",
+                    "forecast": "Muhurat Trading Open",
+                    "actual": "Scheduled",
+                    "outcome_sentiment": "🟢 BULLISH",
+                    "details": "Annual Diwali Muhurat trading session across NSE, BSE, MCX. Equities & Derivatives open 18:15-19:15 IST. Clearing: Weekend settlement.",
+                    "is_holiday": False,
+                    "is_special_session": True,
+                    "source": "NSE/BSE/MCX"
+                })
+            # 2. US Black Friday / Early Close Half-Day Session
+            elif "early close" in nyse_st.lower() or "black friday" in desc.lower():
+                holiday_events.append({
+                    "id": f"special_session_nyse_{d}",
+                    "market": "NYSE",
+                    "date": d,
+                    "time": "19:00:00",
+                    "symbol": "🇺🇸 NYSE / NASDAQ",
+                    "category": "Special Session",
+                    "event": f"Special Session — {desc} (Half-Day Session: US Early Close 13:00 EST / 23:30 IST)",
+                    "impact": "MEDIUM",
+                    "previous": "Full Session",
+                    "forecast": "Early Close 13:00 EST",
+                    "actual": "Scheduled",
+                    "outcome_sentiment": "⚪ NEUTRAL",
+                    "details": "US cash equities close early at 13:00 EST (23:30 IST). Bond markets close early at 14:00 EST. MCX Evening session open.",
+                    "is_holiday": False,
+                    "is_special_session": True,
+                    "source": "NYSE"
+                })
+            else:
+                # 3. Regular Indian Trading Holidays (Diwali Balipratipada, Guru Nanak Jayanti, etc.)
+                if nse_st == "Closed" or bse_st == "Closed":
+                    holiday_events.append({
+                        "id": f"holiday_india_{d}",
+                        "market": "NSE",
+                        "date": d,
+                        "time": "09:15:00",
+                        "symbol": "🇮🇳 NSE / BSE / MCX",
+                        "category": "Holiday",
+                        "event": f"Trading Holiday — {desc} (Equities & Derivatives Closed; MCX: {mcx_st})",
+                        "impact": "HIGH",
+                        "previous": "Open",
+                        "forecast": f"NSE/BSE: Closed | MCX: {mcx_st}",
+                        "actual": "Closed",
+                        "outcome_sentiment": "⚪ NEUTRAL",
+                        "details": f"Indian Stock Exchanges (NSE & BSE) closed for {desc}. Clearing & settlement closed. MCX status: {mcx_st}.",
+                        "is_holiday": True,
+                        "source": "NSE/BSE"
+                    })
+                # 4. Regular US Trading Holidays (Thanksgiving, Christmas, etc.)
+                if nyse_st == "Closed":
+                    holiday_events.append({
+                        "id": f"holiday_us_{d}",
+                        "market": "NYSE",
+                        "date": d,
+                        "time": "19:00:00",
+                        "symbol": "🇺🇸 NYSE / SEC",
+                        "category": "Holiday",
+                        "event": f"Trading Holiday — {desc} (NYSE & Nasdaq Closed; MCX Evening: {mcx_st})",
+                        "impact": "HIGH",
+                        "previous": "Open",
+                        "forecast": "Closed",
+                        "actual": "Closed",
+                        "outcome_sentiment": "⚪ NEUTRAL",
+                        "details": f"US equity markets (NYSE, Nasdaq) closed for {desc}. MCX evening commodities status: {mcx_st}.",
+                        "is_holiday": True,
+                        "source": "NYSE"
+                    })
+
+        return holiday_events
+
     def get_enriched_events(self, filter_range: str = "all", market_filter: str = "ALL") -> List[Dict]:
         """Returns chronologically sorted events enriched with live countdown timers and market filter."""
         curr = now_ist()
@@ -2322,6 +2421,9 @@ class MarketCalendarEngine:
 
         with self.lock:
             raw_list = [dict(v) for v in self.events.values()]
+
+        # Merge authoritative holiday and special session events
+        raw_list.extend(self._get_holiday_events())
 
         enriched = []
         for ev in raw_list:
