@@ -6,7 +6,7 @@ import logging
 import threading
 import concurrent.futures
 from datetime import datetime, timedelta, timezone
-from typing import List, Dict, Optional, Set
+from typing import List, Dict, Optional, Set, Tuple
 import requests
 
 from telegram_notifier import telegram_notifier
