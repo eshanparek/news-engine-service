@@ -839,46 +839,52 @@ def get_calendar_tables(range_filter: str = "all", market_filter: str = "ALL"):
         events = calendar_engine.get_enriched_events(filter_range=range_filter, market_filter=market_filter)
         calendar_visual_html = render_calendar_feed_html(events)
         cal_rows = []
+        global_idx = 1
         for ev in events:
-            mkt = ev.get("market", "NSE").upper()
-            mkt_badge = MARKET_META.get(mkt, MARKET_META["NSE"])["badge"]
-            impact = ev.get("impact", "HIGH")
-            imp_badge = "🔥 HIGH" if impact == "HIGH" else ("⚡ MEDIUM" if impact == "MEDIUM" else "💤 LOW")
-            linked_title = clean_table_text(ev.get("linked_news_title", ""))
-            linked_url = ev.get("linked_news_url", "")
-            if linked_title and linked_url:
-                safe_linked = linked_title.replace("[", "(").replace("]", ")")
-                short_title = safe_linked[:45] + "..." if len(safe_linked) > 45 else safe_linked
-                linked_display = f"[🔗 {short_title}]({linked_url})"
-            elif linked_title:
-                short_title = linked_title[:45] + "..." if len(linked_title) > 45 else linked_title
-                linked_display = f"🔗 {short_title}"
-            else:
-                gcal_url = google_calendar_manager.generate_one_click_url(ev)
-                linked_display = f"[📅 +GCal]({gcal_url})"
+            ev_type = calendar_pdf_engine._classify_event_type(ev)
+            country, regulator = calendar_pdf_engine._infer_country_and_regulator(ev)
+            sector = calendar_pdf_engine._infer_sector(ev)
+            impact_stars = calendar_pdf_engine._infer_impact_stars(ev)
+            t_str = calendar_pdf_engine._format_event_time(ev)
+
+            d_str = str(ev.get("date", ""))
+            try:
+                day_name = datetime.strptime(d_str, "%Y-%m-%d").strftime("%A")
+            except Exception:
+                day_name = "—"
 
             raw_ev_name = clean_table_text(ev.get("event", "Scheduled Release"))
-            if len(raw_ev_name) > 110:
-                raw_ev_name = raw_ev_name[:110] + "..."
+            if ev.get("symbol") and ev.get("symbol") not in raw_ev_name:
+                clean_sym = clean_table_text(str(ev.get("symbol", "")).replace("NSE:", "").replace("BSE:", "").replace("MCX:", ""))
+                if clean_sym:
+                    raw_ev_name = f"{clean_sym} — {raw_ev_name}"
+
+            prev_val = clean_table_text(str(ev.get("previous", "—")) or "—")
+            fore_val = clean_table_text(str(ev.get("forecast", "—")) or "—")
+            sent_text, _ = calendar_pdf_engine._format_sentiment(ev)
+            reasoning = calendar_pdf_engine._build_ai_reasoning(ev)
+            source_val = clean_table_text(str(ev.get("source", regulator or "Wire"))[:15])
 
             cal_rows.append([
-                clean_table_text(ev.get("id", "")),
-                mkt_badge,
-                clean_table_text(ev.get("date", "")),
-                f"{clean_table_text(ev.get('time', ''))} IST",
-                clean_table_text(ev.get("timer", "")),
-                clean_table_text(ev.get("symbol", "")),
+                str(global_idx),
+                t_str,
+                day_name,
+                ev_type,
+                country,
+                regulator,
+                sector,
                 raw_ev_name,
-                imp_badge,
-                clean_table_text(ev.get("previous", "—")),
-                clean_table_text(ev.get("forecast", "—")),
-                clean_table_text(ev.get("actual", "⏳ Pending")),
-                clean_table_text(ev.get("outcome_sentiment", "⏳ PENDING")),
-                linked_display
+                impact_stars,
+                prev_val,
+                fore_val,
+                sent_text,
+                reasoning,
+                source_val
             ])
+            global_idx += 1
 
         if not cal_rows:
-            cal_rows.append(["-", "-", "-", "-", "-", "-", "No events for selected market/time filter", "-", "-", "-", "-", "-", "-"])
+            cal_rows.append(["-", "-", "-", "-", "-", "-", "-", "No events for selected market/time filter", "-", "-", "-", "-", "-", "-"])
 
         holidays_data = calendar_engine.get_holiday_snapshot().get("comparison", [])
         hol_rows = []
@@ -3606,24 +3612,25 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                 cal_pdf_file = gr.File(label="📄 Generated A4 PDF Document (Click to Open / Save)", visible=False, elem_id="cal_pdf_file")
                 cal_action_msg = gr.Markdown(elem_id="cal_action_msg")
 
-            gr.HTML(render_table_ribbon("calendar_table", "Multi-Market Catalyst Schedule & Historical Outcomes", subtitle="5 Bourses", count_badge="Live Timers"))
+            gr.HTML(render_table_ribbon("calendar_table", "Multi-Market Catalyst Ledger (14-Column Ledger)", subtitle="5 Bourses", count_badge="Official Ledger View"))
             calendar_table = gr.Dataframe(
                 headers=[
-                    "Event ID",
-                    "Market",
-                    "Date",
-                    "Time (IST)",
-                    "⏱ Live Timer",
-                    "Asset / Symbol",
-                    "Market Event / Corporate Release",
-                    "Impact",
-                    "Previous",
-                    "Forecast",
-                    "🏁 Actual / Outcome",
-                    "📊 Verdict",
-                    "🔗 Linked News / GCal"
+                    "#",
+                    "Time (of announce)",
+                    "Day",
+                    "Event Type",
+                    "Country",
+                    "Regulator / Issuer",
+                    "Sector",
+                    "Event",
+                    "Impact / Importance (1-5)",
+                    "Previous Related Data",
+                    "Consensus / Forecast",
+                    "Sentiment",
+                    "AI Reasoning",
+                    "Source"
                 ],
-                datatype=["str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "markdown"],
+                datatype=["str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "str"],
                 value=init_cal_rows,
                 interactive=False,
                 wrap=True,

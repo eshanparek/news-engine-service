@@ -2174,13 +2174,13 @@ class MarketCalendarEngine:
         return updated
 
     def dispatch_weekly_pdf_dossier(self) -> Tuple[bool, str]:
-        """Compiles and dispatches the Friday 06:00 AM IST A4 Weekly Snapshot PDF (Next Mon–Sat) to Telegram."""
+        """Compiles and dispatches the Friday 06:00 AM IST A4 Weekly Snapshot PDF (Next Sun–Sat) to Telegram."""
         try:
             from calendar_pdf_engine import calendar_pdf_engine
             pdf_bytes, filename = calendar_pdf_engine.generate_weekly_pdf()
             caption = (
                 "📑 <b>GLOBAL NEWS FEED ROOM — WEEKLY MULTI-MARKET DOSSIER (A4)</b>\n"
-                "🗓️ <b>Upcoming Schedule:</b> Next Monday to Saturday\n"
+                "🗓️ <b>Upcoming Schedule:</b> Next Sunday to Saturday\n"
                 "🏛️ <b>Scope:</b> Unified Multi-Market Ledger (NSE • BSE • MCX • Crypto • NYSE)\n"
                 "📊 <b>Includes:</b> Economic Data, Corporate Actions, Earnings, Dividends, IPOs, Holidays & Timers\n\n"
                 "<i>Global News Feed Room is Powered by EPMC Pvt. Ltd.</i>"
