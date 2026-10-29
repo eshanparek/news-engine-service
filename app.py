@@ -3802,10 +3802,14 @@ tbody tr.epm-highlight-row td:first-child {
     backdrop-filter: blur(8px) !important;
     -webkit-backdrop-filter: blur(8px) !important;
     z-index: 99999 !important;
-    display: flex !important;
+    display: none !important;
     align-items: flex-start !important;
     justify-content: center !important;
     padding-top: 12vh !important;
+}
+
+.epm-palette-backdrop.is-active {
+    display: flex !important;
 }
 
 .epm-palette-dialog {
@@ -4542,7 +4546,7 @@ TERMINAL_CLIENT_JS = r"""
         const modal = document.getElementById('epm-command-palette-modal');
         const input = document.getElementById('epm-palette-input');
         if (modal) {
-            modal.style.display = 'flex';
+            modal.classList.add('is-active');
             if (input) {
                 input.value = '';
                 setTimeout(() => input.focus(), 50);
@@ -4553,7 +4557,7 @@ TERMINAL_CLIENT_JS = r"""
 
     window.epmClosePalette = function() {
         const modal = document.getElementById('epm-command-palette-modal');
-        if (modal) modal.style.display = 'none';
+        if (modal) modal.classList.remove('is-active');
     };
 
     window.epmFilterPalette = function(query) {
