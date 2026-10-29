@@ -1307,8 +1307,6 @@ CUSTOM_CSS = """
    4. Micro-interactions: refined button states, crisp borders, subtle hover pills.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
-
 :root {
     --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
@@ -4168,7 +4166,12 @@ app = gr.mount_gradio_app(
     path="/",
     theme=gr.themes.Soft(),
     css=CUSTOM_CSS,
-    head=f"<style>{CUSTOM_CSS}</style><script>{TERMINAL_CLIENT_JS}</script>",
+    head=(
+        '<link rel="preconnect" href="https://fonts.googleapis.com">'
+        '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
+        '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">'
+        f"<style>{CUSTOM_CSS}</style><script>{TERMINAL_CLIENT_JS}</script>"
+    ),
     js=TERMINAL_CLIENT_JS
 )
 
