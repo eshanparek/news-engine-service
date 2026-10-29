@@ -24,6 +24,7 @@ from google_calendar_manager import google_calendar_manager
 from circular_engine import circular_engine, REGULATORS, REGULATOR_META
 from social_publisher import social_publisher, MEDIA_DIR
 from news_card_generator import news_card_generator
+from calendar_pdf_engine import calendar_pdf_engine
 
 # 1. Start Background Scraper, Scorer & Multi-Market Calendar Timer Daemons
 news_worker.start()
@@ -89,9 +90,11 @@ class AdminTelegramConfig(BaseModel):
     alert_on_countdown: Optional[bool] = True
     alert_on_outcome: Optional[bool] = True
     alert_on_linked_news: Optional[bool] = True
-    auto_daily_today_7am: Optional[bool] = True
-    auto_daily_tomorrow_705am: Optional[bool] = True
+    auto_daily_today_7am: Optional[bool] = False
+    auto_daily_tomorrow_705am: Optional[bool] = False
     auto_holiday_7am: Optional[bool] = True
+    auto_weekly_pdf_fri_6am: Optional[bool] = True
+    auto_monthly_pdf_25th_6am: Optional[bool] = True
 
 
 class GoogleCalendarConfig(BaseModel):
@@ -270,6 +273,46 @@ def api_dispatch_weekly():
     return {"status": "success" if ok else "error", "detail": msg}
 
 
+@app.get("/api/calendar/pdf/weekly")
+def download_weekly_pdf_endpoint():
+    """Generates and downloads the A4 Landscape Weekly Snapshot PDF (Next Mon-Sat) for 1-click download."""
+    pdf_path = calendar_pdf_engine.generate_and_save_weekly_pdf()
+    fn = os.path.basename(pdf_path)
+    return FileResponse(
+        pdf_path,
+        media_type="application/pdf",
+        filename=fn,
+        headers={"Content-Disposition": f'attachment; filename="{fn}"'}
+    )
+
+
+@app.get("/api/calendar/pdf/monthly")
+def download_monthly_pdf_endpoint():
+    """Generates and downloads the A4 Landscape Monthly Outlook PDF (Upcoming Month) for 1-click download."""
+    pdf_path = calendar_pdf_engine.generate_and_save_monthly_pdf()
+    fn = os.path.basename(pdf_path)
+    return FileResponse(
+        pdf_path,
+        media_type="application/pdf",
+        filename=fn,
+        headers={"Content-Disposition": f'attachment; filename="{fn}"'}
+    )
+
+
+@app.post("/api/calendar/dispatch/weekly-pdf")
+def api_dispatch_weekly_pdf():
+    """Dispatches the A4 Landscape Weekly Snapshot PDF directly to the Telegram Calendar channel."""
+    ok, msg = calendar_engine.dispatch_weekly_pdf_dossier()
+    return {"status": "success" if ok else "error", "detail": msg}
+
+
+@app.post("/api/calendar/dispatch/monthly-pdf")
+def api_dispatch_monthly_pdf():
+    """Dispatches the A4 Landscape Monthly Outlook PDF directly to the Telegram Calendar channel."""
+    ok, msg = calendar_engine.dispatch_monthly_pdf_dossier()
+    return {"status": "success" if ok else "error", "detail": msg}
+
+
 @app.get("/api/calendar/ics", response_class=PlainTextResponse)
 def download_calendar_ics(
     range_filter: str = Query("all", alias="range"),
@@ -347,6 +390,8 @@ def get_admin_settings():
         "auto_daily_today_7am": telegram_notifier.auto_daily_today_7am,
         "auto_daily_tomorrow_705am": telegram_notifier.auto_daily_tomorrow_705am,
         "auto_holiday_7am": telegram_notifier.auto_holiday_7am,
+        "auto_weekly_pdf_fri_6am": telegram_notifier.auto_weekly_pdf_fri_6am,
+        "auto_monthly_pdf_25th_6am": telegram_notifier.auto_monthly_pdf_25th_6am,
         "google_calendar_id": google_calendar_manager.calendar_id,
         "google_calendar_enabled": google_calendar_manager.enabled,
         "google_calendar_configured": google_calendar_manager.is_api_configured()
@@ -367,7 +412,9 @@ def update_admin_settings(cfg: AdminTelegramConfig):
         alert_on_linked_news=bool(cfg.alert_on_linked_news),
         auto_daily_today_7am=bool(cfg.auto_daily_today_7am),
         auto_daily_tomorrow_705am=bool(cfg.auto_daily_tomorrow_705am),
-        auto_holiday_7am=bool(cfg.auto_holiday_7am)
+        auto_holiday_7am=bool(cfg.auto_holiday_7am),
+        auto_weekly_pdf_fri_6am=bool(cfg.auto_weekly_pdf_fri_6am),
+        auto_monthly_pdf_25th_6am=bool(cfg.auto_monthly_pdf_25th_6am)
     )
     return {"status": "saved", "settings": saved}
 
@@ -949,7 +996,60 @@ def push_weekly_calendar_dispatch():
     ok, msg = calendar_engine.dispatch_weekly_calendar_message()
     if ok:
         return f"✅ **Complete 7-Day Weekly Calendar Link dispatched to `{telegram_notifier.calendar_chat_id}` with 1-click Google Calendar & Apple Calendar sync!**"
-    return f"⚠️ **Could not send Weekly Calendar Link:** {msg} *(Configure Calendar Telegram Chat ID in Tab 3)*"
+    return f"⚠️ **Could not send Weekly Calendar Link:** {msg} *(Configure Calendar Telegram Chat ID in Tab 4)*"
+
+
+def handle_download_weekly_pdf():
+    pdf_path = calendar_pdf_engine.generate_and_save_weekly_pdf()
+    fn = os.path.basename(pdf_path)
+    return (
+        f"✅ **Weekly Snapshot PDF Generated!** `{fn}` covering next week's Monday–Saturday across NSE, BSE, MCX, CRYPTO & NYSE.\n"
+        f"Click the download file link below or access directly via `/api/calendar/pdf/weekly`.",
+        gr.update(value=pdf_path, visible=True)
+    )
+
+
+def handle_download_monthly_pdf():
+    pdf_path = calendar_pdf_engine.generate_and_save_monthly_pdf()
+    fn = os.path.basename(pdf_path)
+    return (
+        f"✅ **Monthly Outlook PDF Generated!** `{fn}` covering the upcoming month sectioned weekly.\n"
+        f"Click the download file link below or access directly via `/api/calendar/pdf/monthly`.",
+        gr.update(value=pdf_path, visible=True)
+    )
+
+
+def handle_dispatch_weekly_pdf_telegram():
+    ok, msg = calendar_engine.dispatch_weekly_pdf_dossier()
+    pdf_path = calendar_pdf_engine.generate_and_save_weekly_pdf()
+    fn = os.path.basename(pdf_path)
+    if ok:
+        return (
+            f"✅ **Weekly Multi-Market A4 PDF dossier (`{fn}`) dispatched to Telegram `{telegram_notifier.calendar_chat_id}`!**",
+            gr.update(value=pdf_path, visible=True)
+        )
+    return f"⚠️ **Could not dispatch Weekly PDF to Telegram:** {msg}", gr.update(value=pdf_path, visible=True)
+
+
+def handle_dispatch_monthly_pdf_telegram():
+    ok, msg = calendar_engine.dispatch_monthly_pdf_dossier()
+    pdf_path = calendar_pdf_engine.generate_and_save_monthly_pdf()
+    fn = os.path.basename(pdf_path)
+    if ok:
+        return (
+            f"✅ **Monthly Multi-Market A4 PDF outlook (`{fn}`) dispatched to Telegram `{telegram_notifier.calendar_chat_id}`!**",
+            gr.update(value=pdf_path, visible=True)
+        )
+    return f"⚠️ **Could not dispatch Monthly PDF to Telegram:** {msg}", gr.update(value=pdf_path, visible=True)
+
+
+def handle_download_ics_file():
+    events = calendar_engine.get_enriched_events(filter_range="all", market_filter="ALL")
+    ics_content = google_calendar_manager.generate_enhanced_ics(events)
+    ics_path = os.path.join(MEDIA_DIR, "epm_multi_market_calendar.ics")
+    with open(ics_path, "w", encoding="utf-8") as f:
+        f.write(ics_content)
+    return "✅ **RFC 5545 iCalendar feed file generated!** Click to download below or subscribe via `/api/calendar/ics`.", gr.update(value=ics_path, visible=True)
 
 
 def save_admin_telegram_settings(
@@ -968,7 +1068,9 @@ def save_admin_telegram_settings(
     send_photos: bool = True,
     public_url: str = "",
     auto_weekly_fri7am: bool = False,
-    auto_circulars_tg: bool = False
+    auto_circulars_tg: bool = False,
+    auto_weekly_pdf_fri6am: bool = True,
+    auto_monthly_pdf_25th6am: bool = True
 ):
     telegram_notifier.save_admin_settings(
         news_bot_token=news_token,
@@ -986,16 +1088,18 @@ def save_admin_telegram_settings(
         send_as_photos=send_photos,
         public_app_url=public_url,
         auto_weekly_fri_7am=auto_weekly_fri7am,
-        auto_circulars_tg=auto_circulars_tg
+        auto_circulars_tg=auto_circulars_tg,
+        auto_weekly_pdf_fri_6am=auto_weekly_pdf_fri6am,
+        auto_monthly_pdf_25th_6am=auto_monthly_pdf_25th6am
     )
     format_mode = "Infographic Photo Cards 📸" if send_photos else "Detailed Text Messages 💬"
     return (
         f"✅ **Admin Telegram & Automated Schedule Settings Saved!**\n"
         f"- **News Channel ID:** `{telegram_notifier.chat_id or 'Not Set'}` (Enabled: `{telegram_notifier.enabled}`)\n"
-        f"- **Calendar & Outcomes Channel ID:** `{telegram_notifier.calendar_chat_id or 'Not Set'}` (Enabled: `{telegram_notifier.calendar_enabled}`)\n"
+        f"- **Calendar Channel ID:** `{telegram_notifier.calendar_chat_id or 'Not Set'}` (Enabled: `{telegram_notifier.calendar_enabled}`)\n"
         f"- **Public Portal URL:** `{telegram_notifier.get_public_url()}`\n"
         f"- **Morning Dispatch Format:** `{format_mode}`\n"
-        f"- **Daily IST Automation:** 7:00 AM Today Snapshot=`{auto_today_7am}` | 7:05 AM Tomorrow Snapshot=`{auto_tom_705am}` | 7:00 AM Pre-Holiday Alert=`{auto_hol_7am}` | Friday 7:00 AM Weekly Link=`{auto_weekly_fri7am}` | Regulatory Circular Alerts=`{auto_circulars_tg}`"
+        f"- **Automated Schedule (6:00 AM IST):** Friday 6 AM Weekly PDF=`{auto_weekly_pdf_fri6am}` | 25th 6 AM Monthly PDF=`{auto_monthly_pdf_25th6am}` | Pre-Holiday Alert 7 AM=`{auto_hol_7am}` | Legacy Today/Tomorrow Msg=`{auto_today_7am}`/`{auto_tom_705am}`"
     )
 
 
@@ -2364,54 +2468,57 @@ code, .timer-cell, pre {
     overflow: hidden !important;
 }
 
-/* 16. Action Drawers (Zen Mode Smooth CSS Animation) */
-.epm-action-drawer {
-    transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease, margin 0.3s ease, padding 0.3s ease !important;
-    max-height: 500px !important;
-    opacity: 1 !important;
-    overflow: visible !important;
+/* 16. Action Deck & Toolbar Cards */
+.epm-toolbar-card {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 6px !important;
+    padding: 8px 12px !important;
+    margin-top: 4px !important;
+    margin-bottom: 8px !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
 }
 
-.epm-action-drawer.collapsed {
-    max-height: 0 !important;
-    height: 0 !important;
-    opacity: 0 !important;
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
-    margin-top: 0 !important;
-    margin-bottom: 0 !important;
-    overflow: hidden !important;
-    pointer-events: none !important;
-    border: none !important;
-    display: none !important;
-}
-
-.epm-drawer-toggle-row {
-    margin-bottom: 4px !important;
-}
-
-#cal_drawer_toggle, #circ_drawer_toggle {
+#cal_action_deck button, #circ_action_toolbar button {
     font-family: var(--font-sans) !important;
-    font-size: 10.5px !important;
+    font-size: 11.5px !important;
     font-weight: 600 !important;
     border-radius: 4px !important;
-    margin: 0 !important;
-    height: 24px !important;
-    min-height: 24px !important;
-    padding: 0 8px !important;
-    background: #f8fafc !important;
-    border: 1px dashed #cbd5e1 !important;
-    color: #334155 !important;
-    cursor: pointer !important;
+    min-height: 32px !important;
+    height: 32px !important;
+    padding: 0 10px !important;
     transition: all 0.15s ease !important;
-    white-space: nowrap !important;
-    flex-shrink: 0 !important;
 }
 
-#cal_drawer_toggle:hover, #circ_drawer_toggle:hover {
+#cal_action_deck button.primary, #circ_action_toolbar button.primary {
+    background: #0f172a !important;
+    color: #ffffff !important;
+    border: 1px solid #0f172a !important;
+}
+
+#cal_action_deck button.primary:hover, #circ_action_toolbar button.primary:hover {
+    background: #1e293b !important;
+    border-color: #1e293b !important;
+    transform: translateY(-1px) !important;
+}
+
+#cal_action_deck button.secondary, #circ_action_toolbar button.secondary {
+    background: #f8fafc !important;
+    color: #334155 !important;
+    border: 1px solid #cbd5e1 !important;
+}
+
+#cal_action_deck button.secondary:hover, #circ_action_toolbar button.secondary:hover {
     background: #f1f5f9 !important;
     border-color: #94a3b8 !important;
     color: #0f172a !important;
+}
+
+#cal_pdf_file {
+    margin-top: 6px !important;
+    border: 1px dashed #cbd5e1 !important;
+    border-radius: 6px !important;
+    background: #f8fafc !important;
 }
 
 /* 17. Table Header Ribbons & Multi-Density Engine */
@@ -3282,30 +3389,9 @@ TERMINAL_CLIENT_JS = r"""
         window.epmApplyWatchlist("");
     };
 
-    // 8. Action Drawers (Tab 2 Calendar Toolbar & Tab 3 Circulars Drawer)
-    window.epmToggleCalDrawer = function() {
-        const drawer = document.getElementById("cal_action_drawer");
-        const btn = document.getElementById("cal_drawer_toggle");
-        if (!drawer) return;
-        const isCollapsed = drawer.classList.toggle("collapsed");
-        if (btn) {
-            const btnSpan = btn.querySelector("span") || btn;
-            btnSpan.textContent = isCollapsed ? "🛠️ Tools (Expand)" : "✕ Hide Tools";
-        }
-        localStorage.setItem("epm_cal_drawer_collapsed", isCollapsed ? "true" : "false");
-    };
-
-    window.epmToggleCircDrawer = function() {
-        const drawer = document.getElementById("circ_action_drawer");
-        const btn = document.getElementById("circ_drawer_toggle");
-        if (!drawer) return;
-        const isCollapsed = drawer.classList.toggle("collapsed");
-        if (btn) {
-            const btnSpan = btn.querySelector("span") || btn;
-            btnSpan.textContent = isCollapsed ? "🛠️ Tools (Expand)" : "✕ Hide Tools";
-        }
-        localStorage.setItem("epm_circ_drawer_collapsed", isCollapsed ? "true" : "false");
-    };
+    // 8. Action Drawers (Legacy compatibility stubs)
+    window.epmToggleCalDrawer = function() {};
+    window.epmToggleCircDrawer = function() {};
 
     // 9. IST Clock & Status Telemetry Sync Engine
     function updateISTClock() {
@@ -3354,25 +3440,7 @@ TERMINAL_CLIENT_JS = r"""
         updateISTClock();
         syncTelemetryFromStatusBox();
         
-        // Default action drawers to collapsed for ultra-compact vertical footprint
-        const calCollapsed = localStorage.getItem("epm_cal_drawer_collapsed") !== "false";
-        const cDrawer = document.getElementById("cal_action_drawer");
-        const cBtn = document.getElementById("cal_drawer_toggle");
-        if (cDrawer && calCollapsed) cDrawer.classList.add("collapsed");
-        if (cBtn) {
-            const s = cBtn.querySelector("span") || cBtn;
-            s.textContent = calCollapsed ? "🛠️ Tools (Expand)" : "✕ Hide Tools";
-        }
-        
-        const circCollapsed = localStorage.getItem("epm_circ_drawer_collapsed") !== "false";
-        const crDrawer = document.getElementById("circ_action_drawer");
-        const crBtn = document.getElementById("circ_drawer_toggle");
-        if (crDrawer && circCollapsed) crDrawer.classList.add("collapsed");
-        if (crBtn) {
-            const s = crBtn.querySelector("span") || crBtn;
-            s.textContent = circCollapsed ? "🛠️ Tools (Expand)" : "✕ Hide Tools";
-        }
-        
+
         const savedQuery = localStorage.getItem("epm_watchlist") || "";
         if (savedQuery) {
             window.epmApplyWatchlist(savedQuery);
@@ -3512,22 +3580,33 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                     show_label=False,
                     scale=3
                 )
-                cal_drawer_toggle = gr.Button("🛠️ Tools (Expand)", elem_id="cal_drawer_toggle", variant="secondary", scale=0)
 
-            with gr.Column(elem_id="cal_action_drawer", elem_classes=["epm-action-drawer", "collapsed"]):
+            with gr.Group(elem_id="cal_action_deck", elem_classes=["epm-toolbar-card"]):
+                gr.HTML("""
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid #f1f5f9; padding-bottom:6px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:12px; font-weight:800; color:#0f172a; letter-spacing:0.3px;">📑 INSTITUTIONAL MULTI-MARKET CALENDAR DOSSIERS (A4 LANDSCAPE PRINT-READY)</span>
+                        <span style="background:#e0f2fe; color:#0369a1; font-size:10px; font-weight:700; padding:2px 6px; border-radius:3px;">14-COLUMN SCHEMA</span>
+                    </div>
+                    <span style="font-size:11px; color:#64748b; font-weight:500;">
+                        Auto-Dispatches: Friday 6:00 AM (Weekly) & 25th 6:00 AM (Monthly)
+                    </span>
+                </div>
+                """)
                 with gr.Row():
-                    cal_sync_btn = gr.Button("🔄 Sync 5 Markets & Timers", variant="primary", scale=1)
-                    btn_sync_gcal = gr.Button("📅 Sync Google Calendar", variant="secondary", scale=1)
-                    btn_push_today_photo = gr.Button("📸 Send Today's Photo Cards", variant="secondary", scale=1)
-                    btn_push_tomorrow_photo = gr.Button("📸 Send Tomorrow's Photo Cards", variant="secondary", scale=1)
+                    btn_download_weekly = gr.Button("📥 Download Weekly Snapshot PDF (Next Mon–Sat)", variant="primary", scale=2)
+                    btn_download_monthly = gr.Button("📥 Download Monthly Outlook PDF (Upcoming Month)", variant="primary", scale=2)
+                    btn_push_weekly_pdf = gr.Button("✈️ Push Weekly PDF to Telegram (Fri 6 AM Trigger)", variant="secondary", scale=2)
+                    btn_push_monthly_pdf = gr.Button("✈️ Push Monthly PDF to Telegram (25th 6 AM Trigger)", variant="secondary", scale=2)
 
                 with gr.Row():
-                    btn_push_holiday = gr.Button("🏖️ Send Next-Day Holiday Check", variant="secondary", scale=1)
-                    btn_push_weekly = gr.Button("📲 Resend Weekly Sync Links", variant="secondary", scale=1)
-                    btn_push_today = gr.Button("💬 Send Today's Text Snapshot", variant="secondary", scale=1)
-                    btn_push_tomorrow = gr.Button("💬 Send Tomorrow's Text Snapshot", variant="secondary", scale=1)
+                    cal_sync_btn = gr.Button("🔄 Sync 5 Markets & Live Timers", variant="secondary", scale=2)
+                    btn_sync_gcal = gr.Button("📅 Sync Google Calendar (1h Alarms)", variant="secondary", scale=2)
+                    btn_ics_export = gr.Button("📲 Apple / Outlook .ICS", variant="secondary", scale=1)
+                    btn_push_holiday = gr.Button("🏖️ Next-Day Holiday Check", variant="secondary", scale=1)
 
-            cal_action_msg = gr.Markdown(elem_id="cal_action_msg")
+                cal_pdf_file = gr.File(label="📄 Generated A4 PDF Document (Click to Open / Save)", visible=False, elem_id="cal_pdf_file")
+                cal_action_msg = gr.Markdown(elem_id="cal_action_msg")
 
             gr.HTML(render_table_ribbon("calendar_table", "Multi-Market Catalyst Schedule & Historical Outcomes", subtitle="5 Bourses", count_badge="Live Timers"))
             calendar_table = gr.Dataframe(
@@ -3603,18 +3682,17 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
             cal_market_filter.change(get_calendar_tables, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_visual_feed, calendar_table, holidays_table])
             cal_sync_btn.click(sync_and_refresh_calendar, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_visual_feed, calendar_table, holidays_table])
             btn_sync_gcal.click(trigger_sync_google_cal, outputs=[cal_action_msg])
-            btn_push_weekly.click(push_weekly_calendar_dispatch, outputs=[cal_action_msg])
-            btn_push_today_photo.click(push_today_photo_snapshot_all_markets, outputs=[cal_action_msg])
-            btn_push_tomorrow_photo.click(push_tomorrow_photo_snapshot_all_markets, outputs=[cal_action_msg])
-            btn_push_today.click(push_today_snapshot_all_markets, outputs=[cal_action_msg])
-            btn_push_tomorrow.click(push_tomorrow_snapshot_all_markets, outputs=[cal_action_msg])
             btn_push_holiday.click(push_holiday_check_alert, outputs=[cal_action_msg])
+            btn_download_weekly.click(handle_download_weekly_pdf, outputs=[cal_action_msg, cal_pdf_file])
+            btn_download_monthly.click(handle_download_monthly_pdf, outputs=[cal_action_msg, cal_pdf_file])
+            btn_push_weekly_pdf.click(handle_dispatch_weekly_pdf_telegram, outputs=[cal_action_msg, cal_pdf_file])
+            btn_push_monthly_pdf.click(handle_dispatch_monthly_pdf_telegram, outputs=[cal_action_msg, cal_pdf_file])
+            btn_ics_export.click(handle_download_ics_file, outputs=[cal_action_msg, cal_pdf_file])
             save_ev_btn.click(
                 handle_manual_event_save,
                 inputs=[in_ev_id, in_ev_mkt, in_ev_date, in_ev_time, in_ev_sym, in_ev_name, in_ev_imp, in_ev_prev, in_ev_fore, in_ev_act, in_ev_sent, in_ev_push, cal_filter, cal_market_filter],
                 outputs=[cal_action_msg, cal_info_bar, calendar_visual_feed, calendar_table]
             )
-            cal_drawer_toggle.click(None, js="() => window.epmToggleCalDrawer()")
 
         # ═══════════════════════════════════════════════════════════
         # TAB 3: Official Regulatory Circulars & Notifications Repository
@@ -3653,13 +3731,12 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                     placeholder="Search circulars / keywords...",
                     label="",
                     show_label=False,
-                    scale=2
+                    scale=3
                 )
-                circ_drawer_toggle = gr.Button("🛠️ Tools (Expand)", elem_id="circ_drawer_toggle", variant="secondary", scale=0)
 
-            with gr.Row(elem_id="circ_action_drawer", elem_classes=["epm-action-drawer", "collapsed"]):
-                circ_refresh_btn = gr.Button("🔄 Check & Poll Latest Circulars", variant="primary", scale=1)
-                circ_dispatch_btn = gr.Button("📲 Forward Latest Circular to Telegram", variant="secondary", scale=1)
+            with gr.Row(elem_id="circ_action_toolbar", elem_classes=["epm-toolbar-card"]):
+                circ_refresh_btn = gr.Button("🔄 Check & Poll Official Circulars (NSE, BSE, MCX, RBI, FINMIN, FOMC)", variant="primary", scale=3)
+                circ_dispatch_btn = gr.Button("📲 Forward Latest Circular to Telegram", variant="secondary", scale=2)
 
             circ_action_msg = gr.Markdown(elem_id="circ_action_msg")
 
@@ -3710,7 +3787,6 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                 inputs=[circ_reg_filter],
                 outputs=[circ_action_msg]
             )
-            circ_drawer_toggle.click(None, js="() => window.epmToggleCircDrawer()")
 
         # ═══════════════════════════════════════════════════════════
         # TAB 4: Portal Settings Page (Alert Channels, Google Cal & Sources)
@@ -3755,27 +3831,36 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                         label="Enable Market Calendar & Outcomes Telegram Forwarding",
                         value=telegram_notifier.calendar_enabled
                     )
-                    gr.Markdown("**⏰ Automated Daily Morning Dispatches (IST):**")
-                    adm_auto_today_7am = gr.Checkbox(
-                        label="🌅 07:00 AM IST — Auto-Forward Today's Complete Calendar & Timer Snapshot (5 Separate Msgs: NSE, BSE, MCX, Crypto, NYSE)",
-                        value=telegram_notifier.auto_daily_today_7am
+                    gr.Markdown("**⏰ Automated Morning Dispatches (IST Schedule):**")
+                    adm_auto_weekly_pdf_fri6am = gr.Checkbox(
+                        label="📑 Friday 06:00 AM IST — Auto-Dispatch Weekly Multi-Market A4 PDF Dossier (Next Week Mon–Sat)",
+                        value=telegram_notifier.auto_weekly_pdf_fri_6am
                     )
-                    adm_auto_tom_705am = gr.Checkbox(
-                        label="🌄 07:05 AM IST — Auto-Forward Tomorrow's Lined-Up Events Snapshot (5 Separate Msgs: NSE, BSE, MCX, Crypto, NYSE)",
-                        value=telegram_notifier.auto_daily_tomorrow_705am
+                    adm_auto_monthly_pdf_25th6am = gr.Checkbox(
+                        label="📑 25th of Month 06:00 AM IST — Auto-Dispatch Monthly Multi-Market A4 PDF Outlook (Upcoming Month)",
+                        value=telegram_notifier.auto_monthly_pdf_25th_6am
                     )
                     adm_auto_hol_7am = gr.Checkbox(
                         label="🏖️ 07:00 AM IST — Auto-Forward Next-Day Trading Holiday Alert (1 Day Before NSE/BSE/MCX/NYSE Holiday)",
                         value=telegram_notifier.auto_holiday_7am
                     )
-                    adm_auto_weekly_fri7am = gr.Checkbox(
-                        label="🗓️ Friday 07:00 AM IST — Auto-Forward Complete Upcoming Week Calendar Link (Apple & Google)",
-                        value=getattr(telegram_notifier, "auto_weekly_fri_7am", False)
-                    )
                     adm_auto_circulars = gr.Checkbox(
                         label="📜 Auto-Forward Critical Regulatory Circulars (NSE, BSE, MCX, RBI, FinMin, FOMC, NYSE, Crypto) with 3-5 Bullets & PDF Link",
                         value=getattr(telegram_notifier, "auto_circulars_tg", False)
                     )
+                    with gr.Accordion("⚙️ Legacy Dispatches (Optional)", open=False):
+                        adm_auto_today_7am = gr.Checkbox(
+                            label="🌅 07:00 AM IST — Auto-Forward Today's Complete Calendar Snapshot (5 Market Messages)",
+                            value=telegram_notifier.auto_daily_today_7am
+                        )
+                        adm_auto_tom_705am = gr.Checkbox(
+                            label="🌄 07:05 AM IST — Auto-Forward Tomorrow's Lined-Up Events Snapshot (5 Market Messages)",
+                            value=telegram_notifier.auto_daily_tomorrow_705am
+                        )
+                        adm_auto_weekly_fri7am = gr.Checkbox(
+                            label="🗓️ Friday 07:00 AM IST — Auto-Forward Weekly Calendar Links (Apple & Google)",
+                            value=getattr(telegram_notifier, "auto_weekly_fri_7am", False)
+                        )
                     adm_send_as_photos = gr.Checkbox(
                         label="📸 Deliver Morning Calendar Snapshots as Infographic Photo Cards (Details rendered directly in image)",
                         value=getattr(telegram_notifier, "send_as_photos", True)
@@ -3793,7 +3878,7 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                     
                     with gr.Row():
                         test_cal_tg_btn = gr.Button("🔔 Send Test Alert to Calendar Channel")
-                        resend_weekly_btn = gr.Button("📲 Resend Full-Week Calendar Sync Link (Apple & Google) Now")
+                        resend_weekly_btn = gr.Button("📲 Resend Full-Week Calendar Sync Link Now")
 
             save_adm_tg_btn = gr.Button("💾 Save All Telegram & Schedule Settings", variant="primary")
             adm_tg_status = gr.Markdown()
@@ -3806,7 +3891,7 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                     adm_cal_countdown, adm_cal_outcome, adm_cal_linked,
                     adm_auto_today_7am, adm_auto_tom_705am, adm_auto_hol_7am,
                     adm_send_as_photos, adm_public_app_url, adm_auto_weekly_fri7am,
-                    adm_auto_circulars
+                    adm_auto_circulars, adm_auto_weekly_pdf_fri6am, adm_auto_monthly_pdf_25th6am
                 ],
                 outputs=[adm_tg_status]
             )
@@ -3996,10 +4081,10 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                 <div class="guide-card">
                     <h3><span>🌅</span> Automated Morning Telegram Dispatches (IST Schedule)</h3>
                     <ul class="guide-list">
-                        <li><span class="guide-pill">07:00 AM IST Daily</span> &nbsp;—&nbsp; Automatically forwards <b>Today's Complete Multi-Market Calendar snapshot</b> as <b>5 separate messages</b> (<span class="guide-badge">NSE</span>, <span class="guide-badge">BSE</span>, <span class="guide-badge">MCX</span>, <span class="guide-badge">CRYPTO</span>, <span class="guide-badge">NYSE</span>) directly into the designated Calendar channel, complete with countdown timers, previous consensus figures, and 1-click Google Calendar links.</li>
+                        <li><span class="guide-pill">Friday 06:00 AM IST</span> &nbsp;—&nbsp; Automatically compiles and dispatches the <b>Weekly Multi-Market Snapshot PDF Dossier</b> (A4 Landscape, 14-column ledger format covering Monday to Saturday across NSE, BSE, MCX, CRYPTO & NYSE) directly into the designated Calendar Telegram channel.</li>
+                        <li><span class="guide-pill">25th of Month 06:00 AM IST</span> &nbsp;—&nbsp; Automatically compiles and dispatches the <b>Monthly Multi-Market Outlook PDF Dossier</b> (A4 Landscape, weekly-sectioned ledger covering all major catalysts for the upcoming month) into the Calendar channel.</li>
                         <li><span class="guide-pill">07:00 AM IST Daily (Holiday Check)</span> &nbsp;—&nbsp; Evaluates upcoming calendar schedules 24 hours in advance and auto-forwards a <b>Next-Day Trading Holiday Alert</b> across all 5 major bourses whenever a session closure or evening trading break is detected.</li>
-                        <li><span class="guide-pill">07:05 AM IST Daily</span> &nbsp;—&nbsp; Automatically forwards <b>Tomorrow's Lined-Up Events snapshot</b> as 5 separate market messages, giving portfolio managers early visibility into upcoming catalysts.</li>
-                        <li><span class="guide-pill">Friday 07:00 AM IST</span> &nbsp;—&nbsp; Forwards the universal 1-click <b>Weekly Calendar Sync Links</b> (Apple Calendar `.ics` & Google Calendar) to sync the entire following week with one tap.</li>
+                        <li><span class="guide-pill">1-Click PDF Downloads</span> &nbsp;—&nbsp; Immediate access to both weekly and monthly print-ready A4 dossiers on Tab 2 or via machine endpoints <span class="guide-pill">/api/calendar/pdf/weekly</span> and <span class="guide-pill">/api/calendar/pdf/monthly</span>.</li>
                     </ul>
                 </div>
 

@@ -35,14 +35,16 @@ class TelegramNotifier:
         self.calendar_chat_id = os.getenv("CALENDAR_TELEGRAM_CHAT_ID", "").strip()
         self.calendar_enabled = os.getenv("ENABLE_CALENDAR_ALERTS", "true").lower() == "true"
 
-        # Granular Calendar Automation Toggles - strictly 7:00 AM daily snapshot only
+        # Granular Calendar Automation Toggles - Friday 6 AM Weekly PDF & 25th 6 AM Monthly PDF
         self.alert_on_countdown = False        # Disabled: No countdown spam
         self.alert_on_outcome = False          # Disabled: No individual outcome spam
         self.alert_on_linked_news = False      # Disabled: No linked news calendar alerts
-        self.auto_daily_today_7am = True       # Enabled: 07:00 AM IST Today's complete snapshot
-        self.auto_daily_tomorrow_705am = False # Disabled: Daily 7 AM only
-        self.auto_holiday_7am = True           # Enabled: 07:00 AM IST Next-day trading holiday alert
-        self.auto_weekly_fri_7am = False       # Disabled: No weekly blast
+        self.auto_daily_today_7am = False      # Disabled: Replaced by Weekly/Monthly A4 PDFs
+        self.auto_daily_tomorrow_705am = False # Disabled
+        self.auto_holiday_7am = True           # Enabled: 06:00 AM IST Next-day trading holiday alert
+        self.auto_weekly_pdf_fri_6am = True    # Enabled: Friday 06:00 AM IST Weekly A4 Snapshot PDF
+        self.auto_monthly_pdf_25th_6am = True  # Enabled: 25th of month 06:00 AM IST Monthly A4 Outlook PDF
+        self.auto_weekly_fri_7am = False       # Disabled: Replaced by A4 Dossier
         self.auto_circulars_tg = False         # Disabled: Circulars separate
         self.send_as_photos = True             # Deliver morning calendar as high-definition infographic photos
         self.public_app_url = os.getenv("PUBLIC_APP_URL", "").strip()
@@ -105,6 +107,14 @@ class TelegramNotifier:
                     self.auto_circulars_tg = bool(data["auto_circulars_tg"])
                 else:
                     self.auto_circulars_tg = False
+                if "auto_weekly_pdf_fri_6am" in data:
+                    self.auto_weekly_pdf_fri_6am = bool(data["auto_weekly_pdf_fri_6am"])
+                else:
+                    self.auto_weekly_pdf_fri_6am = True
+                if "auto_monthly_pdf_25th_6am" in data:
+                    self.auto_monthly_pdf_25th_6am = bool(data["auto_monthly_pdf_25th_6am"])
+                else:
+                    self.auto_monthly_pdf_25th_6am = True
                 if "auto_weekly_fri_7am" in data:
                     self.auto_weekly_fri_7am = bool(data["auto_weekly_fri_7am"])
                 elif "auto_weekly_mon_7am" in data:
@@ -136,7 +146,9 @@ class TelegramNotifier:
         send_as_photos: bool = True,
         public_app_url: str = "",
         auto_weekly_fri_7am: bool = False,
-        auto_circulars_tg: bool = False
+        auto_circulars_tg: bool = False,
+        auto_weekly_pdf_fri_6am: bool = True,
+        auto_monthly_pdf_25th_6am: bool = True
     ) -> Dict:
         if news_bot_token.strip():
             self.bot_token = news_bot_token.strip()
@@ -157,6 +169,8 @@ class TelegramNotifier:
         self.public_app_url = public_app_url.strip()
         self.auto_weekly_fri_7am = bool(auto_weekly_fri_7am)
         self.auto_circulars_tg = bool(auto_circulars_tg)
+        self.auto_weekly_pdf_fri_6am = bool(auto_weekly_pdf_fri_6am)
+        self.auto_monthly_pdf_25th_6am = bool(auto_monthly_pdf_25th_6am)
 
         payload = {
             "news_bot_token": self.bot_token,
@@ -174,7 +188,9 @@ class TelegramNotifier:
             "send_as_photos": self.send_as_photos,
             "public_app_url": self.public_app_url,
             "auto_weekly_fri_7am": self.auto_weekly_fri_7am,
-            "auto_circulars_tg": self.auto_circulars_tg
+            "auto_circulars_tg": self.auto_circulars_tg,
+            "auto_weekly_pdf_fri_6am": self.auto_weekly_pdf_fri_6am,
+            "auto_monthly_pdf_25th_6am": self.auto_monthly_pdf_25th_6am
         }
         try:
             with open(ADMIN_SETTINGS_FILE, "w") as f:
@@ -361,6 +377,64 @@ class TelegramNotifier:
         token = self.get_effective_calendar_token()
         chat_id = self.get_effective_calendar_chat_id()
         return self.send_photo(token, chat_id, photo_bytes, caption)
+
+    def send_document(self, token: str, chat_id: str, doc_bytes: bytes, filename: str, caption: str = "") -> tuple[bool, str]:
+        """
+        Uploads and dispatches a PDF or document directly to the target Telegram channel using sendDocument API.
+        """
+        if not token or not chat_id:
+            return False, "Missing Bot Token or Chat ID"
+
+        url = f"https://api.telegram.org/bot{token}/sendDocument"
+        files = {
+            "document": (filename, doc_bytes, "application/pdf")
+        }
+        data = {
+            "chat_id": chat_id,
+            "caption": caption[:1024],
+            "parse_mode": "HTML"
+        }
+
+        with self._send_lock:
+            elapsed = time.time() - self._last_send_time
+            if elapsed < 0.8:
+                time.sleep(0.8 - elapsed)
+
+            for attempt in range(3):
+                try:
+                    resp = requests.post(url, data=data, files=files, timeout=35)
+                    self._last_send_time = time.time()
+                    if resp.status_code == 200:
+                        return True, "Delivered"
+                    elif resp.status_code == 400 and "can't parse entities" in resp.text.lower():
+                        logger.warning("Telegram HTML parse error in sendDocument, retrying with plain text caption...")
+                        data_plain = dict(data)
+                        data_plain.pop("parse_mode", None)
+                        data_plain["caption"] = re.sub(r'<[^>]+>', '', caption)[:1020]
+                        resp_plain = requests.post(url, data=data_plain, files=files, timeout=35)
+                        if resp_plain.status_code == 200:
+                            return True, "Delivered (plain text fallback)"
+                    elif resp.status_code == 429:
+                        wait = resp.json().get("parameters", {}).get("retry_after", 4)
+                        time.sleep(wait)
+                        continue
+                    else:
+                        err = resp.text[:160]
+                        logger.warning(f"Telegram sendDocument error ({resp.status_code}): {err}")
+                        return False, f"HTTP {resp.status_code}: {err}"
+                except Exception as e:
+                    logger.error(f"Telegram sendDocument connection error: {e}")
+                    time.sleep(1)
+
+        return False, "Failed to send document"
+
+    def send_calendar_document(self, doc_bytes: bytes, filename: str, caption: str = "") -> tuple[bool, str]:
+        """Dispatches an executive PDF dossier directly to the dedicated Calendar Telegram channel."""
+        if not self.calendar_enabled or not self.is_calendar_configured():
+            return False, "Calendar Telegram channel is disabled or not configured."
+        token = self.get_effective_calendar_token()
+        chat_id = self.get_effective_calendar_chat_id()
+        return self.send_document(token, chat_id, doc_bytes, filename, caption)
 
     def send_calendar_photos_batch(self, photo_items: List[tuple]) -> tuple[bool, str]:
         """

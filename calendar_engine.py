@@ -180,6 +180,8 @@ class MarketCalendarEngine:
         self.last_today_snapshot_date: str = ""
         self.last_tomorrow_snapshot_date: str = ""
         self.last_holiday_alert_date: str = ""
+        self.last_weekly_pdf_date: str = ""
+        self.last_monthly_pdf_date: str = ""
 
         # Live Crypto Spot & Trending Cache
         self.crypto_live_spot: Dict[str, str] = {
@@ -212,6 +214,8 @@ class MarketCalendarEngine:
                 self.last_tomorrow_snapshot_date = data.get("last_tomorrow_snapshot_date", "")
                 self.last_holiday_alert_date = data.get("last_holiday_alert_date", "")
                 self.last_weekly_dispatch_date = data.get("last_weekly_dispatch_date", "")
+                self.last_weekly_pdf_date = data.get("last_weekly_pdf_date", "")
+                self.last_monthly_pdf_date = data.get("last_monthly_pdf_date", "")
             except Exception as e:
                 logger.warning(f"Error loading calendar state: {e}")
 
@@ -226,6 +230,8 @@ class MarketCalendarEngine:
                 "last_tomorrow_snapshot_date": self.last_tomorrow_snapshot_date,
                 "last_holiday_alert_date": self.last_holiday_alert_date,
                 "last_weekly_dispatch_date": getattr(self, "last_weekly_dispatch_date", ""),
+                "last_weekly_pdf_date": getattr(self, "last_weekly_pdf_date", ""),
+                "last_monthly_pdf_date": getattr(self, "last_monthly_pdf_date", ""),
                 "updated_at": now_ist().isoformat()
             }
             with open(CALENDAR_STATE_FILE, "w") as f:
@@ -2167,79 +2173,109 @@ class MarketCalendarEngine:
 
         return updated
 
+    def dispatch_weekly_pdf_dossier(self) -> Tuple[bool, str]:
+        """Compiles and dispatches the Friday 06:00 AM IST A4 Weekly Snapshot PDF (Next Mon–Sat) to Telegram."""
+        try:
+            from calendar_pdf_engine import calendar_pdf_engine
+            pdf_bytes, filename = calendar_pdf_engine.generate_weekly_pdf()
+            caption = (
+                "📑 <b>GLOBAL NEWS FEED ROOM — WEEKLY MULTI-MARKET DOSSIER (A4)</b>\n"
+                "🗓️ <b>Upcoming Schedule:</b> Next Monday to Saturday\n"
+                "🏛️ <b>Scope:</b> Unified Multi-Market Ledger (NSE • BSE • MCX • Crypto • NYSE)\n"
+                "📊 <b>Includes:</b> Economic Data, Corporate Actions, Earnings, Dividends, IPOs, Holidays & Timers\n\n"
+                "<i>Global News Feed Room is Powered by EPMC Pvt. Ltd.</i>"
+            )
+            success, msg = telegram_notifier.send_calendar_document(pdf_bytes, filename, caption)
+            return success, msg
+        except Exception as e:
+            logger.error(f"Error dispatching weekly PDF: {e}")
+            return False, str(e)
+
+    def dispatch_monthly_pdf_dossier(self) -> Tuple[bool, str]:
+        """Compiles and dispatches the 25th of month 06:00 AM IST A4 Monthly Outlook PDF to Telegram."""
+        try:
+            from calendar_pdf_engine import calendar_pdf_engine
+            pdf_bytes, filename = calendar_pdf_engine.generate_monthly_pdf()
+            caption = (
+                "📚 <b>GLOBAL NEWS FEED ROOM — MONTHLY MULTI-MARKET OUTLOOK (A4)</b>\n"
+                "🗓️ <b>Horizon:</b> Full Upcoming Month Calendar\n"
+                "🏛️ <b>Structure:</b> Sectioned Weekly (Monday–Saturday Active Catalysts)\n"
+                "📊 <b>Includes:</b> Macro Forecasts, Earnings Releases, Central Bank Decisions & Trading Holidays\n\n"
+                "<i>Global News Feed Room is Powered by EPMC Pvt. Ltd.</i>"
+            )
+            success, msg = telegram_notifier.send_calendar_document(pdf_bytes, filename, caption)
+            return success, msg
+        except Exception as e:
+            logger.error(f"Error dispatching monthly PDF: {e}")
+            return False, str(e)
+
     # ─────────────────────────────────────────────────────────────
-    #  AUTOMATED 7:00 AM, 7:05 AM, HOLIDAY & LIVE UNFOLDING DAEMON
+    #  AUTOMATED 6:00 AM WEEKLY/MONTHLY PDF & LIVE TIMER DAEMON
     # ─────────────────────────────────────────────────────────────
 
     def check_timers_and_alerts(self):
         """
         Runs every 10 seconds in IST:
-          1. 07:00 AM IST: Next-Day Trading Holiday Alert (1 day before any NSE/BSE/MCX/NYSE holiday)
-          2. 07:00 AM IST: Today's Complete Calendar & Timer Snapshot (5 separate messages: NSE, BSE, MCX, CRYPTO, NYSE)
-          3. 07:05 AM IST: Tomorrow's Lined-Up Events Snapshot (5 separate messages: NSE, BSE, MCX, CRYPTO, NYSE)
+          1. Friday 06:00 AM IST: Weekly A4 PDF Dossier Dispatch (Next Mon–Sat)
+          2. 25th of Month 06:00 AM IST: Monthly A4 PDF Outlook Dispatch (Upcoming Month)
+          3. 06:00 AM IST: Next-Day Trading Holiday Alert (Only 1 day before any NSE/BSE/MCX/NYSE holiday)
           4. Live 24/7: Individual Event T-15m Countdowns & Unfolded Outcomes across ALL companies/events
         """
         curr = now_ist()
         today_str = curr.strftime("%Y-%m-%d")
         tomorrow_str = (curr + timedelta(days=1)).strftime("%Y-%m-%d")
 
-        # ── 1. 07:00 AM IST: Next-Day Trading Holiday Alert (1 day before holiday) ──
-        if curr.hour >= 7 and self.last_holiday_alert_date != today_str:
-            if telegram_notifier.calendar_enabled and telegram_notifier.auto_holiday_7am and telegram_notifier.is_calendar_configured():
-                logger.info(f"Running 07:00 AM IST Next-Day Holiday check for {tomorrow_str}...")
+        # ── 1. Friday 06:00 AM IST: Weekly A4 PDF Dossier Dispatch (Next Mon–Sat) ──
+        is_friday = (curr.weekday() == 4)
+        if is_friday and curr.hour >= 6 and getattr(self, "last_weekly_pdf_date", "") != today_str:
+            if telegram_notifier.calendar_enabled and getattr(telegram_notifier, "auto_weekly_pdf_fri_6am", True) and telegram_notifier.is_calendar_configured():
+                logger.info("Executing Friday 06:00 AM IST Weekly A4 PDF Dossier Dispatch to Telegram...")
+                ok, msg = self.dispatch_weekly_pdf_dossier()
+                if ok:
+                    self.last_weekly_pdf_date = today_str
+                    self._save_state()
+            elif not telegram_notifier.is_calendar_configured():
+                pass
+            else:
+                self.last_weekly_pdf_date = today_str
+                self._save_state()
+
+        # ── 2. 25th of Month 06:00 AM IST: Monthly A4 PDF Outlook Dispatch (Upcoming Month) ──
+        is_25th = (curr.day == 25)
+        if is_25th and curr.hour >= 6 and getattr(self, "last_monthly_pdf_date", "") != today_str:
+            if telegram_notifier.calendar_enabled and getattr(telegram_notifier, "auto_monthly_pdf_25th_6am", True) and telegram_notifier.is_calendar_configured():
+                logger.info("Executing 25th 06:00 AM IST Monthly A4 PDF Outlook Dispatch to Telegram...")
+                ok, msg = self.dispatch_monthly_pdf_dossier()
+                if ok:
+                    self.last_monthly_pdf_date = today_str
+                    self._save_state()
+            elif not telegram_notifier.is_calendar_configured():
+                pass
+            else:
+                self.last_monthly_pdf_date = today_str
+                self._save_state()
+
+        # ── 3. 06:00 AM IST: Next-Day Trading Holiday Alert (1 day before holiday) ──
+        if curr.hour >= 6 and self.last_holiday_alert_date != today_str:
+            if telegram_notifier.calendar_enabled and getattr(telegram_notifier, "auto_holiday_7am", True) and telegram_notifier.is_calendar_configured():
+                logger.info(f"Running 06:00 AM IST Next-Day Holiday check for {tomorrow_str}...")
                 self.dispatch_next_day_holiday_alerts(target_date=tomorrow_str, force_preview=False)
                 self.last_holiday_alert_date = today_str
                 self._save_state()
             elif not telegram_notifier.is_calendar_configured():
-                pass  # Keep unburned until Telegram is configured
+                pass
             else:
                 self.last_holiday_alert_date = today_str
                 self._save_state()
 
-        # ── 2. 07:00 AM IST: Today's Complete Events & Timer Snapshot (Per Market) ──
-        if curr.hour >= 7 and self.last_today_snapshot_date != today_str:
-            if telegram_notifier.calendar_enabled and telegram_notifier.auto_daily_today_7am and telegram_notifier.is_calendar_configured():
-                logger.info(f"Dispatching 07:00 AM IST Today's Snapshot across {MARKETS_ORDER} (send_as_photos={getattr(telegram_notifier, 'send_as_photos', True)})...")
+        # ── Optional Legacy Daily Snapshot (Suppressed by default) ──
+        if getattr(telegram_notifier, "auto_daily_today_7am", False) and curr.hour >= 7 and self.last_today_snapshot_date != today_str:
+            if telegram_notifier.calendar_enabled and telegram_notifier.is_calendar_configured():
                 if getattr(telegram_notifier, "send_as_photos", True):
                     self.dispatch_all_markets_today_photo_snapshot()
                 else:
                     self.dispatch_all_markets_today_snapshot()
                 self.last_today_snapshot_date = today_str
-                self._save_state()
-            elif not telegram_notifier.is_calendar_configured():
-                pass  # Keep unburned until Telegram is configured
-            else:
-                self.last_today_snapshot_date = today_str
-                self._save_state()
-
-        # ── 3. 07:05 AM IST: Tomorrow's Lined-Up Events Snapshot (Per Market) ──
-        if (curr.hour > 7 or (curr.hour == 7 and curr.minute >= 5)) and self.last_tomorrow_snapshot_date != today_str:
-            if telegram_notifier.calendar_enabled and telegram_notifier.auto_daily_tomorrow_705am and telegram_notifier.is_calendar_configured():
-                logger.info(f"Dispatching 07:05 AM IST Tomorrow's Lined-Up Snapshot across {MARKETS_ORDER} (send_as_photos={getattr(telegram_notifier, 'send_as_photos', True)})...")
-                if getattr(telegram_notifier, "send_as_photos", True):
-                    self.dispatch_all_markets_tomorrow_photo_snapshot()
-                else:
-                    self.dispatch_all_markets_tomorrow_snapshot()
-                self.last_tomorrow_snapshot_date = today_str
-                self._save_state()
-            elif not telegram_notifier.is_calendar_configured():
-                pass  # Keep unburned until Telegram is configured
-            else:
-                self.last_tomorrow_snapshot_date = today_str
-                self._save_state()
-
-        # ── 3B. Friday 07:00 AM IST: Complete Upcoming Week Calendar Sync Dispatch ──
-        is_friday = (curr.weekday() == 4)
-        if is_friday and curr.hour >= 7 and getattr(self, "last_weekly_dispatch_date", "") != today_str:
-            if telegram_notifier.calendar_enabled and getattr(telegram_notifier, "auto_weekly_fri_7am", True) and telegram_notifier.is_calendar_configured():
-                logger.info("Dispatching Friday 07:00 AM IST Upcoming Week Calendar Link to Telegram...")
-                self.dispatch_weekly_calendar_message()
-                self.last_weekly_dispatch_date = today_str
-                self._save_state()
-            elif not telegram_notifier.is_calendar_configured():
-                pass
-            else:
-                self.last_weekly_dispatch_date = today_str
                 self._save_state()
 
         # ── 4. Individual Happening Events: T-15m Countdown & Unfolded Outcome Alerts ──
