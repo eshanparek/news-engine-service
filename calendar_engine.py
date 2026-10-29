@@ -2179,10 +2179,8 @@ class MarketCalendarEngine:
             from calendar_pdf_engine import calendar_pdf_engine
             pdf_bytes, filename = calendar_pdf_engine.generate_weekly_pdf()
             caption = (
-                "📑 <b>GLOBAL NEWS FEED ROOM — WEEKLY MULTI-MARKET DOSSIER (A4)</b>\n"
-                "🗓️ <b>Upcoming Schedule:</b> Next Sunday to Saturday\n"
-                "🏛️ <b>Scope:</b> Unified Multi-Market Ledger (NSE • BSE • MCX • Crypto • NYSE)\n"
-                "📊 <b>Includes:</b> Economic Data, Corporate Actions, Earnings, Dividends, IPOs, Holidays & Timers\n\n"
+                "Weekly Calendar Events for NSE, BSE, MCX, Crypto\n"
+                "🔗 Portal / Download: https://p01--news-engine-service--dkhqtlpvx6bh.code.run/\n\n"
                 "<i>Global News Feed Room is Powered by EPMC Pvt. Ltd.</i>"
             )
             success, msg = telegram_notifier.send_calendar_document(pdf_bytes, filename, caption)
@@ -2197,10 +2195,8 @@ class MarketCalendarEngine:
             from calendar_pdf_engine import calendar_pdf_engine
             pdf_bytes, filename = calendar_pdf_engine.generate_monthly_pdf()
             caption = (
-                "📚 <b>GLOBAL NEWS FEED ROOM — MONTHLY MULTI-MARKET OUTLOOK (A4)</b>\n"
-                "🗓️ <b>Horizon:</b> Full Upcoming Month Calendar\n"
-                "🏛️ <b>Structure:</b> Sectioned Weekly (Monday–Saturday Active Catalysts)\n"
-                "📊 <b>Includes:</b> Macro Forecasts, Earnings Releases, Central Bank Decisions & Trading Holidays\n\n"
+                "Monthly Calendar Events for NSE, BSE, MCX, Crypto\n"
+                "🔗 Portal / Download: https://p01--news-engine-service--dkhqtlpvx6bh.code.run/\n\n"
                 "<i>Global News Feed Room is Powered by EPMC Pvt. Ltd.</i>"
             )
             success, msg = telegram_notifier.send_calendar_document(pdf_bytes, filename, caption)

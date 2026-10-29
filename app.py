@@ -1200,10 +1200,10 @@ def handle_dispatch_weekly_pdf_telegram():
     fn = os.path.basename(pdf_path)
     if ok:
         return (
-            f"✅ **Weekly Multi-Market A4 PDF dossier (`{fn}`) dispatched to Telegram `{telegram_notifier.calendar_chat_id}`!**",
-            gr.update(value=pdf_path, visible=True)
+            f"✅ **Weekly Multi-Market A4 PDF dossier (`{fn}`) successfully dispatched to Telegram `{telegram_notifier.calendar_chat_id}`!**",
+            gr.update(visible=False)
         )
-    return f"⚠️ **Could not dispatch Weekly PDF to Telegram:** {msg}", gr.update(value=pdf_path, visible=True)
+    return f"⚠️ **Could not dispatch Weekly PDF to Telegram:** {msg}", gr.update(visible=False)
 
 
 def handle_dispatch_monthly_pdf_telegram():
@@ -1212,10 +1212,10 @@ def handle_dispatch_monthly_pdf_telegram():
     fn = os.path.basename(pdf_path)
     if ok:
         return (
-            f"✅ **Monthly Multi-Market A4 PDF outlook (`{fn}`) dispatched to Telegram `{telegram_notifier.calendar_chat_id}`!**",
-            gr.update(value=pdf_path, visible=True)
+            f"✅ **Monthly Multi-Market A4 PDF outlook (`{fn}`) successfully dispatched to Telegram `{telegram_notifier.calendar_chat_id}`!**",
+            gr.update(visible=False)
         )
-    return f"⚠️ **Could not dispatch Monthly PDF to Telegram:** {msg}", gr.update(value=pdf_path, visible=True)
+    return f"⚠️ **Could not dispatch Monthly PDF to Telegram:** {msg}", gr.update(visible=False)
 
 
 def handle_download_ics_file():
@@ -1552,10 +1552,17 @@ div[class*="gradio-container"],
     max-width: 100% !important;
     width: 100% !important;
     margin: 0 !important;
-    padding: 8px 20px !important;
+    padding: 3px 16px 12px 16px !important;
     background-color: #ffffff !important;
     color: var(--text-primary) !important;
     overflow-x: hidden !important;
+}
+
+.gradio-container .tabs,
+.gradio-container .tabitem {
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
 }
 
 /* 3. Typography & Section Headers */
@@ -1854,67 +1861,101 @@ code, .timer-cell, pre {
 #bottom_news_table th:nth-child(5), #bottom_news_table td:nth-child(5) { width: 8% !important; text-align: center !important; }
 #bottom_news_table th:nth-child(6), #bottom_news_table td:nth-child(6) { width: 10% !important; text-align: center !important; font-size: 11px !important; color: #2563eb !important; }
 
-/* Calendar Table - 15-Column Layout (With Prominent Date Column) */
-#calendar_table table {
-    table-layout: auto !important;
+/* Calendar Table - 15-Column Layout (With Prominent Date Column & Strict 2-Row Event Clamp) */
+#calendar_table,
+#calendar_grid_wrap,
+#calendar_table .table-wrap,
+#calendar_table div[data-testid="dataframe"] {
     width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+}
+
+#calendar_table table {
+    table-layout: fixed !important;
+    min-width: 1720px !important;
+    width: 1720px !important;
     border-collapse: collapse !important;
 }
 
-#calendar_table th,
-#calendar_table td {
+/* Suppress Svelte 3-dot header action button */
+#calendar_table th button,
+.gradio-dataframe th button,
+div[data-testid="dataframe"] th button,
+th button[aria-label*="sort"],
+th button[aria-label*="menu"] {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    pointer-events: none !important;
+}
+
+#calendar_table th {
     vertical-align: middle !important;
+    padding: 6px 8px !important;
+    font-size: 10.5px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.3px !important;
+    white-space: nowrap !important;
+    text-overflow: ellipsis !important;
+    overflow: hidden !important;
 }
 
 #calendar_table th .cell-wrap,
 #calendar_table th span {
     white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
 }
 
-#calendar_table td:nth-child(1),
-#calendar_table td:nth-child(2),
-#calendar_table td:nth-child(3),
-#calendar_table td:nth-child(4),
-#calendar_table td:nth-child(5),
-#calendar_table td:nth-child(6),
-#calendar_table td:nth-child(7),
-#calendar_table td:nth-child(10),
-#calendar_table td:nth-child(13),
-#calendar_table td:nth-child(15) {
-    white-space: nowrap !important;
+#calendar_table tbody tr {
+    height: 38px !important;
+    max-height: 42px !important;
 }
 
-#calendar_table th:nth-child(1) { width: 32px !important; min-width: 32px; max-width: 38px; text-align: center !important; }
-#calendar_table th:nth-child(2) { width: 88px !important; min-width: 88px; max-width: 95px; text-align: center !important; }
-#calendar_table th:nth-child(3) { width: 78px !important; min-width: 78px; max-width: 88px; text-align: center !important; }
-#calendar_table th:nth-child(4) { width: 45px !important; min-width: 45px; max-width: 52px; text-align: center !important; }
-#calendar_table th:nth-child(5) { width: 115px !important; min-width: 115px; max-width: 130px; text-align: left !important; }
-#calendar_table th:nth-child(6) { width: 55px !important; min-width: 55px; max-width: 65px; text-align: center !important; }
-#calendar_table th:nth-child(7) { width: 85px !important; min-width: 85px; max-width: 95px; text-align: center !important; }
-#calendar_table th:nth-child(8) { width: 105px !important; min-width: 105px; max-width: 120px; text-align: left !important; }
-#calendar_table th:nth-child(9) { min-width: 250px !important; text-align: left !important; }
-#calendar_table th:nth-child(10) { width: 68px !important; min-width: 68px; max-width: 78px; text-align: center !important; }
-#calendar_table th:nth-child(11) { width: 85px !important; min-width: 85px; max-width: 95px; text-align: center !important; }
-#calendar_table th:nth-child(12) { width: 85px !important; min-width: 85px; max-width: 95px; text-align: center !important; }
-#calendar_table th:nth-child(13) { width: 75px !important; min-width: 75px; max-width: 85px; text-align: center !important; }
-#calendar_table th:nth-child(14) { min-width: 210px !important; text-align: left !important; }
-#calendar_table th:nth-child(15) { width: 65px !important; min-width: 65px; max-width: 75px; text-align: center !important; }
+#calendar_table tbody td {
+    height: 38px !important;
+    max-height: 42px !important;
+    padding: 3px 6px !important;
+    vertical-align: middle !important;
+    font-size: 11.5px !important;
+    line-height: 1.35 !important;
+    overflow: hidden !important;
+}
 
-#calendar_table td:nth-child(1) { width: 32px !important; text-align: center !important; font-family: var(--font-mono) !important; color: #64748b !important; }
-#calendar_table td:nth-child(2) { width: 88px !important; text-align: center !important; font-family: var(--font-mono) !important; color: #0f172a !important; font-size: 11px !important; font-weight: 600 !important; }
-#calendar_table td:nth-child(3) { width: 78px !important; text-align: center !important; font-family: var(--font-mono) !important; color: #0f172a !important; font-size: 11px !important; }
-#calendar_table td:nth-child(4) { width: 45px !important; text-align: center !important; font-weight: 600 !important; color: #475569 !important; }
-#calendar_table td:nth-child(5) { width: 115px !important; text-align: left !important; font-weight: 600 !important; }
-#calendar_table td:nth-child(6) { width: 55px !important; text-align: center !important; font-weight: 600 !important; color: #334155 !important; }
-#calendar_table td:nth-child(7) { width: 85px !important; text-align: center !important; font-weight: 600 !important; color: #0284c7 !important; }
-#calendar_table td:nth-child(8) { width: 105px !important; text-align: left !important; color: #475569 !important; }
-#calendar_table td:nth-child(9) { min-width: 250px !important; text-align: left !important; font-weight: 600 !important; color: #0f172a !important; }
-#calendar_table td:nth-child(10) { width: 68px !important; text-align: center !important; font-family: var(--font-mono) !important; font-weight: 700 !important; color: #d97706 !important; }
-#calendar_table td:nth-child(11) { width: 85px !important; text-align: center !important; font-family: var(--font-mono) !important; color: #475569 !important; font-size: 11px !important; }
-#calendar_table td:nth-child(12) { width: 85px !important; text-align: center !important; font-family: var(--font-mono) !important; font-weight: 600 !important; color: #059669 !important; font-size: 11px !important; }
-#calendar_table td:nth-child(13) { width: 75px !important; text-align: center !important; font-weight: 700 !important; }
-#calendar_table td:nth-child(14) { min-width: 210px !important; text-align: left !important; color: #334155 !important; font-size: 11.5px !important; }
-#calendar_table td:nth-child(15) { width: 65px !important; text-align: center !important; font-size: 11px !important; color: #2563eb !important; font-weight: 600 !important; }
+/* Strict 2-row clamp on all cells */
+#calendar_table tbody td > *,
+#calendar_table tbody td a,
+#calendar_table tbody td span,
+#calendar_table tbody td div {
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    line-height: 1.35 !important;
+    max-height: 2.7em !important;
+    word-break: break-word !important;
+}
+
+#calendar_table th:nth-child(1), #calendar_table td:nth-child(1) { width: 38px !important; text-align: center !important; font-family: var(--font-mono) !important; color: #64748b !important; white-space: nowrap !important; }
+#calendar_table th:nth-child(2), #calendar_table td:nth-child(2) { width: 95px !important; text-align: center !important; font-family: var(--font-mono) !important; color: #0f172a !important; font-size: 11px !important; font-weight: 700 !important; white-space: nowrap !important; }
+#calendar_table th:nth-child(3), #calendar_table td:nth-child(3) { width: 85px !important; text-align: center !important; font-family: var(--font-mono) !important; color: #0f172a !important; font-size: 11px !important; white-space: nowrap !important; }
+#calendar_table th:nth-child(4), #calendar_table td:nth-child(4) { width: 48px !important; text-align: center !important; font-weight: 600 !important; color: #475569 !important; white-space: nowrap !important; }
+#calendar_table th:nth-child(5), #calendar_table td:nth-child(5) { width: 120px !important; text-align: left !important; font-weight: 600 !important; }
+#calendar_table th:nth-child(6), #calendar_table td:nth-child(6) { width: 65px !important; text-align: center !important; font-weight: 600 !important; color: #334155 !important; white-space: nowrap !important; }
+#calendar_table th:nth-child(7), #calendar_table td:nth-child(7) { width: 105px !important; text-align: center !important; font-weight: 600 !important; color: #0284c7 !important; }
+#calendar_table th:nth-child(8), #calendar_table td:nth-child(8) { width: 115px !important; text-align: left !important; color: #475569 !important; }
+#calendar_table th:nth-child(9), #calendar_table td:nth-child(9) { width: 320px !important; text-align: left !important; font-weight: 600 !important; color: #0f172a !important; }
+#calendar_table th:nth-child(10), #calendar_table td:nth-child(10) { width: 75px !important; text-align: center !important; font-family: var(--font-mono) !important; font-weight: 700 !important; color: #d97706 !important; white-space: nowrap !important; }
+#calendar_table th:nth-child(11), #calendar_table td:nth-child(11) { width: 95px !important; text-align: center !important; font-family: var(--font-mono) !important; color: #475569 !important; font-size: 11px !important; }
+#calendar_table th:nth-child(12), #calendar_table td:nth-child(12) { width: 95px !important; text-align: center !important; font-family: var(--font-mono) !important; font-weight: 600 !important; color: #059669 !important; font-size: 11px !important; }
+#calendar_table th:nth-child(13), #calendar_table td:nth-child(13) { width: 80px !important; text-align: center !important; font-weight: 700 !important; white-space: nowrap !important; }
+#calendar_table th:nth-child(14), #calendar_table td:nth-child(14) { width: 280px !important; text-align: left !important; color: #334155 !important; font-size: 11.5px !important; }
+#calendar_table th:nth-child(15), #calendar_table td:nth-child(15) { width: 70px !important; text-align: center !important; font-size: 11px !important; color: #2563eb !important; font-weight: 600 !important; white-space: nowrap !important; }
 
 /* Holidays Table */
 #holidays_table th:nth-child(1), #holidays_table td:nth-child(1) { width: 8% !important; text-align: center !important; font-family: var(--font-mono) !important; }
@@ -2285,8 +2326,8 @@ code, .timer-cell, pre {
     background: #ffffff !important;
     border-bottom: 1px solid #e2e8f0 !important;
     box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04) !important;
-    margin: -8px -20px 4px -20px !important;
-    padding: 3px 14px 4px 14px !important;
+    margin: -3px -16px 2px -16px !important;
+    padding: 2px 14px 2px 14px !important;
 }
 
 /* Row 1: Brand Cluster, Live Telemetry & Macro Ticker Strip */
@@ -2699,20 +2740,20 @@ code, .timer-cell, pre {
     background: #ffffff !important;
     border: 1px solid #e2e8f0 !important;
     border-radius: 6px !important;
-    padding: 8px 12px !important;
-    margin-top: 4px !important;
-    margin-bottom: 8px !important;
+    padding: 4px 10px !important;
+    margin-top: 2px !important;
+    margin-bottom: 4px !important;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
 }
 
 #cal_action_deck button, #circ_action_toolbar button {
     font-family: var(--font-sans) !important;
-    font-size: 11.5px !important;
+    font-size: 11px !important;
     font-weight: 600 !important;
     border-radius: 4px !important;
-    min-height: 32px !important;
-    height: 32px !important;
-    padding: 0 10px !important;
+    min-height: 28px !important;
+    height: 28px !important;
+    padding: 0 8px !important;
     transition: all 0.15s ease !important;
 }
 
@@ -2741,10 +2782,12 @@ code, .timer-cell, pre {
 }
 
 #cal_pdf_file {
-    margin-top: 6px !important;
-    border: 1px dashed #cbd5e1 !important;
-    border-radius: 6px !important;
-    background: #f8fafc !important;
+    margin-top: 3px !important;
+    margin-bottom: 3px !important;
+    border: 1px dashed #38bdf8 !important;
+    border-radius: 4px !important;
+    background: #f0f9ff !important;
+    padding: 3px 6px !important;
 }
 
 /* 17. Table Header Ribbons & Multi-Density Engine */
@@ -2757,10 +2800,10 @@ code, .timer-cell, pre {
     border-bottom: none !important;
     border-radius: 4px 4px 0 0 !important;
     padding: 2px 8px !important;
-    margin-top: 4px !important;
+    margin-top: 2px !important;
     margin-bottom: 0 !important;
-    min-height: 28px !important;
-    height: 28px !important;
+    min-height: 25px !important;
+    height: 25px !important;
     gap: 6px !important;
     flex-wrap: nowrap !important;
 }
@@ -3526,10 +3569,6 @@ TOP_NAVBAR_HTML = """
                 <span class="epm-btn-icon">🔔</span>
                 <span id="epm-audio-status-lbl">Audio ON</span>
             </button>
-
-            <!-- Quick Resource Links -->
-            <a href="/api/calendar/ics" target="_blank" class="epm-nav-link" title="RFC-5545 iCalendar Subscription Feed">📅 iCal</a>
-            <a href="/docs" target="_blank" class="epm-nav-link" title="OpenAPI / Swagger REST API Docs">⚡ API</a>
         </div>
     </div>
 </div>
@@ -4087,32 +4126,32 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
 
             with gr.Group(elem_id="cal_action_deck", elem_classes=["epm-toolbar-card"]):
                 gr.HTML("""
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid #f1f5f9; padding-bottom:6px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; border-bottom:1px solid #f1f5f9; padding-bottom:4px;">
                     <div style="display:flex; align-items:center; gap:8px;">
-                        <span style="font-size:12px; font-weight:800; color:#0f172a; letter-spacing:0.3px;">📑 INSTITUTIONAL MULTI-MARKET CALENDAR DOSSIERS (A4 LANDSCAPE PRINT-READY)</span>
-                        <span style="background:#e0f2fe; color:#0369a1; font-size:10px; font-weight:700; padding:2px 6px; border-radius:3px;">14-COLUMN SCHEMA</span>
+                        <span style="font-size:11.5px; font-weight:800; color:#0f172a; letter-spacing:0.3px;">📑 INSTITUTIONAL MULTI-MARKET CALENDAR DOSSIERS (A4 PRINT-READY)</span>
+                        <span style="background:#e0f2fe; color:#0369a1; font-size:9.5px; font-weight:700; padding:1px 5px; border-radius:3px;">15-COLUMN SCHEMA (DATE-ENRICHED)</span>
                     </div>
-                    <span style="font-size:11px; color:#64748b; font-weight:500;">
+                    <span style="font-size:10.5px; color:#64748b; font-weight:500;">
                         Auto-Dispatches: Friday 6:00 AM (Weekly) & 25th 6:00 AM (Monthly)
                     </span>
                 </div>
                 """)
                 with gr.Row():
-                    btn_download_weekly = gr.Button("📥 Download Weekly Snapshot PDF (Next Sunday to Saturday)", variant="primary", scale=2)
-                    btn_download_monthly = gr.Button("📥 Download Monthly Outlook PDF (Upcoming Month)", variant="primary", scale=2)
-                    btn_push_weekly_pdf = gr.Button("✈️ Push Weekly PDF to Telegram (Fri 6 AM Trigger)", variant="secondary", scale=2)
-                    btn_push_monthly_pdf = gr.Button("✈️ Push Monthly PDF to Telegram (25th 6 AM Trigger)", variant="secondary", scale=2)
+                    btn_download_weekly = gr.Button("📥 Weekly PDF (Next Sun–Sat)", variant="primary", scale=2)
+                    btn_download_monthly = gr.Button("📥 Monthly PDF (Upcoming Month)", variant="primary", scale=2)
+                    btn_push_weekly_pdf = gr.Button("✈️ Push Weekly to Telegram", variant="secondary", scale=2)
+                    btn_push_monthly_pdf = gr.Button("✈️ Push Monthly to Telegram", variant="secondary", scale=2)
 
                 with gr.Row():
-                    cal_sync_btn = gr.Button("🔄 Sync 5 Markets & Live Timers", variant="secondary", scale=2)
-                    btn_sync_gcal = gr.Button("📅 Sync Google Calendar (1h Alarms)", variant="secondary", scale=2)
-                    btn_ics_export = gr.Button("📲 Apple / Outlook .ICS", variant="secondary", scale=1)
+                    cal_sync_btn = gr.Button("🔄 Sync 5 Markets & Timers", variant="secondary", scale=2)
+                    btn_sync_gcal = gr.Button("📅 Sync Google Calendar", variant="secondary", scale=2)
                     btn_push_holiday = gr.Button("🏖️ Next-Day Holiday Check", variant="secondary", scale=1)
+                    btn_ics_export = gr.Button("📲 Apple / Outlook .ICS", variant="secondary", scale=1)
 
-                cal_pdf_file = gr.File(label="📄 Generated A4 PDF Document (Click to Open / Save)", visible=False, elem_id="cal_pdf_file")
+                cal_pdf_file = gr.File(label="📄 PDF Dossier Ready for Download (Click to Open / Save)", visible=False, elem_id="cal_pdf_file")
                 cal_action_msg = gr.Markdown(elem_id="cal_action_msg")
 
-            gr.HTML(render_table_ribbon("calendar_table", "Multi-Market Catalyst Ledger (15-Column Schema)", subtitle="5 Bourses", count_badge="Official Ledger View"))
+            gr.HTML(render_table_ribbon("calendar_table", "Multi-Market Catalyst Ledger (15-Column Schema — Date-Enriched)", subtitle="5 Bourses", count_badge="Official Ledger View"))
 
             with gr.Column(elem_id="calendar_dossier_wrap"):
                 calendar_visual_feed = gr.HTML(value=init_cal_html, elem_id="calendar_visual_feed")
