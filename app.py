@@ -746,6 +746,171 @@ def render_calendar_feed_html(events: List[Dict]) -> str:
     return f'<div class="epm-stream-container">{"".join(cards_html)}</div>'
 
 
+def render_calendar_dossier_html(events: List[Dict]) -> str:
+    """
+    Renders an exact, interactive high-fidelity replica of the ReportLab A4 PDF Dossier
+    directly on the web page. Groups catalysts date-by-date with warm gold section banners,
+    faint amber table headers, alternating zebra striping, and distinct color-coded badges.
+    """
+    if not events:
+        return (
+            '<div class="epm-empty-state">'
+            '  <div class="epm-empty-icon">📅</div>'
+            '  <div class="epm-empty-title">No Scheduled Catalysts Found For This Filter</div>'
+            '  <div class="epm-empty-sub">Switch the market or time window filter above to explore scheduled corporate releases.</div>'
+            '</div>'
+        )
+
+    events_by_date: Dict[str, List[Dict]] = {}
+    for ev in events:
+        d = ev.get("date", "")
+        if not d:
+            continue
+        if d not in events_by_date:
+            events_by_date[d] = []
+        events_by_date[d].append(ev)
+
+    sorted_dates = sorted(events_by_date.keys())
+    global_row_idx = 1
+    blocks_html = []
+    rendered_total = 0
+    max_render = 300
+
+    for date_str in sorted_dates:
+        if rendered_total >= max_render:
+            break
+        day_events = events_by_date[date_str]
+        day_events.sort(key=lambda x: (str(x.get("time", "99:99")), calendar_pdf_engine._classify_event_type(x)))
+
+        try:
+            dt_obj = datetime.strptime(date_str, "%Y-%m-%d")
+            day_name = dt_obj.strftime("%a")
+            formatted_date = dt_obj.strftime("%d %B %Y")
+        except Exception:
+            day_name = "—"
+            formatted_date = date_str
+
+        banner_html = f"""
+        <div class="epm-dossier-date-banner">
+            <div class="epm-dossier-banner-left">
+                <span class="epm-dossier-label">DATE:</span>
+                <span class="epm-dossier-val">{html.escape(formatted_date)}</span>
+            </div>
+            <div class="epm-dossier-banner-right">
+                <span class="epm-dossier-label">DAY:</span>
+                <span class="epm-dossier-val">{html.escape(day_name)}</span>
+            </div>
+        </div>
+        """
+
+        rows_html = []
+        for r_i, ev in enumerate(day_events):
+            if rendered_total >= max_render:
+                break
+            ev_type = calendar_pdf_engine._classify_event_type(ev)
+            t_str = calendar_pdf_engine._format_event_time(ev)
+            country, regulator = calendar_pdf_engine._infer_country_and_regulator(ev)
+            sector = calendar_pdf_engine._infer_sector(ev)
+            impact_stars = calendar_pdf_engine._infer_impact_stars(ev)
+
+            raw_ev_name = clean_table_text(ev.get("event", "Scheduled Release"))
+            if ev.get("symbol") and ev.get("symbol") not in raw_ev_name:
+                clean_sym = clean_table_text(str(ev.get("symbol", "")).replace("NSE:", "").replace("BSE:", "").replace("MCX:", ""))
+                if clean_sym:
+                    raw_ev_name = f"{clean_sym} — {raw_ev_name}"
+
+            prev_val = clean_table_text(str(ev.get("previous", "—")) or "—")
+            fore_val = clean_table_text(str(ev.get("forecast", "—")) or "—")
+            sent_text, _ = calendar_pdf_engine._format_sentiment(ev)
+            reasoning = clean_table_text(calendar_pdf_engine._build_ai_reasoning(ev))
+            source_val = clean_table_text(str(ev.get("source", regulator or "Wire"))[:15])
+
+            badge_class = "badge-general"
+            if ev_type == "Earning Cal.":
+                badge_class = "badge-earnings"
+            elif ev_type == "Econ Cal.":
+                badge_class = "badge-econ"
+            elif ev_type == "Holiday":
+                badge_class = "badge-holiday"
+            elif ev_type == "Special Session":
+                badge_class = "badge-special"
+            elif "Corp." in ev_type:
+                badge_class = "badge-corp"
+
+            sent_class = "sent-neutral"
+            if "Bull" in sent_text:
+                sent_class = "sent-bullish"
+            elif "Bear" in sent_text:
+                sent_class = "sent-bearish"
+
+            row_bg = "epm-dossier-row-even" if (r_i % 2 == 0) else "epm-dossier-row-odd"
+
+            rows_html.append(f"""
+            <tr class="epm-dossier-row {row_bg}">
+                <td class="col-idx">{global_row_idx}</td>
+                <td class="col-date">{html.escape(date_str)}</td>
+                <td class="col-time">{html.escape(t_str)}</td>
+                <td class="col-day">{html.escape(day_name)}</td>
+                <td class="col-type"><span class="epm-dossier-badge {badge_class}">{html.escape(ev_type)}</span></td>
+                <td class="col-country">{html.escape(country)}</td>
+                <td class="col-reg">{html.escape(regulator)}</td>
+                <td class="col-sec">{html.escape(sector)}</td>
+                <td class="col-event"><b>{html.escape(raw_ev_name)}</b></td>
+                <td class="col-imp"><span class="epm-stars">{html.escape(impact_stars)}</span></td>
+                <td class="col-num">{html.escape(prev_val)}</td>
+                <td class="col-num col-fore">{html.escape(fore_val)}</td>
+                <td class="col-sent"><span class="epm-sent-badge {sent_class}">{html.escape(sent_text)}</span></td>
+                <td class="col-reason">{html.escape(reasoning)}</td>
+                <td class="col-src">{html.escape(source_val)}</td>
+            </tr>
+            """)
+            global_row_idx += 1
+            rendered_total += 1
+
+        block_html = f"""
+        <div class="epm-dossier-block">
+            {banner_html}
+            <div class="epm-dossier-table-wrap">
+                <table class="epm-dossier-table">
+                    <thead>
+                        <tr>
+                            <th class="col-idx">#</th>
+                            <th class="col-date">Date</th>
+                            <th class="col-time">Time (IST)</th>
+                            <th class="col-day">Day</th>
+                            <th class="col-type">Event Type</th>
+                            <th class="col-country">Country</th>
+                            <th class="col-reg">Regulator / Issuer</th>
+                            <th class="col-sec">Sector</th>
+                            <th class="col-event">Event</th>
+                            <th class="col-imp">Impact (1-5)</th>
+                            <th class="col-num">Previous Data</th>
+                            <th class="col-num">Forecast</th>
+                            <th class="col-sent">Sentiment</th>
+                            <th class="col-reason">AI Reasoning</th>
+                            <th class="col-src">Source</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {''.join(rows_html)}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        """
+        blocks_html.append(block_html)
+
+    footer_note = ""
+    if len(events) > max_render:
+        footer_note = f"""
+        <div class="epm-dossier-footer-note">
+            <span>Displaying first {rendered_total} of {len(events)} catalysts for this horizon. Filter by timeframe or market above for focused schedules, or click <b>Download Weekly / Monthly Snapshot PDF</b> for the complete ledger archive.</span>
+        </div>
+        """
+
+    return f'<div class="epm-dossier-container">{"".join(blocks_html)}{footer_note}</div>'
+
+
 def get_dashboard_tables():
     try:
         items = list(news_worker.news_cache)
@@ -837,7 +1002,7 @@ def get_dashboard_tables():
 def get_calendar_tables(range_filter: str = "all", market_filter: str = "ALL"):
     try:
         events = calendar_engine.get_enriched_events(filter_range=range_filter, market_filter=market_filter)
-        calendar_visual_html = render_calendar_feed_html(events)
+        calendar_visual_html = render_calendar_dossier_html(events)
         cal_rows = []
         global_idx = 1
         for ev in events:
@@ -849,8 +1014,11 @@ def get_calendar_tables(range_filter: str = "all", market_filter: str = "ALL"):
 
             d_str = str(ev.get("date", ""))
             try:
-                day_name = datetime.strptime(d_str, "%Y-%m-%d").strftime("%a")
+                dt_obj = datetime.strptime(d_str, "%Y-%m-%d")
+                formatted_d = dt_obj.strftime("%d %b %Y")
+                day_name = dt_obj.strftime("%a")
             except Exception:
+                formatted_d = d_str
                 day_name = "—"
 
             raw_ev_name = clean_table_text(ev.get("event", "Scheduled Release"))
@@ -867,6 +1035,7 @@ def get_calendar_tables(range_filter: str = "all", market_filter: str = "ALL"):
 
             cal_rows.append([
                 str(global_idx),
+                formatted_d,
                 t_str,
                 day_name,
                 ev_type,
@@ -884,7 +1053,7 @@ def get_calendar_tables(range_filter: str = "all", market_filter: str = "ALL"):
             global_idx += 1
 
         if not cal_rows:
-            cal_rows.append(["-", "-", "-", "-", "-", "-", "-", "No events for selected market/time filter", "-", "-", "-", "-", "-", "-"])
+            cal_rows.append(["-", "-", "-", "-", "-", "-", "-", "-", "No events for selected market/time filter", "-", "-", "-", "-", "-", "-"])
 
         holidays_data = calendar_engine.get_holiday_snapshot().get("comparison", [])
         hol_rows = []
@@ -913,7 +1082,7 @@ def get_calendar_tables(range_filter: str = "all", market_filter: str = "ALL"):
         return cal_summary, calendar_visual_html, cal_rows, hol_rows
     except Exception as e:
         err_sum = f"📅 **Market Calendar Status:** Active | `{now_ist().strftime('%Y-%m-%d %H:%M:%S IST')}`"
-        empty_cal = [["-", "-", "-", "-", "-", "-", f"Calendar Notice: {str(e)}", "-", "-", "-", "-", "-", "-"]]
+        empty_cal = [["-", "-", "-", "-", "-", "-", "-", f"Calendar Notice: {str(e)}", "-", "-", "-", "-", "-", "-", "-"]]
         empty_hol = [["-", "-", "-", "-", "-", "-", "-", "-"]]
         return err_sum, f'<div class="epm-empty-state"><div class="epm-empty-icon">📅</div><div class="epm-empty-title">Calendar Initializing</div><div class="epm-empty-sub">{str(e)}</div></div>', empty_cal, empty_hol
 
@@ -1273,6 +1442,16 @@ default_wa_selected = [s["name"] for s in news_worker.sources if s.get("forward_
 def render_table_ribbon(table_id: str, title: str, subtitle: str = "", count_badge: str = "") -> str:
     sub_badge = f'<span class="epm-ribbon-badge">{subtitle}</span>' if subtitle else ""
     cnt_badge = f'<span class="epm-ribbon-count" id="{table_id}_count">{count_badge}</span>' if count_badge else ""
+    
+    cal_view_toggle = ""
+    if table_id == "calendar_table":
+        cal_view_toggle = """
+        <div class="epm-cal-view-group" title="Toggle between Institutional Date-Sectioned PDF Dossier and Data Grid">
+            <button type="button" class="epm-cal-view-btn active" id="btn_cal_dossier" onclick="window.epmSetCalView('dossier', this)" title="Institutional Date-Sectioned PDF Dossier View">📑 PDF Dossier</button>
+            <button type="button" class="epm-cal-view-btn" id="btn_cal_grid" onclick="window.epmSetCalView('grid', this)" title="Flat Data Grid & CSV Explorer">📊 Data Grid</button>
+        </div>
+        """
+
     return f"""
     <div class="epm-table-ribbon" data-target="{table_id}">
         <div class="epm-ribbon-left">
@@ -1282,6 +1461,7 @@ def render_table_ribbon(table_id: str, title: str, subtitle: str = "", count_bad
             {cnt_badge}
         </div>
         <div class="epm-ribbon-controls">
+            {cal_view_toggle}
             <div class="epm-density-group" title="Adjust visible row density and line clamping">
                 <span class="epm-control-label">Density:</span>
                 <button type="button" class="epm-density-btn active" data-density="compact" onclick="window.epmSetDensity('{table_id}', 'compact', this)" title="Compact (2-Line Clamp)">Compact</button>
@@ -1674,7 +1854,7 @@ code, .timer-cell, pre {
 #bottom_news_table th:nth-child(5), #bottom_news_table td:nth-child(5) { width: 8% !important; text-align: center !important; }
 #bottom_news_table th:nth-child(6), #bottom_news_table td:nth-child(6) { width: 10% !important; text-align: center !important; font-size: 11px !important; color: #2563eb !important; }
 
-/* Calendar Table - High-Density Institutional Layout */
+/* Calendar Table - 15-Column Layout (With Prominent Date Column) */
 #calendar_table table {
     table-layout: auto !important;
     width: 100% !important;
@@ -1686,47 +1866,55 @@ code, .timer-cell, pre {
     vertical-align: middle !important;
 }
 
+#calendar_table th .cell-wrap,
+#calendar_table th span {
+    white-space: nowrap !important;
+}
+
 #calendar_table td:nth-child(1),
 #calendar_table td:nth-child(2),
 #calendar_table td:nth-child(3),
 #calendar_table td:nth-child(4),
 #calendar_table td:nth-child(5),
 #calendar_table td:nth-child(6),
-#calendar_table td:nth-child(9),
-#calendar_table td:nth-child(12),
-#calendar_table td:nth-child(14) {
+#calendar_table td:nth-child(7),
+#calendar_table td:nth-child(10),
+#calendar_table td:nth-child(13),
+#calendar_table td:nth-child(15) {
     white-space: nowrap !important;
 }
 
 #calendar_table th:nth-child(1) { width: 32px !important; min-width: 32px; max-width: 38px; text-align: center !important; }
-#calendar_table th:nth-child(2) { width: 75px !important; min-width: 75px; max-width: 85px; text-align: center !important; }
-#calendar_table th:nth-child(3) { width: 45px !important; min-width: 45px; max-width: 52px; text-align: center !important; }
-#calendar_table th:nth-child(4) { width: 120px !important; min-width: 120px; max-width: 135px; text-align: left !important; }
-#calendar_table th:nth-child(5) { width: 60px !important; min-width: 60px; max-width: 70px; text-align: center !important; }
-#calendar_table th:nth-child(6) { width: 85px !important; min-width: 85px; max-width: 95px; text-align: center !important; }
-#calendar_table th:nth-child(7) { width: 110px !important; min-width: 110px; max-width: 130px; text-align: left !important; }
-#calendar_table th:nth-child(8) { min-width: 250px !important; text-align: left !important; }
-#calendar_table th:nth-child(9) { width: 68px !important; min-width: 68px; max-width: 78px; text-align: center !important; }
-#calendar_table th:nth-child(10) { width: 85px !important; min-width: 85px; max-width: 95px; text-align: center !important; }
+#calendar_table th:nth-child(2) { width: 88px !important; min-width: 88px; max-width: 95px; text-align: center !important; }
+#calendar_table th:nth-child(3) { width: 78px !important; min-width: 78px; max-width: 88px; text-align: center !important; }
+#calendar_table th:nth-child(4) { width: 45px !important; min-width: 45px; max-width: 52px; text-align: center !important; }
+#calendar_table th:nth-child(5) { width: 115px !important; min-width: 115px; max-width: 130px; text-align: left !important; }
+#calendar_table th:nth-child(6) { width: 55px !important; min-width: 55px; max-width: 65px; text-align: center !important; }
+#calendar_table th:nth-child(7) { width: 85px !important; min-width: 85px; max-width: 95px; text-align: center !important; }
+#calendar_table th:nth-child(8) { width: 105px !important; min-width: 105px; max-width: 120px; text-align: left !important; }
+#calendar_table th:nth-child(9) { min-width: 250px !important; text-align: left !important; }
+#calendar_table th:nth-child(10) { width: 68px !important; min-width: 68px; max-width: 78px; text-align: center !important; }
 #calendar_table th:nth-child(11) { width: 85px !important; min-width: 85px; max-width: 95px; text-align: center !important; }
-#calendar_table th:nth-child(12) { width: 75px !important; min-width: 75px; max-width: 85px; text-align: center !important; }
-#calendar_table th:nth-child(13) { min-width: 210px !important; text-align: left !important; }
-#calendar_table th:nth-child(14) { width: 65px !important; min-width: 65px; max-width: 75px; text-align: center !important; }
+#calendar_table th:nth-child(12) { width: 85px !important; min-width: 85px; max-width: 95px; text-align: center !important; }
+#calendar_table th:nth-child(13) { width: 75px !important; min-width: 75px; max-width: 85px; text-align: center !important; }
+#calendar_table th:nth-child(14) { min-width: 210px !important; text-align: left !important; }
+#calendar_table th:nth-child(15) { width: 65px !important; min-width: 65px; max-width: 75px; text-align: center !important; }
 
 #calendar_table td:nth-child(1) { width: 32px !important; text-align: center !important; font-family: var(--font-mono) !important; color: #64748b !important; }
-#calendar_table td:nth-child(2) { width: 75px !important; text-align: center !important; font-family: var(--font-mono) !important; color: #0f172a !important; font-size: 11px !important; }
-#calendar_table td:nth-child(3) { width: 45px !important; text-align: center !important; font-weight: 600 !important; color: #475569 !important; }
-#calendar_table td:nth-child(4) { width: 120px !important; text-align: left !important; font-weight: 600 !important; }
-#calendar_table td:nth-child(5) { width: 60px !important; text-align: center !important; font-weight: 600 !important; color: #334155 !important; }
-#calendar_table td:nth-child(6) { width: 85px !important; text-align: center !important; font-weight: 600 !important; color: #0284c7 !important; }
-#calendar_table td:nth-child(7) { width: 110px !important; text-align: left !important; color: #475569 !important; }
-#calendar_table td:nth-child(8) { min-width: 250px !important; text-align: left !important; font-weight: 600 !important; color: #0f172a !important; }
-#calendar_table td:nth-child(9) { width: 68px !important; text-align: center !important; font-family: var(--font-mono) !important; font-weight: 700 !important; color: #d97706 !important; }
-#calendar_table td:nth-child(10) { width: 85px !important; text-align: center !important; font-family: var(--font-mono) !important; color: #475569 !important; font-size: 11px !important; }
-#calendar_table td:nth-child(11) { width: 85px !important; text-align: center !important; font-family: var(--font-mono) !important; font-weight: 600 !important; color: #059669 !important; font-size: 11px !important; }
-#calendar_table td:nth-child(12) { width: 75px !important; text-align: center !important; font-weight: 700 !important; }
-#calendar_table td:nth-child(13) { min-width: 210px !important; text-align: left !important; color: #334155 !important; font-size: 11.5px !important; }
-#calendar_table td:nth-child(14) { width: 65px !important; text-align: center !important; font-size: 11px !important; color: #2563eb !important; font-weight: 600 !important; }
+#calendar_table td:nth-child(2) { width: 88px !important; text-align: center !important; font-family: var(--font-mono) !important; color: #0f172a !important; font-size: 11px !important; font-weight: 600 !important; }
+#calendar_table td:nth-child(3) { width: 78px !important; text-align: center !important; font-family: var(--font-mono) !important; color: #0f172a !important; font-size: 11px !important; }
+#calendar_table td:nth-child(4) { width: 45px !important; text-align: center !important; font-weight: 600 !important; color: #475569 !important; }
+#calendar_table td:nth-child(5) { width: 115px !important; text-align: left !important; font-weight: 600 !important; }
+#calendar_table td:nth-child(6) { width: 55px !important; text-align: center !important; font-weight: 600 !important; color: #334155 !important; }
+#calendar_table td:nth-child(7) { width: 85px !important; text-align: center !important; font-weight: 600 !important; color: #0284c7 !important; }
+#calendar_table td:nth-child(8) { width: 105px !important; text-align: left !important; color: #475569 !important; }
+#calendar_table td:nth-child(9) { min-width: 250px !important; text-align: left !important; font-weight: 600 !important; color: #0f172a !important; }
+#calendar_table td:nth-child(10) { width: 68px !important; text-align: center !important; font-family: var(--font-mono) !important; font-weight: 700 !important; color: #d97706 !important; }
+#calendar_table td:nth-child(11) { width: 85px !important; text-align: center !important; font-family: var(--font-mono) !important; color: #475569 !important; font-size: 11px !important; }
+#calendar_table td:nth-child(12) { width: 85px !important; text-align: center !important; font-family: var(--font-mono) !important; font-weight: 600 !important; color: #059669 !important; font-size: 11px !important; }
+#calendar_table td:nth-child(13) { width: 75px !important; text-align: center !important; font-weight: 700 !important; }
+#calendar_table td:nth-child(14) { min-width: 210px !important; text-align: left !important; color: #334155 !important; font-size: 11.5px !important; }
+#calendar_table td:nth-child(15) { width: 65px !important; text-align: center !important; font-size: 11px !important; color: #2563eb !important; font-weight: 600 !important; }
 
 /* Holidays Table */
 #holidays_table th:nth-child(1), #holidays_table td:nth-child(1) { width: 8% !important; text-align: center !important; font-family: var(--font-mono) !important; }
@@ -2826,7 +3014,8 @@ code, .timer-cell, pre {
 /* Density Compact (2-line clamp) */
 div[id*="_table"].density-compact tbody td,
 #calendar_table.density-compact tbody td,
-.density-compact tbody td {
+.density-compact tbody td,
+.density-compact .epm-dossier-table td {
     padding: 3px 6px !important;
     font-size: 11px !important;
     line-height: 1.25 !important;
@@ -2839,8 +3028,10 @@ div[id*="_table"].density-compact tbody td:nth-child(6) > *,
 div[id*="_table"].density-compact tbody td:nth-child(7) > *,
 div[id*="_table"].density-compact tbody td:nth-child(8) > *,
 div[id*="_table"].density-compact tbody td:nth-child(13) > *,
-#calendar_table.density-compact tbody td:nth-child(8) > *,
-#calendar_table.density-compact tbody td:nth-child(13) > * {
+#calendar_table.density-compact tbody td:nth-child(9) > *,
+#calendar_table.density-compact tbody td:nth-child(14) > *,
+.density-compact .epm-dossier-table .col-event,
+.density-compact .epm-dossier-table .col-reason {
     display: -webkit-box !important;
     -webkit-line-clamp: 2 !important;
     -webkit-box-orient: vertical !important;
@@ -2853,7 +3044,8 @@ div[id*="_table"].density-compact tbody td:nth-child(13) > *,
 /* Density Standard (4-line clamp) */
 div[id*="_table"].density-standard tbody td,
 #calendar_table.density-standard tbody td,
-.density-standard tbody td {
+.density-standard tbody td,
+.density-standard .epm-dossier-table td {
     padding: 6px 8px !important;
     font-size: 11.5px !important;
     line-height: 1.35 !important;
@@ -2866,8 +3058,10 @@ div[id*="_table"].density-standard tbody td:nth-child(6) > *,
 div[id*="_table"].density-standard tbody td:nth-child(7) > *,
 div[id*="_table"].density-standard tbody td:nth-child(8) > *,
 div[id*="_table"].density-standard tbody td:nth-child(13) > *,
-#calendar_table.density-standard tbody td:nth-child(8) > *,
-#calendar_table.density-standard tbody td:nth-child(13) > * {
+#calendar_table.density-standard tbody td:nth-child(9) > *,
+#calendar_table.density-standard tbody td:nth-child(14) > *,
+.density-standard .epm-dossier-table .col-event,
+.density-standard .epm-dossier-table .col-reason {
     display: -webkit-box !important;
     -webkit-line-clamp: 4 !important;
     -webkit-box-orient: vertical !important;
@@ -2880,7 +3074,8 @@ div[id*="_table"].density-standard tbody td:nth-child(13) > *,
 /* Density Expanded (Full Unconstrained Text) */
 div[id*="_table"].density-expanded tbody td,
 #calendar_table.density-expanded tbody td,
-.density-expanded tbody td {
+.density-expanded tbody td,
+.density-expanded .epm-dossier-table td {
     padding: 9px 12px !important;
     font-size: 12.5px !important;
     line-height: 1.45 !important;
@@ -2893,14 +3088,232 @@ div[id*="_table"].density-expanded tbody td:nth-child(6) > *,
 div[id*="_table"].density-expanded tbody td:nth-child(7) > *,
 div[id*="_table"].density-expanded tbody td:nth-child(8) > *,
 div[id*="_table"].density-expanded tbody td:nth-child(13) > *,
-#calendar_table.density-expanded tbody td:nth-child(8) > *,
-#calendar_table.density-expanded tbody td:nth-child(13) > * {
+#calendar_table.density-expanded tbody td:nth-child(9) > *,
+#calendar_table.density-expanded tbody td:nth-child(14) > *,
+.density-expanded .epm-dossier-table .col-event,
+.density-expanded .epm-dossier-table .col-reason {
     display: block !important;
     -webkit-line-clamp: unset !important;
     max-height: none !important;
     overflow: visible !important;
     text-overflow: clip !important;
     line-height: 1.45 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   INSTITUTIONAL PDF DOSSIER MIRROR VIEW (DATE-SECTIONED HTML TABLE)
+   ═══════════════════════════════════════════════════════════════════ */
+
+.epm-cal-view-group {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 2px !important;
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 3px !important;
+    padding: 1px 3px !important;
+    height: 22px !important;
+    margin-right: 4px !important;
+}
+
+.epm-cal-view-btn {
+    border: none !important;
+    background: transparent !important;
+    font-family: var(--font-sans) !important;
+    font-size: 9.5px !important;
+    font-weight: 600 !important;
+    color: #475569 !important;
+    padding: 1px 6px !important;
+    border-radius: 2px !important;
+    cursor: pointer !important;
+    transition: all 0.12s ease !important;
+}
+
+.epm-cal-view-btn:hover {
+    color: #0f172a !important;
+    background: #f1f5f9 !important;
+}
+
+.epm-cal-view-btn.active {
+    background: #0284c7 !important;
+    color: #ffffff !important;
+}
+
+#calendar_dossier_wrap {
+    width: 100% !important;
+}
+
+#calendar_grid_wrap {
+    width: 100% !important;
+    display: none;
+}
+
+.epm-dossier-container {
+    width: 100% !important;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 2px;
+    margin-bottom: 20px;
+}
+
+.epm-dossier-block {
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 6px !important;
+    overflow: hidden !important;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04) !important;
+}
+
+.epm-dossier-date-banner {
+    background: #fef3c7 !important; /* Warm gold / buff matching PDF */
+    border-bottom: 1.5px solid #d97706 !important;
+    padding: 6px 14px !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+}
+
+.epm-dossier-banner-left,
+.epm-dossier-banner-right {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+}
+
+.epm-dossier-label {
+    font-family: var(--font-sans) !important;
+    font-size: 11px !important;
+    font-weight: 800 !important;
+    color: #92400e !important;
+    letter-spacing: 0.5px !important;
+}
+
+.epm-dossier-val {
+    font-family: var(--font-sans) !important;
+    font-size: 12.5px !important;
+    font-weight: 700 !important;
+    color: #78350f !important;
+}
+
+.epm-dossier-table-wrap {
+    width: 100% !important;
+    overflow-x: auto !important;
+}
+
+.epm-dossier-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-family: var(--font-sans) !important;
+    font-size: 11.5px !important;
+    text-align: left !important;
+}
+
+.epm-dossier-table thead th {
+    background: #fffbeb !important; /* Soft cream/amber header matching PDF */
+    color: #0f172a !important;
+    font-size: 10.5px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.3px !important;
+    padding: 6px 8px !important;
+    border-bottom: 1.5px solid #64748b !important;
+    border-right: 1px solid #e2e8f0 !important;
+    white-space: nowrap !important;
+    vertical-align: middle !important;
+}
+
+.epm-dossier-table thead th:last-child {
+    border-right: none !important;
+}
+
+.epm-dossier-row {
+    border-bottom: 1px solid #f1f5f9 !important;
+    transition: background 0.1s ease !important;
+}
+
+.epm-dossier-row-even {
+    background: #ffffff !important;
+}
+
+.epm-dossier-row-odd {
+    background: #f8fafc !important; /* Subtle zebra striping */
+}
+
+.epm-dossier-row:hover {
+    background: #f0f7ff !important;
+}
+
+.epm-dossier-table td {
+    padding: 5px 8px !important;
+    vertical-align: middle !important;
+    border-right: 1px solid #f1f5f9 !important;
+    color: #334155 !important;
+    line-height: 1.35 !important;
+}
+
+.epm-dossier-table td:last-child {
+    border-right: none !important;
+}
+
+.epm-dossier-table .col-idx { width: 32px !important; min-width: 32px; text-align: center !important; font-family: var(--font-mono) !important; font-size: 10.5px !important; color: #64748b !important; }
+.epm-dossier-table .col-date { width: 85px !important; min-width: 85px; text-align: center !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #0f172a !important; white-space: nowrap !important; font-weight: 600 !important; }
+.epm-dossier-table .col-time { width: 75px !important; min-width: 75px; text-align: center !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #0f172a !important; white-space: nowrap !important; }
+.epm-dossier-table .col-day { width: 45px !important; min-width: 45px; text-align: center !important; font-weight: 600 !important; color: #475569 !important; white-space: nowrap !important; }
+.epm-dossier-table .col-type { width: 115px !important; min-width: 115px; white-space: nowrap !important; }
+.epm-dossier-table .col-country { width: 55px !important; min-width: 55px; text-align: center !important; font-weight: 700 !important; color: #1e293b !important; white-space: nowrap !important; }
+.epm-dossier-table .col-reg { width: 85px !important; min-width: 85px; text-align: center !important; font-weight: 600 !important; color: #0284c7 !important; white-space: nowrap !important; }
+.epm-dossier-table .col-sec { width: 105px !important; min-width: 105px; color: #475569 !important; }
+.epm-dossier-table .col-event { min-width: 250px !important; color: #0f172a !important; }
+.epm-dossier-table .col-imp { width: 65px !important; min-width: 65px; text-align: center !important; white-space: nowrap !important; }
+.epm-dossier-table .col-num { width: 85px !important; min-width: 85px; text-align: center !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #475569 !important; white-space: nowrap !important; }
+.epm-dossier-table .col-fore { color: #059669 !important; font-weight: 600 !important; }
+.epm-dossier-table .col-sent { width: 75px !important; min-width: 75px; text-align: center !important; white-space: nowrap !important; }
+.epm-dossier-table .col-reason { min-width: 210px !important; color: #334155 !important; font-size: 11.5px !important; }
+.epm-dossier-table .col-src { width: 65px !important; min-width: 65px; text-align: center !important; font-size: 10.5px !important; font-weight: 600 !important; color: #2563eb !important; white-space: nowrap !important; }
+
+/* Dossier Badges */
+.epm-dossier-badge {
+    display: inline-block !important;
+    padding: 2px 6px !important;
+    border-radius: 3px !important;
+    font-size: 10.5px !important;
+    font-weight: 700 !important;
+    line-height: 1.2 !important;
+}
+.badge-earnings { color: #15803d !important; background: #f0fdf4 !important; border: 1px solid #bbf7d0 !important; }
+.badge-econ { color: #0284c7 !important; background: #f0f9ff !important; border: 1px solid #bae6fd !important; }
+.badge-holiday { color: #991b1b !important; background: #fef2f2 !important; border: 1px solid #fecaca !important; }
+.badge-special { color: #7c3aed !important; background: #f5f3ff !important; border: 1px solid #ddd6fe !important; }
+.badge-corp { color: #334155 !important; background: #f8fafc !important; border: 1px solid #e2e8f0 !important; }
+.badge-general { color: #475569 !important; background: #f1f5f9 !important; }
+
+.epm-stars {
+    color: #d97706 !important;
+    font-family: var(--font-mono) !important;
+    font-weight: 800 !important;
+    letter-spacing: 1px !important;
+}
+
+.epm-sent-badge {
+    display: inline-block !important;
+    padding: 1px 6px !important;
+    border-radius: 3px !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
+}
+.sent-bullish { color: #16a34a !important; background: #dcfce7 !important; }
+.sent-bearish { color: #dc2626 !important; background: #fee2e2 !important; }
+.sent-neutral { color: #64748b !important; background: #f1f5f9 !important; }
+
+.epm-dossier-footer-note {
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 6px !important;
+    padding: 10px 14px !important;
+    text-align: center !important;
+    font-size: 11.5px !important;
+    color: #64748b !important;
 }
 
 /* Collapsed Table State */
@@ -3285,6 +3698,30 @@ TERMINAL_CLIENT_JS = r"""
         });
     };
 
+    // 3b. Calendar View Controller (Dossier vs Data Grid)
+    window.epmSetCalView = function(view, btn) {
+        const dossier = document.getElementById("calendar_dossier_wrap");
+        const grid = document.getElementById("calendar_grid_wrap");
+        const ribbon = document.querySelector('.epm-table-ribbon[data-target="calendar_table"]');
+        if (view === "dossier") {
+            if (dossier) dossier.style.setProperty('display', 'block', 'important');
+            if (grid) grid.style.setProperty('display', 'none', 'important');
+        } else {
+            if (dossier) dossier.style.setProperty('display', 'none', 'important');
+            if (grid) grid.style.setProperty('display', 'block', 'important');
+        }
+        if (ribbon) {
+            ribbon.querySelectorAll(".epm-cal-view-btn").forEach(b => b.classList.remove("active"));
+            if (btn) {
+                btn.classList.add("active");
+            } else {
+                const targetBtn = ribbon.querySelector(view === "dossier" ? "#btn_cal_dossier" : "#btn_cal_grid");
+                if (targetBtn) targetBtn.classList.add("active");
+            }
+        }
+        localStorage.setItem("epm_cal_view_pref", view);
+    };
+
     // 4. Table Collapse / Expand Controller
     window.epmToggleCollapse = function(tableId, btn) {
         const target = document.getElementById(tableId);
@@ -3498,6 +3935,9 @@ TERMINAL_CLIENT_JS = r"""
         if (savedQuery) {
             window.epmApplyWatchlist(savedQuery);
         }
+
+        const savedCalView = localStorage.getItem("epm_cal_view_pref") || "dossier";
+        window.epmSetCalView(savedCalView);
         
         function hideGradioTabs() {
             const defaultTabs = document.querySelectorAll('.tab-wrapper, div[role="tablist"], .tab-container:not(.visually-hidden), .tab-nav');
@@ -3535,6 +3975,17 @@ TERMINAL_CLIENT_JS = r"""
         const savedQuery = localStorage.getItem("epm_watchlist");
         if (savedQuery) window.epmApplyWatchlist(savedQuery);
         
+        const calPref = localStorage.getItem("epm_cal_view_pref") || "dossier";
+        const dossierWrap = document.getElementById("calendar_dossier_wrap");
+        const gridWrap = document.getElementById("calendar_grid_wrap");
+        if (calPref === "dossier") {
+            if (gridWrap && gridWrap.style.display !== "none") gridWrap.style.setProperty('display', 'none', 'important');
+            if (dossierWrap && dossierWrap.style.display !== "block") dossierWrap.style.setProperty('display', 'block', 'important');
+        } else {
+            if (dossierWrap && dossierWrap.style.display !== "none") dossierWrap.style.setProperty('display', 'none', 'important');
+            if (gridWrap && gridWrap.style.display !== "block") gridWrap.style.setProperty('display', 'block', 'important');
+        }
+
         const defaultTabs = document.querySelectorAll('.tab-wrapper, div[role="tablist"], .tab-container:not(.visually-hidden)');
         defaultTabs.forEach(el => {
             if (el.offsetHeight > 0) {
@@ -3661,33 +4112,36 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                 cal_pdf_file = gr.File(label="📄 Generated A4 PDF Document (Click to Open / Save)", visible=False, elem_id="cal_pdf_file")
                 cal_action_msg = gr.Markdown(elem_id="cal_action_msg")
 
-            gr.HTML(render_table_ribbon("calendar_table", "Multi-Market Catalyst Ledger (14-Column Ledger)", subtitle="5 Bourses", count_badge="Official Ledger View"))
-            calendar_table = gr.Dataframe(
-                headers=[
-                    "#",
-                    "Time (of announce)",
-                    "Day",
-                    "Event Type",
-                    "Country",
-                    "Regulator / Issuer",
-                    "Sector",
-                    "Event",
-                    "Impact / Importance (1-5)",
-                    "Previous Related Data",
-                    "Consensus / Forecast",
-                    "Sentiment",
-                    "AI Reasoning",
-                    "Source"
-                ],
-                datatype=["str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "str", "str"],
-                value=init_cal_rows,
-                interactive=False,
-                wrap=True,
-                elem_id="calendar_table"
-            )
+            gr.HTML(render_table_ribbon("calendar_table", "Multi-Market Catalyst Ledger (15-Column Schema)", subtitle="5 Bourses", count_badge="Official Ledger View"))
 
-            with gr.Accordion("🎴 Visual Catalyst Countdown Feed (Cards View)", open=False):
+            with gr.Column(elem_id="calendar_dossier_wrap"):
                 calendar_visual_feed = gr.HTML(value=init_cal_html, elem_id="calendar_visual_feed")
+
+            with gr.Column(elem_id="calendar_grid_wrap"):
+                calendar_table = gr.Dataframe(
+                    headers=[
+                        "#",
+                        "Date",
+                        "Time (IST)",
+                        "Day",
+                        "Event Type",
+                        "Country",
+                        "Regulator / Issuer",
+                        "Sector",
+                        "Event",
+                        "Impact / Importance (1-5)",
+                        "Previous Related Data",
+                        "Consensus / Forecast",
+                        "Sentiment",
+                        "AI Reasoning",
+                        "Source"
+                    ],
+                    datatype=["str"] * 15,
+                    value=init_cal_rows,
+                    interactive=False,
+                    wrap=True,
+                    elem_id="calendar_table"
+                )
 
             gr.HTML(render_table_ribbon("holidays_table", "2026 Authoritative Trading Holidays", subtitle="NSE · BSE · MCX · NYSE · CRYPTO", count_badge="All Sessions"))
             holidays_table = gr.Dataframe(
