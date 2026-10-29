@@ -6,9 +6,10 @@ import sqlite3
 import logging
 import hashlib
 import threading
+import tempfile
 import concurrent.futures
 from datetime import datetime
-from typing import List, Dict, Optional, Set
+from typing import List, Dict, Optional, Set, Any
 from urllib.parse import urlparse, urlunparse, urljoin
 import requests
 from requests.adapters import HTTPAdapter
@@ -26,9 +27,31 @@ logger = logging.getLogger("NewsWorker")
 DB_PATH = os.getenv("ALERT_DB_PATH", "news_alerts.db")
 CONFIG_FILE = "sources_config.json"
 
+def atomic_write_json(file_path: str, data: Any, indent: int = 2) -> None:
+    """Writes JSON atomically via temporary file and rename to prevent 0-byte corruptions."""
+    abs_path = os.path.abspath(file_path)
+    dirname = os.path.dirname(abs_path) or "."
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile("w", dir=dirname, delete=False, encoding="utf-8") as tf:
+            json.dump(data, tf, indent=indent)
+            tf.flush()
+            os.fsync(tf.fileno())
+            tmp_path = tf.name
+        os.replace(tmp_path, abs_path)
+    except Exception as e:
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
+        raise e
+
 def init_alert_db():
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(DB_PATH, timeout=10.0)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
         c = conn.cursor()
         c.execute("""
             CREATE TABLE IF NOT EXISTS sent_news (
@@ -44,7 +67,7 @@ def init_alert_db():
 
 def is_hash_in_db(hash_id: str) -> bool:
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(DB_PATH, timeout=10.0)
         c = conn.cursor()
         c.execute("SELECT 1 FROM sent_news WHERE hash_id = ?", (hash_id,))
         row = c.fetchone()
@@ -55,7 +78,7 @@ def is_hash_in_db(hash_id: str) -> bool:
 
 def record_hash_in_db(hash_id: str, title: str):
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(DB_PATH, timeout=10.0)
         c = conn.cursor()
         c.execute("INSERT OR IGNORE INTO sent_news (hash_id, title) VALUES (?, ?)", (hash_id, title[:200]))
         conn.commit()
@@ -340,6 +363,7 @@ class NewsEngineWorker:
         self.is_running = False
         self.is_initialized = False
         self.last_fetch_time: Optional[datetime] = None
+        self.last_heartbeat: float = time.time()
         self.refresh_interval = int(os.getenv("REFRESH_INTERVAL", "3"))
         self.enable_ai = os.getenv("ENABLE_AI_SCORING", "true").lower() == "true"
         self.min_forward_score = 0 # 0 = forward all, 7 = high impact only
@@ -397,15 +421,14 @@ class NewsEngineWorker:
                 "updated_at": datetime.now().isoformat()
             }
             try:
-                with open(CONFIG_FILE, "w") as f:
-                    json.dump(payload, f, indent=2)
+                atomic_write_json(CONFIG_FILE, payload, indent=2)
                 logger.info("Saved news sources forwarding configuration.")
             except Exception as e:
                 logger.error(f"Error saving sources config: {e}")
 
     def _load_saved_hashes(self):
         try:
-            conn = sqlite3.connect(DB_PATH)
+            conn = sqlite3.connect(DB_PATH, timeout=10.0)
             c = conn.cursor()
             c.execute("SELECT hash_id FROM sent_news")
             for row in c.fetchall():
@@ -701,10 +724,12 @@ class NewsEngineWorker:
         logger.info("News Engine smart adaptive loop started.")
         while self.is_running:
             try:
+                self.last_heartbeat = time.time()
                 self.poll_cycle()
                 sleep_sec = self.get_adaptive_interval()
                 time.sleep(sleep_sec)
             except Exception as e:
+                self.last_heartbeat = time.time()
                 logger.error(f"Worker loop error: {e}")
                 time.sleep(5)
 

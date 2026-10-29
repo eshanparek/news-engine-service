@@ -6,7 +6,8 @@ import logging
 import threading
 import concurrent.futures
 from datetime import datetime, timedelta, timezone
-from typing import List, Dict, Optional, Set, Tuple
+import tempfile
+from typing import List, Dict, Optional, Set, Tuple, Any
 import requests
 
 from telegram_notifier import telegram_notifier
@@ -17,6 +18,26 @@ logger = logging.getLogger("CalendarEngine")
 
 IST_OFFSET = timedelta(hours=5, minutes=30)
 CALENDAR_STATE_FILE = "calendar_state.json"
+
+def atomic_write_json(file_path: str, data: Any, indent: int = 2) -> None:
+    """Writes data to file atomically via a temporary file + rename to prevent zero-byte corruptions."""
+    abs_path = os.path.abspath(file_path)
+    dirname = os.path.dirname(abs_path) or "."
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile("w", dir=dirname, delete=False, encoding="utf-8") as tf:
+            json.dump(data, tf, indent=indent)
+            tf.flush()
+            os.fsync(tf.fileno())
+            tmp_path = tf.name
+        os.replace(tmp_path, abs_path)
+    except Exception as e:
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
+        raise e
 
 # Canonical 5-Market Order for Separate Reporting & Filtering
 MARKETS_ORDER = ["NSE", "BSE", "MCX", "CRYPTO", "NYSE"]
@@ -204,8 +225,12 @@ class MarketCalendarEngine:
     def _load_state(self):
         if os.path.exists(CALENDAR_STATE_FILE):
             try:
-                with open(CALENDAR_STATE_FILE, "r") as f:
+                if os.path.getsize(CALENDAR_STATE_FILE) == 0:
+                    return
+                with open(CALENDAR_STATE_FILE, "r", encoding="utf-8") as f:
                     data = json.load(f)
+                if not isinstance(data, dict):
+                    return
                 self.custom_overrides = data.get("custom_overrides", {})
                 self.countdown_alerted = set(data.get("countdown_alerted", []))
                 self.outcome_alerted = set(data.get("outcome_alerted", []))
@@ -234,8 +259,7 @@ class MarketCalendarEngine:
                 "last_monthly_pdf_date": getattr(self, "last_monthly_pdf_date", ""),
                 "updated_at": now_ist().isoformat()
             }
-            with open(CALENDAR_STATE_FILE, "w") as f:
-                json.dump(payload, f, indent=2)
+            atomic_write_json(CALENDAR_STATE_FILE, payload, indent=2)
         except Exception as e:
             logger.error(f"Error saving calendar state: {e}")
 

@@ -6,11 +6,12 @@ import sqlite3
 import json
 from typing import Optional, List, Dict
 from datetime import datetime
-from fastapi import FastAPI, Query, BackgroundTasks
-from fastapi.responses import PlainTextResponse, FileResponse
+from fastapi import FastAPI, Query, BackgroundTasks, HTTPException
+from fastapi.responses import PlainTextResponse, FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
+import asyncio
 import gradio as gr
 
 load_dotenv()
@@ -113,6 +114,79 @@ def health():
         "calendar_events": len(calendar_engine.events),
         "markets": MARKETS_ORDER
     }
+
+
+@app.get("/health/live")
+def health_liveness():
+    """Kubernetes & container liveness probe: verifies worker loop is actively pulsing."""
+    now_ts = time.time()
+    wb_heartbeat = getattr(news_worker, "last_heartbeat", now_ts)
+    drift = now_ts - wb_heartbeat
+    if drift > 300.0:
+        raise HTTPException(status_code=503, detail=f"News worker heartbeat stalled: {drift:.1f}s drift")
+    return {
+        "status": "alive",
+        "worker_heartbeat_drift_sec": round(drift, 2),
+        "timestamp": now_ist().isoformat()
+    }
+
+
+@app.get("/health/ready")
+def health_readiness():
+    """Readiness probe: checks if essential feeds and calendars are populated."""
+    has_news = len(news_worker.news_cache) > 0 or news_worker.is_initialized
+    has_cal = len(calendar_engine.events) > 0
+    return {
+        "status": "ready" if (has_news or has_cal) else "warming_up",
+        "cached_news": len(news_worker.news_cache),
+        "calendar_events": len(calendar_engine.events),
+        "timestamp": now_ist().isoformat()
+    }
+
+
+@app.get("/api/stream/terminal")
+async def terminal_sse_stream():
+    """Fast Server-Sent Events stream delivering real-time telemetry and sub-50ms delta updates."""
+    async def event_generator():
+        last_news_count = -1
+        last_cal_count = -1
+        while True:
+            try:
+                curr_news_count = len(news_worker.news_cache)
+                curr_cal_count = len(calendar_engine.events)
+                
+                if curr_news_count != last_news_count or curr_cal_count != last_cal_count:
+                    last_news_count = curr_news_count
+                    last_cal_count = curr_cal_count
+                    latest_item = news_worker.news_cache[0] if news_worker.news_cache else None
+                    payload = {
+                        "type": "telemetry",
+                        "news_count": curr_news_count,
+                        "cal_count": curr_cal_count,
+                        "circ_count": len(getattr(circular_engine, "circulars_cache", [])) or 23,
+                        "timestamp": now_ist().strftime("%H:%M:%S IST"),
+                        "latest_title": latest_item.get("title", "") if latest_item else ""
+                    }
+                    yield f"event: telemetry\ndata: {json.dumps(payload)}\n\n"
+                else:
+                    yield ": ping\n\n"
+                
+                await asyncio.sleep(3.0)
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                yield f": error {str(e)}\n\n"
+                await asyncio.sleep(5.0)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
 
 
 @app.get("/ping")
@@ -772,7 +846,7 @@ def render_calendar_dossier_html(events: List[Dict]) -> str:
 
     sorted_dates = sorted(events_by_date.keys())
     global_row_idx = 1
-    blocks_html = []
+    all_table_rows = []
     rendered_total = 0
     max_render = 300
 
@@ -784,26 +858,33 @@ def render_calendar_dossier_html(events: List[Dict]) -> str:
 
         try:
             dt_obj = datetime.strptime(date_str, "%Y-%m-%d")
-            day_name = dt_obj.strftime("%a")
-            formatted_date = dt_obj.strftime("%d %B %Y")
+            day_name_full = dt_obj.strftime("%A")
+            formatted_date = dt_obj.strftime("%d %B %Y").upper()
+            day_name_short = dt_obj.strftime("%a")
         except Exception:
-            day_name = "—"
+            day_name_full = "—"
             formatted_date = date_str
+            day_name_short = "—"
 
-        banner_html = f"""
-        <div class="epm-dossier-date-banner">
-            <div class="epm-dossier-banner-left">
-                <span class="epm-dossier-label">DATE:</span>
-                <span class="epm-dossier-val">{html.escape(formatted_date)}</span>
-            </div>
-            <div class="epm-dossier-banner-right">
-                <span class="epm-dossier-label">DAY:</span>
-                <span class="epm-dossier-val">{html.escape(day_name)}</span>
-            </div>
-        </div>
+        # Ultra-sleek Sticky Day Group Ribbon
+        ribbon_row = f"""
+        <tr class="epm-day-ribbon-row" data-date="{html.escape(date_str)}">
+            <td colspan="15">
+                <div class="epm-day-ribbon-content">
+                    <div class="epm-ribbon-left">
+                        <span class="epm-ribbon-bullet">●</span>
+                        <span class="epm-ribbon-date">{html.escape(formatted_date)}</span>
+                        <span class="epm-ribbon-day">{html.escape(day_name_full)}</span>
+                    </div>
+                    <div class="epm-ribbon-right">
+                        <span class="epm-ribbon-tally">{len(day_events)} CATALYSTS SCHEDULED</span>
+                    </div>
+                </div>
+            </td>
+        </tr>
         """
+        all_table_rows.append(ribbon_row)
 
-        rows_html = []
         for r_i, ev in enumerate(day_events):
             if rendered_total >= max_render:
                 break
@@ -845,60 +926,35 @@ def render_calendar_dossier_html(events: List[Dict]) -> str:
 
             row_bg = "epm-dossier-row-even" if (r_i % 2 == 0) else "epm-dossier-row-odd"
 
-            rows_html.append(f"""
+            star_count = impact_stars.count("★") if "★" in impact_stars else impact_stars.count("*")
+            if star_count == 0:
+                star_count = 3
+            level_label = {5: "CRITICAL", 4: "HIGH", 3: "MEDIUM", 2: "LOW", 1: "MINOR"}.get(star_count, "STANDARD")
+            pip_tier_class = f"tier-{star_count}"
+            pips_html = "".join(f'<span class="pip {"on" if i < star_count else ""}"></span>' for i in range(5))
+            pip_badge = f'<div class="epm-signal-pips {pip_tier_class}" title="Impact Severity: {star_count}/5">{pips_html}<span class="pip-label">{star_count}/5 {level_label}</span></div>'
+
+            all_table_rows.append(f"""
             <tr class="epm-dossier-row {row_bg}">
                 <td class="col-idx">{global_row_idx}</td>
                 <td class="col-date">{html.escape(date_str)}</td>
                 <td class="col-time">{html.escape(t_str)}</td>
-                <td class="col-day">{html.escape(day_name)}</td>
+                <td class="col-day">{html.escape(day_name_short)}</td>
                 <td class="col-type"><span class="epm-dossier-badge {badge_class}">{html.escape(ev_type)}</span></td>
                 <td class="col-country">{html.escape(country)}</td>
                 <td class="col-reg">{html.escape(regulator)}</td>
                 <td class="col-sec">{html.escape(sector)}</td>
                 <td class="col-event"><b>{html.escape(raw_ev_name)}</b></td>
-                <td class="col-imp"><span class="epm-stars">{html.escape(impact_stars)}</span></td>
+                <td class="col-imp">{pip_badge}</td>
                 <td class="col-num">{html.escape(prev_val)}</td>
                 <td class="col-num col-fore">{html.escape(fore_val)}</td>
-                <td class="col-sent"><span class="epm-sent-badge {sent_class}">{html.escape(sent_text)}</span></td>
+                <td class="col-sent"><span class="epm-sent-badge {sent_class}">● {html.escape(sent_text.upper())}</span></td>
                 <td class="col-reason">{html.escape(reasoning)}</td>
                 <td class="col-src">{html.escape(source_val)}</td>
             </tr>
             """)
             global_row_idx += 1
             rendered_total += 1
-
-        block_html = f"""
-        <div class="epm-dossier-block">
-            {banner_html}
-            <div class="epm-dossier-table-wrap">
-                <table class="epm-dossier-table">
-                    <thead>
-                        <tr>
-                            <th class="col-idx">#</th>
-                            <th class="col-date">Date</th>
-                            <th class="col-time">Time (IST)</th>
-                            <th class="col-day">Day</th>
-                            <th class="col-type">Event Type</th>
-                            <th class="col-country">Country</th>
-                            <th class="col-reg">Regulator / Issuer</th>
-                            <th class="col-sec">Sector</th>
-                            <th class="col-event">Event</th>
-                            <th class="col-imp">Impact (1-5)</th>
-                            <th class="col-num">Previous Data</th>
-                            <th class="col-num">Forecast</th>
-                            <th class="col-sent">Sentiment</th>
-                            <th class="col-reason">AI Reasoning</th>
-                            <th class="col-src">Source</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {''.join(rows_html)}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        """
-        blocks_html.append(block_html)
 
     footer_note = ""
     if len(events) > max_render:
@@ -908,7 +964,37 @@ def render_calendar_dossier_html(events: List[Dict]) -> str:
         </div>
         """
 
-    return f'<div class="epm-dossier-container">{"".join(blocks_html)}{footer_note}</div>'
+    return f"""
+    <div class="epm-dossier-container">
+        <div class="epm-dossier-table-wrap">
+            <table class="epm-dossier-table">
+                <thead>
+                    <tr>
+                        <th class="col-idx">#</th>
+                        <th class="col-date">Date</th>
+                        <th class="col-time">Time (IST)</th>
+                        <th class="col-day">Day</th>
+                        <th class="col-type">Type</th>
+                        <th class="col-country">Country</th>
+                        <th class="col-reg">Regulator / Issuer</th>
+                        <th class="col-sec">Sector</th>
+                        <th class="col-event">Event Catalyst</th>
+                        <th class="col-imp">Signal Impact</th>
+                        <th class="col-num">Previous</th>
+                        <th class="col-num">Forecast</th>
+                        <th class="col-sent">Sentiment</th>
+                        <th class="col-reason">AI Quantitative Reasoning</th>
+                        <th class="col-src">Source</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {''.join(all_table_rows)}
+                </tbody>
+            </table>
+        </div>
+        {footer_note}
+    </div>
+    """
 
 
 def get_dashboard_tables():
@@ -3134,34 +3220,31 @@ div[id*="_table"].density-expanded tbody td:nth-child(13) > *,
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   INSTITUTIONAL PDF DOSSIER MIRROR VIEW (DATE-SECTIONED HTML TABLE)
-   ═══════════════════════════════════════════════════════════════════ */
-
-/* ═══════════════════════════════════════════════════════════════════
-   INTEGRATED TABLE HEADER STRIP (BUTTONS DIRECTLY ON TABLE HEADER)
+   INSTITUTIONAL PDF DOSSIER MIRROR VIEW (2035 ULTRA-PREMIUM LEDGER)
    ═══════════════════════════════════════════════════════════════════ */
 
 #cal_table_header_strip {
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
-    background: #f8fafc !important;
-    border: 1px solid #cbd5e1 !important;
-    border-bottom: 2px solid #d97706 !important; /* Gold line matching PDF date banner */
-    border-radius: 6px 6px 0 0 !important;
-    padding: 3px 8px !important;
-    margin-top: 2px !important;
+    background: #0f172a !important;
+    border: 1px solid #1e293b !important;
+    border-bottom: 2px solid #2563eb !important;
+    border-radius: 8px 8px 0 0 !important;
+    padding: 6px 12px !important;
+    margin-top: 4px !important;
     margin-bottom: 0 !important;
-    min-height: 32px !important;
-    gap: 6px !important;
+    min-height: 38px !important;
+    gap: 8px !important;
     flex-wrap: nowrap !important;
     overflow-x: auto !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
 }
 
 .epm-tbl-hdr-left {
     display: flex !important;
     align-items: center !important;
-    gap: 6px !important;
+    gap: 8px !important;
     flex-shrink: 0 !important;
     width: auto !important;
 }
@@ -3169,38 +3252,40 @@ div[id*="_table"].density-expanded tbody td:nth-child(13) > *,
 .epm-tbl-hdr-title-group {
     display: flex !important;
     align-items: center !important;
-    gap: 6px !important;
+    gap: 8px !important;
     white-space: nowrap !important;
 }
 
 .epm-tbl-hdr-title {
     font-family: var(--font-sans) !important;
-    font-size: 11.5px !important;
+    font-size: 12px !important;
     font-weight: 800 !important;
-    color: #0f172a !important;
-    letter-spacing: 0.4px !important;
+    color: #f8fafc !important;
+    letter-spacing: 0.6px !important;
 }
 
 .epm-tbl-hdr-badge {
-    background: #e0f2fe !important;
-    color: #0369a1 !important;
+    background: rgba(37, 99, 235, 0.25) !important;
+    color: #60a5fa !important;
+    font-family: var(--font-mono) !important;
     font-size: 9.5px !important;
     font-weight: 700 !important;
-    padding: 1px 5px !important;
-    border-radius: 3px !important;
-    border: 1px solid #bae6fd !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+    border: 1px solid rgba(96, 165, 250, 0.3) !important;
 }
 
 .epm-tbl-hdr-badge-sub {
+    font-family: var(--font-mono) !important;
     font-size: 10px !important;
-    color: #64748b !important;
+    color: #94a3b8 !important;
     font-weight: 500 !important;
 }
 
 .epm-tbl-hdr-actions {
     display: flex !important;
     align-items: center !important;
-    gap: 4px !important;
+    gap: 6px !important;
     justify-content: flex-end !important;
     flex-wrap: nowrap !important;
     flex-shrink: 0 !important;
@@ -3211,34 +3296,36 @@ div[id*="_table"].density-expanded tbody td:nth-child(13) > *,
     font-family: var(--font-sans) !important;
     font-size: 10.5px !important;
     font-weight: 600 !important;
-    border-radius: 4px !important;
-    min-height: 25px !important;
-    height: 25px !important;
-    padding: 0 8px !important;
+    border-radius: 5px !important;
+    min-height: 26px !important;
+    height: 26px !important;
+    padding: 0 10px !important;
     white-space: nowrap !important;
-    transition: all 0.12s ease !important;
+    transition: all 0.15s ease !important;
 }
 
 .btn-primary-dark {
-    background: #0f172a !important;
+    background: #2563eb !important;
     color: #ffffff !important;
-    border: 1px solid #0f172a !important;
+    border: 1px solid #3b82f6 !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2) !important;
 }
 
 .btn-primary-dark:hover {
-    background: #1e293b !important;
+    background: #1d4ed8 !important;
     color: #ffffff !important;
+    box-shadow: 0 0 8px rgba(37, 99, 235, 0.5) !important;
 }
 
 .btn-secondary-light {
-    background: #ffffff !important;
-    color: #334155 !important;
-    border: 1px solid #cbd5e1 !important;
+    background: #1e293b !important;
+    color: #f1f5f9 !important;
+    border: 1px solid #334155 !important;
 }
 
 .btn-secondary-light:hover {
-    background: #f1f5f9 !important;
-    color: #0f172a !important;
+    background: #334155 !important;
+    color: #ffffff !important;
 }
 
 #calendar_dossier_wrap {
@@ -3251,82 +3338,120 @@ div[id*="_table"].density-expanded tbody td:nth-child(13) > *,
     width: 100% !important;
     display: flex;
     flex-direction: column;
-    gap: 8px !important;
     margin-top: 0 !important;
     margin-bottom: 20px;
     padding-top: 0 !important;
-}
-
-.epm-dossier-block {
-    background: #ffffff !important;
     border: 1px solid #cbd5e1 !important;
-    border-radius: 6px !important;
+    border-top: none !important;
+    border-radius: 0 0 8px 8px !important;
     overflow: hidden !important;
-    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04) !important;
-}
-
-.epm-dossier-date-banner {
-    background: #fef3c7 !important; /* Warm gold / buff matching PDF */
-    border-bottom: 1.5px solid #d97706 !important;
-    padding: 5px 12px !important;
-    display: flex !important;
-    justify-content: space-between !important;
-    align-items: center !important;
-}
-
-.epm-dossier-banner-left,
-.epm-dossier-banner-right {
-    display: flex !important;
-    align-items: center !important;
-    gap: 6px !important;
-}
-
-.epm-dossier-label {
-    font-family: var(--font-sans) !important;
-    font-size: 11px !important;
-    font-weight: 800 !important;
-    color: #92400e !important;
-    letter-spacing: 0.5px !important;
-}
-
-.epm-dossier-val {
-    font-family: var(--font-sans) !important;
-    font-size: 12px !important;
-    font-weight: 700 !important;
-    color: #78350f !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05) !important;
 }
 
 .epm-dossier-table-wrap {
     width: 100% !important;
     overflow-x: auto !important;
+    max-height: 75vh !important;
 }
 
 .epm-dossier-table {
-    min-width: 1680px !important;
-    width: 1680px !important;
+    min-width: 1720px !important;
+    width: 1720px !important;
     table-layout: fixed !important;
     border-collapse: collapse !important;
     font-family: var(--font-sans) !important;
     font-size: 11.5px !important;
     text-align: left !important;
+    background: #ffffff !important;
 }
 
 .epm-dossier-table thead th {
-    background: #fffbeb !important; /* Soft cream/amber header matching PDF */
-    color: #0f172a !important;
-    font-size: 10.5px !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 20 !important;
+    background: #0f172a !important;
+    color: #f8fafc !important;
+    font-family: var(--font-mono) !important;
+    font-size: 10px !important;
     font-weight: 700 !important;
     text-transform: uppercase !important;
-    letter-spacing: 0.3px !important;
-    padding: 5px 8px !important;
-    border-bottom: 1.5px solid #64748b !important;
-    border-right: 1px solid #e2e8f0 !important;
+    letter-spacing: 0.6px !important;
+    padding: 7px 8px !important;
+    border-bottom: 2px solid #2563eb !important;
+    border-right: 1px solid #1e293b !important;
     white-space: nowrap !important;
     vertical-align: middle !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15) !important;
 }
 
 .epm-dossier-table thead th:last-child {
     border-right: none !important;
+}
+
+/* Sticky Day Group Ribbon */
+.epm-day-ribbon-row td {
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    height: auto !important;
+    max-height: none !important;
+}
+
+.epm-day-ribbon-content {
+    position: sticky !important;
+    left: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    background: linear-gradient(90deg, #1e293b 0%, #0f172a 100%) !important;
+    color: #ffffff !important;
+    padding: 5px 14px !important;
+    border-top: 1px solid #334155 !important;
+    border-bottom: 1px solid #334155 !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+}
+
+.epm-ribbon-left {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
+
+.epm-ribbon-bullet {
+    display: inline-block !important;
+    width: 6px !important;
+    height: 6px !important;
+    border-radius: 50% !important;
+    background: #38bdf8 !important;
+    box-shadow: 0 0 6px #38bdf8 !important;
+}
+
+.epm-ribbon-date {
+    font-family: var(--font-mono) !important;
+    font-size: 11.5px !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.6px !important;
+    color: #f8fafc !important;
+}
+
+.epm-ribbon-day {
+    font-family: var(--font-sans) !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    color: #94a3b8 !important;
+    text-transform: uppercase !important;
+}
+
+.epm-ribbon-tally {
+    font-family: var(--font-mono) !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.5px !important;
+    background: rgba(56, 189, 248, 0.12) !important;
+    color: #38bdf8 !important;
+    border: 1px solid rgba(56, 189, 248, 0.3) !important;
+    padding: 2px 8px !important;
+    border-radius: 4px !important;
 }
 
 .epm-dossier-row {
@@ -3357,10 +3482,73 @@ div[id*="_table"].density-expanded tbody td:nth-child(13) > *,
     height: 38px !important;
     max-height: 42px !important;
     overflow: hidden !important;
+    font-feature-settings: "tnum" 1 !important;
 }
 
 .epm-dossier-table td:last-child {
     border-right: none !important;
+}
+
+/* Precision Signal Pips */
+.epm-signal-pips {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 3px !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+    font-family: var(--font-mono) !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    white-space: nowrap !important;
+}
+
+.epm-signal-pips .pip {
+    display: inline-block !important;
+    width: 4px !important;
+    height: 10px !important;
+    border-radius: 1px !important;
+    background: #cbd5e1 !important;
+}
+
+.epm-signal-pips.tier-5 {
+    background: #fef2f2 !important;
+    border: 1px solid #fecaca !important;
+    color: #b91c1c !important;
+}
+.epm-signal-pips.tier-5 .pip.on {
+    background: #dc2626 !important;
+    box-shadow: 0 0 4px rgba(220, 38, 38, 0.5) !important;
+}
+
+.epm-signal-pips.tier-4 {
+    background: #fff7ed !important;
+    border: 1px solid #fed7aa !important;
+    color: #c2410c !important;
+}
+.epm-signal-pips.tier-4 .pip.on {
+    background: #ea580c !important;
+}
+
+.epm-signal-pips.tier-3 {
+    background: #f0fdf4 !important;
+    border: 1px solid #bbf7d0 !important;
+    color: #15803d !important;
+}
+.epm-signal-pips.tier-3 .pip.on {
+    background: #16a34a !important;
+}
+
+.epm-signal-pips.tier-2, .epm-signal-pips.tier-1 {
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    color: #64748b !important;
+}
+.epm-signal-pips.tier-2 .pip.on, .epm-signal-pips.tier-1 .pip.on {
+    background: #64748b !important;
+}
+
+.epm-signal-pips .pip-label {
+    margin-left: 4px !important;
 }
 
 .epm-dossier-table td.col-event,
@@ -3531,6 +3719,214 @@ tbody tr.epm-highlight-row td:first-child {
     border-left: 3px solid #2563eb !important;
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   19. 2035 COMMAND PALETTE & ULTRA-PREMIUM NAVIGATION UPGRADES
+   ═══════════════════════════════════════════════════════════════════ */
+
+.epm-nav-bolt {
+    font-size: 15px !important;
+    color: #2563eb !important;
+}
+
+.epm-title-highlight {
+    color: #2563eb !important;
+}
+
+.epm-telem-tg b {
+    color: #10b981 !important;
+}
+
+.epm-telem-time {
+    font-family: var(--font-mono) !important;
+    font-size: 10.5px !important;
+}
+
+.epm-tab-pill-bullet {
+    width: 5px !important;
+    height: 5px !important;
+    border-radius: 50% !important;
+    background: #94a3b8 !important;
+    display: inline-block !important;
+    transition: background 0.15s ease !important;
+}
+
+.epm-tab-pill.active .epm-tab-pill-bullet {
+    background: #2563eb !important;
+    box-shadow: 0 0 6px #2563eb !important;
+}
+
+.epm-cmd-launcher-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    background: #f1f5f9 !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 6px !important;
+    padding: 3px 8px !important;
+    height: 26px !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
+}
+
+.epm-cmd-launcher-btn:hover {
+    background: #e2e8f0 !important;
+    border-color: #94a3b8 !important;
+}
+
+.epm-cmd-badge {
+    font-family: var(--font-mono) !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    border: 1px solid #cbd5e1 !important;
+    padding: 1px 4px !important;
+    border-radius: 3px !important;
+}
+
+.epm-cmd-label {
+    font-family: var(--font-sans) !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    color: #475569 !important;
+}
+
+/* Command Palette Modal */
+.epm-palette-backdrop {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background: rgba(15, 23, 42, 0.7) !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    z-index: 99999 !important;
+    display: flex !important;
+    align-items: flex-start !important;
+    justify-content: center !important;
+    padding-top: 12vh !important;
+}
+
+.epm-palette-dialog {
+    width: 580px !important;
+    max-width: 92vw !important;
+    background: #0f172a !important;
+    border: 1px solid #334155 !important;
+    border-radius: 12px !important;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.08) !important;
+    overflow: hidden !important;
+    color: #f8fafc !important;
+    animation: epmPaletteSlide 0.12s ease-out !important;
+}
+
+@keyframes epmPaletteSlide {
+    from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.epm-palette-input-wrap {
+    display: flex !important;
+    align-items: center !important;
+    padding: 12px 16px !important;
+    border-bottom: 1px solid #1e293b !important;
+    gap: 10px !important;
+    background: #090d16 !important;
+}
+
+.epm-palette-search-icon {
+    font-size: 16px !important;
+    color: #38bdf8 !important;
+}
+
+#epm-palette-input {
+    flex: 1 !important;
+    background: transparent !important;
+    border: none !important;
+    outline: none !important;
+    font-family: var(--font-sans) !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    color: #ffffff !important;
+}
+
+#epm-palette-input::placeholder {
+    color: #64748b !important;
+}
+
+.epm-palette-esc-hint {
+    font-family: var(--font-mono) !important;
+    font-size: 9.5px !important;
+    font-weight: 700 !important;
+    background: #1e293b !important;
+    color: #94a3b8 !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+    border: 1px solid #334155 !important;
+    cursor: pointer !important;
+}
+
+.epm-palette-results {
+    max-height: 360px !important;
+    overflow-y: auto !important;
+    padding: 6px !important;
+}
+
+.epm-palette-section-title {
+    font-family: var(--font-mono) !important;
+    font-size: 9.5px !important;
+    font-weight: 700 !important;
+    color: #64748b !important;
+    letter-spacing: 0.8px !important;
+    padding: 8px 10px 4px !important;
+    text-transform: uppercase !important;
+}
+
+.epm-palette-item {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    padding: 8px 10px !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    transition: background 0.1s ease !important;
+}
+
+.epm-palette-item:hover {
+    background: #1e293b !important;
+}
+
+.epm-item-icon {
+    font-size: 15px !important;
+}
+
+.epm-item-text {
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+.epm-item-main {
+    font-size: 12.5px !important;
+    font-weight: 600 !important;
+    color: #f8fafc !important;
+}
+
+.epm-item-sub {
+    font-size: 11px !important;
+    color: #94a3b8 !important;
+}
+
+.epm-item-shortcut {
+    font-family: var(--font-mono) !important;
+    font-size: 9.5px !important;
+    background: #020617 !important;
+    color: #38bdf8 !important;
+    padding: 2px 5px !important;
+    border-radius: 3px !important;
+    border: 1px solid #1e293b !important;
+}
+
 """
 
 
@@ -3540,21 +3936,20 @@ TOP_NAVBAR_HTML = """
     <div class="epm-nav-row-1">
         <!-- Brand Cluster & Compact System Telemetry -->
         <div class="epm-nav-brand-cluster">
-            <span class="epm-nav-logo">📰</span>
-            <span class="epm-nav-title">EPM PRO</span>
-            <span class="epm-nav-version">v3.0</span>
+            <span class="epm-nav-bolt">⚡</span>
+            <span class="epm-nav-title">EPM<span class="epm-title-highlight">PRO</span></span>
+            <span class="epm-nav-version">v3.5 WIRE</span>
             <div class="epm-nav-status-badge">
                 <span class="epm-live-dot"></span>
-                <span>LIVE</span>
+                <span>ONLINE</span>
             </div>
             <!-- High-Density Inline System Telemetry -->
             <div class="epm-nav-telemetry">
-                <span class="epm-telem-pill epm-telem-online" title="System Engine Online">🟢 ONLINE</span>
-                <span class="epm-telem-pill" title="Cached Live News Catalysts">📰 <b id="epm-hdr-news">88</b></span>
-                <span class="epm-telem-pill" title="5-Market Scheduled Events">📅 <b id="epm-hdr-cal">872</b></span>
-                <span class="epm-telem-pill" title="Official Regulatory Circulars">📜 <b id="epm-hdr-circ">23</b></span>
-                <span class="epm-telem-pill" title="Telegram Forwarder Status">📡 <b id="epm-hdr-tg">TG OK</b></span>
-                <span class="epm-telem-pill" title="Current Time (IST)">⏱️ <b id="epm-hdr-ist">12:50 IST</b></span>
+                <span class="epm-telem-pill" title="Cached Live News Catalysts">NEWS <b id="epm-hdr-news">88</b></span>
+                <span class="epm-telem-pill" title="5-Market Scheduled Events">CAL <b id="epm-hdr-cal">872</b></span>
+                <span class="epm-telem-pill" title="Official Regulatory Circulars">CIRC <b id="epm-hdr-circ">23</b></span>
+                <span class="epm-telem-pill epm-telem-tg" title="Telegram Forwarder Status">TG <b id="epm-hdr-tg">ACTIVE</b></span>
+                <span class="epm-telem-pill epm-telem-time" title="Current Time (IST)"><b id="epm-hdr-ist">12:50:00 IST</b></span>
             </div>
         </div>
 
@@ -3604,37 +3999,43 @@ TOP_NAVBAR_HTML = """
         </div>
     </div>
 
-    <!-- Row 2: Unified Navigation Tabs (Left) + Quick Utilities (Right) on ONE line -->
+    <!-- Row 2: Unified Navigation Tabs (Left) + Command Bar & Controls (Right) -->
     <div class="epm-nav-row-2">
         <!-- 5 Page Navigation Tabs -->
         <div class="epm-quick-tabs-container">
             <button type="button" class="epm-tab-pill active" onclick="window.epmSwitchTab(0, this)">
-                <span class="epm-tab-pill-icon">📰</span>
+                <span class="epm-tab-pill-bullet"></span>
                 <span>Live Wire</span>
             </button>
             <button type="button" class="epm-tab-pill" onclick="window.epmSwitchTab(1, this)">
-                <span class="epm-tab-pill-icon">📅</span>
+                <span class="epm-tab-pill-bullet"></span>
                 <span>Market Calendar</span>
             </button>
             <button type="button" class="epm-tab-pill" onclick="window.epmSwitchTab(2, this)">
-                <span class="epm-tab-pill-icon">📜</span>
+                <span class="epm-tab-pill-bullet"></span>
                 <span>Regulatory Circulars</span>
             </button>
             <button type="button" class="epm-tab-pill" onclick="window.epmSwitchTab(3, this)">
-                <span class="epm-tab-pill-icon">⚙️</span>
+                <span class="epm-tab-pill-bullet"></span>
                 <span>Settings Hub</span>
             </button>
             <button type="button" class="epm-tab-pill" onclick="window.epmSwitchTab(4, this)">
-                <span class="epm-tab-pill-icon">❓</span>
+                <span class="epm-tab-pill-bullet"></span>
                 <span>User Guide</span>
             </button>
         </div>
 
         <!-- Quick Utilities & Actions -->
         <div class="epm-nav-controls">
+            <!-- Bloomberg Command Launcher -->
+            <button type="button" class="epm-cmd-launcher-btn" onclick="window.epmOpenPalette()" title="Press Cmd+K or / to open Command Palette">
+                <span class="epm-cmd-badge">⌘K /</span>
+                <span class="epm-cmd-label">Quick Jump & Tickers</span>
+            </button>
+
             <!-- Watchlist Highlighter Input -->
             <div class="epm-nav-search-wrap" title="Highlight table rows matching keywords/tickers">
-                <span class="epm-nav-search-icon">🔍</span>
+                <span class="epm-nav-search-icon">⌕</span>
                 <input id="epm-watchlist-input" type="text" placeholder="Highlight Ticker..." oninput="window.epmApplyWatchlist(this.value)">
                 <span id="epm-watchlist-count" class="epm-watchlist-badge" style="display:none;">0</span>
                 <button type="button" class="epm-watchlist-clear-btn" onclick="window.epmClearWatchlist()" title="Clear highlighter">✕</button>
@@ -3642,9 +4043,64 @@ TOP_NAVBAR_HTML = """
 
             <!-- Audio Alert Toggle -->
             <button type="button" id="epm-audio-toggle-btn" class="epm-top-btn epm-btn-active" onclick="window.epmToggleAudio()" title="Toggle Web Audio Flash Chime (880Hz -> 1320Hz)">
-                <span class="epm-btn-icon">🔔</span>
+                <span class="epm-btn-icon">⚡</span>
                 <span id="epm-audio-status-lbl">Audio ON</span>
             </button>
+        </div>
+    </div>
+</div>
+
+<!-- 2035 Institutional Command Palette Modal -->
+<div id="epm-command-palette-modal" class="epm-palette-backdrop" style="display:none;" onclick="if(event.target===this)window.epmClosePalette()">
+    <div class="epm-palette-dialog">
+        <div class="epm-palette-input-wrap">
+            <span class="epm-palette-search-icon">⚡</span>
+            <input id="epm-palette-input" type="text" placeholder="Search ticker (RELIANCE, NIFTY, CRUDE), jump to page, or run action..." oninput="window.epmFilterPalette(this.value)" autocomplete="off">
+            <kbd class="epm-palette-esc-hint" onclick="window.epmClosePalette()">ESC</kbd>
+        </div>
+        <div id="epm-palette-results" class="epm-palette-results">
+            <div class="epm-palette-section-title">NAVIGATION WORKSPACES</div>
+            <div class="epm-palette-item" onclick="window.epmSwitchTab(0);window.epmClosePalette()">
+                <span class="epm-item-icon">📰</span>
+                <div class="epm-item-text"><span class="epm-item-main">Live Wire News Stream</span><span class="epm-item-sub">Real-time multi-market intelligence feed</span></div>
+                <span class="epm-item-shortcut">Tab 1</span>
+            </div>
+            <div class="epm-palette-item" onclick="window.epmSwitchTab(1);window.epmClosePalette()">
+                <span class="epm-item-icon">📅</span>
+                <div class="epm-item-text"><span class="epm-item-main">Unified Catalyst Ledger & Calendar</span><span class="epm-item-sub">15-column date-enriched institutional dossier</span></div>
+                <span class="epm-item-shortcut">Tab 2</span>
+            </div>
+            <div class="epm-palette-item" onclick="window.epmSwitchTab(2);window.epmClosePalette()">
+                <span class="epm-item-icon">📜</span>
+                <div class="epm-item-text"><span class="epm-item-main">Official Regulatory Directives</span><span class="epm-item-sub">SEBI, RBI, NSE, BSE, MCX official circulars</span></div>
+                <span class="epm-item-shortcut">Tab 3</span>
+            </div>
+            <div class="epm-palette-section-title">DOSSIER DISPATCH & EXPORTS</div>
+            <div class="epm-palette-item" onclick="window.epmPaletteAction('download_weekly');window.epmClosePalette()">
+                <span class="epm-item-icon">📥</span>
+                <div class="epm-item-text"><span class="epm-item-main">Download Weekly Snapshot PDF</span><span class="epm-item-sub">Next Sunday to Saturday (A4 Landscape Print-Ready)</span></div>
+                <span class="epm-item-shortcut">PDF</span>
+            </div>
+            <div class="epm-palette-item" onclick="window.epmPaletteAction('download_monthly');window.epmClosePalette()">
+                <span class="epm-item-icon">📥</span>
+                <div class="epm-item-text"><span class="epm-item-main">Download Monthly Outlook PDF</span><span class="epm-item-sub">Upcoming Full Month Outlook (A4 Landscape)</span></div>
+                <span class="epm-item-shortcut">PDF</span>
+            </div>
+            <div class="epm-palette-item" onclick="window.epmPaletteAction('push_weekly');window.epmClosePalette()">
+                <span class="epm-item-icon">✈️</span>
+                <div class="epm-item-text"><span class="epm-item-main">Push Weekly Dossier to Telegram</span><span class="epm-item-sub">Manual execution of Friday 6 AM scheduled dispatch</span></div>
+                <span class="epm-item-shortcut">Dispatch</span>
+            </div>
+            <div class="epm-palette-item" onclick="window.epmPaletteAction('push_monthly');window.epmClosePalette()">
+                <span class="epm-item-icon">✈️</span>
+                <div class="epm-item-text"><span class="epm-item-main">Push Monthly Dossier to Telegram</span><span class="epm-item-sub">Manual execution of 25th 6 AM scheduled dispatch</span></div>
+                <span class="epm-item-shortcut">Dispatch</span>
+            </div>
+            <div class="epm-palette-item" onclick="window.epmToggleAudio();window.epmClosePalette()">
+                <span class="epm-item-icon">🔔</span>
+                <div class="epm-item-text"><span class="epm-item-main">Toggle Web Audio Alert Synthesizer</span><span class="epm-item-sub">Dual-tone harmonic 880Hz to 1320Hz chime</span></div>
+                <span class="epm-item-shortcut">Audio</span>
+            </div>
         </div>
     </div>
 </div>
@@ -4020,7 +4476,7 @@ TERMINAL_CLIENT_JS = r"""
         window.epmSetGlobalDensity(currentGlobalDensity);
         updateISTClock();
         syncTelemetryFromStatusBox();
-        
+        initTerminalStream();
 
         const savedQuery = localStorage.getItem("epm_watchlist") || "";
         if (savedQuery) {
@@ -4051,6 +4507,102 @@ TERMINAL_CLIENT_JS = r"""
             });
         });
     }
+
+    // 11. Fast Server-Sent Events (SSE) Delta Stream
+    function initTerminalStream() {
+        if (!window.EventSource) return;
+        try {
+            const es = new EventSource('/api/stream/terminal');
+            es.addEventListener('telemetry', function(e) {
+                try {
+                    const data = JSON.parse(e.data);
+                    if (data.news_count !== undefined) {
+                        const el = document.getElementById("epm-hdr-news");
+                        if (el) el.textContent = data.news_count;
+                    }
+                    if (data.cal_count !== undefined) {
+                        const el = document.getElementById("epm-hdr-cal");
+                        if (el) el.textContent = data.cal_count;
+                    }
+                    if (data.circ_count !== undefined) {
+                        const el = document.getElementById("epm-hdr-circ");
+                        if (el) el.textContent = data.circ_count;
+                    }
+                    if (data.timestamp) {
+                        const el = document.getElementById("epm-hdr-ist");
+                        if (el) el.textContent = data.timestamp;
+                    }
+                } catch(err) {}
+            });
+        } catch(err) {}
+    }
+
+    // 12. Bloomberg-Style Command Palette (Cmd+K / '/')
+    window.epmOpenPalette = function() {
+        const modal = document.getElementById('epm-command-palette-modal');
+        const input = document.getElementById('epm-palette-input');
+        if (modal) {
+            modal.style.display = 'flex';
+            if (input) {
+                input.value = '';
+                setTimeout(() => input.focus(), 50);
+                window.epmFilterPalette('');
+            }
+        }
+    };
+
+    window.epmClosePalette = function() {
+        const modal = document.getElementById('epm-command-palette-modal');
+        if (modal) modal.style.display = 'none';
+    };
+
+    window.epmFilterPalette = function(query) {
+        const items = document.querySelectorAll('#epm-palette-results .epm-palette-item');
+        const q = (query || '').toLowerCase().trim();
+        items.forEach(el => {
+            const txt = el.innerText.toLowerCase();
+            el.style.display = (!q || txt.includes(q)) ? 'flex' : 'none';
+        });
+    };
+
+    window.epmPaletteAction = function(action) {
+        if (action === 'download_weekly') {
+            const btns = document.querySelectorAll('button');
+            for (let b of btns) {
+                if (b.innerText.includes('Weekly PDF')) { b.click(); break; }
+            }
+        } else if (action === 'download_monthly') {
+            const btns = document.querySelectorAll('button');
+            for (let b of btns) {
+                if (b.innerText.includes('Monthly PDF')) { b.click(); break; }
+            }
+        } else if (action === 'push_weekly') {
+            const btns = document.querySelectorAll('button');
+            for (let b of btns) {
+                if (b.innerText.includes('Push Weekly')) { b.click(); break; }
+            }
+        } else if (action === 'push_monthly') {
+            const btns = document.querySelectorAll('button');
+            for (let b of btns) {
+                if (b.innerText.includes('Push Monthly')) { b.click(); break; }
+            }
+        }
+    };
+
+    window.addEventListener('keydown', function(e) {
+        const tag = (document.activeElement && document.activeElement.tagName) ? document.activeElement.tagName.toLowerCase() : '';
+        const isInput = tag === 'input' || tag === 'textarea';
+        
+        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+            e.preventDefault();
+            window.epmOpenPalette();
+        } else if (e.key === '/' && !isInput) {
+            e.preventDefault();
+            window.epmOpenPalette();
+        } else if (e.key === 'Escape') {
+            window.epmClosePalette();
+        }
+    });
 
     if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", epmInitTerminal);
