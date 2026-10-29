@@ -5,19 +5,26 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 
-from reportlab.lib.pagesizes import A4, landscape
-from reportlab.platypus import (
-    SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak, KeepTogether, Image as RLImage
-)
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib import colors
-from reportlab.pdfgen import canvas
+try:
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.platypus import (
+        SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak, KeepTogether, Image as RLImage
+    )
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
+    from reportlab.pdfgen import canvas
+    REPORTLAB_AVAILABLE = True
+    CanvasBase = canvas.Canvas
+    PAGE_WIDTH, PAGE_HEIGHT = landscape(A4)
+except Exception as e:
+    REPORTLAB_AVAILABLE = False
+    CanvasBase = object
+    PAGE_WIDTH, PAGE_HEIGHT = 841.89, 595.28
 
 logger = logging.getLogger("CalendarPDFEngine")
 
 # Standard Dimensions for A4 Landscape
 # Width = 841.89 pt, Height = 595.28 pt
-PAGE_WIDTH, PAGE_HEIGHT = landscape(A4)
 MARGIN_LEFT = 20
 MARGIN_RIGHT = 20
 MARGIN_TOP = 42
@@ -65,7 +72,7 @@ def clean_text(text: str) -> str:
     return re.sub(r"\s+", " ", cleaned).strip()
 
 
-class NumberedCanvas(canvas.Canvas):
+class NumberedCanvas(CanvasBase):
     """
     Two-pass canvas to compute dynamic total page count (Page X of Y)
     and draw uniform headers and running footers on every page.
@@ -168,7 +175,8 @@ class CalendarPDFEngine:
     matching the exact spreadsheet schema and color hierarchy requested.
     """
     def __init__(self):
-        self._init_styles()
+        if REPORTLAB_AVAILABLE:
+            self._init_styles()
 
     def _init_styles(self):
         self.styles = getSampleStyleSheet()
@@ -516,6 +524,8 @@ class CalendarPDFEngine:
         Compiles the weekly multi-market snapshot PDF covering next week's Monday to Saturday.
         Returns: (pdf_bytes, filename)
         """
+        if not REPORTLAB_AVAILABLE:
+            raise RuntimeError("ReportLab library is not available in the current environment")
         curr = target_friday or datetime.now(timezone(timedelta(hours=5, minutes=30)))
         # Find next Monday:
         # If today is Friday (weekday = 4), next Monday is Friday + 3 days
@@ -592,6 +602,8 @@ class CalendarPDFEngine:
         sectioned weekly.
         Returns: (pdf_bytes, filename)
         """
+        if not REPORTLAB_AVAILABLE:
+            raise RuntimeError("ReportLab library is not available in the current environment")
         curr = target_date or datetime.now(timezone(timedelta(hours=5, minutes=30)))
         # Next month calculation
         if curr.month == 12:
