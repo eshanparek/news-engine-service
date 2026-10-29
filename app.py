@@ -1442,15 +1442,6 @@ default_wa_selected = [s["name"] for s in news_worker.sources if s.get("forward_
 def render_table_ribbon(table_id: str, title: str, subtitle: str = "", count_badge: str = "") -> str:
     sub_badge = f'<span class="epm-ribbon-badge">{subtitle}</span>' if subtitle else ""
     cnt_badge = f'<span class="epm-ribbon-count" id="{table_id}_count">{count_badge}</span>' if count_badge else ""
-    
-    cal_view_toggle = ""
-    if table_id == "calendar_table":
-        cal_view_toggle = """
-        <div class="epm-cal-view-group" title="Toggle between Institutional Date-Sectioned PDF Dossier and Data Grid">
-            <button type="button" class="epm-cal-view-btn active" id="btn_cal_dossier" onclick="window.epmSetCalView('dossier', this)" title="Institutional Date-Sectioned PDF Dossier View">📑 PDF Dossier</button>
-            <button type="button" class="epm-cal-view-btn" id="btn_cal_grid" onclick="window.epmSetCalView('grid', this)" title="Flat Data Grid & CSV Explorer">📊 Data Grid</button>
-        </div>
-        """
 
     return f"""
     <div class="epm-table-ribbon" data-target="{table_id}">
@@ -1461,7 +1452,6 @@ def render_table_ribbon(table_id: str, title: str, subtitle: str = "", count_bad
             {cnt_badge}
         </div>
         <div class="epm-ribbon-controls">
-            {cal_view_toggle}
             <div class="epm-density-group" title="Adjust visible row density and line clamping">
                 <span class="epm-control-label">Density:</span>
                 <button type="button" class="epm-density-btn active" data-density="compact" onclick="window.epmSetDensity('{table_id}', 'compact', this)" title="Compact (2-Line Clamp)">Compact</button>
@@ -3147,57 +3137,124 @@ div[id*="_table"].density-expanded tbody td:nth-child(13) > *,
    INSTITUTIONAL PDF DOSSIER MIRROR VIEW (DATE-SECTIONED HTML TABLE)
    ═══════════════════════════════════════════════════════════════════ */
 
-.epm-cal-view-group {
-    display: inline-flex !important;
+/* ═══════════════════════════════════════════════════════════════════
+   INTEGRATED TABLE HEADER STRIP (BUTTONS DIRECTLY ON TABLE HEADER)
+   ═══════════════════════════════════════════════════════════════════ */
+
+#cal_table_header_strip {
+    display: flex !important;
     align-items: center !important;
-    gap: 2px !important;
-    background: #ffffff !important;
+    justify-content: space-between !important;
+    background: #f8fafc !important;
     border: 1px solid #cbd5e1 !important;
-    border-radius: 3px !important;
-    padding: 1px 3px !important;
-    height: 22px !important;
-    margin-right: 4px !important;
+    border-bottom: 2px solid #d97706 !important; /* Gold line matching PDF date banner */
+    border-radius: 6px 6px 0 0 !important;
+    padding: 3px 8px !important;
+    margin-top: 2px !important;
+    margin-bottom: 0 !important;
+    min-height: 32px !important;
+    gap: 6px !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
 }
 
-.epm-cal-view-btn {
-    border: none !important;
-    background: transparent !important;
+.epm-tbl-hdr-left {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    flex-shrink: 0 !important;
+    width: auto !important;
+}
+
+.epm-tbl-hdr-title-group {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    white-space: nowrap !important;
+}
+
+.epm-tbl-hdr-title {
     font-family: var(--font-sans) !important;
+    font-size: 11.5px !important;
+    font-weight: 800 !important;
+    color: #0f172a !important;
+    letter-spacing: 0.4px !important;
+}
+
+.epm-tbl-hdr-badge {
+    background: #e0f2fe !important;
+    color: #0369a1 !important;
     font-size: 9.5px !important;
+    font-weight: 700 !important;
+    padding: 1px 5px !important;
+    border-radius: 3px !important;
+    border: 1px solid #bae6fd !important;
+}
+
+.epm-tbl-hdr-badge-sub {
+    font-size: 10px !important;
+    color: #64748b !important;
+    font-weight: 500 !important;
+}
+
+.epm-tbl-hdr-actions {
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    justify-content: flex-end !important;
+    flex-wrap: nowrap !important;
+    flex-shrink: 0 !important;
+    width: auto !important;
+}
+
+.epm-hdr-action-btn {
+    font-family: var(--font-sans) !important;
+    font-size: 10.5px !important;
     font-weight: 600 !important;
-    color: #475569 !important;
-    padding: 1px 6px !important;
-    border-radius: 2px !important;
-    cursor: pointer !important;
+    border-radius: 4px !important;
+    min-height: 25px !important;
+    height: 25px !important;
+    padding: 0 8px !important;
+    white-space: nowrap !important;
     transition: all 0.12s ease !important;
 }
 
-.epm-cal-view-btn:hover {
-    color: #0f172a !important;
-    background: #f1f5f9 !important;
+.btn-primary-dark {
+    background: #0f172a !important;
+    color: #ffffff !important;
+    border: 1px solid #0f172a !important;
 }
 
-.epm-cal-view-btn.active {
-    background: #0284c7 !important;
+.btn-primary-dark:hover {
+    background: #1e293b !important;
     color: #ffffff !important;
+}
+
+.btn-secondary-light {
+    background: #ffffff !important;
+    color: #334155 !important;
+    border: 1px solid #cbd5e1 !important;
+}
+
+.btn-secondary-light:hover {
+    background: #f1f5f9 !important;
+    color: #0f172a !important;
 }
 
 #calendar_dossier_wrap {
     width: 100% !important;
-}
-
-#calendar_grid_wrap {
-    width: 100% !important;
-    display: none;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
 }
 
 .epm-dossier-container {
     width: 100% !important;
     display: flex;
     flex-direction: column;
-    gap: 16px;
-    margin-top: 2px;
+    gap: 8px !important;
+    margin-top: 0 !important;
     margin-bottom: 20px;
+    padding-top: 0 !important;
 }
 
 .epm-dossier-block {
@@ -3211,7 +3268,7 @@ div[id*="_table"].density-expanded tbody td:nth-child(13) > *,
 .epm-dossier-date-banner {
     background: #fef3c7 !important; /* Warm gold / buff matching PDF */
     border-bottom: 1.5px solid #d97706 !important;
-    padding: 6px 14px !important;
+    padding: 5px 12px !important;
     display: flex !important;
     justify-content: space-between !important;
     align-items: center !important;
@@ -3234,7 +3291,7 @@ div[id*="_table"].density-expanded tbody td:nth-child(13) > *,
 
 .epm-dossier-val {
     font-family: var(--font-sans) !important;
-    font-size: 12.5px !important;
+    font-size: 12px !important;
     font-weight: 700 !important;
     color: #78350f !important;
 }
@@ -3245,7 +3302,9 @@ div[id*="_table"].density-expanded tbody td:nth-child(13) > *,
 }
 
 .epm-dossier-table {
-    width: 100% !important;
+    min-width: 1680px !important;
+    width: 1680px !important;
+    table-layout: fixed !important;
     border-collapse: collapse !important;
     font-family: var(--font-sans) !important;
     font-size: 11.5px !important;
@@ -3259,7 +3318,7 @@ div[id*="_table"].density-expanded tbody td:nth-child(13) > *,
     font-weight: 700 !important;
     text-transform: uppercase !important;
     letter-spacing: 0.3px !important;
-    padding: 6px 8px !important;
+    padding: 5px 8px !important;
     border-bottom: 1.5px solid #64748b !important;
     border-right: 1px solid #e2e8f0 !important;
     white-space: nowrap !important;
@@ -3271,6 +3330,8 @@ div[id*="_table"].density-expanded tbody td:nth-child(13) > *,
 }
 
 .epm-dossier-row {
+    height: 38px !important;
+    max-height: 42px !important;
     border-bottom: 1px solid #f1f5f9 !important;
     transition: background 0.1s ease !important;
 }
@@ -3288,32 +3349,47 @@ div[id*="_table"].density-expanded tbody td:nth-child(13) > *,
 }
 
 .epm-dossier-table td {
-    padding: 5px 8px !important;
+    padding: 3px 6px !important;
     vertical-align: middle !important;
     border-right: 1px solid #f1f5f9 !important;
     color: #334155 !important;
     line-height: 1.35 !important;
+    height: 38px !important;
+    max-height: 42px !important;
+    overflow: hidden !important;
 }
 
 .epm-dossier-table td:last-child {
     border-right: none !important;
 }
 
-.epm-dossier-table .col-idx { width: 32px !important; min-width: 32px; text-align: center !important; font-family: var(--font-mono) !important; font-size: 10.5px !important; color: #64748b !important; }
-.epm-dossier-table .col-date { width: 85px !important; min-width: 85px; text-align: center !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #0f172a !important; white-space: nowrap !important; font-weight: 600 !important; }
-.epm-dossier-table .col-time { width: 75px !important; min-width: 75px; text-align: center !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #0f172a !important; white-space: nowrap !important; }
-.epm-dossier-table .col-day { width: 45px !important; min-width: 45px; text-align: center !important; font-weight: 600 !important; color: #475569 !important; white-space: nowrap !important; }
+.epm-dossier-table td.col-event,
+.epm-dossier-table td.col-event b,
+.epm-dossier-table td.col-reason {
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    line-height: 1.35 !important;
+    max-height: 2.7em !important;
+}
+
+.epm-dossier-table .col-idx { width: 36px !important; min-width: 36px; text-align: center !important; font-family: var(--font-mono) !important; font-size: 10.5px !important; color: #64748b !important; }
+.epm-dossier-table .col-date { width: 90px !important; min-width: 90px; text-align: center !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #0f172a !important; white-space: nowrap !important; font-weight: 700 !important; }
+.epm-dossier-table .col-time { width: 80px !important; min-width: 80px; text-align: center !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #0f172a !important; white-space: nowrap !important; }
+.epm-dossier-table .col-day { width: 48px !important; min-width: 48px; text-align: center !important; font-weight: 600 !important; color: #475569 !important; white-space: nowrap !important; }
 .epm-dossier-table .col-type { width: 115px !important; min-width: 115px; white-space: nowrap !important; }
-.epm-dossier-table .col-country { width: 55px !important; min-width: 55px; text-align: center !important; font-weight: 700 !important; color: #1e293b !important; white-space: nowrap !important; }
-.epm-dossier-table .col-reg { width: 85px !important; min-width: 85px; text-align: center !important; font-weight: 600 !important; color: #0284c7 !important; white-space: nowrap !important; }
-.epm-dossier-table .col-sec { width: 105px !important; min-width: 105px; color: #475569 !important; }
-.epm-dossier-table .col-event { min-width: 250px !important; color: #0f172a !important; }
-.epm-dossier-table .col-imp { width: 65px !important; min-width: 65px; text-align: center !important; white-space: nowrap !important; }
-.epm-dossier-table .col-num { width: 85px !important; min-width: 85px; text-align: center !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #475569 !important; white-space: nowrap !important; }
+.epm-dossier-table .col-country { width: 65px !important; min-width: 65px; text-align: center !important; font-weight: 700 !important; color: #1e293b !important; white-space: nowrap !important; }
+.epm-dossier-table .col-reg { width: 110px !important; min-width: 110px; text-align: center !important; font-weight: 600 !important; color: #0284c7 !important; }
+.epm-dossier-table .col-sec { width: 110px !important; min-width: 110px; color: #475569 !important; }
+.epm-dossier-table .col-event { width: 310px !important; min-width: 310px !important; color: #0f172a !important; }
+.epm-dossier-table .col-imp { width: 75px !important; min-width: 75px; text-align: center !important; white-space: nowrap !important; }
+.epm-dossier-table .col-num { width: 90px !important; min-width: 90px; text-align: center !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #475569 !important; white-space: nowrap !important; }
 .epm-dossier-table .col-fore { color: #059669 !important; font-weight: 600 !important; }
 .epm-dossier-table .col-sent { width: 75px !important; min-width: 75px; text-align: center !important; white-space: nowrap !important; }
-.epm-dossier-table .col-reason { min-width: 210px !important; color: #334155 !important; font-size: 11.5px !important; }
-.epm-dossier-table .col-src { width: 65px !important; min-width: 65px; text-align: center !important; font-size: 10.5px !important; font-weight: 600 !important; color: #2563eb !important; white-space: nowrap !important; }
+.epm-dossier-table .col-reason { width: 250px !important; min-width: 250px !important; color: #334155 !important; font-size: 11.5px !important; }
+.epm-dossier-table .col-src { width: 70px !important; min-width: 70px; text-align: center !important; font-size: 10.5px !important; font-weight: 600 !important; color: #2563eb !important; white-space: nowrap !important; }
 
 /* Dossier Badges */
 .epm-dossier-badge {
@@ -3737,30 +3813,6 @@ TERMINAL_CLIENT_JS = r"""
         });
     };
 
-    // 3b. Calendar View Controller (Dossier vs Data Grid)
-    window.epmSetCalView = function(view, btn) {
-        const dossier = document.getElementById("calendar_dossier_wrap");
-        const grid = document.getElementById("calendar_grid_wrap");
-        const ribbon = document.querySelector('.epm-table-ribbon[data-target="calendar_table"]');
-        if (view === "dossier") {
-            if (dossier) dossier.style.setProperty('display', 'block', 'important');
-            if (grid) grid.style.setProperty('display', 'none', 'important');
-        } else {
-            if (dossier) dossier.style.setProperty('display', 'none', 'important');
-            if (grid) grid.style.setProperty('display', 'block', 'important');
-        }
-        if (ribbon) {
-            ribbon.querySelectorAll(".epm-cal-view-btn").forEach(b => b.classList.remove("active"));
-            if (btn) {
-                btn.classList.add("active");
-            } else {
-                const targetBtn = ribbon.querySelector(view === "dossier" ? "#btn_cal_dossier" : "#btn_cal_grid");
-                if (targetBtn) targetBtn.classList.add("active");
-            }
-        }
-        localStorage.setItem("epm_cal_view_pref", view);
-    };
-
     // 4. Table Collapse / Expand Controller
     window.epmToggleCollapse = function(tableId, btn) {
         const target = document.getElementById(tableId);
@@ -3975,9 +4027,6 @@ TERMINAL_CLIENT_JS = r"""
             window.epmApplyWatchlist(savedQuery);
         }
 
-        const savedCalView = localStorage.getItem("epm_cal_view_pref") || "dossier";
-        window.epmSetCalView(savedCalView);
-        
         function hideGradioTabs() {
             const defaultTabs = document.querySelectorAll('.tab-wrapper, div[role="tablist"], .tab-container:not(.visually-hidden), .tab-nav');
             defaultTabs.forEach(el => {
@@ -4014,15 +4063,9 @@ TERMINAL_CLIENT_JS = r"""
         const savedQuery = localStorage.getItem("epm_watchlist");
         if (savedQuery) window.epmApplyWatchlist(savedQuery);
         
-        const calPref = localStorage.getItem("epm_cal_view_pref") || "dossier";
         const dossierWrap = document.getElementById("calendar_dossier_wrap");
-        const gridWrap = document.getElementById("calendar_grid_wrap");
-        if (calPref === "dossier") {
-            if (gridWrap && gridWrap.style.display !== "none") gridWrap.style.setProperty('display', 'none', 'important');
-            if (dossierWrap && dossierWrap.style.display !== "block") dossierWrap.style.setProperty('display', 'block', 'important');
-        } else {
-            if (dossierWrap && dossierWrap.style.display !== "none") dossierWrap.style.setProperty('display', 'none', 'important');
-            if (gridWrap && gridWrap.style.display !== "block") gridWrap.style.setProperty('display', 'block', 'important');
+        if (dossierWrap && dossierWrap.style.display !== "block") {
+            dossierWrap.style.setProperty('display', 'block', 'important');
         }
 
         const defaultTabs = document.querySelectorAll('.tab-wrapper, div[role="tablist"], .tab-container:not(.visually-hidden)');
@@ -4124,63 +4167,56 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                     scale=3
                 )
 
-            with gr.Group(elem_id="cal_action_deck", elem_classes=["epm-toolbar-card"]):
-                gr.HTML("""
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; border-bottom:1px solid #f1f5f9; padding-bottom:4px;">
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <span style="font-size:11.5px; font-weight:800; color:#0f172a; letter-spacing:0.3px;">📑 INSTITUTIONAL MULTI-MARKET CALENDAR DOSSIERS (A4 PRINT-READY)</span>
-                        <span style="background:#e0f2fe; color:#0369a1; font-size:9.5px; font-weight:700; padding:1px 5px; border-radius:3px;">15-COLUMN SCHEMA (DATE-ENRICHED)</span>
+            with gr.Row(elem_id="cal_table_header_strip", elem_classes=["epm-table-header-integrated"]):
+                with gr.Row(elem_classes=["epm-tbl-hdr-left"]):
+                    gr.HTML("""
+                    <div class="epm-tbl-hdr-title-group">
+                        <span class="epm-ribbon-bullet">●</span>
+                        <span class="epm-tbl-hdr-title">MULTI-MARKET CATALYST DOSSIER</span>
+                        <span class="epm-tbl-hdr-badge">15-COLUMN SCHEMA</span>
+                        <span class="epm-tbl-hdr-badge-sub">Auto: Fri 6 AM & 25th 6 AM</span>
                     </div>
-                    <span style="font-size:10.5px; color:#64748b; font-weight:500;">
-                        Auto-Dispatches: Friday 6:00 AM (Weekly) & 25th 6:00 AM (Monthly)
-                    </span>
-                </div>
-                """)
-                with gr.Row():
-                    btn_download_weekly = gr.Button("📥 Weekly PDF (Next Sun–Sat)", variant="primary", scale=2)
-                    btn_download_monthly = gr.Button("📥 Monthly PDF (Upcoming Month)", variant="primary", scale=2)
-                    btn_push_weekly_pdf = gr.Button("✈️ Push Weekly to Telegram", variant="secondary", scale=2)
-                    btn_push_monthly_pdf = gr.Button("✈️ Push Monthly to Telegram", variant="secondary", scale=2)
+                    """)
+                with gr.Row(elem_classes=["epm-tbl-hdr-actions"]):
+                    btn_download_weekly = gr.Button("📥 Weekly PDF", variant="primary", elem_classes=["epm-hdr-action-btn", "btn-primary-dark"])
+                    btn_download_monthly = gr.Button("📥 Monthly PDF", variant="primary", elem_classes=["epm-hdr-action-btn", "btn-primary-dark"])
+                    btn_push_weekly_pdf = gr.Button("✈️ Push Weekly", variant="secondary", elem_classes=["epm-hdr-action-btn", "btn-secondary-light"])
+                    btn_push_monthly_pdf = gr.Button("✈️ Push Monthly", variant="secondary", elem_classes=["epm-hdr-action-btn", "btn-secondary-light"])
+                    btn_sync_gcal = gr.Button("📅 Google Cal", variant="secondary", elem_classes=["epm-hdr-action-btn", "btn-secondary-light"])
+                    btn_ics_export = gr.Button("📲 Apple/Outlook .ICS", variant="secondary", elem_classes=["epm-hdr-action-btn", "btn-secondary-light"])
+                    btn_push_holiday = gr.Button("🏖️ Holiday Check", variant="secondary", elem_classes=["epm-hdr-action-btn", "btn-secondary-light"])
 
-                with gr.Row():
-                    cal_sync_btn = gr.Button("🔄 Sync 5 Markets & Timers", variant="secondary", scale=2)
-                    btn_sync_gcal = gr.Button("📅 Sync Google Calendar", variant="secondary", scale=2)
-                    btn_push_holiday = gr.Button("🏖️ Next-Day Holiday Check", variant="secondary", scale=1)
-                    btn_ics_export = gr.Button("📲 Apple / Outlook .ICS", variant="secondary", scale=1)
-
-                cal_pdf_file = gr.File(label="📄 PDF Dossier Ready for Download (Click to Open / Save)", visible=False, elem_id="cal_pdf_file")
-                cal_action_msg = gr.Markdown(elem_id="cal_action_msg")
-
-            gr.HTML(render_table_ribbon("calendar_table", "Multi-Market Catalyst Ledger (15-Column Schema — Date-Enriched)", subtitle="5 Bourses", count_badge="Official Ledger View"))
+            cal_action_msg = gr.Markdown(elem_id="cal_action_msg")
+            cal_pdf_file = gr.File(label="📄 PDF Dossier Ready for Download (Click to Open / Save)", visible=False, elem_id="cal_pdf_file")
 
             with gr.Column(elem_id="calendar_dossier_wrap"):
                 calendar_visual_feed = gr.HTML(value=init_cal_html, elem_id="calendar_visual_feed")
 
-            with gr.Column(elem_id="calendar_grid_wrap"):
-                calendar_table = gr.Dataframe(
-                    headers=[
-                        "#",
-                        "Date",
-                        "Time (IST)",
-                        "Day",
-                        "Event Type",
-                        "Country",
-                        "Regulator / Issuer",
-                        "Sector",
-                        "Event",
-                        "Impact / Importance (1-5)",
-                        "Previous Related Data",
-                        "Consensus / Forecast",
-                        "Sentiment",
-                        "AI Reasoning",
-                        "Source"
-                    ],
-                    datatype=["str"] * 15,
-                    value=init_cal_rows,
-                    interactive=False,
-                    wrap=True,
-                    elem_id="calendar_table"
-                )
+            calendar_table = gr.Dataframe(
+                headers=[
+                    "#",
+                    "Date",
+                    "Time (IST)",
+                    "Day",
+                    "Event Type",
+                    "Country",
+                    "Regulator / Issuer",
+                    "Sector",
+                    "Event",
+                    "Impact / Importance (1-5)",
+                    "Previous Related Data",
+                    "Consensus / Forecast",
+                    "Sentiment",
+                    "AI Reasoning",
+                    "Source"
+                ],
+                datatype=["str"] * 15,
+                value=init_cal_rows,
+                interactive=False,
+                wrap=True,
+                visible=False,
+                elem_id="calendar_table"
+            )
 
             gr.HTML(render_table_ribbon("holidays_table", "2026 Authoritative Trading Holidays", subtitle="NSE · BSE · MCX · NYSE · CRYPTO", count_badge="All Sessions"))
             holidays_table = gr.Dataframe(
@@ -4227,7 +4263,6 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
 
             cal_filter.change(get_calendar_tables, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_visual_feed, calendar_table, holidays_table])
             cal_market_filter.change(get_calendar_tables, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_visual_feed, calendar_table, holidays_table])
-            cal_sync_btn.click(sync_and_refresh_calendar, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_visual_feed, calendar_table, holidays_table])
             btn_sync_gcal.click(trigger_sync_google_cal, outputs=[cal_action_msg])
             btn_push_holiday.click(push_holiday_check_alert, outputs=[cal_action_msg])
             btn_download_weekly.click(handle_download_weekly_pdf, outputs=[cal_action_msg, cal_pdf_file])

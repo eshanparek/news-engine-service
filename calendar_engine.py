@@ -2428,6 +2428,10 @@ class MarketCalendarEngine:
                 continue
 
             d = ev.get("date", "")
+            # Only display events from the current day onwards (exclude elapsed past dates)
+            if d and d < today_str:
+                continue
+
             timer_str, status_code, diff_sec = self.compute_event_timer(ev)
 
             if filter_range == "today" and d != today_str:
