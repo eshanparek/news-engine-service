@@ -44,6 +44,7 @@ class TelegramNotifier:
         self.auto_holiday_7am = True           # Enabled: 06:00 AM IST Next-day trading holiday alert
         self.auto_weekly_pdf_fri_6am = True    # Enabled: Friday 06:00 AM IST Weekly A4 Snapshot PDF
         self.auto_monthly_pdf_25th_6am = True  # Enabled: 25th of month 06:00 AM IST Monthly A4 Outlook PDF
+        self.auto_daily_outcomes_pdf_5pm = True # Enabled: Daily 05:00 PM IST Outcomes & Results A4 Dossier
         self.auto_weekly_fri_7am = False       # Disabled: Replaced by A4 Dossier
         self.auto_circulars_tg = False         # Disabled: Circulars separate
         self.send_as_photos = True             # Deliver morning calendar as high-definition infographic photos
@@ -115,6 +116,10 @@ class TelegramNotifier:
                     self.auto_monthly_pdf_25th_6am = bool(data["auto_monthly_pdf_25th_6am"])
                 else:
                     self.auto_monthly_pdf_25th_6am = True
+                if "auto_daily_outcomes_pdf_5pm" in data:
+                    self.auto_daily_outcomes_pdf_5pm = bool(data["auto_daily_outcomes_pdf_5pm"])
+                else:
+                    self.auto_daily_outcomes_pdf_5pm = True
                 if "auto_weekly_fri_7am" in data:
                     self.auto_weekly_fri_7am = bool(data["auto_weekly_fri_7am"])
                 elif "auto_weekly_mon_7am" in data:
@@ -171,6 +176,8 @@ class TelegramNotifier:
         self.auto_circulars_tg = bool(auto_circulars_tg)
         self.auto_weekly_pdf_fri_6am = bool(auto_weekly_pdf_fri_6am)
         self.auto_monthly_pdf_25th_6am = bool(auto_monthly_pdf_25th_6am)
+        if hasattr(self, "auto_daily_outcomes_pdf_5pm"):
+            pass
 
         payload = {
             "news_bot_token": self.bot_token,
@@ -190,7 +197,8 @@ class TelegramNotifier:
             "auto_weekly_fri_7am": self.auto_weekly_fri_7am,
             "auto_circulars_tg": self.auto_circulars_tg,
             "auto_weekly_pdf_fri_6am": self.auto_weekly_pdf_fri_6am,
-            "auto_monthly_pdf_25th_6am": self.auto_monthly_pdf_25th_6am
+            "auto_monthly_pdf_25th_6am": self.auto_monthly_pdf_25th_6am,
+            "auto_daily_outcomes_pdf_5pm": getattr(self, "auto_daily_outcomes_pdf_5pm", True)
         }
         try:
             with open(ADMIN_SETTINGS_FILE, "w") as f:

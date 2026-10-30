@@ -32,22 +32,23 @@ MARGIN_BOTTOM = 38
 USABLE_WIDTH = PAGE_WIDTH - (MARGIN_LEFT + MARGIN_RIGHT) # ~801.89 pt
 
 # Column Widths Budget (Total = ~802 pt)
-# Matching user spreadsheet with shortened taxonomy optimizations:
+# Matching user spreadsheet with 15-column schema including Outcome / Results:
 COL_WIDTHS = [
-    20,  # 0: #
-    44,  # 1: Time (IST)
-    32,  # 2: Day (Mon, Tue, Wed...)
-    68,  # 3: Event Type (Earning Cal., Corp. Board Meet...)
-    38,  # 4: Country
-    46,  # 5: Regulator / Issuer
-    50,  # 6: Sector
-    184, # 7: Event (Expanded)
-    42,  # 8: Impact (1-5)
-    48,  # 9: Previous Related Data
-    48,  # 10: Consensus / Forecast
-    42,  # 11: Sentiment
-    150, # 12: AI Reasoning (Expanded)
-    38   # 13: Source
+    18,  # 0: #
+    42,  # 1: Time (IST)
+    30,  # 2: Day (Mon, Tue, Wed...)
+    60,  # 3: Event Type (Earning Cal., Corp. Board Meet...)
+    36,  # 4: Country
+    44,  # 5: Regulator / Issuer
+    46,  # 6: Sector
+    155, # 7: Event (Expanded)
+    38,  # 8: Impact (1-5)
+    42,  # 9: Previous Related Data
+    42,  # 10: Consensus / Forecast
+    68,  # 11: Outcome / Results (NEW!)
+    38,  # 12: Sentiment
+    130, # 13: AI Reasoning (Expanded)
+    36   # 14: Source
 ]
 
 # Scaling to fit exactly USABLE_WIDTH = 801.89 pt
@@ -250,6 +251,22 @@ class CalendarPDFEngine:
             fontSize=7.5,
             leading=9,
             textColor=colors.HexColor("#991B1B")
+        )
+        self.style_outcome_released = ParagraphStyle(
+            'OutcomeReleased',
+            parent=self.style_cell,
+            fontName='Helvetica-Bold',
+            fontSize=6.5,
+            leading=8,
+            textColor=colors.HexColor("#065F46")
+        )
+        self.style_outcome_pending = ParagraphStyle(
+            'OutcomePending',
+            parent=self.style_cell,
+            fontName='Helvetica',
+            fontSize=6.5,
+            leading=8,
+            textColor=colors.HexColor("#64748B")
         )
 
     def _classify_event_type(self, ev: Dict) -> str:
@@ -511,15 +528,15 @@ class CalendarPDFEngine:
             date_banner_data = [
                 [
                     Paragraph(f"<b>Date:</b> {formatted_date}", self.style_section_date),
-                    "", "", "", "", "",
+                    "", "", "", "", "", "",
                     Paragraph(f"<b>Day:</b> {day_name}", self.style_section_date),
                     "", "", "", "", "", "", ""
                 ]
             ]
             date_table = Table(date_banner_data, colWidths=COLUMN_WIDTHS)
             date_table.setStyle(TableStyle([
-                ('SPAN', (0, 0), (5, 0)),
-                ('SPAN', (6, 0), (13, 0)),
+                ('SPAN', (0, 0), (6, 0)),
+                ('SPAN', (7, 0), (14, 0)),
                 ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor("#FEF3C7")), # Warm soft buff/yellow
                 ('TOPPADDING', (0, 0), (-1, -1), 4),
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
@@ -530,7 +547,7 @@ class CalendarPDFEngine:
             ]))
             flowables.append(date_table)
 
-            # ── Main 14-Column Data Table ──
+            # ── Main 15-Column Data Table ──
             # Header Row matching user's spreadsheet
             table_data = [
                 [
@@ -545,6 +562,7 @@ class CalendarPDFEngine:
                     Paragraph("<b>Impact / Importance (1-5)</b>", self.style_th),
                     Paragraph("<b>Previous Related Data</b>", self.style_th),
                     Paragraph("<b>Consensus / Forecast</b>", self.style_th),
+                    Paragraph("<b>Outcome / Results</b>", self.style_th),
                     Paragraph("<b>Sentiment</b>", self.style_th),
                     Paragraph("<b>AI Reasoning</b>", self.style_th_left),
                     Paragraph("<b>Source</b>", self.style_th)
@@ -566,6 +584,12 @@ class CalendarPDFEngine:
                 impact_stars = self._infer_impact_stars(ev)
                 prev_val = clean_text(str(ev.get("previous", "—")) or "—")
                 fore_val = clean_text(str(ev.get("forecast", "—")) or "—")
+                actual_val = clean_text(str(ev.get("actual", "⏳ Pending")) or "⏳ Pending")
+                if not actual_val or actual_val in ("—", "None"):
+                    actual_val = "⏳ Pending"
+                is_actual_released = not actual_val.startswith("⏳") and actual_val != "Scheduled"
+                outcome_style = self.style_outcome_released if is_actual_released else self.style_outcome_pending
+
                 sent_text, sent_style = self._format_sentiment(ev)
                 reasoning = clean_text(self._build_ai_reasoning(ev))
                 source_val = clean_text(str(ev.get("source", regulator or "Wire"))[:12])
@@ -591,6 +615,7 @@ class CalendarPDFEngine:
                     Paragraph(impact_stars, self.style_cell_center),
                     Paragraph(prev_val, self.style_cell_center),
                     Paragraph(fore_val, self.style_cell_center),
+                    Paragraph(actual_val, outcome_style),
                     Paragraph(sent_text, sent_style),
                     Paragraph(reasoning, self.style_cell),
                     Paragraph(source_val, self.style_cell_center)
@@ -696,6 +721,92 @@ class CalendarPDFEngine:
     def generate_and_save_monthly_pdf(self, target_date: Optional[datetime] = None) -> str:
         """Generates monthly PDF bytes and saves to MEDIA_DIR, returning the absolute file path."""
         pdf_bytes, filename = self.generate_monthly_pdf(target_date)
+        from social_publisher import MEDIA_DIR
+        out_path = os.path.join(MEDIA_DIR, filename)
+        with open(out_path, "wb") as f:
+            f.write(pdf_bytes)
+        return out_path
+
+    def generate_daily_outcomes_pdf(self, target_dt: Optional[datetime] = None) -> Tuple[bytes, str]:
+        """
+        Compiles the Daily Multi-Market Outcomes & Results A4 Dossier covering the rolling
+        24-hour cycle from Yesterday 5:00 PM IST to Today 5:00 PM IST.
+        Returns: (pdf_bytes, filename)
+        """
+        if not REPORTLAB_AVAILABLE:
+            raise RuntimeError("ReportLab library is not available in the current environment")
+
+        curr = target_dt or datetime.now(timezone(timedelta(hours=5, minutes=30)))
+        # Window: Yesterday 17:00 IST to Today 17:00 IST
+        end_dt = curr.replace(hour=17, minute=0, second=0, microsecond=0)
+        start_dt = end_dt - timedelta(days=1)
+
+        start_date_str = start_dt.strftime("%Y-%m-%d")
+        end_date_str = end_dt.strftime("%Y-%m-%d")
+
+        filename = f"Global_News_Feed_Room_Daily_Outcomes_{end_date_str}_5PM.pdf"
+        doc_title = "Global News Feed Room — Daily Multi-Market Outcomes Dossier"
+        doc_subtitle = f"Rolling 24H Review: {start_dt.strftime('%d %b %Y, 17:00')} to {end_dt.strftime('%d %b %Y, 17:00 IST')}"
+
+        from calendar_engine import calendar_engine
+        all_events = calendar_engine.get_enriched_events()
+
+        # Filter events whose timestamp falls in this 24-hr window
+        window_events = []
+        for e in all_events:
+            d_str = str(e.get("date", ""))
+            t_str = str(e.get("time", "12:00:00"))[:5]
+            if len(t_str) == 4:
+                t_str = "0" + t_str
+            try:
+                ev_dt = datetime.strptime(f"{d_str} {t_str}", "%Y-%m-%d %H:%M")
+                ev_dt = ev_dt.replace(tzinfo=timezone(timedelta(hours=5, minutes=30)))
+            except Exception:
+                continue
+
+            if start_dt <= ev_dt <= end_dt:
+                window_events.append(e)
+
+        # Fallback to date range if empty
+        if not window_events:
+            window_events = [
+                e for e in all_events
+                if str(e.get("date", "")) in (start_date_str, end_date_str)
+            ]
+
+        # Prioritize unfolded events with outcomes at the top of each day
+        def sort_priority(ev):
+            actual = str(ev.get("actual", "⏳ Pending"))
+            has_actual = 0 if (not actual.startswith("⏳") and actual != "Scheduled") else 1
+            return (has_actual, str(ev.get("time", "99:99")))
+
+        window_events.sort(key=sort_priority)
+
+        buf = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buf,
+            pagesize=landscape(A4),
+            leftMargin=MARGIN_LEFT,
+            rightMargin=MARGIN_RIGHT,
+            topMargin=MARGIN_TOP,
+            bottomMargin=MARGIN_BOTTOM
+        )
+
+        flowables = self.build_pdf_flowables(window_events, doc_title, doc_subtitle)
+
+        def make_canvas(*args, **kwargs):
+            c = NumberedCanvas(*args, **kwargs)
+            c.doc_title = doc_title
+            c.doc_subtitle = doc_subtitle
+            return c
+
+        doc.build(flowables, canvasmaker=make_canvas)
+        buf.seek(0)
+        return buf.getvalue(), filename
+
+    def generate_and_save_daily_outcomes_pdf(self, target_dt: Optional[datetime] = None) -> str:
+        """Generates daily outcomes PDF bytes and saves to MEDIA_DIR, returning the absolute file path."""
+        pdf_bytes, filename = self.generate_daily_outcomes_pdf(target_dt)
         from social_publisher import MEDIA_DIR
         out_path = os.path.join(MEDIA_DIR, filename)
         with open(out_path, "wb") as f:

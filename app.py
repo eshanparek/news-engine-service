@@ -373,6 +373,19 @@ def download_monthly_pdf_endpoint():
     )
 
 
+@app.get("/api/calendar/pdf/daily-outcomes")
+def download_daily_outcomes_pdf_endpoint():
+    """Generates and downloads the A4 Landscape Daily Outcomes PDF (Yesterday 5 PM to Today 5 PM) for 1-click download."""
+    pdf_path = calendar_pdf_engine.generate_and_save_daily_outcomes_pdf()
+    fn = os.path.basename(pdf_path)
+    return FileResponse(
+        pdf_path,
+        media_type="application/pdf",
+        filename=fn,
+        headers={"Content-Disposition": f'attachment; filename="{fn}"'}
+    )
+
+
 @app.post("/api/calendar/dispatch/weekly-pdf")
 def api_dispatch_weekly_pdf():
     """Dispatches the A4 Landscape Weekly Snapshot PDF directly to the Telegram Calendar channel."""
@@ -384,6 +397,13 @@ def api_dispatch_weekly_pdf():
 def api_dispatch_monthly_pdf():
     """Dispatches the A4 Landscape Monthly Outlook PDF directly to the Telegram Calendar channel."""
     ok, msg = calendar_engine.dispatch_monthly_pdf_dossier()
+    return {"status": "success" if ok else "error", "detail": msg}
+
+
+@app.post("/api/calendar/dispatch/daily-outcomes-pdf")
+def api_dispatch_daily_outcomes_pdf():
+    """Dispatches the Daily Outcomes PDF directly to the Telegram Calendar channel."""
+    ok, msg = calendar_engine.dispatch_daily_outcomes_pdf_dossier()
     return {"status": "success" if ok else "error", "detail": msg}
 
 
@@ -869,7 +889,7 @@ def render_calendar_dossier_html(events: List[Dict]) -> str:
         # Ultra-sleek Sticky Day Group Ribbon
         ribbon_row = f"""
         <tr class="epm-day-ribbon-row" data-date="{html.escape(date_str)}">
-            <td colspan="15">
+            <td colspan="16">
                 <div class="epm-day-ribbon-content">
                     <div class="epm-ribbon-left">
                         <span class="epm-ribbon-bullet">●</span>
@@ -902,6 +922,13 @@ def render_calendar_dossier_html(events: List[Dict]) -> str:
 
             prev_val = clean_table_text(str(ev.get("previous", "—")) or "—")
             fore_val = clean_table_text(str(ev.get("forecast", "—")) or "—")
+            actual_val = clean_table_text(str(ev.get("actual", "⏳ Pending")) or "⏳ Pending")
+            if not actual_val or actual_val in ("—", "None"):
+                actual_val = "⏳ Pending"
+            is_outcome_released = not actual_val.startswith("⏳") and actual_val != "Scheduled"
+            outcome_class = "outcome-released" if is_outcome_released else "outcome-pending"
+            outcome_badge = f'<span class="epm-outcome-pill {outcome_class}" title="{html.escape(actual_val)}">{html.escape(actual_val)}</span>'
+
             sent_text, _ = calendar_pdf_engine._format_sentiment(ev)
             reasoning = clean_table_text(calendar_pdf_engine._build_ai_reasoning(ev))
             source_val = clean_table_text(str(ev.get("source", regulator or "Wire"))[:15])
@@ -948,6 +975,7 @@ def render_calendar_dossier_html(events: List[Dict]) -> str:
                 <td class="col-imp">{pip_badge}</td>
                 <td class="col-num">{html.escape(prev_val)}</td>
                 <td class="col-num col-fore">{html.escape(fore_val)}</td>
+                <td class="col-outcome">{outcome_badge}</td>
                 <td class="col-sent"><span class="epm-sent-badge {sent_class}">● {html.escape(sent_text.upper())}</span></td>
                 <td class="col-reason">{html.escape(reasoning)}</td>
                 <td class="col-src">{html.escape(source_val)}</td>
@@ -982,6 +1010,7 @@ def render_calendar_dossier_html(events: List[Dict]) -> str:
                         <th class="col-imp">Signal Impact</th>
                         <th class="col-num">Previous</th>
                         <th class="col-num">Forecast</th>
+                        <th class="col-outcome">Outcome / Results</th>
                         <th class="col-sent">Sentiment</th>
                         <th class="col-reason">AI Quantitative Reasoning</th>
                         <th class="col-src">Source</th>
@@ -992,6 +1021,11 @@ def render_calendar_dossier_html(events: List[Dict]) -> str:
                 </tbody>
             </table>
         </div>
+        <a href="/api/calendar/pdf/daily-outcomes" download target="_blank" class="epm-daily-pdf-floater" title="Download Official 5 PM Daily Outcomes Dossier (Rolling 24H Results)">
+            <span class="floater-pulse"></span>
+            <span class="floater-label">📥 <b>Daily Outcomes PDF (5 PM Release)</b></span>
+            <span class="floater-tag">A4 Dossier</span>
+        </a>
         {footer_note}
     </div>
     """
@@ -1302,6 +1336,28 @@ def handle_dispatch_monthly_pdf_telegram():
             gr.update(visible=False)
         )
     return f"⚠️ **Could not dispatch Monthly PDF to Telegram:** {msg}", gr.update(visible=False)
+
+
+def handle_download_daily_outcomes_pdf():
+    pdf_path = calendar_pdf_engine.generate_and_save_daily_outcomes_pdf()
+    fn = os.path.basename(pdf_path)
+    return (
+        f"✅ **Daily Outcomes PDF Generated!** `{fn}` covering unfolded results & events from Yesterday 5 PM to Today 5 PM IST.\n"
+        f"Click the download file link below or access directly via `/api/calendar/pdf/daily-outcomes`.",
+        gr.update(value=pdf_path, visible=True)
+    )
+
+
+def handle_dispatch_daily_outcomes_pdf_telegram():
+    ok, msg = calendar_engine.dispatch_daily_outcomes_pdf_dossier()
+    pdf_path = calendar_pdf_engine.generate_and_save_daily_outcomes_pdf()
+    fn = os.path.basename(pdf_path)
+    if ok:
+        return (
+            f"✅ **Daily Outcomes A4 PDF dossier (`{fn}`) successfully dispatched to Telegram `{telegram_notifier.calendar_chat_id}`!**",
+            gr.update(visible=False)
+        )
+    return f"⚠️ **Could not dispatch Daily Outcomes PDF to Telegram:** {msg}", gr.update(visible=False)
 
 
 def handle_download_ics_file():
@@ -3318,6 +3374,19 @@ div[id*="_table"].density-expanded tbody td:nth-child(13) > *,
     box-shadow: 0 0 6px rgba(37, 99, 235, 0.4) !important;
 }
 
+.btn-primary-emerald {
+    background: #059669 !important;
+    color: #ffffff !important;
+    border: 1px solid #047857 !important;
+    box-shadow: 0 1px 2px rgba(5, 150, 105, 0.2) !important;
+}
+
+.btn-primary-emerald:hover {
+    background: #047857 !important;
+    color: #ffffff !important;
+    box-shadow: 0 0 6px rgba(5, 150, 105, 0.4) !important;
+}
+
 .btn-secondary-light {
     background: #ffffff !important;
     color: #334155 !important;
@@ -3370,8 +3439,8 @@ div[id*="_table"].density-expanded tbody td:nth-child(13) > *,
 }
 
 .epm-dossier-table {
-    min-width: 1720px !important;
-    width: 1720px !important;
+    min-width: 1880px !important;
+    width: 1880px !important;
     table-layout: fixed !important;
     border-collapse: collapse !important;
     font-family: var(--font-sans) !important;
@@ -3579,20 +3648,116 @@ div[id*="_table"].density-expanded tbody td:nth-child(13) > *,
 }
 
 .epm-dossier-table .col-idx { width: 36px !important; min-width: 36px; text-align: center !important; font-family: var(--font-mono) !important; font-size: 10.5px !important; color: #64748b !important; }
-.epm-dossier-table .col-date { width: 90px !important; min-width: 90px; text-align: center !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #0f172a !important; white-space: nowrap !important; font-weight: 700 !important; }
-.epm-dossier-table .col-time { width: 80px !important; min-width: 80px; text-align: center !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #0f172a !important; white-space: nowrap !important; }
-.epm-dossier-table .col-day { width: 48px !important; min-width: 48px; text-align: center !important; font-weight: 600 !important; color: #475569 !important; white-space: nowrap !important; }
+.epm-dossier-table .col-date { width: 92px !important; min-width: 92px; text-align: center !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #0f172a !important; white-space: nowrap !important; font-weight: 700 !important; }
+.epm-dossier-table .col-time { width: 78px !important; min-width: 78px; text-align: center !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #0f172a !important; white-space: nowrap !important; }
+.epm-dossier-table .col-day { width: 46px !important; min-width: 46px; text-align: center !important; font-weight: 600 !important; color: #475569 !important; white-space: nowrap !important; }
 .epm-dossier-table .col-type { width: 115px !important; min-width: 115px; white-space: nowrap !important; }
-.epm-dossier-table .col-country { width: 65px !important; min-width: 65px; text-align: center !important; font-weight: 700 !important; color: #1e293b !important; white-space: nowrap !important; }
+.epm-dossier-table .col-country { width: 64px !important; min-width: 64px; text-align: center !important; font-weight: 700 !important; color: #1e293b !important; white-space: nowrap !important; }
 .epm-dossier-table .col-reg { width: 110px !important; min-width: 110px; text-align: center !important; font-weight: 600 !important; color: #0284c7 !important; }
 .epm-dossier-table .col-sec { width: 110px !important; min-width: 110px; color: #475569 !important; }
 .epm-dossier-table .col-event { width: 310px !important; min-width: 310px !important; color: #0f172a !important; }
-.epm-dossier-table .col-imp { width: 75px !important; min-width: 75px; text-align: center !important; white-space: nowrap !important; }
-.epm-dossier-table .col-num { width: 90px !important; min-width: 90px; text-align: center !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #475569 !important; white-space: nowrap !important; }
+.epm-dossier-table .col-imp { width: 105px !important; min-width: 105px !important; text-align: center !important; white-space: nowrap !important; }
+.epm-dossier-table .col-num { width: 88px !important; min-width: 88px; text-align: center !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #475569 !important; white-space: nowrap !important; }
 .epm-dossier-table .col-fore { color: #059669 !important; font-weight: 600 !important; }
-.epm-dossier-table .col-sent { width: 75px !important; min-width: 75px; text-align: center !important; white-space: nowrap !important; }
-.epm-dossier-table .col-reason { width: 250px !important; min-width: 250px !important; color: #334155 !important; font-size: 11.5px !important; }
+.epm-dossier-table .col-outcome { width: 175px !important; min-width: 175px !important; vertical-align: middle !important; }
+.epm-dossier-table .col-sent { width: 80px !important; min-width: 80px; text-align: center !important; white-space: nowrap !important; }
+.epm-dossier-table .col-reason { width: 275px !important; min-width: 275px !important; color: #334155 !important; font-size: 11.5px !important; }
 .epm-dossier-table .col-src { width: 70px !important; min-width: 70px; text-align: center !important; font-size: 10.5px !important; font-weight: 600 !important; color: #2563eb !important; white-space: nowrap !important; }
+
+/* Unfolded Outcome & Results Badges */
+.epm-outcome-pill {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    padding: 2px 7px !important;
+    border-radius: 4px !important;
+    font-family: var(--font-mono) !important;
+    font-size: 10.5px !important;
+    font-weight: 600 !important;
+    line-height: 1.3 !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+.epm-outcome-pill.outcome-released {
+    background: #ecfdf5 !important;
+    border: 1px solid #a7f3d0 !important;
+    color: #065f46 !important;
+    font-weight: 700 !important;
+}
+.epm-outcome-pill.outcome-pending {
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    color: #64748b !important;
+    font-weight: 500 !important;
+}
+
+/* Floating 5 PM Daily Outcomes PDF Pill */
+.epm-daily-pdf-floater {
+    position: fixed !important;
+    bottom: 22px !important;
+    right: 26px !important;
+    z-index: 999 !important;
+    background: #ffffff !important;
+    border: 1.5px solid #059669 !important;
+    border-radius: 9999px !important;
+    box-shadow: 0 4px 16px rgba(5, 150, 105, 0.22), 0 2px 6px rgba(0, 0, 0, 0.08) !important;
+    padding: 6px 14px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    text-decoration: none !important;
+    cursor: pointer !important;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    backdrop-filter: blur(8px) !important;
+}
+.epm-daily-pdf-floater:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 24px rgba(5, 150, 105, 0.32) !important;
+    background: #f0fdf4 !important;
+    border-color: #047857 !important;
+}
+.epm-daily-pdf-floater .floater-pulse {
+    display: inline-block !important;
+    width: 8px !important;
+    height: 8px !important;
+    border-radius: 50% !important;
+    background: #10b981 !important;
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7) !important;
+    animation: floater-pulse-anim 2s infinite !important;
+}
+@keyframes floater-pulse-anim {
+    0% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+    }
+    70% {
+        transform: scale(1);
+        box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+    }
+    100% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+    }
+}
+.epm-daily-pdf-floater .floater-label {
+    font-family: var(--font-sans) !important;
+    font-size: 11.5px !important;
+    font-weight: 700 !important;
+    color: #065f46 !important;
+    letter-spacing: 0.2px !important;
+}
+.epm-daily-pdf-floater .floater-tag {
+    font-family: var(--font-mono) !important;
+    font-size: 9.5px !important;
+    font-weight: 700 !important;
+    background: #ecfdf5 !important;
+    color: #047857 !important;
+    padding: 1px 6px !important;
+    border-radius: 4px !important;
+    border: 1px solid #a7f3d0 !important;
+}
 
 /* Dossier Badges */
 .epm-dossier-badge {
@@ -4747,11 +4912,13 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                         <div class="epm-tbl-hdr-title-group">
                             <span class="epm-ribbon-bullet">●</span>
                             <span class="epm-tbl-hdr-title">MULTI-MARKET CATALYST DOSSIER</span>
-                            <span class="epm-tbl-hdr-badge">15-COLUMN SCHEMA</span>
-                            <span class="epm-tbl-hdr-badge-sub">Auto: Fri 6 AM & 25th 6 AM</span>
+                            <span class="epm-tbl-hdr-badge">16-COLUMN SCHEMA</span>
+                            <span class="epm-tbl-hdr-badge-sub">Auto: Daily 5 PM · Fri 6 AM · 25th 6 AM</span>
                         </div>
                         """)
                     with gr.Row(elem_classes=["epm-tbl-hdr-actions"]):
+                        btn_download_daily_outcomes = gr.Button("📥 5 PM Outcomes PDF", variant="primary", elem_classes=["epm-hdr-action-btn", "btn-primary-emerald"])
+                        btn_push_daily_outcomes = gr.Button("✈️ Push 5 PM", variant="secondary", elem_classes=["epm-hdr-action-btn", "btn-secondary-light"])
                         btn_download_weekly = gr.Button("📥 Weekly PDF", variant="primary", elem_classes=["epm-hdr-action-btn", "btn-primary-dark"])
                         btn_download_monthly = gr.Button("📥 Monthly PDF", variant="primary", elem_classes=["epm-hdr-action-btn", "btn-primary-dark"])
                         btn_push_weekly_pdf = gr.Button("✈️ Push Weekly", variant="secondary", elem_classes=["epm-hdr-action-btn", "btn-secondary-light"])
@@ -4839,6 +5006,8 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
             cal_market_filter.change(get_calendar_tables, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_visual_feed, calendar_table, holidays_table])
             btn_sync_gcal.click(trigger_sync_google_cal, outputs=[cal_action_msg])
             btn_push_holiday.click(push_holiday_check_alert, outputs=[cal_action_msg])
+            btn_download_daily_outcomes.click(handle_download_daily_outcomes_pdf, outputs=[cal_action_msg, cal_pdf_file])
+            btn_push_daily_outcomes.click(handle_dispatch_daily_outcomes_pdf_telegram, outputs=[cal_action_msg, cal_pdf_file])
             btn_download_weekly.click(handle_download_weekly_pdf, outputs=[cal_action_msg, cal_pdf_file])
             btn_download_monthly.click(handle_download_monthly_pdf, outputs=[cal_action_msg, cal_pdf_file])
             btn_push_weekly_pdf.click(handle_dispatch_weekly_pdf_telegram, outputs=[cal_action_msg, cal_pdf_file])

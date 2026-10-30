@@ -203,6 +203,7 @@ class MarketCalendarEngine:
         self.last_holiday_alert_date: str = ""
         self.last_weekly_pdf_date: str = ""
         self.last_monthly_pdf_date: str = ""
+        self.last_daily_outcomes_pdf_date: str = ""
 
         # Live Crypto Spot & Trending Cache
         self.crypto_live_spot: Dict[str, str] = {
@@ -241,6 +242,7 @@ class MarketCalendarEngine:
                 self.last_weekly_dispatch_date = data.get("last_weekly_dispatch_date", "")
                 self.last_weekly_pdf_date = data.get("last_weekly_pdf_date", "")
                 self.last_monthly_pdf_date = data.get("last_monthly_pdf_date", "")
+                self.last_daily_outcomes_pdf_date = data.get("last_daily_outcomes_pdf_date", "")
             except Exception as e:
                 logger.warning(f"Error loading calendar state: {e}")
 
@@ -257,6 +259,7 @@ class MarketCalendarEngine:
                 "last_weekly_dispatch_date": getattr(self, "last_weekly_dispatch_date", ""),
                 "last_weekly_pdf_date": getattr(self, "last_weekly_pdf_date", ""),
                 "last_monthly_pdf_date": getattr(self, "last_monthly_pdf_date", ""),
+                "last_daily_outcomes_pdf_date": getattr(self, "last_daily_outcomes_pdf_date", ""),
                 "updated_at": now_ist().isoformat()
             }
             atomic_write_json(CALENDAR_STATE_FILE, payload, indent=2)
@@ -2229,8 +2232,25 @@ class MarketCalendarEngine:
             logger.error(f"Error dispatching monthly PDF: {e}")
             return False, str(e)
 
+    def dispatch_daily_outcomes_pdf_dossier(self) -> Tuple[bool, str]:
+        """Compiles and dispatches the Daily 05:00 PM IST A4 Outcomes PDF (Yesterday 5 PM to Today 5 PM) to Telegram."""
+        try:
+            from calendar_pdf_engine import calendar_pdf_engine
+            pdf_bytes, filename = calendar_pdf_engine.generate_daily_outcomes_pdf()
+            caption = (
+                "Daily Calendar Outcomes & Results for NSE, BSE, MCX, Crypto\n"
+                "🗓️ 24-Hour Cycle: Yesterday 5:00 PM to Today 5:00 PM IST\n"
+                "🔗 Portal / Download: https://p01--news-engine-service--dkhqtlpvx6bh.code.run/\n\n"
+                "<i>Global News Feed Room is Powered by EPMC Pvt. Ltd.</i>"
+            )
+            success, msg = telegram_notifier.send_calendar_document(pdf_bytes, filename, caption)
+            return success, msg
+        except Exception as e:
+            logger.error(f"Error dispatching daily outcomes PDF: {e}")
+            return False, str(e)
+
     # ─────────────────────────────────────────────────────────────
-    #  AUTOMATED 6:00 AM WEEKLY/MONTHLY PDF & LIVE TIMER DAEMON
+    #  AUTOMATED 5:00 PM / 6:00 AM PDF & LIVE TIMER DAEMON
     # ─────────────────────────────────────────────────────────────
 
     def check_timers_and_alerts(self):
@@ -2238,8 +2258,9 @@ class MarketCalendarEngine:
         Runs every 10 seconds in IST:
           1. Friday 06:00 AM IST: Weekly A4 PDF Dossier Dispatch (Next Mon–Sat)
           2. 25th of Month 06:00 AM IST: Monthly A4 PDF Outlook Dispatch (Upcoming Month)
-          3. 06:00 AM IST: Next-Day Trading Holiday Alert (Only 1 day before any NSE/BSE/MCX/NYSE holiday)
-          4. Live 24/7: Individual Event T-15m Countdowns & Unfolded Outcomes across ALL companies/events
+          3. Daily 05:00 PM IST: Daily Outcomes & Results A4 Dossier Dispatch (Yesterday 5 PM to Today 5 PM)
+          4. 06:00 AM IST: Next-Day Trading Holiday Alert (Only 1 day before any NSE/BSE/MCX/NYSE holiday)
+          5. Live 24/7: Individual Event T-15m Countdowns & Unfolded Outcomes across ALL companies/events
         """
         curr = now_ist()
         today_str = curr.strftime("%Y-%m-%d")
@@ -2275,7 +2296,21 @@ class MarketCalendarEngine:
                 self.last_monthly_pdf_date = today_str
                 self._save_state()
 
-        # ── 3. 06:00 AM IST: Next-Day Trading Holiday Alert (1 day before holiday) ──
+        # ── 3. Daily 05:00 PM IST: Outcomes & Results A4 PDF Dispatch (Yesterday 5 PM to Today 5 PM IST) ──
+        if curr.hour >= 17 and getattr(self, "last_daily_outcomes_pdf_date", "") != today_str:
+            if telegram_notifier.calendar_enabled and getattr(telegram_notifier, "auto_daily_outcomes_pdf_5pm", True) and telegram_notifier.is_calendar_configured():
+                logger.info("Executing Daily 05:00 PM IST Outcomes A4 PDF Dossier Dispatch to Telegram...")
+                ok, msg = self.dispatch_daily_outcomes_pdf_dossier()
+                if ok:
+                    self.last_daily_outcomes_pdf_date = today_str
+                    self._save_state()
+            elif not telegram_notifier.is_calendar_configured():
+                pass
+            else:
+                self.last_daily_outcomes_pdf_date = today_str
+                self._save_state()
+
+        # ── 4. 06:00 AM IST: Next-Day Trading Holiday Alert (1 day before holiday) ──
         if curr.hour >= 6 and self.last_holiday_alert_date != today_str:
             if telegram_notifier.calendar_enabled and getattr(telegram_notifier, "auto_holiday_7am", True) and telegram_notifier.is_calendar_configured():
                 logger.info(f"Running 06:00 AM IST Next-Day Holiday check for {tomorrow_str}...")
