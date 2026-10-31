@@ -561,7 +561,7 @@ def render_news_feed_html(items: List[Dict]) -> str:
         sector_pills = "".join(f'<span class="epm-sector-tag">{html.escape(str(s))}</span>' for s in sectors[:3]) if sectors else ""
 
         card = f'''
-        <div class="epm-card epm-news-card {sent_class}">
+        <div class="epm-card epm-news-card {sent_class}" role="button" tabindex="0">
             <div class="epm-card-header">
                 <div class="epm-meta-left">
                     <span class="epm-source-chip">{source}</span>
@@ -579,13 +579,26 @@ def render_news_feed_html(items: List[Dict]) -> str:
             </div>
             <div class="epm-card-footer">
                 <div class="epm-sectors-wrap">{sector_pills}</div>
-                <div class="epm-rel-badge">Relevance: <b>{rel}%</b></div>
+                <div class="epm-rel-badge">Relevance: <b>{rel}%</b> · <span class="epm-inshorts-tap">📖 Tap for Inshorts View</span></div>
             </div>
         </div>
         '''
         cards_html.append(card)
 
-    return f'<div class="epm-stream-container">{"".join(cards_html)}</div>'
+    stream_selector = """
+    <div class="epm-mobile-stream-selector">
+        <div class="epm-stream-title">
+            <span class="epm-ribbon-bullet">●</span>
+            <span class="epm-st-text">INSTITUTIONAL BREAKING WIRE</span>
+            <span class="epm-live-pill">LIVE FEED</span>
+        </div>
+        <div class="epm-stream-mode-toggles">
+            <button type="button" class="epm-mode-btn active" id="btn-mode-cards" onclick="window.epmSwitchMobileStreamMode('cards')">📱 List Feed</button>
+            <button type="button" class="epm-mode-btn" id="btn-mode-table" onclick="window.epmSwitchMobileStreamMode('table')">📊 Grid Table</button>
+        </div>
+    </div>
+    """
+    return f'{stream_selector}<div class="epm-stream-container">{"".join(cards_html)}</div>'
 
 
 def render_circulars_feed_html(circulars: List[Dict]) -> str:
@@ -933,8 +946,10 @@ def render_calendar_dossier_html(events: List[Dict]) -> str:
                 if clean_sym:
                     raw_ev_name = f"{clean_sym} — {raw_ev_name}"
 
-            prev_val = clean_table_text(str(ev.get("previous", "—")) or "—")
-            fore_val = clean_table_text(str(ev.get("forecast", "—")) or "—")
+            raw_prev = clean_table_text(str(ev.get("previous", "—")) or "—")
+            raw_fore = clean_table_text(str(ev.get("forecast", "—")) or "—")
+            prev_display = "Exch." if raw_prev == "Exchange Intimation" else (raw_prev[:10] + "…" if len(raw_prev) > 12 else raw_prev)
+            fore_display = "Press" if raw_fore == "Press Release" else (raw_fore[:10] + "…" if len(raw_fore) > 12 else raw_fore)
             actual_val = clean_table_text(str(ev.get("actual", "⏳ Pending")) or "⏳ Pending")
             if not actual_val or actual_val in ("—", "None"):
                 actual_val = "⏳ Pending"
@@ -986,8 +1001,8 @@ def render_calendar_dossier_html(events: List[Dict]) -> str:
                 <td class="col-sec">{html.escape(sector)}</td>
                 <td class="col-event"><b>{html.escape(raw_ev_name)}</b></td>
                 <td class="col-imp">{pip_badge}</td>
-                <td class="col-prev">{html.escape(prev_val)}</td>
-                <td class="col-fore">{html.escape(fore_val)}</td>
+                <td class="col-prev" title="{html.escape(raw_prev)}">{html.escape(prev_display)}</td>
+                <td class="col-fore" title="{html.escape(raw_fore)}">{html.escape(fore_display)}</td>
                 <td class="col-outcome">{outcome_badge}</td>
                 <td class="col-sent"><span class="epm-sent-badge {sent_class}">● {html.escape(sent_text.upper())}</span></td>
                 <td class="col-reason"><div class="epm-reason-text">{html.escape(reasoning)}</div></td>
@@ -1286,8 +1301,10 @@ def get_calendar_tables(range_filter: str = "all", market_filter: str = "ALL"):
                 if clean_sym:
                     raw_ev_name = f"{clean_sym} — {raw_ev_name}"
 
-            prev_val = clean_table_text(str(ev.get("previous", "—")) or "—")
-            fore_val = clean_table_text(str(ev.get("forecast", "—")) or "—")
+            raw_prev = clean_table_text(str(ev.get("previous", "—")) or "—")
+            raw_fore = clean_table_text(str(ev.get("forecast", "—")) or "—")
+            prev_display = "Exch." if raw_prev == "Exchange Intimation" else (raw_prev[:10] + "…" if len(raw_prev) > 12 else raw_prev)
+            fore_display = "Press" if raw_fore == "Press Release" else (raw_fore[:10] + "…" if len(raw_fore) > 12 else raw_fore)
             actual_val = clean_table_text(str(ev.get("actual", "⏳ Pending")) or "⏳ Pending")
             sent_text, _ = calendar_pdf_engine._format_sentiment(ev)
             reasoning = calendar_pdf_engine._build_ai_reasoning(ev)
@@ -1303,8 +1320,8 @@ def get_calendar_tables(range_filter: str = "all", market_filter: str = "ALL"):
                 sector,
                 raw_ev_name,
                 impact_stars,
-                prev_val,
-                fore_val,
+                prev_display,
+                fore_display,
                 actual_val,
                 sent_text,
                 reasoning
@@ -2186,6 +2203,37 @@ tbody tr, .gradio-container tbody tr {
 .epm-dossier-table th.col-outcome, .epm-dossier-table td.col-outcome { width: 4.5% !important; max-width: 4.5% !important; text-align: center !important; }
 .epm-dossier-table th.col-sent, .epm-dossier-table td.col-sent { width: 4.5% !important; max-width: 4.5% !important; text-align: center !important; }
 .epm-dossier-table th.col-reason, .epm-dossier-table td.col-reason { width: 14.5% !important; max-width: 14.5% !important; }
+
+/* Signal Impact 5-Bar Graded Pips */
+.epm-signal-pips {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 2px !important;
+    vertical-align: middle !important;
+}
+.epm-signal-pips .pip {
+    display: inline-block !important;
+    width: 3.5px !important;
+    height: 11px !important;
+    border-radius: 1px !important;
+    background: #E2E8F0 !important;
+    transition: background 0.15s ease !important;
+}
+.epm-signal-pips.tier-5 .pip.on { background: #EF4444 !important; }
+.epm-signal-pips.tier-4 .pip.on { background: #F97316 !important; }
+.epm-signal-pips.tier-3 .pip.on { background: #EAB308 !important; }
+.epm-signal-pips.tier-2 .pip.on { background: #10B981 !important; }
+.epm-signal-pips.tier-1 .pip.on { background: #64748B !important; }
+
+.epm-dossier-table td.col-prev,
+.epm-dossier-table td.col-fore {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    max-width: 0 !important;
+    font-size: 11px !important;
+}
 
 #calendar_table th:nth-child(1), #calendar_table td:nth-child(1) { width: 2.0% !important; max-width: 2.0% !important; text-align: center !important; }
 #calendar_table th:nth-child(2), #calendar_table td:nth-child(2) { width: 5.5% !important; max-width: 5.5% !important; }
@@ -3276,6 +3324,116 @@ tbody tr:hover td {
         gap: 4px !important;
     }
 
+    /* Mobile Stream Selector */
+    .epm-mobile-stream-selector {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        padding: 6px 10px !important;
+        background: #FFFFFF !important;
+        border: 1px solid #E2E8F0 !important;
+        border-radius: 6px !important;
+        margin-bottom: 8px !important;
+    }
+    .epm-stream-title {
+        display: flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        font-size: 11px !important;
+        font-weight: 700 !important;
+        color: #0F172A !important;
+    }
+    .epm-live-pill {
+        font-size: 9px !important;
+        font-weight: 700 !important;
+        padding: 1px 5px !important;
+        border-radius: 3px !important;
+        background: #ECFDF5 !important;
+        color: #059669 !important;
+        border: 1px solid #A7F3D0 !important;
+    }
+    .epm-stream-mode-toggles {
+        display: flex !important;
+        align-items: center !important;
+        gap: 4px !important;
+        background: #F1F5F9 !important;
+        padding: 2px !important;
+        border-radius: 5px !important;
+    }
+    .epm-mode-btn {
+        border: none !important;
+        background: transparent !important;
+        font-size: 10px !important;
+        font-weight: 600 !important;
+        color: #64748B !important;
+        padding: 3px 7px !important;
+        border-radius: 4px !important;
+        cursor: pointer !important;
+        transition: all 0.15s ease !important;
+    }
+    .epm-mode-btn.active {
+        background: #FFFFFF !important;
+        color: #0052FF !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+    }
+
+    /* By default on mobile, show the clean readable list cards */
+    #sec_breaking_wire {
+        display: none !important;
+    }
+    #sec_secondary_wire {
+        display: none !important;
+    }
+    #sec_visual_news {
+        display: block !important;
+        margin-top: 0 !important;
+        border: none !important;
+        background: transparent !important;
+    }
+    #sec_visual_news > .label-wrap {
+        display: none !important;
+    }
+    #sec_visual_news > div > .open,
+    #sec_visual_news .wrap.default,
+    #sec_visual_news [data-testid="accordion"] > div:last-child {
+        display: block !important;
+        padding: 0 !important;
+        border: none !important;
+        background: transparent !important;
+    }
+    #news_visual_feed {
+        display: block !important;
+    }
+    .epm-news-card {
+        background: #FFFFFF !important;
+        border: 1px solid #E2E8F0 !important;
+        border-radius: 8px !important;
+        padding: 11px 13px !important;
+        margin-bottom: 8px !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+    }
+    .epm-news-title {
+        font-size: 13px !important;
+        line-height: 1.4 !important;
+        font-weight: 600 !important;
+        color: #0F172A !important;
+        display: -webkit-box !important;
+        -webkit-line-clamp: 3 !important;
+        -webkit-box-orient: vertical !important;
+        overflow: hidden !important;
+        margin: 6px 0 !important;
+    }
+    .epm-news-reasoning {
+        font-size: 11px !important;
+        color: #475569 !important;
+        line-height: 1.35 !important;
+        display: -webkit-box !important;
+        -webkit-line-clamp: 2 !important;
+        -webkit-box-orient: vertical !important;
+        overflow: hidden !important;
+        margin-bottom: 6px !important;
+    }
+
     /* Mobile News Streams: High-Density Responsive Table with Horizontal & Vertical Touch Scroll */
     #top_news_table, #bottom_news_table {
         background: #FFFFFF !important;
@@ -4204,6 +4362,35 @@ TERMINAL_CLIENT_JS = r"""
     window.epmToggleMobileMenu = window.epmToggleSideMenu;
     window.epmOpenMobileMenu = window.epmOpenSideMenu;
     window.epmCloseMobileMenu = window.epmCloseSideMenu;
+
+    window.epmSwitchMobileStreamMode = function(mode) {
+        const secBreaking = document.getElementById('sec_breaking_wire');
+        const secSecondary = document.getElementById('sec_secondary_wire');
+        const secVisual = document.getElementById('sec_visual_news');
+        const btnCards = document.getElementById('btn-mode-cards');
+        const btnTable = document.getElementById('btn-mode-table');
+
+        if (mode === 'table') {
+            if (secBreaking) secBreaking.style.setProperty('display', 'block', 'important');
+            if (secSecondary) secSecondary.style.setProperty('display', 'block', 'important');
+            if (secVisual) {
+                const container = secVisual.querySelector('.epm-stream-container');
+                if (container) container.style.setProperty('display', 'none', 'important');
+            }
+            if (btnTable) btnTable.classList.add('active');
+            if (btnCards) btnCards.classList.remove('active');
+        } else {
+            if (secBreaking) secBreaking.style.setProperty('display', 'none', 'important');
+            if (secSecondary) secSecondary.style.setProperty('display', 'none', 'important');
+            if (secVisual) {
+                secVisual.style.setProperty('display', 'block', 'important');
+                const container = secVisual.querySelector('.epm-stream-container');
+                if (container) container.style.setProperty('display', 'block', 'important');
+            }
+            if (btnCards) btnCards.classList.add('active');
+            if (btnTable) btnTable.classList.remove('active');
+        }
+    };
 
     // 14. Inshorts-Style Mobile Page View Drawer (Bottom Sheet) Controller
     window.epmOpenInshortsDrawer = function(data) {
