@@ -1671,66 +1671,66 @@ def render_table_ribbon(
 
 CUSTOM_CSS = """
 /* ═══════════════════════════════════════════════════════════════════════════
-   EPM PRO INSTITUTIONAL FINANCIAL TERMINAL - ULTRA-PREMIUM 2026 WHITE THEME
-   Inspired by: Bloomberg Terminal, TradingView, Linear, Vercel
-   Design Principles:
-   1. Pure white (#ffffff) canvas with subtle light slate (#f8fafc) elevations.
-   2. Crisp, clean typography: Inter for UI/copy, JetBrains Mono for numbers/tickers.
-   3. High density layout: zero wasted space, strict 2-line clamp on text.
-   4. Micro-interactions: refined button states, crisp borders, subtle hover pills.
+   EPMPRO INSTITUTIONAL FINTECH DESIGN SYSTEM (2026 DARK-MODE ARCHITECTURE)
+   Specialized for Terminal Platforms: Bloomberg, Linear, TradingView, Robinhood
    ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
-    --font-sans: -apple-system, BlinkMacSystemFont, "Inter", "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    
-    --bg-page: #ffffff;
-    --bg-surface: #ffffff;
-    --bg-surface-elevated: #f8fafc;
-    --bg-surface-subtle: #f1f5f9;
-    
-    --border-subtle: #f1f5f9;
-    --border-color: #e2e8f0;
-    --border-strong: #cbd5e1;
-    --border-focus: #2563eb;
-    
-    --text-primary: #0f172a;
-    --text-secondary: #334155;
-    --text-muted: #64748b;
-    
-    --accent-blue: #2563eb;
-    --accent-blue-hover: #1d4ed8;
-    --accent-emerald: #059669;
-    --accent-amber: #d97706;
-    --accent-rose: #e11d48;
-    
+    --font-sans: "Inter", "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: "JetBrains Mono", "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+    /* Institutional Dark Slate Palette */
+    --bg-page: #0B0E14;              /* Deep Charcoal Slate */
+    --bg-surface: #121721;           /* Surface / Cards / Tables */
+    --bg-surface-elevated: #161D2A;  /* Elevated Panels / Headers */
+    --bg-surface-subtle: #1C2536;    /* Interactive hovers & pills */
+
+    --border-subtle: rgba(255, 255, 255, 0.05);
+    --border-color: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.16);
+    --border-focus: #0052FF;
+
+    --text-primary: #F1F5F9;         /* High-contrast crisp white */
+    --text-secondary: #94A3B8;       /* Slate medium text */
+    --text-muted: #64748B;           /* Dim text */
+
+    /* Financial Accents */
+    --accent-blue: #0052FF;          /* International Klein Blue */
+    --accent-blue-hover: #1A66FF;
+    --accent-amber: #F59E0B;         /* Bloomberg Amber */
+    --accent-emerald: #10B981;       /* Bullish Emerald */
+    --accent-emerald-bg: rgba(16, 185, 129, 0.15);
+    --accent-rose: #F43F5E;          /* Bearish Rose */
+    --accent-rose-bg: rgba(244, 63, 94, 0.15);
+    --accent-slate-bg: rgba(148, 163, 184, 0.12);
+
     --radius-xs: 4px;
     --radius-sm: 6px;
     --radius-md: 8px;
     --radius-lg: 12px;
 }
 
-/* 1. Global Reset & Pure White Baseline */
+/* 1. Global Reset & Charcoal Slate Baseline */
 html, body {
     width: 100% !important;
     max-width: 100vw !important;
     overflow-x: hidden !important;
     margin: 0 !important;
     padding: 0 !important;
-    background-color: #ffffff !important;
+    background-color: var(--bg-page) !important;
     color: var(--text-primary) !important;
     font-family: var(--font-sans) !important;
     font-size: 13px !important;
     line-height: 1.45 !important;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+    -webkit-font-smoothing: antialiased !important;
+    -moz-osx-font-smoothing: grayscale !important;
 }
 
 *, *::before, *::after {
     box-sizing: border-box !important;
 }
 
-/* 2. Gradio Container (Enforced Light/White Institutional Layout) */
+/* 2. Gradio Container (Enforced Institutional Dark Layout) */
 .gradio-container, 
 .gradio-container > .main, 
 .gradio-container > .wrap,
@@ -1739,8 +1739,8 @@ div[class*="gradio-container"],
     max-width: 100% !important;
     width: 100% !important;
     margin: 0 !important;
-    padding: 3px 16px 12px 16px !important;
-    background-color: #ffffff !important;
+    padding: 4px 16px 20px 16px !important;
+    background-color: var(--bg-page) !important;
     color: var(--text-primary) !important;
     overflow-x: hidden !important;
 }
@@ -1754,6 +1754,7 @@ div[class*="gradio-container"],
     margin: 0 !important;
     gap: 0 !important;
     border: none !important;
+    background: transparent !important;
 }
 
 /* 3. Typography & Section Headers */
@@ -1764,2815 +1765,555 @@ h1, h2, h3, h4 {
     margin-block: 0.4rem 0.5rem !important;
 }
 
-h1 {
-    font-size: 20px !important;
-    font-weight: 800 !important;
-    color: #0f172a !important;
-}
+h1 { font-size: 20px !important; font-weight: 800 !important; }
+h2 { font-size: 16px !important; font-weight: 700 !important; }
+h3 { font-size: 13px !important; font-weight: 700 !important; }
+h4 { font-size: 12px !important; font-weight: 600 !important; color: var(--text-secondary) !important; }
 
-h2 {
-    font-size: 16px !important;
-    font-weight: 700 !important;
-    color: #0f172a !important;
-}
-
-h3 {
-    font-size: 13px !important;
-    font-weight: 700 !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.05em !important;
-    color: #334155 !important;
-    margin-top: 10px !important;
-    margin-bottom: 8px !important;
-}
-
-h4 {
-    font-size: 12px !important;
-    font-weight: 700 !important;
-    color: #475569 !important;
-}
-
-/* 4. Complete Eradication of Gradio Tab Navigation Bar to prevent Duplicate Menus */
-.tab-wrapper,
-.tab-wrapper.svelte-11gaq1,
-.tab-container,
-.tab-container.svelte-11gaq1,
-div[role="tablist"],
-.gradio-container div[role="tablist"],
-.tabs > .tab-wrapper,
-.gradio-container .tab-wrapper,
-.tab-nav,
-.tabs > .tab-nav,
-div[data-testid="tabs"] > .tab-nav,
-.gradio-container .tab-nav {
-    height: 0px !important;
-    max-height: 0px !important;
-    min-height: 0px !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    overflow: hidden !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
-    border: none !important;
-    visibility: hidden !important;
-    line-height: 0 !important;
-    font-size: 0 !important;
-}
-
-.tab-container:after,
-.tab-wrapper:after {
-    display: none !important;
-    height: 0 !important;
-    border: none !important;
-}
-
-/* 5. Streamlined Action Buttons (Compact, Uniform Heights, No Clutter) */
-button, .gr-button {
+p, span, div, label {
     font-family: var(--font-sans) !important;
-    font-size: 11.5px !important;
-    font-weight: 600 !important;
-    border-radius: var(--radius-sm) !important;
-    padding: 6px 12px !important;
-    min-height: 33px !important;
-    height: 33px !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    cursor: pointer !important;
-    transition: all 0.15s ease !important;
+}
+
+/* 4. Desktop Table Headers - Zero Single-Letter Word Wrapping */
+th, thead th, .gradio-container thead th, div[data-testid="dataframe"] thead th {
     white-space: nowrap !important;
-    text-overflow: ellipsis !important;
-}
-
-button.primary, .gr-button-primary {
-    background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
-    color: #ffffff !important;
-    border: 1px solid #1d4ed8 !important;
-    box-shadow: 0 1px 2px rgba(37, 99, 235, 0.2) !important;
-}
-
-button.primary:hover, .gr-button-primary:hover {
-    background: linear-gradient(135deg, #1d4ed8, #1e40af) !important;
-    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.3) !important;
-    transform: translateY(-1px);
-}
-
-button.secondary, .gr-button-secondary {
-    background: #ffffff !important;
-    color: #334155 !important;
-    border: 1px solid #cbd5e1 !important;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02) !important;
-}
-
-button.secondary:hover, .gr-button-secondary:hover {
-    background: #f8fafc !important;
-    border-color: #94a3b8 !important;
-    color: #0f172a !important;
-}
-
-/* 6. Form Controls, Radios & Inputs */
-input, textarea, select {
-    background-color: #ffffff !important;
-    border: 1px solid #cbd5e1 !important;
-    color: #0f172a !important;
-    border-radius: var(--radius-sm) !important;
-    font-family: var(--font-sans) !important;
-    font-size: 12.5px !important;
-    padding: 6px 10px !important;
-}
-
-input:focus, textarea:focus, select:focus {
-    border-color: #2563eb !important;
-    box-shadow: 0 0 0 1px #2563eb !important;
-    outline: none !important;
-}
-
-.gr-radio, fieldset {
-    background: #ffffff !important;
-    border: 1px solid #e2e8f0 !important;
-    border-radius: var(--radius-sm) !important;
-    padding: 4px 10px !important;
-}
-
-.gr-radio label, fieldset label {
-    font-size: 12px !important;
-    font-weight: 500 !important;
-    color: #334155 !important;
-}
-
-/* 7. Accordions (Sleek Micro-Borders) */
-.gr-accordion {
-    border: 1px solid #e2e8f0 !important;
-    border-radius: var(--radius-md) !important;
-    background: #ffffff !important;
-    margin-top: 10px !important;
-    margin-bottom: 12px !important;
+    word-break: keep-all !important;
     overflow: hidden !important;
-}
-
-.gr-accordion > .label-wrap {
-    background: #f8fafc !important;
-    padding: 8px 12px !important;
-    font-size: 12px !important;
-    font-weight: 600 !important;
-    color: #334155 !important;
-    border-bottom: 1px solid #e2e8f0 !important;
-}
-
-.gr-accordion > .label-wrap:hover {
-    background: #f1f5f9 !important;
-    color: #0f172a !important;
-}
-
-/* 8. Institutional High-Density Data Tables */
-.table-wrap,
-.gradio-dataframe,
-div[data-testid="dataframe"],
-.table-container {
-    width: 100% !important;
-    max-width: 100% !important;
-    overflow-x: auto !important;
-    border-radius: var(--radius-md) !important;
-    border: 1px solid #e2e8f0 !important;
-    background: #ffffff !important;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02) !important;
-    margin-bottom: 6px !important;
-}
-
-table {
-    table-layout: fixed !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    border-collapse: collapse !important;
-    font-family: var(--font-sans) !important;
-    background: #ffffff !important;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11" !important;
-}
-
-thead th {
-    background-color: #f8fafc !important;
-    color: #475569 !important;
+    text-overflow: ellipsis !important;
+    text-transform: uppercase !important;
     font-family: var(--font-sans) !important;
     font-size: 11px !important;
-    font-weight: 600 !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.02em !important;
-    padding: 5px 8px !important;
-    border-bottom: 1px solid #cbd5e1 !important;
-    border-right: 1px solid #f1f5f9 !important;
-    white-space: nowrap !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.04em !important;
+    color: #94A3B8 !important;
+    background: #151B27 !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+    padding: 7px 10px !important;
     vertical-align: middle !important;
-    position: sticky !important;
-    top: 0 !important;
-    z-index: 2 !important;
 }
 
-tbody td {
-    padding: 4px 8px !important;
-    font-size: 11.5px !important;
-    color: #0f172a !important;
-    border-bottom: 1px solid #f1f5f9 !important;
-    border-right: 1px solid #f8fafc !important;
-    vertical-align: middle !important;
-    line-height: 1.32 !important;
-    word-break: break-word !important;
-    overflow-wrap: anywhere !important;
-    background: #ffffff !important;
-    height: auto !important;
-    font-family: var(--font-sans) !important;
-}
+/* Desktop Sensible Column Minimum Widths */
+#top_news_table th:nth-child(1), #top_news_table td:nth-child(1) { min-width: 78px !important; width: 78px !important; text-align: center !important; }
+#top_news_table th:nth-child(2), #top_news_table td:nth-child(2) { min-width: 96px !important; width: 96px !important; text-align: center !important; }
+#top_news_table th:nth-child(3), #top_news_table td:nth-child(3) { min-width: 84px !important; width: 84px !important; text-align: center !important; }
+#top_news_table th:nth-child(4), #top_news_table td:nth-child(4) { min-width: 320px !important; }
+#top_news_table th:nth-child(5), #top_news_table td:nth-child(5) { min-width: 130px !important; width: 130px !important; }
+#top_news_table th:nth-child(6), #top_news_table td:nth-child(6) { min-width: 260px !important; }
+#top_news_table th:nth-child(7), #top_news_table td:nth-child(7) { min-width: 110px !important; width: 110px !important; }
+#top_news_table th:nth-child(8), #top_news_table td:nth-child(8) { min-width: 78px !important; width: 78px !important; text-align: center !important; }
+#top_news_table th:nth-child(9), #top_news_table td:nth-child(9) { min-width: 95px !important; width: 95px !important; text-align: center !important; }
 
-tbody tr:nth-child(even) td {
-    background-color: #fcfdfe !important;
-}
+#bottom_news_table th:nth-child(1), #bottom_news_table td:nth-child(1) { min-width: 90px !important; text-align: center !important; }
+#bottom_news_table th:nth-child(2), #bottom_news_table td:nth-child(2) { min-width: 110px !important; }
+#bottom_news_table th:nth-child(3), #bottom_news_table td:nth-child(3) { min-width: 340px !important; }
+#bottom_news_table th:nth-child(4), #bottom_news_table td:nth-child(4) { min-width: 80px !important; text-align: center !important; }
+#bottom_news_table th:nth-child(5), #bottom_news_table td:nth-child(5) { min-width: 96px !important; text-align: center !important; }
+#bottom_news_table th:nth-child(6), #bottom_news_table td:nth-child(6) { min-width: 100px !important; text-align: center !important; }
 
-tbody tr:hover td {
-    background-color: #f8fafc !important;
-}
-
-/* 9. Monospace Elements for Raw Code / Hash Tokens Only */
-code, .timer-cell, pre {
+/* 5. Numerical & Data Cells (JetBrains / Geist Mono + Tabular Figures) */
+#top_news_table td:nth-child(1),
+#top_news_table td:nth-child(8),
+#top_news_table td:nth-child(9),
+#bottom_news_table td:nth-child(1),
+#bottom_news_table td:nth-child(4),
+#calendar_table td:nth-child(1),
+#calendar_table td:nth-child(2),
+#calendar_table td:nth-child(3),
+#calendar_table td:nth-child(10),
+#calendar_table td:nth-child(11),
+#calendar_table td:nth-child(12),
+#calendar_table td:nth-child(13),
+#circ_table td:nth-child(2),
+#circ_table td:nth-child(3),
+.timer-cell, code, .epm-ticker-val, .epm-ticker-chg {
     font-family: var(--font-mono) !important;
-    font-size: 11px !important;
-    background: #f1f5f9 !important;
-    color: #0f172a !important;
-    padding: 2px 5px !important;
-    border-radius: 4px !important;
-    border: 1px solid #e2e8f0 !important;
+    font-feature-settings: "tnum" 1, "zero" 1 !important;
+    font-variant-numeric: tabular-nums !important;
 }
 
-/* 10. Strict 2-Line Clamp for Headlines, Events, Summaries */
-#top_news_table tbody td:nth-child(4) > *,
-#top_news_table tbody td:nth-child(4) a,
-#top_news_table tbody td:nth-child(5) > *,
-#top_news_table tbody td:nth-child(6) > *,
-#bottom_news_table tbody td:nth-child(3) > *,
-#bottom_news_table tbody td:nth-child(3) a,
-#circ_table tbody td:nth-child(5) > *,
-#circ_table tbody td:nth-child(5) a,
-#circ_table tbody td:nth-child(7) > * {
-    display: -webkit-box !important;
-    -webkit-line-clamp: 2 !important;
-    -webkit-box-orient: vertical !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    max-height: 2.65em !important;
-    line-height: 1.32 !important;
-    word-break: break-word !important;
-}
-
-#top_news_table tbody td:nth-child(4),
-#top_news_table tbody td:nth-child(5),
-#top_news_table tbody td:nth-child(6),
-#bottom_news_table tbody td:nth-child(3),
-#circ_table tbody td:nth-child(5),
-#circ_table tbody td:nth-child(7) {
-    max-height: 2.85em !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    line-height: 1.32 !important;
-}
-
-/* 11. Column Allocations for Tables (Institutional Sans-Serif + Tabular Figures) */
-
-/* Top News Table */
-#top_news_table th:nth-child(1), #top_news_table td:nth-child(1) { width: 5.5% !important; text-align: center !important; font-family: var(--font-sans) !important; font-variant-numeric: tabular-nums !important; font-feature-settings: "tnum" 1 !important; font-weight: 700 !important; color: #b45309 !important; }
-#top_news_table th:nth-child(2), #top_news_table td:nth-child(2) { width: 8.5% !important; text-align: center !important; font-weight: 600 !important; }
-#top_news_table th:nth-child(3), #top_news_table td:nth-child(3) { width: 7% !important; text-align: center !important; font-weight: 700 !important; }
-#top_news_table th:nth-child(4), #top_news_table td:nth-child(4) { width: 32% !important; font-weight: 600 !important; color: #0f172a !important; }
-#top_news_table th:nth-child(5), #top_news_table td:nth-child(5) { width: 11% !important; color: #475569 !important; font-size: 11px !important; }
-#top_news_table th:nth-child(6), #top_news_table td:nth-child(6) { width: 20% !important; color: #334155 !important; font-size: 11px !important; }
-#top_news_table th:nth-child(7), #top_news_table td:nth-child(7) { width: 7% !important; font-size: 11px !important; color: #0284c7 !important; font-weight: 600 !important; }
-#top_news_table th:nth-child(8), #top_news_table td:nth-child(8) { width: 4% !important; text-align: center !important; font-family: var(--font-sans) !important; font-variant-numeric: tabular-nums !important; font-feature-settings: "tnum" 1 !important; font-weight: 600 !important; color: #475569 !important; }
-#top_news_table th:nth-child(9), #top_news_table td:nth-child(9) { width: 5% !important; text-align: center !important; font-family: var(--font-sans) !important; font-variant-numeric: tabular-nums !important; font-feature-settings: "tnum" 1 !important; font-size: 11px !important; color: #64748b !important; }
-
-/* Bottom News Table */
-#bottom_news_table th:nth-child(1), #bottom_news_table td:nth-child(1) { width: 8% !important; text-align: center !important; font-family: var(--font-sans) !important; font-variant-numeric: tabular-nums !important; font-feature-settings: "tnum" 1 !important; font-size: 11px !important; color: #64748b !important; }
-#bottom_news_table th:nth-child(2), #bottom_news_table td:nth-child(2) { width: 12% !important; color: #0284c7 !important; font-weight: 600 !important; }
-#bottom_news_table th:nth-child(3), #bottom_news_table td:nth-child(3) { width: 56% !important; font-weight: 500 !important; color: #0f172a !important; }
-#bottom_news_table th:nth-child(4), #bottom_news_table td:nth-child(4) { width: 6% !important; text-align: center !important; font-family: var(--font-sans) !important; font-variant-numeric: tabular-nums !important; font-feature-settings: "tnum" 1 !important; font-weight: 600 !important; color: #475569 !important; }
-#bottom_news_table th:nth-child(5), #bottom_news_table td:nth-child(5) { width: 8% !important; text-align: center !important; }
-#bottom_news_table th:nth-child(6), #bottom_news_table td:nth-child(6) { width: 10% !important; text-align: center !important; font-size: 11px !important; color: #2563eb !important; }
-
-/* Calendar Table - 15-Column Layout (With Prominent Date Column & Strict 2-Row Event Clamp) */
-#calendar_table,
-#calendar_grid_wrap,
-#calendar_table .table-wrap,
-#calendar_table div[data-testid="dataframe"] {
-    width: 100% !important;
-    max-width: 100% !important;
-    overflow-x: auto !important;
-}
-
-#calendar_table table {
-    table-layout: fixed !important;
-    min-width: 1720px !important;
-    width: 1720px !important;
-    border-collapse: collapse !important;
-}
-
-/* Suppress Svelte 3-dot header action button */
-#calendar_table th button,
-.gradio-dataframe th button,
-div[data-testid="dataframe"] th button,
-th button[aria-label*="sort"],
-th button[aria-label*="menu"] {
-    display: none !important;
-    width: 0 !important;
-    height: 0 !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    border: none !important;
-    pointer-events: none !important;
-}
-
-#calendar_table th {
-    vertical-align: middle !important;
-    padding: 5px 8px !important;
-    font-size: 10.5px !important;
-    font-weight: 600 !important;
-    letter-spacing: 0.02em !important;
-    white-space: nowrap !important;
-    text-overflow: ellipsis !important;
-    overflow: hidden !important;
-}
-
-#calendar_table th .cell-wrap,
-#calendar_table th span {
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-}
-
-#calendar_table tbody tr {
-    height: 34px !important;
-    max-height: 38px !important;
-}
-
-#calendar_table tbody td {
-    height: 34px !important;
-    max-height: 38px !important;
-    padding: 3px 6px !important;
-    vertical-align: middle !important;
-    font-size: 11.5px !important;
-    line-height: 1.32 !important;
-    overflow: hidden !important;
-}
-
-/* Strict 2-row clamp on all cells */
-#calendar_table tbody td > *,
-#calendar_table tbody td a,
-#calendar_table tbody td span,
-#calendar_table tbody td div {
-    display: -webkit-box !important;
-    -webkit-line-clamp: 2 !important;
-    -webkit-box-orient: vertical !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    line-height: 1.32 !important;
-    max-height: 2.65em !important;
-    word-break: break-word !important;
-}
-
-#calendar_table th:nth-child(1), #calendar_table td:nth-child(1) { width: 38px !important; text-align: center !important; font-family: var(--font-sans) !important; font-variant-numeric: tabular-nums !important; font-feature-settings: "tnum" 1 !important; color: #64748b !important; white-space: nowrap !important; }
-#calendar_table th:nth-child(2), #calendar_table td:nth-child(2) { width: 95px !important; text-align: center !important; font-family: var(--font-sans) !important; font-variant-numeric: tabular-nums !important; font-feature-settings: "tnum" 1 !important; color: #0f172a !important; font-size: 11px !important; font-weight: 600 !important; white-space: nowrap !important; }
-#calendar_table th:nth-child(3), #calendar_table td:nth-child(3) { width: 85px !important; text-align: center !important; font-family: var(--font-sans) !important; font-variant-numeric: tabular-nums !important; font-feature-settings: "tnum" 1 !important; color: #0f172a !important; font-size: 11px !important; white-space: nowrap !important; }
-#calendar_table th:nth-child(4), #calendar_table td:nth-child(4) { width: 48px !important; text-align: center !important; font-weight: 600 !important; color: #475569 !important; white-space: nowrap !important; }
-#calendar_table th:nth-child(5), #calendar_table td:nth-child(5) { width: 120px !important; text-align: left !important; font-weight: 600 !important; }
-#calendar_table th:nth-child(6), #calendar_table td:nth-child(6) { width: 65px !important; text-align: center !important; font-weight: 600 !important; color: #334155 !important; white-space: nowrap !important; }
-#calendar_table th:nth-child(7), #calendar_table td:nth-child(7) { width: 75px !important; text-align: center !important; font-weight: 600 !important; color: #0284c7 !important; }
-#calendar_table th:nth-child(8), #calendar_table td:nth-child(8) { width: 110px !important; text-align: left !important; color: #475569 !important; }
-#calendar_table th:nth-child(9), #calendar_table td:nth-child(9) { width: 320px !important; text-align: left !important; font-weight: 600 !important; color: #0f172a !important; }
-#calendar_table th:nth-child(10), #calendar_table td:nth-child(10) { width: 60px !important; text-align: center !important; font-family: var(--font-sans) !important; font-weight: 600 !important; color: #d97706 !important; white-space: nowrap !important; }
-#calendar_table th:nth-child(11), #calendar_table td:nth-child(11) { width: 85px !important; text-align: center !important; font-family: var(--font-sans) !important; font-variant-numeric: tabular-nums !important; font-feature-settings: "tnum" 1 !important; color: #475569 !important; font-size: 11px !important; }
-#calendar_table th:nth-child(12), #calendar_table td:nth-child(12) { width: 85px !important; text-align: center !important; font-family: var(--font-sans) !important; font-variant-numeric: tabular-nums !important; font-feature-settings: "tnum" 1 !important; font-weight: 600 !important; color: #059669 !important; font-size: 11px !important; }
-#calendar_table th:nth-child(13), #calendar_table td:nth-child(13) { width: 140px !important; text-align: left !important; font-weight: 600 !important; }
-#calendar_table th:nth-child(14), #calendar_table td:nth-child(14) { width: 75px !important; text-align: center !important; font-weight: 700 !important; white-space: nowrap !important; }
-#calendar_table th:nth-child(15), #calendar_table td:nth-child(15) { width: 275px !important; text-align: left !important; color: #334155 !important; font-size: 11px !important; }
-
-/* Holidays Table */
-#holidays_table th:nth-child(1), #holidays_table td:nth-child(1) { width: 8% !important; text-align: center !important; font-family: var(--font-sans) !important; font-variant-numeric: tabular-nums !important; font-feature-settings: "tnum" 1 !important; font-weight: 600 !important; }
-#holidays_table th:nth-child(2), #holidays_table td:nth-child(2) { width: 7% !important; text-align: center !important; }
-#holidays_table th:nth-child(3), #holidays_table td:nth-child(3) { width: 23% !important; font-weight: 600 !important; color: #0f172a !important; }
-#holidays_table th:nth-child(4), #holidays_table td:nth-child(4) { width: 12% !important; text-align: center !important; }
-#holidays_table th:nth-child(5), #holidays_table td:nth-child(5) { width: 12% !important; text-align: center !important; }
-#holidays_table th:nth-child(6), #holidays_table td:nth-child(6) { width: 15% !important; text-align: center !important; }
-#holidays_table th:nth-child(7), #holidays_table td:nth-child(7) { width: 13% !important; text-align: center !important; }
-#holidays_table th:nth-child(8), #holidays_table td:nth-child(8) { width: 10% !important; text-align: center !important; }
-
-/* Regulatory Circulars Table */
-#circ_table th:nth-child(1), #circ_table td:nth-child(1) { width: 6% !important; text-align: center !important; font-weight: 700 !important; }
-#circ_table th:nth-child(2), #circ_table td:nth-child(2) { width: 9% !important; font-family: var(--font-sans) !important; font-variant-numeric: tabular-nums !important; font-feature-settings: "tnum" 1 !important; font-size: 11px !important; color: #0f172a !important; font-weight: 600 !important; text-align: center !important; }
-#circ_table th:nth-child(3), #circ_table td:nth-child(3) { width: 6% !important; text-align: center !important; font-family: var(--font-sans) !important; font-variant-numeric: tabular-nums !important; font-feature-settings: "tnum" 1 !important; color: #475569 !important; font-size: 11px !important; }
-#circ_table th:nth-child(4), #circ_table td:nth-child(4) { width: 6% !important; text-align: center !important; font-weight: 700 !important; }
-#circ_table th:nth-child(5), #circ_table td:nth-child(5) { width: 28% !important; font-weight: 600 !important; color: #0f172a !important; line-height: 1.32 !important; }
-#circ_table th:nth-child(6), #circ_table td:nth-child(6) { width: 9% !important; color: #475569 !important; font-size: 11px !important; }
-#circ_table th:nth-child(7), #circ_table td:nth-child(7) { width: 27% !important; color: #334155 !important; font-size: 11px !important; line-height: 1.32 !important; }
-#circ_table th:nth-child(8), #circ_table td:nth-child(8) { width: 9% !important; text-align: center !important; }
-#circ_table td:nth-child(8) a {
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    padding: 3px 8px !important;
-    background: #2563eb !important;
-    color: #ffffff !important;
-    border-radius: 4px !important;
-    font-weight: 600 !important;
-    font-size: 11px !important;
-    text-decoration: none !important;
-    transition: all 0.15s ease !important;
-    white-space: nowrap !important;
-}
-#circ_table td:nth-child(8) a:hover {
-    background: #1d4ed8 !important;
-    transform: translateY(-1px) !important;
-}
-
-/* Hyperlinks inside data tables */
+/* 6. Crisp Neutral Headline Links & Hover Glow */
 #top_news_table td:nth-child(4) a,
 #bottom_news_table td:nth-child(3) a,
-#circ_table td:nth-child(5) a {
-    color: #0f172a !important;
-    font-weight: 600 !important;
+#circ_table td:nth-child(5) a,
+.epm-news-title {
+    color: #F1F5F9 !important;
     text-decoration: none !important;
+    font-weight: 600 !important;
     transition: color 0.15s ease !important;
 }
 #top_news_table td:nth-child(4) a:hover,
 #bottom_news_table td:nth-child(3) a:hover,
-#circ_table td:nth-child(5) a:hover {
-    color: #2563eb !important;
-    text-decoration: underline !important;
-}
-#bottom_news_table td:nth-child(6) a,
-#calendar_table td:nth-child(13) a {
-    color: #2563eb !important;
-    font-size: 11px !important;
-    font-weight: 600 !important;
-    text-decoration: none !important;
-}
-#bottom_news_table td:nth-child(6) a:hover,
-#calendar_table td:nth-child(13) a:hover {
+#circ_table td:nth-child(5) a:hover,
+.epm-news-title:hover {
+    color: #60A5FA !important;
     text-decoration: underline !important;
 }
 
-/* 12. Visual Card Feed Components (Inside Accordions) */
-.epm-stream-container {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    width: 100% !important;
-    margin: 8px 0 16px 0;
-}
-
-.epm-card {
-    background: #ffffff !important;
-    border: 1px solid #e2e8f0 !important;
-    border-radius: 8px !important;
-    padding: 12px 16px !important;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03) !important;
-    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease !important;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.epm-card:hover {
-    transform: translateY(-1px) !important;
-    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06) !important;
-    border-color: #cbd5e1 !important;
-}
-
-.epm-card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 6px;
-    padding-bottom: 6px;
-    border-bottom: 1px solid #f1f5f9;
-}
-
-.epm-meta-left, .epm-meta-right {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 6px;
-}
-
-.epm-source-chip {
-    font-family: var(--font-sans) !important;
-    font-size: 10.5px !important;
-    font-weight: 700 !important;
-    text-transform: uppercase !important;
-    background: #f1f5f9 !important;
-    color: #1e293b !important;
-    padding: 2px 6px !important;
-    border-radius: 4px !important;
-    border: 1px solid #e2e8f0 !important;
-}
-
-.epm-time-chip {
-    font-family: var(--font-mono) !important;
-    font-size: 10.5px !important;
-    color: #64748b !important;
-}
-
-.epm-score-pill {
-    font-family: var(--font-mono) !important;
-    font-size: 11.5px !important;
-    font-weight: 700 !important;
-    background: #eff6ff !important;
-    color: #2563eb !important;
-    border: 1px solid #bfdbfe !important;
-    padding: 2px 8px !important;
-    border-radius: 4px !important;
-}
-
-.epm-badge {
-    font-family: var(--font-sans) !important;
-    font-size: 10.5px !important;
-    font-weight: 700 !important;
-    padding: 2px 6px !important;
-    border-radius: 4px !important;
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-}
-
-.epm-badge.impact-high { background: #fff1f2 !important; color: #e11d48 !important; border: 1px solid #fecdd3 !important; }
-.epm-badge.impact-medium { background: #f0f9ff !important; color: #0284c7 !important; border: 1px solid #bae6fd !important; }
-.epm-badge.impact-low { background: #f8fafc !important; color: #64748b !important; border: 1px solid #e2e8f0 !important; }
-.epm-badge.sent-bullish { background: #f0fdf4 !important; color: #16a34a !important; border: 1px solid #bbf7d0 !important; }
-.epm-badge.sent-bearish { background: #fef2f2 !important; color: #dc2626 !important; border: 1px solid #fecaca !important; }
-.epm-badge.sent-neutral { background: #f8fafc !important; color: #475569 !important; border: 1px solid #e2e8f0 !important; }
-.epm-badge.sent-pending { background: #fffbeb !important; color: #b45309 !important; border: 1px solid #fde68a !important; }
-
-.epm-news-title {
-    font-family: var(--font-sans) !important;
-    font-size: 14px !important;
-    font-weight: 700 !important;
-    color: #0f172a !important;
-    text-decoration: none !important;
-    line-height: 1.4 !important;
-    transition: color 0.15s ease !important;
-}
-.epm-news-title:hover { color: #2563eb !important; }
-
-.epm-news-reasoning {
-    font-family: var(--font-sans) !important;
+/* 7. Institutional Dark Table Rows */
+tbody tr td, .gradio-container tbody td {
+    background-color: var(--bg-surface) !important;
+    color: var(--text-primary) !important;
+    border-bottom: 1px solid var(--border-subtle) !important;
+    border-top: none !important;
+    padding: 7px 10px !important;
     font-size: 12.5px !important;
-    color: #475569 !important;
-    background: #f8fafc !important;
-    padding: 6px 10px !important;
-    border-radius: 6px !important;
-    border-left: 3px solid #cbd5e1 !important;
-    margin-top: 5px !important;
-    line-height: 1.45 !important;
 }
 
-.epm-card-footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+tbody tr:nth-child(even) td {
+    background-color: #0E131C !important;
+}
+
+tbody tr:hover td {
+    background-color: #182030 !important;
+}
+
+/* 8. Sleek Sentiment Badge Pills */
+.sent-pill, [data-sent], .sent-bullish {
+    background: rgba(16, 185, 129, 0.15) !important;
+    color: #10B981 !important;
+    border: 1px solid rgba(16, 185, 129, 0.3) !important;
+    border-radius: 4px !important;
+    padding: 2px 7px !important;
     font-size: 11px !important;
-    color: #64748b !important;
-    padding-top: 4px;
-}
-
-.epm-sectors-wrap { display: flex; gap: 4px; flex-wrap: wrap; }
-.epm-sector-tag {
-    background: #f1f5f9 !important;
-    color: #334155 !important;
-    padding: 2px 6px !important;
-    border-radius: 4px !important;
-    font-size: 10px !important;
-    font-weight: 600 !important;
-}
-
-.epm-empty-state {
-    background: #ffffff !important;
-    border: 1px dashed #cbd5e1 !important;
-    border-radius: 8px !important;
-    padding: 30px 16px !important;
-    text-align: center !important;
-    color: #64748b !important;
-    margin: 10px 0 !important;
-}
-.epm-empty-icon { font-size: 28px !important; margin-bottom: 6px; }
-.epm-empty-title { font-size: 14px !important; font-weight: 700 !important; color: #0f172a !important; margin-bottom: 2px; }
-.epm-empty-sub { font-size: 12px !important; color: #64748b !important; }
-
-/* Calendar & Circulars Cards inside accordions */
-.epm-cal-card, .epm-circ-card {
-    border-left: 3px solid #2563eb !important;
-}
-.epm-mkt-chip, .epm-reg-chip {
-    font-family: var(--font-sans) !important;
     font-weight: 700 !important;
-    font-size: 10.5px !important;
-    padding: 2px 6px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+}
+.sent-bearish {
+    background: rgba(244, 63, 94, 0.15) !important;
+    color: #F43F5E !important;
+    border: 1px solid rgba(244, 63, 94, 0.3) !important;
     border-radius: 4px !important;
-    background: #f1f5f9 !important;
-    border: 1px solid #cbd5e1 !important;
-}
-.epm-time-ist {
-    font-family: var(--font-mono) !important;
-    font-size: 11.5px !important;
-    color: #0f172a !important;
-}
-.epm-timer-pill {
-    font-family: var(--font-mono) !important;
-    font-size: 10.5px !important;
+    padding: 2px 7px !important;
+    font-size: 11px !important;
     font-weight: 700 !important;
-    padding: 2px 6px !important;
-    border-radius: 4px !important;
+    display: inline-flex !important;
+    align-items: center !important;
 }
-.timer-active { background: #fff7ed !important; color: #c2410c !important; border: 1px solid #ffedd5 !important; }
-.timer-live { background: #ecfdf5 !important; color: #047857 !important; border: 1px solid #a7f3d0 !important; }
-.timer-done { background: #f8fafc !important; color: #64748b !important; border: 1px solid #e2e8f0 !important; }
-
-.epm-gcal-btn {
-    font-family: var(--font-sans) !important;
+.sent-neutral {
+    background: rgba(148, 163, 184, 0.12) !important;
+    color: #94A3B8 !important;
+    border: 1px solid rgba(148, 163, 184, 0.25) !important;
+    border-radius: 4px !important;
+    padding: 2px 7px !important;
     font-size: 11px !important;
     font-weight: 600 !important;
-    background: #f8fafc !important;
-    color: #1d4ed8 !important;
-    border: 1px solid #bfdbfe !important;
-    padding: 4px 10px !important;
-    border-radius: 4px !important;
-    text-decoration: none !important;
-    transition: all 0.15s ease !important;
-}
-.epm-gcal-btn:hover { background: #eff6ff !important; color: #1e40af !important; }
-
-.epm-metrics-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-    gap: 6px;
-    margin-top: 8px;
-}
-.epm-metric-box {
-    background: #f8fafc !important;
-    border: 1px solid #e2e8f0 !important;
-    border-radius: 6px !important;
-    padding: 5px 8px !important;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-.epm-m-label {
-    font-size: 9px !important;
-    font-weight: 700 !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.05em !important;
-    color: #64748b !important;
-}
-.epm-m-val {
-    font-family: var(--font-mono) !important;
-    font-size: 12px !important;
-    font-weight: 700 !important;
-    color: #0f172a !important;
+    display: inline-flex !important;
+    align-items: center !important;
 }
 
-.epm-circ-bullets-box {
-    background: #f8fafc !important;
-    border: 1px solid #e2e8f0 !important;
-    border-radius: 6px !important;
-    padding: 8px 12px !important;
-    margin-top: 6px !important;
-}
-.epm-circ-bullets-head {
-    font-size: 10.5px !important;
-    color: #2563eb !important;
-    text-transform: uppercase !important;
+/* Color-coded score & impact micro-pills */
+.score-pill, #top_news_table td:nth-child(1) {
+    color: #F59E0B !important;
     font-weight: 700 !important;
-    margin-bottom: 4px !important;
-}
-.epm-circ-bullets-list {
-    margin: 0 !important;
-    padding-left: 16px !important;
-    font-size: 12px !important;
-    color: #334155 !important;
-    line-height: 1.45 !important;
 }
 
-/* 13. Dedicated User Guide & Operations Manual Styling */
-.guide-container {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    padding: 4px 0 20px 0;
-}
-.guide-card {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 16px 20px;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
-}
-.guide-card h3 {
-    font-size: 14px !important;
-    font-weight: 700 !important;
-    color: #0f172a !important;
-    margin-top: 0 !important;
-    margin-bottom: 6px !important;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-.guide-badge {
-    font-family: var(--font-mono);
-    font-size: 10.5px;
-    font-weight: 700;
-    padding: 2px 6px;
-    border-radius: 4px;
-    background: #eff6ff;
-    color: #2563eb;
-    border: 1px solid #dbeafe;
-}
-.guide-list {
-    margin: 6px 0;
-    padding-left: 18px;
-    color: #334155;
-    line-height: 1.55;
-    font-size: 12.5px;
-}
-.guide-list li {
-    margin-bottom: 5px;
-}
-.guide-pill {
-    display: inline-block;
-    padding: 1px 5px;
-    background: #f1f5f9;
-    border: 1px solid #e2e8f0;
-    border-radius: 4px;
-    font-family: var(--font-mono);
-    font-size: 11px;
-    color: #0f172a;
-    font-weight: 600;
-}
-
-/* 14. Top Institutional Sticky Telemetry Ribbon & Navbar */
+/* 9. Top Navigation Bar & Desk Header (Institutional Dark Mode) */
 .epm-top-navbar {
-    position: sticky !important;
-    top: 0 !important;
-    z-index: 1000 !important;
-    background: #ffffff !important;
-    border-bottom: 1px solid #e2e8f0 !important;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04) !important;
-    margin: -3px -16px 0 -16px !important;
-    padding: 2px 14px 2px 14px !important;
+    background: var(--bg-surface-elevated) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 8px !important;
+    backdrop-filter: blur(12px) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+    padding: 6px 12px !important;
+    margin-bottom: 8px !important;
 }
 
-/* Row 1: Brand Cluster, Live Telemetry & Macro Ticker Strip */
 .epm-nav-row-1 {
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
-    gap: 10px !important;
-    flex-wrap: nowrap !important;
-    height: 26px !important;
-    line-height: 26px !important;
-    overflow: hidden !important;
+    gap: 12px !important;
+    min-height: 32px !important;
 }
 
 .epm-nav-brand-cluster {
     display: flex !important;
     align-items: center !important;
-    gap: 6px !important;
-    flex-shrink: 0 !important;
+    gap: 8px !important;
 }
 
-.epm-nav-logo {
-    font-size: 15px !important;
+.epm-nav-bolt {
+    font-size: 16px !important;
+    color: #0052FF !important;
+    filter: drop-shadow(0 0 6px rgba(0, 82, 255, 0.5));
 }
 
 .epm-nav-title {
     font-family: var(--font-sans) !important;
-    font-size: 13.5px !important;
+    font-size: 15px !important;
     font-weight: 800 !important;
-    color: #0f172a !important;
+    color: #F1F5F9 !important;
     letter-spacing: -0.02em !important;
 }
 
+.epm-title-highlight {
+    color: #0052FF !important;
+}
+
 .epm-nav-version {
-    font-family: var(--font-mono) !important;
-    font-size: 9px !important;
+    font-size: 9.5px !important;
     font-weight: 700 !important;
-    color: #2563eb !important;
-    background: #eff6ff !important;
-    border: 1px solid #bfdbfe !important;
-    padding: 0 4px !important;
-    border-radius: 3px !important;
-    height: 16px !important;
-    line-height: 14px !important;
+    background: rgba(0, 82, 255, 0.15) !important;
+    color: #60A5FA !important;
+    border: 1px solid rgba(0, 82, 255, 0.3) !important;
+    padding: 1px 5px !important;
+    border-radius: 4px !important;
 }
 
 .epm-nav-status-badge {
     display: inline-flex !important;
     align-items: center !important;
-    gap: 4px !important;
-    padding: 0 5px !important;
-    height: 16px !important;
-    line-height: 14px !important;
-    background: #f0fdf4 !important;
-    border: 1px solid #bbf7d0 !important;
-    border-radius: 3px !important;
-    font-family: var(--font-mono) !important;
-    font-size: 9px !important;
+    gap: 5px !important;
+    font-size: 10px !important;
     font-weight: 700 !important;
-    color: #16a34a !important;
+    color: #10B981 !important;
+    background: rgba(16, 185, 129, 0.15) !important;
+    border: 1px solid rgba(16, 185, 129, 0.3) !important;
+    padding: 1px 6px !important;
+    border-radius: 4px !important;
 }
 
 .epm-live-dot {
     width: 6px !important;
     height: 6px !important;
     border-radius: 50% !important;
-    background: #16a34a !important;
-    display: inline-block !important;
-    box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.2) !important;
-    animation: epmPulse 2s infinite !important;
+    background: #10B981 !important;
+    box-shadow: 0 0 6px #10B981 !important;
+    animation: epmPulseDot 1.8s infinite ease-in-out !important;
 }
 
-@keyframes epmPulse {
-    0% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.4); }
-    70% { box-shadow: 0 0 0 5px rgba(22, 163, 74, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
+@keyframes epmPulseDot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.85); }
 }
 
 .epm-nav-telemetry {
-    display: inline-flex !important;
+    display: flex !important;
     align-items: center !important;
-    gap: 4px !important;
-    margin-left: 4px !important;
+    gap: 5px !important;
 }
 
 .epm-telem-pill {
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 2px !important;
-    height: 18px !important;
-    line-height: 16px !important;
-    padding: 0 5px !important;
-    background: #f8fafc !important;
-    border: 1px solid #e2e8f0 !important;
-    border-radius: 3px !important;
-    font-family: var(--font-mono) !important;
     font-size: 9.5px !important;
-    color: #475569 !important;
-    white-space: nowrap !important;
+    font-weight: 600 !important;
+    background: #181F2C !important;
+    color: #94A3B8 !important;
+    border: 1px solid var(--border-subtle) !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
 }
-
 .epm-telem-pill b {
-    color: #0f172a !important;
-    font-weight: 700 !important;
+    color: #F1F5F9 !important;
+    font-family: var(--font-mono) !important;
+}
+.epm-telem-tg b {
+    color: #10B981 !important;
 }
 
-.epm-telem-online {
-    background: #f0fdf4 !important;
-    border-color: #bbf7d0 !important;
-    color: #16a34a !important;
-    font-weight: 700 !important;
-}
-
-/* Macro Telemetry Strip */
+/* Macro Ticker Strip */
 .epm-telemetry-strip {
     display: flex !important;
     align-items: center !important;
-    gap: 6px !important;
+    gap: 12px !important;
+    background: var(--bg-page) !important;
+    border: 1px solid var(--border-subtle) !important;
+    border-radius: 6px !important;
+    padding: 3px 10px !important;
     overflow-x: auto !important;
     scrollbar-width: none !important;
-    background: #f8fafc !important;
-    border: 1px solid #e2e8f0 !important;
-    border-radius: 4px !important;
-    padding: 0 8px !important;
-    height: 20px !important;
-    line-height: 18px !important;
-    flex: 0 1 auto !important;
 }
-
-.epm-telemetry-strip::-webkit-scrollbar {
-    display: none !important;
-}
+.epm-telemetry-strip::-webkit-scrollbar { display: none !important; }
 
 .epm-ticker-item {
     display: flex !important;
     align-items: center !important;
-    gap: 4px !important;
-    font-family: var(--font-mono) !important;
-    font-size: 10px !important;
+    gap: 5px !important;
+    font-size: 11px !important;
     white-space: nowrap !important;
-    cursor: default !important;
 }
+.epm-ticker-sym { color: #94A3B8 !important; font-weight: 600 !important; }
+.epm-ticker-val { color: #F1F5F9 !important; font-weight: 700 !important; font-family: var(--font-mono) !important; }
+.epm-ticker-chg.up { color: #10B981 !important; font-family: var(--font-mono) !important; font-weight: 700 !important; }
+.epm-ticker-chg.down { color: #F43F5E !important; font-family: var(--font-mono) !important; font-weight: 700 !important; }
+.epm-ticker-divider { width: 1px !important; height: 12px !important; background: var(--border-color) !important; }
 
-.epm-ticker-sym {
-    font-weight: 700 !important;
-    color: #475569 !important;
-    font-size: 9.5px !important;
-}
-
-.epm-ticker-val {
-    font-weight: 700 !important;
-    color: #0f172a !important;
-}
-
-.epm-ticker-chg.up {
-    font-weight: 700 !important;
-    color: #16a34a !important;
-    background: #f0fdf4 !important;
-    border: 1px solid #bbf7d0 !important;
-    padding: 0 3px !important;
-    border-radius: 2px !important;
-    font-size: 9px !important;
-}
-
-.epm-ticker-chg.down {
-    font-weight: 700 !important;
-    color: #dc2626 !important;
-    background: #fef2f2 !important;
-    border: 1px solid #fecaca !important;
-    padding: 0 3px !important;
-    border-radius: 2px !important;
-    font-size: 9px !important;
-}
-
-.epm-ticker-divider {
-    width: 1px !important;
-    height: 10px !important;
-    background: #cbd5e1 !important;
-}
-
-/* Row 2: Unified Navigation Tabs + Controls on ONE line */
+/* Desktop Row 2 Tabs */
 .epm-nav-row-2 {
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
     gap: 8px !important;
-    flex-wrap: nowrap !important;
-    padding-top: 3px !important;
-    margin-top: 3px !important;
-    border-top: 1px solid #f1f5f9 !important;
-    height: 27px !important;
-    line-height: 27px !important;
+    padding-top: 5px !important;
+    border-top: 1px solid var(--border-subtle) !important;
 }
 
 .epm-quick-tabs-container {
-    display: inline-flex !important;
+    display: flex !important;
     align-items: center !important;
-    gap: 2px !important;
-    background: #f1f5f9 !important;
-    padding: 2px !important;
-    border-radius: 6px !important;
-    border: 1px solid #e2e8f0 !important;
-    flex-wrap: nowrap !important;
+    gap: 4px !important;
 }
 
 .epm-tab-pill {
     display: inline-flex !important;
     align-items: center !important;
     gap: 5px !important;
-    height: 22px !important;
-    padding: 0 10px !important;
+    padding: 4px 10px !important;
+    border-radius: 6px !important;
+    background: #181F2C !important;
+    border: 1px solid var(--border-color) !important;
+    color: #94A3B8 !important;
     font-family: var(--font-sans) !important;
-    font-size: 11px !important;
-    font-weight: 500 !important;
-    border-radius: 4px !important;
-    border: none !important;
-    background: transparent !important;
-    color: #64748b !important;
+    font-size: 11.5px !important;
+    font-weight: 600 !important;
     cursor: pointer !important;
-    transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1) !important;
-    white-space: nowrap !important;
-    line-height: 22px !important;
-}
-
-.epm-tab-pill .epm-tab-pill-bullet {
-    display: inline-block !important;
-    width: 5px !important;
-    height: 5px !important;
-    border-radius: 50% !important;
-    background: #94a3b8 !important;
     transition: all 0.15s ease !important;
 }
-
 .epm-tab-pill:hover {
-    background: rgba(255, 255, 255, 0.6) !important;
-    color: #0f172a !important;
+    background: #1E2738 !important;
+    color: #F1F5F9 !important;
+    border-color: rgba(255, 255, 255, 0.15) !important;
 }
-
 .epm-tab-pill.active {
-    background: #ffffff !important;
-    color: #1d4ed8 !important;
-    font-weight: 700 !important;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04) !important;
-    border: none !important;
+    background: rgba(0, 82, 255, 0.18) !important;
+    color: #60A5FA !important;
+    border-color: #0052FF !important;
+    box-shadow: 0 0 10px rgba(0, 82, 255, 0.25) !important;
 }
-
-.epm-tab-pill.active .epm-tab-pill-bullet {
-    background: #2563eb !important;
-    box-shadow: 0 0 4px rgba(37, 99, 235, 0.4) !important;
-}
-
-.epm-tab-pill.active *,
-.epm-tab-pill.active span,
-.epm-tab-pill.active .epm-tab-pill-icon {
-    color: #1d4ed8 !important;
-    font-weight: 700 !important;
-}
-
-.epm-tab-pill.active:hover {
-    background: #ffffff !important;
-}
-
-/* Top Nav Controls Right */
-.epm-nav-controls {
-    display: flex !important;
-    align-items: center !important;
-    gap: 4px !important;
-    flex-shrink: 0 !important;
-    flex-wrap: nowrap !important;
-}
-
-.epm-nav-search-wrap {
-    position: relative !important;
-    display: flex !important;
-    align-items: center !important;
-}
-
-#epm-watchlist-input {
-    width: 120px !important;
-    height: 23px !important;
-    font-size: 10.5px !important;
-    padding: 1px 18px 1px 18px !important;
-    border: 1px solid #cbd5e1 !important;
-    border-radius: 4px !important;
-    background: #ffffff !important;
-    color: #0f172a !important;
-    transition: width 0.2s ease, border-color 0.15s ease !important;
-}
-
-#epm-watchlist-input:focus {
-    width: 160px !important;
-    border-color: #2563eb !important;
-    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12) !important;
-    outline: none !important;
-}
-
-.epm-nav-search-icon {
-    position: absolute !important;
-    left: 5px !important;
-    font-size: 10px !important;
-    pointer-events: none !important;
-    color: #94a3b8 !important;
-}
-
-.epm-watchlist-clear-btn {
-    position: absolute !important;
-    right: 5px !important;
-    background: transparent !important;
-    border: none !important;
-    font-size: 9px !important;
-    color: #94a3b8 !important;
-    cursor: pointer !important;
-    padding: 0 !important;
-}
-
-.epm-watchlist-clear-btn:hover {
-    color: #0f172a !important;
-}
-
-.epm-watchlist-badge {
-    position: absolute !important;
-    right: 18px !important;
-    font-family: var(--font-mono) !important;
-    font-size: 8.5px !important;
-    background: #2563eb !important;
-    color: #ffffff !important;
-    padding: 0 3px !important;
-    border-radius: 2px !important;
-    font-weight: 700 !important;
-    white-space: nowrap !important;
-}
-
-.epm-top-btn {
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 3px !important;
-    height: 23px !important;
-    padding: 0 6px !important;
-    font-family: var(--font-sans) !important;
-    font-size: 10.5px !important;
-    font-weight: 600 !important;
-    border-radius: 4px !important;
-    border: 1px solid #cbd5e1 !important;
-    background: #ffffff !important;
-    color: #334155 !important;
-    cursor: pointer !important;
-    transition: all 0.12s ease !important;
-    white-space: nowrap !important;
-}
-
-.epm-top-btn:hover {
-    background: #f8fafc !important;
-    border-color: #94a3b8 !important;
-    color: #0f172a !important;
-}
-
-.epm-btn-active {
-    background: #f0fdf4 !important;
-    border-color: #86efac !important;
-    color: #16a34a !important;
-}
-
-.epm-btn-muted {
-    background: #fef2f2 !important;
-    border-color: #fca5a5 !important;
-    color: #dc2626 !important;
-}
-
-.epm-cmd-btn {
-    background: #2563eb !important;
-    color: #ffffff !important;
-    border-color: #1d4ed8 !important;
-}
-
-.epm-cmd-btn:hover {
-    background: #1d4ed8 !important;
-    border-color: #1d4ed8 !important;
-    color: #ffffff !important;
-}
-
-.epm-kbd-badge {
-    font-family: var(--font-mono) !important;
-    font-size: 9px !important;
-    background: #334155 !important;
-    color: #38bdf8 !important;
-    padding: 0 3px !important;
-    border-radius: 2px !important;
-    font-weight: 700 !important;
-}
-
-.epm-nav-link {
-    font-family: var(--font-sans) !important;
-    font-size: 10.5px !important;
-    font-weight: 600 !important;
-    color: #2563eb !important;
-    text-decoration: none !important;
-    padding: 1px 6px !important;
-    height: 23px !important;
-    line-height: 19px !important;
-    box-sizing: border-box !important;
-    border-radius: 4px !important;
-    background: #eff6ff !important;
-    border: 1px solid #dbeafe !important;
-    transition: all 0.12s ease !important;
-    white-space: nowrap !important;
-}
-
-.epm-nav-link:hover {
-    background: #dbeafe !important;
-    color: #1d4ed8 !important;
-}
-
-/* 15. Hidden Telemetry Elements & Zero-Height Subheaders */
-#epm-status-box, #cal_info_bar, #circ_info_bar, #cal_action_msg:empty, #circ_action_msg:empty {
-    display: none !important;
-    height: 0 !important;
-    max-height: 0 !important;
-    min-height: 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    border: none !important;
-    overflow: hidden !important;
-}
-
-/* 16. Action Deck & Toolbar Cards */
-.epm-toolbar-card {
-    background: #ffffff !important;
-    border: 1px solid #e2e8f0 !important;
-    border-radius: 4px !important;
-    padding: 3px 8px !important;
-    margin-top: 2px !important;
-    margin-bottom: 3px !important;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02) !important;
-}
-
-#cal_action_deck button, #circ_action_toolbar button {
-    font-family: var(--font-sans) !important;
-    font-size: 11px !important;
-    font-weight: 600 !important;
-    border-radius: 4px !important;
-    min-height: 26px !important;
-    height: 26px !important;
-    padding: 0 8px !important;
-    transition: all 0.15s ease !important;
-}
-
-#cal_action_deck button.primary, #circ_action_toolbar button.primary {
-    background: #2563eb !important;
-    color: #ffffff !important;
-    border: 1px solid #1d4ed8 !important;
-}
-
-#cal_action_deck button.primary:hover, #circ_action_toolbar button.primary:hover {
-    background: #1d4ed8 !important;
-    border-color: #1d4ed8 !important;
-    transform: translateY(-1px) !important;
-}
-
-#cal_action_deck button.secondary, #circ_action_toolbar button.secondary {
-    background: #f8fafc !important;
-    color: #334155 !important;
-    border: 1px solid #cbd5e1 !important;
-}
-
-#cal_action_deck button.secondary:hover, #circ_action_toolbar button.secondary:hover {
-    background: #f1f5f9 !important;
-    border-color: #94a3b8 !important;
-    color: #0f172a !important;
-}
-
-#cal_pdf_file {
-    margin-top: 2px !important;
-    margin-bottom: 2px !important;
-    border: 1px dashed #38bdf8 !important;
-    border-radius: 4px !important;
-    background: #f0f9ff !important;
-    padding: 3px 6px !important;
-}
-
-/* 17. Table Header Ribbons & High-Density Integration */
-.epm-table-ribbon {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    background: #f8fafc !important;
-    border: 1px solid #cbd5e1 !important;
-    border-bottom: none !important;
-    border-radius: 4px 4px 0 0 !important;
-    padding: 2px 8px !important;
-    margin-top: 2px !important;
-    margin-bottom: 0 !important;
-    min-height: 24px !important;
-    height: 24px !important;
-    gap: 6px !important;
-    flex-wrap: nowrap !important;
-}
-
-.epm-ribbon-left {
-    display: flex !important;
-    align-items: center !important;
-    gap: 6px !important;
-    flex-wrap: nowrap !important;
-}
-
-.epm-ribbon-bullet {
-    color: #2563eb !important;
-    font-size: 9px !important;
-}
-
-.epm-ribbon-title {
-    font-family: var(--font-sans) !important;
-    font-size: 11.5px !important;
-    font-weight: 700 !important;
-    color: #0f172a !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.02em !important;
-}
-
-.epm-ribbon-badge {
-    font-family: var(--font-sans) !important;
-    font-size: 9.5px !important;
-    font-weight: 600 !important;
-    color: #2563eb !important;
-    background: #eff6ff !important;
-    border: 1px solid #bfdbfe !important;
-    padding: 0 5px !important;
-    border-radius: 3px !important;
-}
-
-.epm-ribbon-count {
-    font-family: var(--font-sans) !important;
-    font-variant-numeric: tabular-nums !important;
-    font-feature-settings: "tnum" 1 !important;
-    font-size: 9.5px !important;
-    font-weight: 600 !important;
-    color: #64748b !important;
-}
-
-.epm-ribbon-controls {
-    display: flex !important;
-    align-items: center !important;
-    gap: 4px !important;
-    flex-wrap: nowrap !important;
-}
-
-.epm-ribbon-btn {
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 3px !important;
-    height: 20px !important;
-    padding: 0 6px !important;
-    font-family: var(--font-sans) !important;
-    font-size: 10px !important;
-    font-weight: 600 !important;
-    color: #334155 !important;
-    background: #ffffff !important;
-    border: 1px solid #cbd5e1 !important;
-    border-radius: 3px !important;
-    cursor: pointer !important;
-    transition: all 0.12s ease !important;
-}
-
-.epm-ribbon-btn:hover {
-    background: #f1f5f9 !important;
-    color: #0f172a !important;
-    border-color: #94a3b8 !important;
-}
-
-.epm-collapse-btn {
-    width: 20px !important;
-    padding: 0 !important;
-    justify-content: center !important;
-    font-size: 12px !important;
-    font-weight: 700 !important;
-}
-
-/* Tab 1 Header Strip */
-#tab1_header_strip {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    gap: 8px !important;
-    margin-top: 2px !important;
-    margin-bottom: 0 !important;
-}
-
-#tab1_header_strip .epm-table-ribbon {
-    flex: 1 1 auto !important;
-    margin-top: 0 !important;
-}
-
-#tab1_refresh_btn {
-    height: 24px !important;
-    min-height: 24px !important;
-    font-size: 11px !important;
-    padding: 0 10px !important;
-    margin: 0 !important;
-    border-radius: 4px !important;
-    font-weight: 600 !important;
-    white-space: nowrap !important;
-}
-
-/* Tab 2 & Tab 3 Ultra-Compact Filter Rows */
-#cal_filters_row, #circ_filters_row {
-    display: flex !important;
-    align-items: center !important;
-    gap: 6px !important;
-    margin: 2px 0 3px 0 !important;
-    padding: 0 !important;
-    flex-wrap: nowrap !important;
-    overflow-x: auto !important;
-    min-height: 26px !important;
-}
-
-#cal_filters_row .gradio-radio, #circ_filters_row .gradio-radio {
-    margin: 0 !important;
-    padding: 0 !important;
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-}
-
-#cal_filters_row .gradio-radio > label, #circ_filters_row .gradio-radio > label,
-#cal_filters_row .gradio-radio > .block-title, #circ_filters_row .gradio-radio > .block-title {
-    display: none !important;
-}
-
-#cal_filters_row .wrap, #circ_filters_row .wrap {
-    display: inline-flex !important;
-    flex-direction: row !important;
-    align-items: center !important;
-    gap: 2px !important;
-    margin: 0 !important;
-    padding: 2px !important;
-    background: #f1f5f9 !important;
-    border-radius: 6px !important;
-    border: 1px solid #e2e8f0 !important;
-    flex-wrap: nowrap !important;
-}
-
-#cal_filters_row .wrap label, #circ_filters_row .wrap label {
-    display: inline-flex !important;
-    align-items: center !important;
-    height: 22px !important;
-    padding: 0 8px !important;
-    border: none !important;
-    border-radius: 4px !important;
-    background: transparent !important;
-    font-size: 10.5px !important;
-    font-weight: 600 !important;
-    color: #64748b !important;
-    cursor: pointer !important;
-    margin: 0 !important;
-    transition: all 0.12s ease !important;
-    white-space: nowrap !important;
-}
-
-#cal_filters_row .wrap label:hover, #circ_filters_row .wrap label:hover {
-    background: rgba(255, 255, 255, 0.6) !important;
-    color: #0f172a !important;
-}
-
-#cal_filters_row .wrap label:has(input:checked), #circ_filters_row .wrap label:has(input:checked) {
-    background: #ffffff !important;
-    color: #1d4ed8 !important;
-    border: none !important;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08) !important;
-    font-weight: 700 !important;
-}
-
-#cal_filters_row .wrap input[type="radio"], #circ_filters_row .wrap input[type="radio"] {
-    display: none !important;
-}
-
-#circ_filters_row .gradio-textbox {
-    margin: 0 !important;
-    padding: 0 !important;
-    min-height: 24px !important;
-    flex: 1 1 auto !important;
-}
-
-#circ_filters_row .gradio-textbox label,
-#circ_filters_row .gradio-textbox .block-title {
-    display: none !important;
-}
-
-#circ_filters_row .gradio-textbox input {
-    height: 24px !important;
-    padding: 1px 8px !important;
-    font-size: 11px !important;
-    border: 1px solid #cbd5e1 !important;
-    border-radius: 4px !important;
-}
-
-/* Gapless Ribbon-to-Table Anchor Rules */
-div:has(> .epm-table-ribbon),
-div:has(> * > .epm-table-ribbon) {
-    margin-bottom: 0 !important;
-    padding-bottom: 0 !important;
-}
-
-div[id*="_table"] {
-    margin-top: 0 !important;
-    padding-top: 0 !important;
-}
-
-div[id*="_table"] .table-wrap,
-div[id*="_table"] .gradio-dataframe,
-div[id*="_table"] div[data-testid="dataframe"],
-div[id*="_table"] .table-container {
-    border-top-left-radius: 0 !important;
-    border-top-right-radius: 0 !important;
-    border-top: none !important;
-    margin-top: 0 !important;
-    margin-bottom: 6px !important;
-}
-
-/* Zero-Height Collapsed Action Messages */
-#cal_action_msg,
-#circ_action_msg {
-    margin: 0 !important;
-    padding: 0 !important;
-}
-
-#cal_action_msg:not(:has(.prose:not(:empty))),
-#cal_action_msg:has(.prose:empty),
-#circ_action_msg:not(:has(.prose:not(:empty))),
-#circ_action_msg:has(.prose:empty) {
-    display: none !important;
-    height: 0 !important;
-    min-height: 0 !important;
-    max-height: 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    border: none !important;
-}
-
-#cal_action_msg:has(.prose:not(:empty)),
-#circ_action_msg:has(.prose:not(:empty)) {
-    margin: 3px 0 !important;
-    padding: 4px 8px !important;
-    font-size: 11.5px !important;
-    border-radius: 4px !important;
-    background: #f0fdf4 !important;
-    border: 1px solid #bbf7d0 !important;
-}
-
-/* ═══════════════════════════════════════════════════════════════════
-   INSTITUTIONAL PDF DOSSIER MIRROR VIEW (2035 ULTRA-PREMIUM LEDGER)
-   ═══════════════════════════════════════════════════════════════════ */
-
-#cal_table_header_strip {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    background: #ffffff !important;
-    border: 1px solid #cbd5e1 !important;
-    border-bottom: 2px solid #2563eb !important;
-    border-radius: 6px 6px 0 0 !important;
-    padding: 3px 8px !important;
-    margin-top: 0 !important;
-    margin-bottom: 0 !important;
-    min-height: 28px !important;
-    gap: 8px !important;
-    flex-wrap: nowrap !important;
-    overflow-x: auto !important;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
-    width: 100% !important;
-}
-
-#cal_table_header_strip .epm-tbl-hdr-left,
-.epm-tbl-hdr-left {
-    display: flex !important;
-    align-items: center !important;
-    gap: 6px !important;
-    flex: 0 0 390px !important;
-    min-width: 390px !important;
-    width: 390px !important;
-}
-
-.epm-tbl-hdr-title-group {
-    display: flex !important;
-    align-items: center !important;
-    gap: 6px !important;
-    white-space: nowrap !important;
-}
-
-.epm-tbl-hdr-title {
-    font-family: var(--font-sans) !important;
-    font-size: 11.5px !important;
-    font-weight: 800 !important;
-    color: #0f172a !important;
-    letter-spacing: 0.4px !important;
-}
-
-.epm-tbl-hdr-badge {
-    background: #eff6ff !important;
-    color: #2563eb !important;
-    font-family: var(--font-mono) !important;
-    font-size: 9px !important;
-    font-weight: 700 !important;
-    padding: 1px 5px !important;
-    border-radius: 3px !important;
-    border: 1px solid #bfdbfe !important;
-}
-
-.epm-tbl-hdr-badge-sub {
-    font-family: var(--font-mono) !important;
-    font-size: 9.5px !important;
-    color: #64748b !important;
-    font-weight: 500 !important;
-}
-
-#cal_table_header_strip .epm-tbl-hdr-actions,
-.epm-tbl-hdr-actions {
-    display: flex !important;
-    align-items: center !important;
-    gap: 3px !important;
-    justify-content: flex-end !important;
-    flex-wrap: nowrap !important;
-    flex: 0 0 auto !important;
-    margin-left: auto !important;
-    width: auto !important;
-}
-
-#cal_table_header_strip .epm-tbl-hdr-actions > button,
-#cal_table_header_strip .epm-tbl-hdr-actions button,
-#cal_table_header_strip button.epm-hdr-action-btn,
-.epm-hdr-action-btn {
-    flex: 0 0 auto !important;
-    width: auto !important;
-    min-width: 0 !important;
-    max-width: fit-content !important;
-    font-family: var(--font-sans) !important;
-    font-size: 10px !important;
-    font-weight: 600 !important;
-    border-radius: 4px !important;
-    min-height: 22px !important;
-    height: 22px !important;
-    padding: 0 5px !important;
-    white-space: nowrap !important;
-    transition: all 0.12s ease !important;
-}
-
-.btn-primary-dark {
-    background: #2563eb !important;
-    color: #ffffff !important;
-    border: 1px solid #1d4ed8 !important;
-    box-shadow: 0 1px 2px rgba(37, 99, 235, 0.2) !important;
-}
-
-.btn-primary-dark:hover {
-    background: #1d4ed8 !important;
-    color: #ffffff !important;
-    box-shadow: 0 0 6px rgba(37, 99, 235, 0.4) !important;
-}
-
-.btn-primary-emerald {
-    background: #059669 !important;
-    color: #ffffff !important;
-    border: 1px solid #047857 !important;
-    box-shadow: 0 1px 2px rgba(5, 150, 105, 0.2) !important;
-}
-
-.btn-primary-emerald:hover {
-    background: #047857 !important;
-    color: #ffffff !important;
-    box-shadow: 0 0 6px rgba(5, 150, 105, 0.4) !important;
-}
-
-.btn-secondary-light {
-    background: #ffffff !important;
-    color: #334155 !important;
-    border: 1px solid #cbd5e1 !important;
-}
-
-.btn-secondary-light:hover {
-    background: #f8fafc !important;
-    color: #0f172a !important;
-    border-color: #94a3b8 !important;
-}
-
-#calendar_dossier_wrap {
-    width: 100% !important;
-    margin-top: 0 !important;
-    padding-top: 0 !important;
-    gap: 0 !important;
-}
-
-#calendar_dossier_wrap > * {
-    margin-top: 0 !important;
-    margin-bottom: 0 !important;
-}
-
-.epm-hidden-action-row {
-    display: none !important;
-    height: 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-}
-
-.epm-dossier-container {
-    width: 100% !important;
-    display: flex;
-    flex-direction: column;
-    margin-top: 0 !important;
-    margin-bottom: 6px !important;
-    padding-top: 0 !important;
-    border: 1px solid #cbd5e1 !important;
-    border-top: none !important;
-    border-radius: 0 0 6px 6px !important;
-    overflow: hidden !important;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03) !important;
-}
-
-.epm-dossier-table-wrap {
-    width: 100% !important;
-    overflow-x: auto !important;
-    max-height: 75vh !important;
-}
-
-.epm-dossier-table {
-    min-width: 1720px !important;
-    width: 1720px !important;
-    table-layout: fixed !important;
-    border-collapse: collapse !important;
-    font-family: var(--font-sans) !important;
-    font-size: 11.5px !important;
-    text-align: left !important;
-    background: #ffffff !important;
-}
-
-.epm-dossier-table thead th {
-    position: sticky !important;
-    top: 0 !important;
-    z-index: 20 !important;
-    background: #f8fafc !important;
-    color: #475569 !important;
-    font-family: var(--font-sans) !important;
-    font-size: 10.5px !important;
-    font-weight: 600 !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.02em !important;
-    padding: 5px 8px !important;
-    border-bottom: 1px solid #cbd5e1 !important;
-    border-right: 1px solid #e2e8f0 !important;
-    white-space: nowrap !important;
-    vertical-align: middle !important;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.02) !important;
-}
-
-.epm-dossier-table thead th:last-child {
-    border-right: none !important;
-}
-
-/* Sticky Day Group Ribbon */
-.epm-day-ribbon-row td {
-    padding: 0 !important;
-    border: none !important;
-    background: transparent !important;
-    height: auto !important;
-    max-height: none !important;
-}
-
-.epm-day-ribbon-content {
-    position: sticky !important;
-    left: 0 !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    background: #f1f5f9 !important;
-    color: #0f172a !important;
-    padding: 3px 10px !important;
-    border-top: 1px solid #cbd5e1 !important;
-    border-bottom: 1px solid #cbd5e1 !important;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.02) !important;
-}
-
-.epm-ribbon-left {
-    display: flex !important;
-    align-items: center !important;
-    gap: 8px !important;
-}
-
-.epm-ribbon-bullet {
-    display: inline-block !important;
-    width: 6px !important;
-    height: 6px !important;
-    border-radius: 50% !important;
-    background: #2563eb !important;
-    box-shadow: 0 0 4px rgba(37, 99, 235, 0.4) !important;
-}
-
-.epm-ribbon-date {
-    font-family: var(--font-sans) !important;
-    font-variant-numeric: tabular-nums !important;
-    font-feature-settings: "tnum" 1 !important;
-    font-size: 11px !important;
-    font-weight: 700 !important;
-    color: #0f172a !important;
-}
-
-.epm-ribbon-day {
-    font-family: var(--font-sans) !important;
-    font-size: 10.5px !important;
-    font-weight: 600 !important;
-    color: #475569 !important;
-    text-transform: uppercase !important;
-}
-
-.epm-ribbon-tally {
-    font-family: var(--font-sans) !important;
-    font-variant-numeric: tabular-nums !important;
-    font-feature-settings: "tnum" 1 !important;
-    font-size: 9.5px !important;
-    font-weight: 600 !important;
-    background: #e0f2fe !important;
-    color: #0284c7 !important;
-    border: 1px solid #bae6fd !important;
-    padding: 1px 6px !important;
-    border-radius: 3px !important;
-}
-
-.epm-dossier-row {
-    height: 34px !important;
-    max-height: 38px !important;
-    border-bottom: 1px solid #f1f5f9 !important;
-    transition: background 0.1s ease !important;
-}
-
-.epm-dossier-row-even {
-    background: #ffffff !important;
-}
-
-.epm-dossier-row-odd {
-    background: #f8fafc !important; /* Subtle zebra striping */
-}
-
-.epm-dossier-row:hover {
-    background: #f0f7ff !important;
-}
-
-.epm-dossier-table td {
-    padding: 3px 6px !important;
-    vertical-align: middle !important;
-    border-right: 1px solid #f1f5f9 !important;
-    color: #334155 !important;
-    line-height: 1.32 !important;
-    height: 34px !important;
-    max-height: 38px !important;
-    overflow: hidden !important;
-    font-family: var(--font-sans) !important;
-    font-variant-numeric: tabular-nums !important;
-    font-feature-settings: "tnum" 1 !important;
-}
-
-.epm-dossier-table td:last-child {
-    border-right: none !important;
-}
-
-/* Precision Signal Pips */
-.epm-signal-pips {
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 3px !important;
-    padding: 2px 6px !important;
-    border-radius: 4px !important;
-    font-family: var(--font-sans) !important;
-    font-size: 10px !important;
-    font-weight: 700 !important;
-    white-space: nowrap !important;
-}
-
-.epm-signal-pips .pip {
-    display: inline-block !important;
-    width: 4px !important;
-    height: 10px !important;
-    border-radius: 1px !important;
-    background: #cbd5e1 !important;
-}
-
-.epm-signal-pips.tier-5 {
-    background: #fef2f2 !important;
-    border: 1px solid #fecaca !important;
-    color: #b91c1c !important;
-}
-.epm-signal-pips.tier-5 .pip.on {
-    background: #dc2626 !important;
-    box-shadow: 0 0 4px rgba(220, 38, 38, 0.5) !important;
-}
-
-.epm-signal-pips.tier-4 {
-    background: #fff7ed !important;
-    border: 1px solid #fed7aa !important;
-    color: #c2410c !important;
-}
-.epm-signal-pips.tier-4 .pip.on {
-    background: #ea580c !important;
-}
-
-.epm-signal-pips.tier-3 {
-    background: #f0fdf4 !important;
-    border: 1px solid #bbf7d0 !important;
-    color: #15803d !important;
-}
-.epm-signal-pips.tier-3 .pip.on {
-    background: #16a34a !important;
-}
-
-.epm-signal-pips.tier-2, .epm-signal-pips.tier-1 {
-    background: #f8fafc !important;
-    border: 1px solid #e2e8f0 !important;
-    color: #64748b !important;
-}
-.epm-signal-pips.tier-2 .pip.on, .epm-signal-pips.tier-1 .pip.on {
-    background: #64748b !important;
-}
-
-.epm-signal-pips .pip-label {
-    margin-left: 4px !important;
-}
-
-.epm-dossier-table td.col-event,
-.epm-dossier-table td.col-event b,
-.epm-dossier-table td.col-reason {
-    display: -webkit-box !important;
-    -webkit-line-clamp: 2 !important;
-    -webkit-box-orient: vertical !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    line-height: 1.32 !important;
-    max-height: 2.65em !important;
-}
-
-.epm-dossier-table .col-idx { width: 36px !important; min-width: 36px; text-align: center !important; font-family: var(--font-sans) !important; font-variant-numeric: tabular-nums !important; font-feature-settings: "tnum" 1 !important; font-size: 10.5px !important; color: #64748b !important; }
-.epm-dossier-table .col-date { width: 92px !important; min-width: 92px; text-align: center !important; font-family: var(--font-sans) !important; font-variant-numeric: tabular-nums !important; font-feature-settings: "tnum" 1 !important; font-size: 11px !important; color: #0f172a !important; white-space: nowrap !important; font-weight: 600 !important; }
-.epm-dossier-table .col-time { width: 78px !important; min-width: 78px; text-align: center !important; font-family: var(--font-sans) !important; font-variant-numeric: tabular-nums !important; font-feature-settings: "tnum" 1 !important; font-size: 11px !important; color: #0f172a !important; white-space: nowrap !important; }
-.epm-dossier-table .col-day { width: 46px !important; min-width: 46px; text-align: center !important; font-weight: 600 !important; color: #475569 !important; white-space: nowrap !important; }
-.epm-dossier-table .col-type { width: 115px !important; min-width: 115px; white-space: nowrap !important; }
-.epm-dossier-table .col-country { width: 64px !important; min-width: 64px; text-align: center !important; font-weight: 700 !important; color: #1e293b !important; white-space: nowrap !important; }
-.epm-dossier-table .col-reg { width: 75px !important; min-width: 75px; text-align: center !important; font-weight: 600 !important; color: #0284c7 !important; }
-.epm-dossier-table .col-sec { width: 110px !important; min-width: 110px; color: #475569 !important; }
-.epm-dossier-table .col-event { width: 325px !important; min-width: 325px !important; color: #0f172a !important; }
-.epm-dossier-table .col-imp { width: 58px !important; min-width: 58px !important; text-align: center !important; white-space: nowrap !important; }
-.epm-dossier-table .col-num { width: 88px !important; min-width: 88px; text-align: center !important; font-family: var(--font-sans) !important; font-variant-numeric: tabular-nums !important; font-feature-settings: "tnum" 1 !important; font-size: 11px !important; color: #475569 !important; white-space: nowrap !important; }
-.epm-dossier-table .col-fore { color: #059669 !important; font-weight: 600 !important; }
-.epm-dossier-table .col-outcome { width: 175px !important; min-width: 175px !important; vertical-align: middle !important; }
-.epm-dossier-table .col-sent { width: 80px !important; min-width: 80px; text-align: center !important; white-space: nowrap !important; }
-.epm-dossier-table .col-reason { width: 285px !important; min-width: 285px !important; color: #334155 !important; font-size: 11.5px !important; }
-
-/* Unfolded Outcome & Results Badges */
-.epm-outcome-pill {
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 4px !important;
-    padding: 2px 7px !important;
-    border-radius: 4px !important;
-    font-family: var(--font-sans) !important;
-    font-variant-numeric: tabular-nums !important;
-    font-feature-settings: "tnum" 1 !important;
-    font-size: 10.5px !important;
-    font-weight: 600 !important;
-    line-height: 1.3 !important;
-    max-width: 100% !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    white-space: nowrap !important;
-}
-.epm-outcome-pill.outcome-released {
-    background: #ecfdf5 !important;
-    border: 1px solid #a7f3d0 !important;
-    color: #065f46 !important;
-    font-weight: 700 !important;
-}
-.epm-outcome-pill.outcome-pending {
-    background: #f8fafc !important;
-    border: 1px solid #e2e8f0 !important;
-    color: #64748b !important;
-    font-weight: 500 !important;
-}
-
-/* Floating 5 PM Daily Outcomes PDF Pill */
-.epm-daily-pdf-floater {
-    position: fixed !important;
-    bottom: 22px !important;
-    right: 26px !important;
-    z-index: 999 !important;
-    background: #ffffff !important;
-    border: 1.5px solid #059669 !important;
-    border-radius: 9999px !important;
-    box-shadow: 0 4px 16px rgba(5, 150, 105, 0.22), 0 2px 6px rgba(0, 0, 0, 0.08) !important;
-    padding: 6px 14px !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 8px !important;
-    text-decoration: none !important;
-    cursor: pointer !important;
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
-    backdrop-filter: blur(8px) !important;
-}
-.epm-daily-pdf-floater:hover {
-    transform: translateY(-2px) !important;
-    box-shadow: 0 8px 24px rgba(5, 150, 105, 0.32) !important;
-    background: #f0fdf4 !important;
-    border-color: #047857 !important;
-}
-.epm-daily-pdf-floater .floater-pulse {
-    display: inline-block !important;
-    width: 8px !important;
-    height: 8px !important;
-    border-radius: 50% !important;
-    background: #10b981 !important;
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7) !important;
-    animation: floater-pulse-anim 2s infinite !important;
-}
-@keyframes floater-pulse-anim {
-    0% {
-        transform: scale(0.95);
-        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
-    }
-    70% {
-        transform: scale(1);
-        box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
-    }
-    100% {
-        transform: scale(0.95);
-        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
-    }
-}
-.epm-daily-pdf-floater .floater-label {
-    font-family: var(--font-sans) !important;
-    font-size: 11.5px !important;
-    font-weight: 700 !important;
-    color: #065f46 !important;
-    letter-spacing: 0.2px !important;
-}
-.epm-daily-pdf-floater .floater-tag {
-    font-family: var(--font-sans) !important;
-    font-size: 9.5px !important;
-    font-weight: 700 !important;
-    background: #ecfdf5 !important;
-    color: #047857 !important;
-    padding: 1px 6px !important;
-    border-radius: 4px !important;
-    border: 1px solid #a7f3d0 !important;
-}
-
-/* Dossier Badges */
-.epm-dossier-badge {
-    display: inline-block !important;
-    padding: 2px 6px !important;
-    border-radius: 3px !important;
-    font-size: 10.5px !important;
-    font-weight: 700 !important;
-    line-height: 1.2 !important;
-}
-.badge-earnings { color: #15803d !important; background: #f0fdf4 !important; border: 1px solid #bbf7d0 !important; }
-.badge-econ { color: #0284c7 !important; background: #f0f9ff !important; border: 1px solid #bae6fd !important; }
-.badge-holiday { color: #991b1b !important; background: #fef2f2 !important; border: 1px solid #fecaca !important; }
-.badge-special { color: #7c3aed !important; background: #f5f3ff !important; border: 1px solid #ddd6fe !important; }
-.badge-corp { color: #334155 !important; background: #f8fafc !important; border: 1px solid #e2e8f0 !important; }
-.badge-general { color: #475569 !important; background: #f1f5f9 !important; }
-
-.epm-stars {
-    color: #d97706 !important;
-    font-family: var(--font-sans) !important;
-    font-weight: 700 !important;
-    letter-spacing: 0.05em !important;
-}
-
-.epm-sent-badge {
-    display: inline-block !important;
-    padding: 1px 6px !important;
-    border-radius: 3px !important;
-    font-size: 10px !important;
-    font-weight: 700 !important;
-}
-.sent-bullish { color: #16a34a !important; background: #dcfce7 !important; }
-.sent-bearish { color: #dc2626 !important; background: #fee2e2 !important; }
-.sent-neutral { color: #64748b !important; background: #f1f5f9 !important; }
-
-.epm-dossier-footer-note {
-    background: #f8fafc !important;
-    border: 1px solid #e2e8f0 !important;
-    border-radius: 6px !important;
-    padding: 10px 14px !important;
-    text-align: center !important;
-    font-size: 11.5px !important;
-    color: #64748b !important;
-}
-
-/* Collapsed Table State */
-div[id*="_table"].epm-table-collapsed .table-wrap,
-div[id*="_table"].epm-table-collapsed table,
-div[id*="_table"].epm-table-collapsed div[data-testid="dataframe"],
-div[id*="_table"].epm-table-collapsed .table-container {
-    max-height: 0 !important;
-    min-height: 0 !important;
-    height: 0 !important;
-    overflow: hidden !important;
-    opacity: 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    border: none !important;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
-}
-
-/* 17. Full-Screen Focus Mode & Floating Banner */
-.epm-fullscreen-active {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important;
-    background: #ffffff !important;
-    z-index: 99990 !important;
-    padding: 60px 24px 24px 24px !important;
-    overflow-y: auto !important;
-    box-sizing: border-box !important;
-}
-
-.epm-fullscreen-active .table-wrap,
-.epm-fullscreen-active table,
-.epm-fullscreen-active .gradio-dataframe {
-    width: 100% !important;
-    max-height: none !important;
-    height: auto !important;
-}
-
-.epm-focus-banner {
-    position: fixed !important;
-    top: 12px !important;
-    left: 50% !important;
-    transform: translateX(-50%) !important;
-    z-index: 99999 !important;
-    background: #ffffff !important;
-    color: #0f172a !important;
-    border: 1px solid #cbd5e1 !important;
-    padding: 8px 18px !important;
-    border-radius: 30px !important;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1) !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 12px !important;
-    font-size: 12px !important;
-    font-family: var(--font-sans) !important;
-}
-
-.epm-focus-banner-content {
-    display: flex !important;
-    align-items: center !important;
-    gap: 12px !important;
-}
-
-.epm-focus-exit-btn {
-    background: #ef4444 !important;
-    color: #ffffff !important;
-    border: none !important;
-    padding: 3px 10px !important;
-    border-radius: 15px !important;
-    font-weight: 700 !important;
-    font-size: 11px !important;
-    cursor: pointer !important;
-    transition: background 0.15s ease !important;
-}
-
-.epm-focus-exit-btn:hover {
-    background: #dc2626 !important;
-}
-
-.epm-focus-body-lock {
-    overflow: hidden !important;
-}
-
-/* 18. Watchlist Highlighter & Glow */
-tbody tr.epm-highlight-row td {
-    background-color: #f0f7ff !important;
-    border-top: 1px solid #bfdbfe !important;
-    border-bottom: 1px solid #bfdbfe !important;
-    font-weight: 600 !important;
-}
-
-tbody tr.epm-highlight-row td:first-child {
-    border-left: 3px solid #2563eb !important;
-}
-
-/* ═══════════════════════════════════════════════════════════════════
-   19. 2035 COMMAND PALETTE & ULTRA-PREMIUM NAVIGATION UPGRADES
-   ═══════════════════════════════════════════════════════════════════ */
-
-.epm-nav-bolt {
-    font-size: 15px !important;
-    color: #2563eb !important;
-}
-
-.epm-title-highlight {
-    color: #2563eb !important;
-}
-
-.epm-telem-tg b {
-    color: #10b981 !important;
-}
-
-.epm-telem-time {
-    font-family: var(--font-mono) !important;
-    font-size: 10.5px !important;
-}
-
 .epm-tab-pill-bullet {
     width: 5px !important;
     height: 5px !important;
     border-radius: 50% !important;
-    background: #94a3b8 !important;
-    display: inline-block !important;
-    transition: background 0.15s ease !important;
+    background: #64748B !important;
+}
+.epm-tab-pill.active .epm-tab-pill-bullet {
+    background: #60A5FA !important;
+    box-shadow: 0 0 5px #60A5FA !important;
 }
 
-.epm-tab-pill.active .epm-tab-pill-bullet {
-    background: #2563eb !important;
-    box-shadow: 0 0 6px #2563eb !important;
+.epm-nav-controls {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
 }
 
 .epm-cmd-launcher-btn {
     display: inline-flex !important;
     align-items: center !important;
-    gap: 6px !important;
-    background: #f1f5f9 !important;
-    border: 1px solid #cbd5e1 !important;
-    border-radius: 6px !important;
-    padding: 3px 8px !important;
+    gap: 5px !important;
     height: 26px !important;
+    padding: 0 8px !important;
+    background: #181F2C !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 5px !important;
+    color: #94A3B8 !important;
+    font-size: 11px !important;
     cursor: pointer !important;
-    transition: all 0.15s ease !important;
 }
-
-.epm-cmd-launcher-btn:hover {
-    background: #e2e8f0 !important;
-    border-color: #94a3b8 !important;
-}
-
 .epm-cmd-badge {
     font-family: var(--font-mono) !important;
-    font-size: 10px !important;
-    font-weight: 700 !important;
-    background: #ffffff !important;
-    color: #0f172a !important;
-    border: 1px solid #cbd5e1 !important;
-    padding: 1px 4px !important;
+    font-size: 9.5px !important;
+    background: rgba(0, 82, 255, 0.15) !important;
+    color: #60A5FA !important;
+    border: 1px solid rgba(0, 82, 255, 0.3) !important;
+    padding: 0 4px !important;
     border-radius: 3px !important;
 }
 
-.epm-cmd-label {
-    font-family: var(--font-sans) !important;
-    font-size: 11px !important;
-    font-weight: 600 !important;
-    color: #475569 !important;
-}
-
-/* Command Palette Modal */
-.epm-palette-backdrop {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important;
-    background: rgba(15, 23, 42, 0.7) !important;
-    backdrop-filter: blur(8px) !important;
-    -webkit-backdrop-filter: blur(8px) !important;
-    z-index: 99999 !important;
-    display: none !important;
-    align-items: flex-start !important;
-    justify-content: center !important;
-    padding-top: 12vh !important;
-}
-
-.epm-palette-backdrop.is-active {
-    display: flex !important;
-}
-
-.epm-palette-dialog {
-    width: 580px !important;
-    max-width: 92vw !important;
-    background: #ffffff !important;
-    border: 1px solid #cbd5e1 !important;
-    border-radius: 12px !important;
-    box-shadow: 0 20px 40px rgba(0,0,0,0.15), 0 1px 3px rgba(0,0,0,0.08) !important;
-    overflow: hidden !important;
-    color: #0f172a !important;
-    animation: epmPaletteSlide 0.12s ease-out !important;
-}
-
-@keyframes epmPaletteSlide {
-    from { opacity: 0; transform: translateY(-8px) scale(0.98); }
-    to { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-.epm-palette-input-wrap {
-    display: flex !important;
+.epm-nav-search-wrap {
+    display: inline-flex !important;
     align-items: center !important;
-    padding: 12px 16px !important;
-    border-bottom: 1px solid #e2e8f0 !important;
-    gap: 10px !important;
-    background: #f8fafc !important;
+    height: 26px !important;
+    background: #181F2C !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 5px !important;
+    padding: 0 6px !important;
+    gap: 4px !important;
 }
-
-.epm-palette-search-icon {
-    font-size: 16px !important;
-    color: #2563eb !important;
-}
-
-#epm-palette-input {
-    flex: 1 !important;
+.epm-nav-search-wrap input {
     background: transparent !important;
     border: none !important;
+    color: #F1F5F9 !important;
+    font-size: 11px !important;
     outline: none !important;
-    font-family: var(--font-sans) !important;
-    font-size: 14px !important;
-    font-weight: 500 !important;
-    color: #0f172a !important;
+    width: 105px !important;
 }
 
-#epm-palette-input::placeholder {
-    color: #94a3b8 !important;
-}
-
-.epm-palette-esc-hint {
-    font-family: var(--font-mono) !important;
-    font-size: 9.5px !important;
-    font-weight: 700 !important;
-    background: #f1f5f9 !important;
-    color: #475569 !important;
-    padding: 2px 6px !important;
-    border-radius: 4px !important;
-    border: 1px solid #cbd5e1 !important;
-    cursor: pointer !important;
-}
-
-.epm-palette-results {
-    max-height: 360px !important;
-    overflow-y: auto !important;
-    padding: 6px !important;
-    background: #ffffff !important;
-}
-
-.epm-palette-section-title {
-    font-family: var(--font-sans) !important;
-    font-size: 9.5px !important;
-    font-weight: 700 !important;
-    color: #64748b !important;
-    letter-spacing: 0.04em !important;
-    padding: 8px 10px 4px !important;
-    text-transform: uppercase !important;
-}
-
-.epm-palette-item {
-    display: flex !important;
+.epm-top-btn {
+    display: inline-flex !important;
     align-items: center !important;
-    gap: 10px !important;
-    padding: 8px 10px !important;
-    border-radius: 6px !important;
-    cursor: pointer !important;
-    transition: background 0.1s ease !important;
-}
-
-.epm-palette-item:hover {
-    background: #f1f5f9 !important;
-}
-
-.epm-item-icon {
-    font-size: 15px !important;
-}
-
-.epm-item-text {
-    flex: 1 !important;
-    display: flex !important;
-    flex-direction: column !important;
-}
-
-.epm-item-main {
-    font-size: 12.5px !important;
-    font-weight: 600 !important;
-    color: #0f172a !important;
-}
-
-.epm-item-sub {
+    gap: 4px !important;
+    height: 26px !important;
+    padding: 0 8px !important;
+    background: #181F2C !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 5px !important;
+    color: #F1F5F9 !important;
     font-size: 11px !important;
-    color: #64748b !important;
+    cursor: pointer !important;
+}
+.epm-top-btn.epm-btn-active {
+    background: rgba(16, 185, 129, 0.15) !important;
+    color: #10B981 !important;
+    border-color: rgba(16, 185, 129, 0.3) !important;
 }
 
-.epm-item-shortcut {
-    font-family: var(--font-mono) !important;
-    font-size: 9.5px !important;
-    background: #eff6ff !important;
-    color: #2563eb !important;
-    padding: 2px 5px !important;
-    border-radius: 3px !important;
-    border: 1px solid #bfdbfe !important;
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   2035 INSTITUTIONAL TABLE TYPOGRAPHY & ZERO MONOSPACE OVERRIDE
-   ═══════════════════════════════════════════════════════════════════════════ */
-.gradio-container table,
-.gradio-container table *,
-.gradio-container div[data-testid="dataframe"],
-.gradio-container div[data-testid="dataframe"] *,
-.gradio-container .table-wrap,
-.gradio-container .table-wrap *,
-.gradio-container td,
-.gradio-container td *,
-.gradio-container th,
-.gradio-container th *,
-.epm-dossier-table,
-.epm-dossier-table * {
-    font-family: -apple-system, BlinkMacSystemFont, "Inter", "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
-}
-
-/* Explicitly reserve tabular figures for numbers & timestamps */
-.gradio-container td.col-idx,
-.gradio-container td.col-date,
-.gradio-container td.col-time,
-.gradio-container td.col-num,
-.epm-dossier-table .col-idx,
-.epm-dossier-table .col-date,
-.epm-dossier-table .col-time,
-.epm-dossier-table .col-num,
-#calendar_table td:nth-child(1),
-#calendar_table td:nth-child(2),
-#calendar_table td:nth-child(3),
-#calendar_table td:nth-child(11),
-#calendar_table td:nth-child(12),
-#top_news_table td:nth-child(1),
-#top_news_table td:nth-child(8),
-#top_news_table td:nth-child(9),
-#bottom_news_table td:nth-child(1),
-#bottom_news_table td:nth-child(4),
-#circ_table td:nth-child(2),
-#circ_table td:nth-child(3),
-#holidays_table td:nth-child(1) {
-    font-variant-numeric: tabular-nums !important;
-    font-feature-settings: "tnum" 1 !important;
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   MODULAR WORKSPACE: RE-ORDERABLE & COLLAPSIBLE SECTIONS
-   ═══════════════════════════════════════════════════════════════════════════ */
-.epm-modular-section {
+/* 10. Table Ribbons & Modular Workspace Headers */
+.epm-table-ribbon, #cal_table_header_strip, #tab1_header_strip {
     display: flex !important;
-    flex-direction: column !important;
-    margin-bottom: 6px !important;
-    padding: 0 !important;
-    position: relative !important;
-    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, opacity 0.15s ease !important;
-    border-radius: 4px !important;
-}
-
-.epm-modular-section.is-reordering {
-    opacity: 0.8 !important;
-    transform: scale(0.995) !important;
-    background: rgba(37, 99, 235, 0.04) !important;
-    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.3) !important;
-}
-
-/* When a section is collapsed, hide everything inside it EXCEPT the ribbon or header strip */
-.epm-modular-section.is-collapsed > *:not(.epm-table-ribbon):not(#cal_table_header_strip):not(#tab1_header_strip) {
-    display: none !important;
-}
-
-.epm-modular-section.is-collapsed .epm-table-ribbon,
-.epm-modular-section.is-collapsed #cal_table_header_strip,
-.epm-modular-section.is-collapsed #tab1_header_strip {
-    border-radius: 4px !important;
-    border-bottom: 1px solid #cbd5e1 !important;
-    margin-bottom: 2px !important;
-}
-
-/* Controls grouping */
-.epm-section-ctrl-wrap {
-    display: inline-flex !important;
     align-items: center !important;
-    gap: 3px !important;
+    justify-content: space-between !important;
+    background: #151B27 !important;
+    border: 1px solid var(--border-color) !important;
+    border-bottom: 2px solid #0052FF !important;
+    border-radius: 6px 6px 0 0 !important;
+    padding: 4px 10px !important;
+    min-height: 30px !important;
 }
 
-.epm-section-reorder-group {
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 1px !important;
-    background: #ffffff !important;
-    border: 1px solid #cbd5e1 !important;
+.epm-ribbon-title {
+    font-size: 11.5px !important;
+    font-weight: 700 !important;
+    color: #F1F5F9 !important;
+    letter-spacing: 0.02em !important;
+}
+.epm-ribbon-subtitle {
+    font-size: 10px !important;
+    color: #64748B !important;
+}
+.epm-ribbon-badge {
+    font-size: 9.5px !important;
+    font-weight: 700 !important;
+    background: rgba(0, 82, 255, 0.15) !important;
+    color: #60A5FA !important;
+    border: 1px solid rgba(0, 82, 255, 0.3) !important;
+    padding: 1px 5px !important;
     border-radius: 3px !important;
-    padding: 1px !important;
 }
 
-.epm-reorder-btn {
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    width: 17px !important;
-    height: 17px !important;
-    min-height: 17px !important;
-    padding: 0 !important;
-    border: none !important;
-    background: transparent !important;
-    color: #475569 !important;
-    cursor: pointer !important;
-    border-radius: 2px !important;
-    transition: all 0.12s ease !important;
-}
-
-.epm-reorder-btn:hover:not(:disabled) {
-    background: #f1f5f9 !important;
-    color: #0f172a !important;
-}
-
-.epm-reorder-btn:disabled,
-.epm-reorder-btn[disabled],
-.epm-reorder-btn.is-disabled {
-    opacity: 0.3 !important;
-    cursor: not-allowed !important;
-    pointer-events: none !important;
-}
-
-.epm-collapse-btn {
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    width: 19px !important;
-    height: 19px !important;
-    min-height: 19px !important;
-    padding: 0 !important;
-    background: #ffffff !important;
-    border: 1px solid #cbd5e1 !important;
-    border-radius: 3px !important;
-    color: #334155 !important;
+.epm-ribbon-btn, button.epm-hdr-action-btn {
+    height: 22px !important;
+    padding: 0 7px !important;
+    font-size: 10px !important;
+    font-weight: 600 !important;
+    background: #181F2C !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 4px !important;
+    color: #94A3B8 !important;
     cursor: pointer !important;
     transition: all 0.12s ease !important;
 }
-
-.epm-collapse-btn:hover {
-    background: #f1f5f9 !important;
-    color: #0f172a !important;
-    border-color: #94a3b8 !important;
+.epm-ribbon-btn:hover, button.epm-hdr-action-btn:hover {
+    background: #1E2738 !important;
+    color: #F1F5F9 !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
 }
 
-.epm-collapse-btn .epm-chevron-icon {
-    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
-    display: block !important;
+/* 11. Bento Cards (Settings Hub, User Guide & Admin Panels) */
+.epm-bento-card {
+    background: var(--bg-surface) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 10px !important;
+    padding: 18px 20px !important;
+    margin-bottom: 14px !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2) !important;
+    transition: border-color 0.15s ease !important;
+}
+.epm-bento-card:hover {
+    border-color: rgba(255, 255, 255, 0.14) !important;
 }
 
-.epm-modular-section.is-collapsed .epm-collapse-btn .epm-chevron-icon {
-    transform: rotate(-90deg) !important;
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   MOBILE SIDE DRAWER & INSHORTS PAGE VIEW DRAWER STYLING
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-/* Mobile Hamburger Menu Button */
-.epm-mobile-menu-trigger {
-    display: none !important;
-    align-items: center;
-    gap: 6px;
-    height: 30px;
-    padding: 0 10px;
-    background: #ffffff;
-    border: 1px solid #cbd5e1;
-    border-radius: 6px;
-    cursor: pointer;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
-    transition: all 0.15s ease;
-    flex-shrink: 0;
-}
-
-.epm-mobile-menu-trigger:hover,
-.epm-mobile-menu-trigger:active {
-    background: #f1f5f9;
-    border-color: #94a3b8;
-}
-
-.epm-hamburger-line {
-    display: block;
-    width: 14px;
-    height: 2px;
-    background-color: #0f172a;
-    border-radius: 1px;
-    margin: 2px 0;
-}
-
-.epm-menu-text {
-    font-family: var(--font-sans);
-    font-size: 11px;
-    font-weight: 700;
-    color: #0f172a;
-    letter-spacing: 0.04em;
-}
-
-/* Mobile Slide-Out Side Navigation Drawer */
-.epm-drawer-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(15, 23, 42, 0.5);
-    backdrop-filter: blur(4px);
-    z-index: 1040;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.25s ease;
-}
-
-.epm-drawer-backdrop.is-open {
-    opacity: 1;
-    pointer-events: auto;
-}
-
-.epm-mobile-drawer {
-    position: fixed;
-    top: 0;
-    right: -320px;
-    width: 300px;
-    max-width: 86vw;
-    height: 100vh;
-    background: #ffffff;
-    z-index: 1050;
-    box-shadow: -8px 0 24px rgba(15, 23, 42, 0.15);
-    transition: right 0.28s cubic-bezier(0.16, 1, 0.3, 1);
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-}
-
-.epm-mobile-drawer.is-open {
-    right: 0;
-}
-
-.epm-drawer-header {
-    display: flex;
+.epm-bento-header {
+    display: flex !important;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 16px;
-    border-bottom: 1px solid #e2e8f0;
-    background: #f8fafc;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-subtle);
 }
-
-.epm-drawer-brand {
+.epm-bento-title {
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    color: #F1F5F9 !important;
     display: flex;
     align-items: center;
     gap: 8px;
 }
+.epm-bento-desc {
+    font-size: 11.5px !important;
+    color: #94A3B8 !important;
+    margin-bottom: 14px !important;
+    line-height: 1.5 !important;
+}
 
+/* Custom Segmented Inputs & Buttons in Dark Mode */
+.gradio-container button.primary,
+.gradio-container button[variant="primary"] {
+    background: #0052FF !important;
+    color: #ffffff !important;
+    border: none !important;
+    font-weight: 700 !important;
+    border-radius: 6px !important;
+    box-shadow: 0 2px 10px rgba(0, 82, 255, 0.3) !important;
+    transition: all 0.15s ease !important;
+}
+.gradio-container button.primary:hover,
+.gradio-container button[variant="primary"]:hover {
+    background: #1A66FF !important;
+    box-shadow: 0 4px 14px rgba(0, 82, 255, 0.45) !important;
+}
+
+.gradio-container input[type="text"],
+.gradio-container input[type="password"],
+.gradio-container textarea,
+.gradio-container select {
+    background-color: #181F2C !important;
+    border: 1px solid var(--border-color) !important;
+    color: #F1F5F9 !important;
+    border-radius: 6px !important;
+    font-size: 12px !important;
+}
+.gradio-container input:focus,
+.gradio-container textarea:focus {
+    border-color: #0052FF !important;
+    box-shadow: 0 0 0 1px #0052FF !important;
+}
+
+/* Custom Sleek Checkbox / Toggle Switches */
+.gradio-container input[type="checkbox"] {
+    accent-color: #0052FF !important;
+    cursor: pointer !important;
+}
+
+/* 12. Inshorts & Mobile Side Drawer Dark Theme */
+.epm-mobile-drawer {
+    background: #121721 !important;
+    border-left: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+.epm-drawer-header {
+    background: #151B27 !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
 .epm-drawer-title {
-    font-family: var(--font-sans);
-    font-size: 15px;
-    font-weight: 800;
-    color: #0f172a;
-    letter-spacing: -0.01em;
+    color: #F1F5F9 !important;
 }
-
-.epm-drawer-badge {
-    font-size: 9px;
-    font-weight: 700;
-    background: #eff6ff;
-    color: #2563eb;
-    border: 1px solid #bfdbfe;
-    padding: 1px 5px;
-    border-radius: 4px;
-}
-
-.epm-drawer-close-btn {
-    width: 28px;
-    height: 28px;
-    border: 1px solid #cbd5e1;
-    background: #ffffff;
-    border-radius: 6px;
-    color: #64748b;
-    font-size: 13px;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-}
-
-.epm-drawer-body {
-    padding: 14px 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    flex: 1;
-}
-
-.epm-drawer-section-label {
-    font-family: var(--font-sans);
-    font-size: 10px;
-    font-weight: 700;
-    color: #64748b;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-top: 4px;
-}
-
-.epm-drawer-nav-list {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
 .epm-drawer-nav-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 12px;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    cursor: pointer;
-    text-align: left;
-    transition: all 0.15s ease;
-    width: 100%;
+    background: #181F2C !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
-
-.epm-drawer-nav-item:hover,
-.epm-drawer-nav-item.active {
-    background: #eff6ff;
-    border-color: #2563eb;
+.epm-drawer-nav-item:hover, .epm-drawer-nav-item.active {
+    background: rgba(0, 82, 255, 0.15) !important;
+    border-color: #0052FF !important;
 }
-
-.epm-drawer-item-icon {
-    font-size: 18px;
-}
-
-.epm-drawer-item-info {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-.epm-drawer-item-name {
-    font-family: var(--font-sans);
-    font-size: 12.5px;
-    font-weight: 700;
-    color: #0f172a;
-}
-
-.epm-drawer-item-desc {
-    font-family: var(--font-sans);
-    font-size: 10.5px;
-    color: #64748b;
-}
-
-.epm-drawer-tag {
-    font-size: 9.5px;
-    font-weight: 700;
-    padding: 2px 6px;
-    border-radius: 4px;
-    background: #e2e8f0;
-    color: #475569;
-}
-
-.epm-drawer-nav-item.active .epm-drawer-tag {
-    background: #2563eb;
-    color: #ffffff;
-}
-
-.epm-drawer-tools {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
+.epm-drawer-item-name { color: #F1F5F9 !important; }
+.epm-drawer-item-desc { color: #94A3B8 !important; }
 .epm-drawer-tool-btn {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 12px;
-    background: #ffffff;
-    border: 1px solid #cbd5e1;
-    border-radius: 6px;
-    font-family: var(--font-sans);
-    font-size: 11.5px;
-    font-weight: 600;
-    color: #0f172a;
-    cursor: pointer;
-    text-decoration: none;
-    transition: all 0.15s ease;
+    background: #181F2C !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    color: #F1F5F9 !important;
 }
 
-.epm-drawer-tool-btn:hover {
-    background: #f1f5f9;
-    border-color: #94a3b8;
-}
-
-.epm-drawer-tool-btn .tool-left {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.epm-drawer-tool-btn .tool-kbd {
-    font-family: var(--font-mono);
-    font-size: 9.5px;
-    background: #eff6ff;
-    color: #2563eb;
-    border: 1px solid #bfdbfe;
-    padding: 1px 5px;
-    border-radius: 3px;
-}
-
-.epm-drawer-tool-btn .tool-badge {
-    font-size: 9px;
-    font-weight: 700;
-    padding: 1px 5px;
-    border-radius: 3px;
-    background: #eff6ff;
-    color: #2563eb;
-    border: 1px solid #bfdbfe;
-}
-
-.epm-drawer-tool-btn .tool-badge.emerald {
-    background: #ecfdf5;
-    color: #059669;
-    border-color: #a7f3d0;
-}
-
-.epm-drawer-footer {
-    margin-top: auto;
-    padding-top: 12px;
-    border-top: 1px solid #f1f5f9;
-    font-size: 9.5px;
-    color: #94a3b8;
-    text-align: center;
-}
-
-/* Inshorts Full-Page / Bottom-Sheet Drawer */
-.epm-inshorts-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(15, 23, 42, 0.65);
-    backdrop-filter: blur(5px);
-    z-index: 1060;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.25s ease;
-}
-
-.epm-inshorts-backdrop.is-open {
-    opacity: 1 !important;
-    pointer-events: auto !important;
-}
-
+/* Inshorts Page View Drawer */
 .epm-inshorts-drawer {
     position: fixed !important;
     left: 0 !important;
@@ -4580,520 +2321,251 @@ tbody tr.epm-highlight-row td:first-child {
     bottom: -110vh !important;
     max-height: 94vh !important;
     height: 90vh !important;
-    background: #ffffff !important;
+    background: #121721 !important;
     border-radius: 18px 18px 0 0 !important;
-    box-shadow: 0 -12px 36px rgba(15, 23, 42, 0.25) !important;
+    box-shadow: 0 -12px 36px rgba(0, 0, 0, 0.6) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.12) !important;
     z-index: 99999 !important;
     display: flex !important;
     flex-direction: column !important;
     overflow: hidden !important;
     transition: bottom 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
-
 .epm-inshorts-drawer.is-open {
     bottom: 0 !important;
 }
 
-.epm-inshorts-handle-bar {
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    padding: 8px 0 4px 0;
-    cursor: grab;
-    flex-shrink: 0;
-}
-
-.epm-inshorts-handle {
-    width: 36px;
-    height: 4px;
-    background: #cbd5e1;
-    border-radius: 2px;
-}
-
 .epm-inshorts-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 6px 16px 10px 16px;
-    border-bottom: 1px solid #f1f5f9;
-    flex-shrink: 0;
+    background: #151B27 !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
-
-.epm-inshorts-meta-strip {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-wrap: wrap;
-}
-
-.epm-inshorts-source {
-    font-size: 10.5px;
-    font-weight: 700;
-    color: #0284c7;
-    background: #f0f9ff;
-    border: 1px solid #bae6fd;
-    padding: 2px 7px;
-    border-radius: 4px;
-}
-
-.epm-inshorts-time {
-    font-size: 10px;
-    color: #64748b;
-    font-family: var(--font-sans);
-    font-variant-numeric: tabular-nums;
-}
-
-.epm-inshorts-sentiment {
-    font-size: 10px;
-    font-weight: 700;
-    padding: 2px 6px;
-    border-radius: 4px;
-    background: #f1f5f9;
-}
-
-.epm-inshorts-sentiment.bullish {
-    background: #ecfdf5;
-    color: #059669;
-}
-
-.epm-inshorts-sentiment.bearish {
-    background: #fef2f2;
-    color: #dc2626;
-}
-
-.epm-inshorts-score {
-    font-size: 10px;
-    font-weight: 700;
-    background: #fef3c7;
-    color: #b45309;
-    padding: 2px 6px;
-    border-radius: 4px;
-}
-
-.epm-inshorts-close {
-    width: 28px;
-    height: 28px;
-    border: 1px solid #cbd5e1;
-    border-radius: 6px;
-    background: #ffffff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 13px;
-    font-weight: 700;
-    color: #64748b;
-    cursor: pointer;
-}
-
-.epm-inshorts-body-scroll {
-    padding: 16px 18px;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-}
-
-.epm-inshorts-hero-banner {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-
-.epm-inshorts-impact-pill {
-    font-size: 10.5px;
-    font-weight: 800;
-    padding: 3px 8px;
-    border-radius: 4px;
-    background: #fef2f2;
-    color: #dc2626;
-    border: 1px solid #fecaca;
-    letter-spacing: 0.02em;
-}
-
-.epm-inshorts-sectors {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    flex-wrap: wrap;
-}
-
-.epm-inshorts-tag {
-    font-size: 10px;
-    font-weight: 600;
-    background: #f1f5f9;
-    color: #334155;
-    padding: 2px 6px;
-    border-radius: 4px;
-}
-
 .epm-inshorts-title {
-    font-family: var(--font-sans);
-    font-size: 18px;
-    font-weight: 800;
-    line-height: 1.35;
-    color: #0f172a;
-    letter-spacing: -0.02em;
-    margin: 0;
+    color: #F1F5F9 !important;
 }
-
 .epm-inshorts-section {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 12px 14px;
+    background: #151B27 !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
-
-.epm-inshorts-section-heading {
-    font-size: 10.5px;
-    font-weight: 800;
-    color: #475569;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-}
-
 .epm-inshorts-reasoning-text {
-    font-family: var(--font-sans);
-    font-size: 13.5px;
-    line-height: 1.55;
-    color: #1e293b;
+    color: #CBD5E1 !important;
 }
-
-.epm-inshorts-metrics-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-}
-
-.epm-metric-card {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 6px;
-    padding: 8px 4px;
-    text-align: center;
-}
-
-.epm-metric-card.highlight {
-    background: #f0fdf4;
-    border-color: #86efac;
-}
-
-.epm-metric-card .m-label {
-    font-size: 9px;
-    font-weight: 700;
-    color: #64748b;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-}
-
-.epm-metric-card .m-val {
-    font-family: var(--font-sans);
-    font-size: 12px;
-    font-weight: 700;
-    color: #0f172a;
-    margin-top: 2px;
-}
-
-.epm-metric-card.highlight .m-val {
-    color: #166534;
-}
-
-.epm-inshorts-footer-note {
-    font-size: 10px;
-    color: #94a3b8;
-    text-align: center;
-    padding: 8px 0;
-}
-
-/* Inshorts Fixed Bottom Bar */
 .epm-inshorts-bottom-bar {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 16px;
-    background: #ffffff;
-    border-top: 1px solid #e2e8f0;
-    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.03);
-    flex-shrink: 0;
+    background: #151B27 !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
-
-.epm-inshorts-primary-action {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 8px 12px;
-    background: linear-gradient(135deg, #1d4ed8, #2563eb);
-    color: #ffffff;
-    border-radius: 8px;
-    text-decoration: none;
-    cursor: pointer;
-    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
-    transition: all 0.15s ease;
-}
-
-.epm-inshorts-primary-action .action-txt {
-    font-size: 12.5px;
-    font-weight: 700;
-}
-
-.epm-inshorts-primary-action .action-sub {
-    font-size: 9.5px;
-    opacity: 0.85;
-}
-
 .epm-inshorts-dismiss-btn {
-    height: 38px;
-    padding: 0 12px;
-    background: #f1f5f9;
-    border: 1px solid #cbd5e1;
-    border-radius: 8px;
-    font-size: 12px;
-    font-weight: 700;
-    color: #334155;
-    cursor: pointer;
+    background: #181F2C !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    color: #CBD5E1 !important;
+}
+.epm-metric-card {
+    background: #181F2C !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+.epm-metric-card.highlight {
+    background: rgba(16, 185, 129, 0.12) !important;
+    border-color: rgba(16, 185, 129, 0.3) !important;
+}
+.epm-metric-card .m-val {
+    color: #F1F5F9 !important;
 }
 
-/* Body lock when drawer is open */
-body.epm-drawer-locked {
-    overflow: hidden !important;
+/* Desktop: Mobile triggers hidden */
+.epm-mobile-menu-trigger,
+.epm-mobile-bottom-nav {
+    display: none !important;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   MOBILE & TABLET RESPONSIVE SYSTEM (Dual-Axis Touch Scroller & Layout Adapt)
+   13. MOBILE-FIRST RESPONSIVE ARCHITECTURE (< 768px Viewports)
    ═══════════════════════════════════════════════════════════════════════════ */
-
-/* ── Tablet & Small Laptops (<= 1024px) ── */
-@media (max-width: 1024px) {
-    .gradio-container, 
-    .gradio-container > .main, 
-    .gradio-container > .wrap,
-    div[class*="gradio-container"] {
-        padding: 2px 8px 10px 8px !important;
-    }
-
-    .epm-nav-row-1 {
-        gap: 6px !important;
-    }
-
-    #epm-telemetry-ticker {
-        gap: 8px !important;
-    }
-
-    .epm-nav-row-2 {
-        gap: 6px !important;
-    }
-
-    .epm-quick-tab-btn {
-        padding: 0 8px !important;
-        font-size: 11px !important;
-    }
-
-    #cal_table_header_strip .epm-tbl-hdr-left {
-        min-width: 280px !important;
-        width: 280px !important;
-        flex: 0 0 280px !important;
-    }
-
-    #cal_table_header_strip button.epm-hdr-action-btn {
-        padding: 0 6px !important;
-        font-size: 10px !important;
-    }
-}
-
-/* ── Mobile Devices & Phablets (<= 767px) ── */
 @media (max-width: 767px) {
-    /* 1. Global Touch Viewport Reset */
-    html, body {
-        width: 100% !important;
-        max-width: 100vw !important;
-        overflow-x: hidden !important;
+    body {
+        padding-bottom: 66px !important; /* Space for Sticky Bottom Nav */
     }
 
-    .gradio-container, 
-    .gradio-container > .main, 
-    .gradio-container > .wrap,
-    div[class*="gradio-container"] {
-        padding: 2px 4px 8px 4px !important;
-        width: 100% !important;
-        max-width: 100vw !important;
-    }
-
-    /* 2. Top Navigation Bar on Mobile (Header + MENU Button only, clean news dashboard) */
+    /* 1. Header & MENU trigger */
     .epm-top-navbar {
-        height: auto !important;
-        min-height: auto !important;
         padding: 6px 10px !important;
-        margin-bottom: 6px !important;
-        gap: 0 !important;
+        margin-bottom: 4px !important;
     }
-
     .epm-nav-row-1 {
         flex-direction: row !important;
         align-items: center !important;
         justify-content: space-between !important;
-        height: 36px !important;
-        gap: 8px !important;
-        padding: 0 !important;
     }
-
-    .epm-nav-brand-cluster {
-        width: auto !important;
-        flex: 1 !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: flex-start !important;
-        gap: 6px !important;
-        overflow: hidden !important;
-    }
-
-    .epm-nav-brand-cluster .epm-nav-telemetry {
+    .epm-nav-telemetry {
         display: none !important;
     }
-
     .epm-mobile-menu-trigger {
         display: flex !important;
-        flex-shrink: 0 !important;
+        background: #181F2C !important;
+        border: 1px solid var(--border-color) !important;
+        color: #F1F5F9 !important;
     }
-
-    #epm-telemetry-ticker {
-        display: none !important;
+    .epm-hamburger-line {
+        background: #F1F5F9 !important;
     }
-
+    .epm-menu-text {
+        color: #F1F5F9 !important;
+    }
     .epm-nav-row-2 {
         display: none !important;
     }
 
-    /* Interactive Touch Card & Row Feedback (Mobile List to Inshorts Drawer) */
-    #top_news_table tbody tr,
-    #bottom_news_table tbody tr,
-    #circ_table tbody tr,
-    #calendar_table tbody tr,
-    .epm-dossier-row,
-    .epm-card.epm-news-card {
-        cursor: pointer !important;
-        -webkit-tap-highlight-color: rgba(37, 99, 235, 0.15) !important;
-        transition: background-color 0.15s ease, transform 0.15s ease !important;
-    }
-
-    #top_news_table tbody tr:active,
-    #bottom_news_table tbody tr:active,
-    #circ_table tbody tr:active,
-    #calendar_table tbody tr:active,
-    .epm-dossier-row:active {
-        background-color: #eff6ff !important;
-    }
-
-    /* 3. Dual-Axis Table Scrollers with Sticky Headers & Sticky Index Column */
-    .table-wrap,
-    .gradio-dataframe,
-    div[data-testid="dataframe"],
-    .epm-dossier-table-wrap {
+    /* 2. Smooth Auto-Scrolling Marquee Ticker Pinned Beneath Header */
+    #epm-telemetry-ticker {
+        display: flex !important;
         width: 100% !important;
-        max-width: 100% !important;
+        background: #0B0E14 !important;
+        border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+        padding: 4px 6px !important;
         overflow-x: auto !important;
-        overflow-y: auto !important;
-        max-height: 68vh !important;
-        -webkit-overflow-scrolling: touch !important;
-        overscroll-behavior: contain !important;
-        border-radius: 0 0 4px 4px !important;
+        scrollbar-width: none !important;
+        gap: 12px !important;
     }
 
-    /* Enforce Min-Widths so table columns never crush on small screens */
-    #top_news_table table {
-        min-width: 890px !important;
-        width: 890px !important;
-        table-layout: fixed !important;
-    }
-
-    #bottom_news_table table {
-        min-width: 780px !important;
-        width: 780px !important;
-        table-layout: fixed !important;
-    }
-
-    #circ_table table {
-        min-width: 950px !important;
-        width: 950px !important;
-        table-layout: fixed !important;
-    }
-
-    #holidays_table table {
-        min-width: 740px !important;
-        width: 740px !important;
-        table-layout: fixed !important;
-    }
-
-    #calendar_table table,
-    .epm-dossier-table {
-        min-width: 1720px !important;
-        width: 1720px !important;
-        table-layout: fixed !important;
-    }
-
-    /* Vertical Sticky Headers */
-    .gradio-container thead th,
-    .epm-dossier-table thead th {
-        position: sticky !important;
-        top: 0 !important;
-        z-index: 10 !important;
-        background-color: #f8fafc !important;
-        box-shadow: 0 2px 4px rgba(15, 23, 42, 0.05) !important;
-    }
-
-    /* Horizontal Sticky Column 1 */
-    #top_news_table th:nth-child(1),
-    #top_news_table td:nth-child(1),
-    #bottom_news_table th:nth-child(1),
-    #bottom_news_table td:nth-child(1),
-    #circ_table th:nth-child(1),
-    #circ_table td:nth-child(1),
-    #holidays_table th:nth-child(1),
-    #holidays_table td:nth-child(1),
-    .epm-dossier-table th.col-idx,
-    .epm-dossier-table td.col-idx {
-        position: sticky !important;
-        left: 0 !important;
-        z-index: 5 !important;
-        background-color: #ffffff !important;
-        box-shadow: 2px 0 4px rgba(15, 23, 42, 0.04) !important;
-    }
-
-    .gradio-container thead th:nth-child(1),
-    .epm-dossier-table thead th.col-idx {
-        z-index: 12 !important;
-        background-color: #f8fafc !important;
-    }
-
-    /* 4. Table Header Ribbons on Mobile */
-    .epm-table-ribbon {
-        padding: 3px 6px !important;
-        gap: 4px !important;
-    }
-
-    .epm-ribbon-title {
-        font-size: 10.5px !important;
-    }
-
-    .epm-ribbon-badge {
+    /* 3. News Streams: High-Density Card List (Never Raw Crushed Tables) */
+    #top_news_table thead,
+    #bottom_news_table thead {
         display: none !important;
     }
 
-    .epm-ribbon-btn {
-        height: 20px !important;
-        padding: 0 5px !important;
-        font-size: 9.5px !important;
+    #top_news_table, #bottom_news_table {
+        background: transparent !important;
+        border: none !important;
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    #top_news_table table, #bottom_news_table table {
+        width: 100% !important;
+        min-width: 100% !important;
+        display: block !important;
+        border: none !important;
+    }
+
+    #top_news_table tbody, #bottom_news_table tbody {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 8px !important;
+        width: 100% !important;
+    }
+
+    #top_news_table tbody tr, #bottom_news_table tbody tr {
+        display: flex !important;
+        flex-direction: column !important;
+        background: #121721 !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        border-radius: 8px !important;
+        padding: 12px 14px !important;
+        gap: 6px !important;
+        width: 100% !important;
+        cursor: pointer !important;
+        transition: transform 0.15s ease, border-color 0.15s ease !important;
+    }
+
+    #top_news_table tbody tr:active, #bottom_news_table tbody tr:active {
+        transform: scale(0.99) !important;
+        border-color: #0052FF !important;
+    }
+
+    #top_news_table tbody td, #bottom_news_table tbody td {
+        display: block !important;
+        width: 100% !important;
+        padding: 0 !important;
+        border: none !important;
+        background: transparent !important;
+    }
+
+    /* Top row meta strip (Score, Sentiment, Impact, Time, Source) */
+    #top_news_table tbody td:nth-child(1),
+    #top_news_table tbody td:nth-child(2),
+    #top_news_table tbody td:nth-child(3),
+    #top_news_table tbody td:nth-child(7),
+    #top_news_table tbody td:nth-child(9),
+    #bottom_news_table tbody td:nth-child(1),
+    #bottom_news_table tbody td:nth-child(2),
+    #bottom_news_table tbody td:nth-child(5) {
+        display: inline-flex !important;
+        width: auto !important;
+        order: 1 !important;
+        margin-right: 6px !important;
+    }
+
+    /* Middle bold headline */
+    #top_news_table tbody td:nth-child(4),
+    #bottom_news_table tbody td:nth-child(3) {
+        font-size: 14px !important;
+        font-weight: 700 !important;
+        line-height: 1.4 !important;
+        color: #F1F5F9 !important;
+        order: 2 !important;
+        margin: 4px 0 !important;
+    }
+
+    /* Bottom row: AI Reasoning & Sectors */
+    #top_news_table tbody td:nth-child(6) {
+        order: 3 !important;
+        font-size: 12px !important;
+        color: #94A3B8 !important;
+        line-height: 1.45 !important;
+    }
+    #top_news_table tbody td:nth-child(5),
+    #top_news_table tbody td:nth-child(8) {
+        display: inline-flex !important;
+        width: auto !important;
+        order: 4 !important;
+        margin-right: 6px !important;
+    }
+
+    /* 4. Thumb-Accessible Sticky Bottom Navigation Bar */
+    .epm-mobile-bottom-nav {
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        height: 56px !important;
+        background: rgba(15, 19, 28, 0.96) !important;
+        backdrop-filter: blur(16px) !important;
+        -webkit-backdrop-filter: blur(16px) !important;
+        border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-around !important;
+        z-index: 1030 !important;
+        padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+    }
+
+    .epm-mobile-bottom-btn {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        background: transparent !important;
+        border: none !important;
+        color: #94A3B8 !important;
+        padding: 6px 12px !important;
+        font-family: var(--font-sans) !important;
+        cursor: pointer !important;
+        gap: 2px !important;
+        transition: color 0.15s ease !important;
+    }
+    .epm-mobile-bottom-btn .m-icon {
+        font-size: 16px !important;
+    }
+    .epm-mobile-bottom-btn .m-label {
+        font-size: 10px !important;
+        font-weight: 600 !important;
+        letter-spacing: 0.02em !important;
+    }
+    .epm-mobile-bottom-btn.active {
+        color: #0052FF !important;
+    }
+    .epm-mobile-bottom-btn.active .m-label {
+        color: #60A5FA !important;
+        font-weight: 700 !important;
     }
 
     /* 5. Mobile Filter Rows */
@@ -5101,161 +2573,6 @@ body.epm-drawer-locked {
         flex-direction: column !important;
         align-items: stretch !important;
         gap: 4px !important;
-        margin: 2px 0 4px 0 !important;
-        overflow-x: visible !important;
-    }
-
-    #cal_filters_row .gradio-radio, #circ_filters_row .gradio-radio {
-        width: 100% !important;
-        overflow-x: auto !important;
-        -webkit-overflow-scrolling: touch !important;
-        scrollbar-width: none !important;
-    }
-
-    #cal_filters_row .wrap, #circ_filters_row .wrap {
-        display: inline-flex !important;
-        flex-direction: row !important;
-        width: max-content !important;
-        padding: 2px !important;
-        gap: 2px !important;
-    }
-
-    #cal_filters_row .wrap label, #circ_filters_row .wrap label {
-        min-height: 26px !important;
-        height: 26px !important;
-        line-height: 26px !important;
-        padding: 0 8px !important;
-        font-size: 10.5px !important;
-        flex-shrink: 0 !important;
-    }
-
-    #circ_filters_row .gradio-textbox {
-        width: 100% !important;
-        margin-top: 2px !important;
-    }
-
-    #circ_filters_row .gradio-textbox input {
-        height: 28px !important;
-        font-size: 12px !important;
-        width: 100% !important;
-    }
-
-    /* 6. Action Toolbars on Mobile */
-    #cal_table_header_strip {
-        flex-direction: column !important;
-        align-items: stretch !important;
-        height: auto !important;
-        padding: 4px 6px !important;
-        gap: 4px !important;
-    }
-
-    #cal_table_header_strip .epm-tbl-hdr-left {
-        width: 100% !important;
-        min-width: 100% !important;
-        flex: 1 1 100% !important;
-        justify-content: space-between !important;
-    }
-
-    .epm-tbl-hdr-title {
-        font-size: 10.5px !important;
-    }
-
-    .epm-tbl-hdr-badge-sub {
-        display: none !important;
-    }
-
-    #cal_table_header_strip .epm-tbl-hdr-actions {
-        width: 100% !important;
-        justify-content: flex-start !important;
-        overflow-x: auto !important;
-        -webkit-overflow-scrolling: touch !important;
-        scrollbar-width: none !important;
-        gap: 3px !important;
-        padding-bottom: 2px !important;
-    }
-
-    #cal_table_header_strip button.epm-hdr-action-btn {
-        min-height: 24px !important;
-        height: 24px !important;
-        padding: 0 6px !important;
-        font-size: 9.5px !important;
-        flex-shrink: 0 !important;
-    }
-
-    #circ_action_toolbar {
-        flex-direction: column !important;
-        gap: 4px !important;
-        padding: 4px !important;
-    }
-
-    #circ_action_toolbar button {
-        width: 100% !important;
-        min-height: 30px !important;
-        height: auto !important;
-        padding: 4px 8px !important;
-        font-size: 10.5px !important;
-        white-space: normal !important;
-        text-align: center !important;
-        line-height: 1.3 !important;
-    }
-
-    #tab1_header_strip {
-        flex-direction: column !important;
-        align-items: stretch !important;
-        gap: 4px !important;
-    }
-
-    #tab1_refresh_btn {
-        width: 100% !important;
-        min-height: 28px !important;
-        justify-content: center !important;
-    }
-
-    /* 7. Floating 5 PM Download Button */
-    .epm-daily-pdf-floater {
-        bottom: 8px !important;
-        right: 8px !important;
-        padding: 4px 8px !important;
-    }
-    .epm-daily-pdf-floater .floater-label {
-        font-size: 10px !important;
-    }
-    .epm-daily-pdf-floater .floater-tag {
-        display: none !important;
-    }
-}
-
-/* ── Ultra-Compact Screen Refinements (<= 430px: iPhone 13/14/15/16 Pro, Galaxy S24) ── */
-@media (max-width: 430px) {
-    .epm-nav-title {
-        font-size: 12px !important;
-    }
-
-    .epm-telem-pill {
-        font-size: 8.5px !important;
-        padding: 0 4px !important;
-        height: 16px !important;
-    }
-
-    .epm-cmd-launcher-btn {
-        padding: 0 4px !important;
-    }
-
-    .epm-cmd-badge {
-        font-size: 9px !important;
-        padding: 0 2px !important;
-    }
-
-    .epm-daily-pdf-floater {
-        bottom: 8px !important;
-        right: 8px !important;
-        padding: 4px 8px !important;
-    }
-    .epm-daily-pdf-floater .floater-label {
-        font-size: 10px !important;
-    }
-    .epm-daily-pdf-floater .floater-tag {
-        display: none !important;
     }
 }
 """
@@ -5607,6 +2924,30 @@ TOP_NAVBAR_HTML = """
         <button type="button" class="epm-inshorts-dismiss-btn" onclick="window.epmCloseInshortsDrawer()">✕ Close</button>
     </div>
 </div>
+<!-- Mobile Sticky Bottom Navigation Bar (Thumb-Accessible, Fixed to Bottom on Mobile) -->
+<div id="epm-mobile-bottom-nav" class="epm-mobile-bottom-nav">
+    <button type="button" class="epm-mobile-bottom-btn active" data-tab="0" onclick="window.epmSwitchTab(0)">
+        <span class="m-icon">⚡</span>
+        <span class="m-label">Wire</span>
+    </button>
+    <button type="button" class="epm-mobile-bottom-btn" data-tab="1" onclick="window.epmSwitchTab(1)">
+        <span class="m-icon">📅</span>
+        <span class="m-label">Calendar</span>
+    </button>
+    <button type="button" class="epm-mobile-bottom-btn" data-tab="2" onclick="window.epmSwitchTab(2)">
+        <span class="m-icon">📜</span>
+        <span class="m-label">Circulars</span>
+    </button>
+    <button type="button" class="epm-mobile-bottom-btn" data-tab="3" onclick="window.epmSwitchTab(3)">
+        <span class="m-icon">⚙️</span>
+        <span class="m-label">Settings</span>
+    </button>
+    <button type="button" class="epm-mobile-bottom-btn" data-tab="4" onclick="window.epmSwitchTab(4)">
+        <span class="m-icon">❓</span>
+        <span class="m-label">Docs</span>
+    </button>
+</div>
+
 """
 
 
@@ -5733,6 +3074,11 @@ TERMINAL_CLIENT_JS = r"""
         drawerItems.forEach((d, idx) => {
             if (idx === tabIdx) d.classList.add('active');
             else d.classList.remove('active');
+        });
+        const bottomBtns = document.querySelectorAll('.epm-mobile-bottom-btn');
+        bottomBtns.forEach((b, idx) => {
+            if (idx === tabIdx) b.classList.add('active');
+            else b.classList.remove('active');
         });
         const badge = document.getElementById("epm-active-tab-indicator");
         if (badge && TAB_NAMES[tabIdx]) {
@@ -6930,11 +4276,13 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
         # TAB 4: Portal Settings Page (Alert Channels, Google Cal & Sources)
         # ═══════════════════════════════════════════════════════════
         with gr.TabItem("⚙️ Portal Settings & Integrations"):
-            gr.Markdown("### ⚙️ System Settings & External Integrations Hub", elem_id="settings_hdr")
+            gr.Markdown("### ⚙️ Institutional Settings & External Integrations Hub", elem_id="settings_hdr")
 
-            with gr.Row():
-                with gr.Column():
-                    gr.Markdown("#### 📰 Channel 1: Live Breaking News Telegram")
+            with gr.Column(elem_classes=["epm-bento-card"]):
+                gr.Markdown("### 📡 Multi-Market Telegram Forwarders & Automated Dispatches")
+                with gr.Row():
+                    with gr.Column():
+                        gr.Markdown("#### 📰 Channel 1: Live Breaking News Telegram")
                     adm_news_token = gr.Textbox(
                         label="News Bot Token",
                         value=telegram_notifier.bot_token,
@@ -7037,8 +4385,8 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
             test_cal_tg_btn.click(lambda: trigger_test_telegram("calendar"), outputs=[adm_tg_status])
             resend_weekly_btn.click(push_weekly_calendar_dispatch, outputs=[adm_tg_status])
 
-            gr.Markdown("---")
-            gr.Markdown("### 📅 Google Calendar Direct API Integration (Automated 1-Hour Reminder Alarms)")
+            with gr.Column(elem_classes=["epm-bento-card"]):
+                gr.Markdown("### 📅 Google Calendar Direct API Integration (Automated 1-Hour Reminder Alarms)")
             gr.Markdown(
                 "Directly synchronizes events from the EPM Pro calendar into your personal or team Google Calendar with **60-minute email and popup reminders**. "
                 "You can authenticate using a Google Cloud Service Account JSON key or JSON string."
@@ -7079,8 +4427,8 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
             )
             sync_gcal_admin_btn.click(trigger_sync_google_cal, outputs=[gcal_admin_status])
 
-            gr.Markdown("---")
-            gr.Markdown("### 📸 Omnichannel Social Media Auto-Broadcasting Hub (Instagram, X / Twitter & Discord)")
+            with gr.Column(elem_classes=["epm-bento-card"]):
+                gr.Markdown("### 📸 Omnichannel Social Media Auto-Broadcasting Hub (Instagram, X / Twitter & Discord)")
             gr.Markdown(
                 "Directly publishes publication-grade **1080×1350 financial infographic cards** (Finshots/Bloomberg style) and morning multi-market calendar snapshots to **Instagram, X / Twitter, and Discord** via official APIs."
             )
@@ -7179,8 +4527,8 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
             test_tw_btn.click(lambda: trigger_test_social("twitter"), outputs=[social_admin_status])
             test_discord_btn.click(lambda: trigger_test_social("discord"), outputs=[social_admin_status])
 
-            gr.Markdown("---")
-            gr.Markdown("### 📡 Connected News Sources & Selective Forwarding Rules")
+            with gr.Column(elem_classes=["epm-bento-card"]):
+                gr.Markdown("### 📡 Connected News Sources & Selective Forwarding Rules")
             sources_table = gr.Dataframe(
                 headers=["Source Name", "Category", "Ingestion Type", "Telegram Alerts", "WhatsApp Alerts", "Feed / Scrape URL"],
                 datatype=["str", "str", "str", "str", "str", "str"],
@@ -7215,84 +4563,167 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
         # ═══════════════════════════════════════════════════════════
         with gr.TabItem("❓ User Guide & Operations Manual"):
             gr.HTML("""
-            <div class="guide-container">
-                <div class="guide-card">
-                    <h3><span>🌅</span> Automated Morning Telegram Dispatches (IST Schedule)</h3>
-                    <ul class="guide-list">
-                        <li><span class="guide-pill">Friday 06:00 AM IST</span> &nbsp;—&nbsp; Automatically compiles and dispatches the <b>Weekly Multi-Market Snapshot PDF Dossier</b> (A4 Landscape, 14-column ledger format covering Monday to Saturday across NSE, BSE, MCX, CRYPTO & NYSE) directly into the designated Calendar Telegram channel.</li>
-                        <li><span class="guide-pill">25th of Month 06:00 AM IST</span> &nbsp;—&nbsp; Automatically compiles and dispatches the <b>Monthly Multi-Market Outlook PDF Dossier</b> (A4 Landscape, weekly-sectioned ledger covering all major catalysts for the upcoming month) into the Calendar channel.</li>
-                        <li><span class="guide-pill">07:00 AM IST Daily (Holiday Check)</span> &nbsp;—&nbsp; Evaluates upcoming calendar schedules 24 hours in advance and auto-forwards a <b>Next-Day Trading Holiday Alert</b> across all 5 major bourses whenever a session closure or evening trading break is detected.</li>
-                        <li><span class="guide-pill">1-Click PDF Downloads</span> &nbsp;—&nbsp; Immediate access to both weekly and monthly print-ready A4 dossiers on Tab 2 or via machine endpoints <span class="guide-pill">/api/calendar/pdf/weekly</span> and <span class="guide-pill">/api/calendar/pdf/monthly</span>.</li>
-                    </ul>
+            <div class="epm-docs-layout">
+                <!-- Top Quick Jump Bar -->
+                <div class="epm-docs-quick-bar">
+                    <span class="epm-docs-pill active">📘 Quick Reference</span>
+                    <a href="#api-endpoints" class="epm-docs-pill">⚡ Machine APIs</a>
+                    <a href="#schedule-matrix" class="epm-docs-pill">⏰ Dispatches</a>
+                    <a href="#market-coverage" class="epm-docs-pill">🌐 Markets</a>
+                    <a href="#ai-architecture" class="epm-docs-pill">🧠 Gemini 2.5</a>
                 </div>
 
-                <div class="guide-card">
-                    <h3><span>⚡</span> Real-Time Unfolding Outcomes & Timer Triggers</h3>
-                    <ul class="guide-list">
-                        <li><b>T-15m Live Countdown Alerts:</b> Automatically notifies traders 15 minutes before high-impact economic releases (e.g. US CPI, RBI MPC Rate Decisions, Non-Farm Payrolls) to prepare for intraday volatility.</li>
-                        <li><b>Live Outcome Dispatches:</b> When official figures unfold, the engine immediately calculates <span class="guide-pill">Actual vs Forecast vs Previous</span> and computes the institutional market verdict (<span style="color:#16a34a; font-weight:700;">🟢 BULLISH</span>, <span style="color:#dc2626; font-weight:700;">🔴 BEARISH</span>, or <span style="color:#475569; font-weight:700;">⚪ NEUTRAL</span>).</li>
-                        <li><b>Linked Wire Intelligence:</b> As soon as breaking news hits the wire covering a scheduled catalyst (e.g. Reliance Q2 earnings report), the event row automatically binds a direct link to the verified article.</li>
-                    </ul>
+                <!-- API Endpoints Bento Card -->
+                <div id="api-endpoints" class="epm-bento-card">
+                    <div class="epm-bento-header">
+                        <div class="epm-bento-title"><span>⚡</span> Machine APIs & Programmatic Endpoints</div>
+                        <span class="epm-badge sent-bullish">🟢 LIVE 200 OK</span>
+                    </div>
+                    <div class="epm-bento-desc">High-throughput REST and SSE endpoints for trading algos, institutional research desks, and quant workflows.</div>
+                    
+                    <div class="epm-api-grid">
+                        <div class="epm-api-card">
+                            <div class="epm-api-head">
+                                <span class="epm-method-badge get">GET</span>
+                                <code class="epm-endpoint">/api/news</code>
+                                <span class="epm-api-status">JSON</span>
+                            </div>
+                            <div class="epm-api-body">
+                                <p>Real-time breaking wire stream with Gemini 2.5 AI impact score (0-10), bullish/bearish directional verdict, sector classification, and relevance %.</p>
+                                <pre><code>curl -s "https://your-domain/api/news?min_score=7" | jq .</code></pre>
+                            </div>
+                        </div>
+
+                        <div class="epm-api-card">
+                            <div class="epm-api-head">
+                                <span class="epm-method-badge get">GET</span>
+                                <code class="epm-endpoint">/api/calendar</code>
+                                <span class="epm-api-status">JSON</span>
+                            </div>
+                            <div class="epm-api-body">
+                                <p>15-column date-enriched catalyst ledger across NSE, BSE, MCX, CRYPTO & NYSE with live countdown timers and unfolded outcomes.</p>
+                                <pre><code>curl -s "https://your-domain/api/calendar?filter=today&market=NSE"</code></pre>
+                            </div>
+                        </div>
+
+                        <div class="epm-api-card">
+                            <div class="epm-api-head">
+                                <span class="epm-method-badge get">GET</span>
+                                <code class="epm-endpoint">/api/calendar/pdf/daily-outcomes</code>
+                                <span class="epm-api-status pdf">A4 PDF</span>
+                            </div>
+                            <div class="epm-api-body">
+                                <p>Daily 5:00 PM rolling outcome dossier compiling all unfolded macroeconomic & corporate results over the last 24-hour cycle.</p>
+                                <pre><code>curl -s -O "https://your-domain/api/calendar/pdf/daily-outcomes"</code></pre>
+                            </div>
+                        </div>
+
+                        <div class="epm-api-card">
+                            <div class="epm-api-head">
+                                <span class="epm-method-badge get">GET</span>
+                                <code class="epm-endpoint">/api/stream/terminal</code>
+                                <span class="epm-api-status sse">SSE Stream</span>
+                            </div>
+                            <div class="epm-api-body">
+                                <p>Low-latency Server-Sent Events stream delivering live ticker telemetry, news count, and real-time IST clock synchronization.</p>
+                                <pre><code>curl -N "https://your-domain/api/stream/terminal"</code></pre>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="guide-card">
-                    <h3><span>🌐</span> Multi-Market Institutional Coverage</h3>
-                    <ul class="guide-list">
-                        <li><b>🇮🇳 NSE & BSE:</b> Nifty 50 constituents, Bank Nifty, quarterly earnings releases, board meetings, dividend ex-dates, and F&O contract expiries.</li>
-                        <li><b>⛽ MCX:</b> Crude Oil inventories, Natural Gas storage releases, Gold & Silver delivery contracts, and morning/evening trading session schedules.</li>
-                        <li><b>₿ CRYPTO:</b> Bitcoin halving schedules, ETF net flow disclosures, protocol upgrades, and key macroeconomic digital asset triggers.</li>
-                        <li><b>🇺🇸 NYSE & NASDAQ:</b> Federal Reserve FOMC interest rate meetings, Jackson Hole speeches, US CPI/PPI inflation prints, and US corporate mega-cap earnings.</li>
-                    </ul>
+                <!-- Schedule Matrix Bento Card -->
+                <div id="schedule-matrix" class="epm-bento-card">
+                    <div class="epm-bento-header">
+                        <div class="epm-bento-title"><span>⏰</span> Automated Morning Telegram Dispatches (IST Schedule)</div>
+                        <span class="epm-badge sent-neutral">Cron Engine Active</span>
+                    </div>
+                    <div class="epm-docs-table-wrap">
+                        <table class="epm-docs-table">
+                            <thead>
+                                <tr>
+                                    <th>Trigger Schedule</th>
+                                    <th>Target Channel</th>
+                                    <th>Dossier / Deliverable</th>
+                                    <th>Format</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>Friday 06:00 AM IST</code></td>
+                                    <td>Market Calendar Channel</td>
+                                    <td>Weekly Multi-Market Catalyst Dossier (Monday to Saturday Outlook)</td>
+                                    <td><span class="epm-badge-pill">A4 Landscape PDF</span></td>
+                                </tr>
+                                <tr>
+                                    <td><code>25th of Month 06:00 AM IST</code></td>
+                                    <td>Market Calendar Channel</td>
+                                    <td>Monthly Multi-Market Outlook (All Major Next-Month Catalysts)</td>
+                                    <td><span class="epm-badge-pill">A4 Landscape PDF</span></td>
+                                </tr>
+                                <tr>
+                                    <td><code>Daily 05:00 PM IST</code></td>
+                                    <td>Market Calendar Channel</td>
+                                    <td>24-Hour Rolling Unfolded Results & Outcome Dossier</td>
+                                    <td><span class="epm-badge-pill emerald">PDF Floater & A4</span></td>
+                                </tr>
+                                <tr>
+                                    <td><code>Daily 07:00 AM IST</code></td>
+                                    <td>Market Calendar Channel</td>
+                                    <td>Next-Day Trading Holiday Alert (1 Day Before Session Breaks)</td>
+                                    <td><span class="epm-badge-pill">Infographic Alert</span></td>
+                                </tr>
+                                <tr>
+                                    <td><code>Real-Time / On Publication</code></td>
+                                    <td>Market Calendar Channel</td>
+                                    <td>Regulatory Circulars (NSE, BSE, MCX, RBI, FINMIN, FOMC)</td>
+                                    <td><span class="epm-badge-pill">3-5 Bullets + PDF</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
-                <div class="guide-card">
-                    <h3><span>📜</span> Authentic Document-Backed Regulatory Circulars</h3>
-                    <ul class="guide-list">
-                        <li><b>Verified Ingestion:</b> Continuously polls official repositories: <span class="guide-badge">NSE</span>, <span class="guide-badge">BSE</span>, <span class="guide-badge">MCX</span>, <span class="guide-badge">RBI</span>, <span class="guide-badge">FINMIN</span>, <span class="guide-badge">FOMC</span>, <span class="guide-badge">NYSE</span>, and <span class="guide-badge">CRYPTO</span>.</li>
-                        <li><b>AI Executive Summaries (3-5 Bullets):</b> Distills legal and regulatory jargon into crisp, actionable directives covering margin requirements, circuit filter revisions, and operational compliance.</li>
-                        <li><b>Native PDF Direct Access:</b> Every release features a verified 1-click link directly to the official PDF file stored in authentic regulator archives.</li>
-                    </ul>
+                <!-- Multi-Market Coverage Bento Card -->
+                <div id="market-coverage" class="epm-bento-card">
+                    <div class="epm-bento-header">
+                        <div class="epm-bento-title"><span>🌐</span> Multi-Market Institutional Coverage Matrix</div>
+                    </div>
+                    <div class="epm-market-grid">
+                        <div class="epm-market-box">
+                            <div class="m-box-title">🇮🇳 NSE & BSE Equity / F&O</div>
+                            <p>Nifty 50, Bank Nifty, quarterly corporate earnings, board meets, dividend ex-dates, and monthly derivatives expiry cycles.</p>
+                        </div>
+                        <div class="epm-market-box">
+                            <div class="m-box-title">⛽ MCX Commodities</div>
+                            <p>Crude oil inventory prints, natural gas weekly storage, gold/silver delivery expiry contracts, and dual-session trading schedules.</p>
+                        </div>
+                        <div class="epm-market-box">
+                            <div class="m-box-title">₿ CRYPTO Macro</div>
+                            <p>Bitcoin halving schedules, ETF net inflow/outflow disclosures, major protocol upgrades, and regulatory enforcement actions.</p>
+                        </div>
+                        <div class="epm-market-box">
+                            <div class="m-box-title">🇺🇸 NYSE & NASDAQ</div>
+                            <p>Federal Reserve FOMC decisions, US CPI/PPI inflation prints, non-farm payrolls, and mega-cap corporate earnings releases.</p>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="guide-card">
-                    <h3><span>🧠</span> AI Impact & Sentiment Engine (Gemini 2.5 Architecture)</h3>
-                    <ul class="guide-list">
-                        <li><b>0-10 Impact Rating:</b> News items scored ≥ 7 or categorized as High Impact are automatically promoted to the Primary Wire table and eligible for instant Telegram push alerts.</li>
-                        <li><b>Directional Verdict:</b> Analyzes the macro implications of breaking headlines to classify market sentiment into Bullish, Bearish, or Neutral.</li>
-                        <li><b>Sector & Ticker Tagging:</b> Maps news events directly to impacted industrial sectors (e.g., Banking, Auto, IT, Energy, Commodities) and primary stock tickers.</li>
+                <!-- AI Impact & Scoring Bento Card -->
+                <div id="ai-architecture" class="epm-bento-card">
+                    <div class="epm-bento-header">
+                        <div class="epm-bento-title"><span>🧠</span> Gemini 2.5 AI Impact Scoring & Sentiment Engine</div>
+                    </div>
+                    <div class="epm-bento-desc">
+                        Every incoming wire catalyst is analyzed through multi-modal quantitative prompts evaluating market volatility, liquidity risk, and sector tailwinds.
+                    </div>
+                    <ul class="epm-docs-list">
+                        <li><b>Impact Scoring (0 to 10):</b> Items scored ≥ 7 are promoted to the Primary Breaking Wire and dispatched via Telegram.</li>
+                        <li><b>Directional Verdict:</b> Classified into <span class="sent-pill sent-bullish">🟢 BULLISH</span>, <span class="sent-pill sent-bearish">🔴 BEARISH</span>, or <span class="sent-pill sent-neutral">⚪ NEUTRAL</span> with explicit quantitative reasoning.</li>
+                        <li><b>Sector & Ticker Resolution:</b> Extracted into industrial clusters (Energy, Auto, IT, Banking) with direct stock symbol tagging.</li>
                     </ul>
                 </div>
-
-                <div class="guide-card">
-                    <h3><span>📲</span> Calendar Subscriptions & 1-Click Sync</h3>
-                    <ul class="guide-list">
-                        <li><b>Universal iCal Subscription Feed:</b> Connect your Apple Calendar, Outlook, or Thunderbird using the dynamic subscription endpoint: <span class="guide-pill">/api/calendar/ics</span>. All 5 markets update automatically.</li>
-                        <li><b>Google Calendar Direct Sync:</b> One-click sync buttons in the terminal and on event rows instantly create calendar events with automated <b>60-minute alarm notifications</b>.</li>
-                        <li><b>Service Account Background Daemon:</b> For enterprise teams, configure Google Cloud Service Account credentials in Tab 4 for continuous headless sync.</li>
-                    </ul>
-                </div>
-
-                <div class="guide-card">
-                    <h3><span>📊</span> High-Density Institutional Table Navigation (2-Row Clamp)</h3>
-                    <ul class="guide-list">
-                        <li><b>Max 2-Row Line Clamping:</b> All table cells strictly clamp long headlines, event titles, and AI summaries to at most 2 rows with clean ellipsis (<span class="guide-pill">-webkit-line-clamp: 2</span>). This increases visible screen information density by <b>75%</b> and eliminates excessive vertical scrolling.</li>
-                        <li><b>Structured Companion Columns:</b> Complementary attributes (Score, Sentiment, Tickers, AI Reasoning, Source, Timestamps) are placed side-by-side in dedicated columns.</li>
-                        <li><b>Alternative Expanded Card Views:</b> When you wish to read entire paragraphs or explore full cards, toggle the <span class="guide-pill">🎴 Visual Feed</span> accordion available in each tab.</li>
-                    </ul>
-                </div>
-
-                <div class="guide-card">
-                    <h3><span>⚡</span> REST API & Developer Integration Reference</h3>
-                    <ul class="guide-list">
-                        <li><span class="guide-pill">GET /api/news</span> &nbsp;—&nbsp; Returns high-speed cached news items with AI scores, sector tags, and relevance ratings.</li>
-                        <li><span class="guide-pill">GET /api/calendar</span> &nbsp;—&nbsp; Returns enriched multi-market events, live timers, and unfolded outcomes.</li>
-                        <li><span class="guide-pill">GET /api/calendar/ics</span> &nbsp;—&nbsp; RFC 5545 compliant iCalendar feed compatible with Apple, Google, and Microsoft platforms.</li>
-                        <li><span class="guide-pill">GET /api/circulars</span> &nbsp;—&nbsp; Indexed regulatory circulars, AI 3-5 bullet points, and verified PDF links.</li>
-                        <li><span class="guide-pill">GET /docs</span> &nbsp;—&nbsp; Complete OpenAPI / Swagger interactive documentation and API sandbox.</li>
-                    </ul>
-                </div>
-            </div>
-            """)
+            </div>""")
 
     refresh_btn.click(manual_refresh, outputs=[status_box, top_news_visual, top_table, bottom_table]).then(None, js="() => window.epmPlayChime(false)")
     demo.load(get_dashboard_tables, outputs=[status_box, top_news_visual, top_table, bottom_table])
