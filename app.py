@@ -2286,34 +2286,148 @@ tbody tr:hover td {
 }
 
 /* 12. Inshorts & Mobile Side Drawer Dark Theme */
-.epm-mobile-drawer {
-    background: #121721 !important;
-    border-left: 1px solid rgba(255, 255, 255, 0.1) !important;
+.epm-drawer-backdrop {
+    position: fixed !important;
+    inset: 0 !important;
+    background: rgba(0, 0, 0, 0.65) !important;
+    backdrop-filter: blur(4px) !important;
+    z-index: 1040 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transition: opacity 0.25s ease !important;
 }
+.epm-drawer-backdrop.is-open {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
+.epm-mobile-drawer {
+    position: fixed !important;
+    top: 0 !important;
+    right: -320px !important;
+    width: 300px !important;
+    max-width: 86vw !important;
+    height: 100vh !important;
+    background: #121721 !important;
+    z-index: 1050 !important;
+    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.5) !important;
+    border-left: 1px solid rgba(255, 255, 255, 0.1) !important;
+    transition: right 0.28s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+}
+.epm-mobile-drawer.is-open {
+    right: 0 !important;
+}
+
 .epm-drawer-header {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 14px 16px !important;
     background: #151B27 !important;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
 .epm-drawer-title {
     color: #F1F5F9 !important;
 }
+.epm-drawer-close-btn {
+    width: 28px !important;
+    height: 28px !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    background: #181F2C !important;
+    color: #94A3B8 !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+.epm-drawer-close-btn:hover {
+    color: #F1F5F9 !important;
+    border-color: #0052FF !important;
+}
+.epm-drawer-body {
+    padding: 14px 16px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+    flex: 1 !important;
+}
+.epm-drawer-section-label {
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.06em !important;
+    color: #64748B !important;
+    text-transform: uppercase !important;
+    margin-bottom: 4px !important;
+}
+.epm-drawer-nav-list {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 6px !important;
+}
 .epm-drawer-nav-item {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    padding: 8px 12px !important;
     background: #181F2C !important;
     border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 8px !important;
+    cursor: pointer !important;
+    text-align: left !important;
+    transition: all 0.15s ease !important;
 }
 .epm-drawer-nav-item:hover, .epm-drawer-nav-item.active {
     background: rgba(0, 82, 255, 0.15) !important;
     border-color: #0052FF !important;
 }
-.epm-drawer-item-name { color: #F1F5F9 !important; }
-.epm-drawer-item-desc { color: #94A3B8 !important; }
+.epm-drawer-item-name { color: #F1F5F9 !important; font-size: 12px !important; font-weight: 700 !important; }
+.epm-drawer-item-desc { color: #94A3B8 !important; font-size: 10px !important; }
 .epm-drawer-tool-btn {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 8px 12px !important;
     background: #181F2C !important;
     border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 8px !important;
     color: #F1F5F9 !important;
+    font-size: 11.5px !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+}
+.epm-drawer-tool-btn:hover {
+    border-color: #0052FF !important;
+    background: rgba(0, 82, 255, 0.1) !important;
+}
+.epm-drawer-footer {
+    padding: 12px 16px !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+    font-size: 9.5px !important;
+    color: #64748B !important;
+    text-align: center !important;
 }
 
-/* Inshorts Page View Drawer */
+/* Inshorts Full-Page / Bottom-Sheet Drawer */
+.epm-inshorts-backdrop {
+    position: fixed !important;
+    inset: 0 !important;
+    background: rgba(0, 0, 0, 0.65) !important;
+    backdrop-filter: blur(5px) !important;
+    z-index: 1060 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transition: opacity 0.25s ease !important;
+}
+.epm-inshorts-backdrop.is-open {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
 .epm-inshorts-drawer {
     position: fixed !important;
     left: 0 !important;
@@ -2335,45 +2449,217 @@ tbody tr:hover td {
     bottom: 0 !important;
 }
 
+.epm-inshorts-handle-bar {
+    width: 100% !important;
+    display: flex !important;
+    justify-content: center !important;
+    padding: 8px 0 4px 0 !important;
+    cursor: grab !important;
+    flex-shrink: 0 !important;
+}
+.epm-inshorts-handle {
+    width: 36px !important;
+    height: 4px !important;
+    background: #334155 !important;
+    border-radius: 2px !important;
+}
 .epm-inshorts-header {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 6px 16px 10px 16px !important;
     background: #151B27 !important;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+    flex-shrink: 0 !important;
+}
+.epm-inshorts-meta-strip {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    flex-wrap: wrap !important;
+}
+.epm-inshorts-source {
+    font-size: 10.5px !important;
+    font-weight: 700 !important;
+    color: #60A5FA !important;
+    background: rgba(37, 99, 235, 0.15) !important;
+    border: 1px solid rgba(59, 130, 246, 0.3) !important;
+    padding: 2px 7px !important;
+    border-radius: 4px !important;
+}
+.epm-inshorts-time {
+    font-size: 10px !important;
+    color: #94A3B8 !important;
+    font-family: var(--font-mono) !important;
+}
+.epm-inshorts-close {
+    width: 28px !important;
+    height: 28px !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 6px !important;
+    background: #181F2C !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    color: #94A3B8 !important;
+    cursor: pointer !important;
+}
+.epm-inshorts-close:hover {
+    color: #F1F5F9 !important;
+    border-color: #0052FF !important;
+}
+.epm-inshorts-body-scroll {
+    padding: 16px 18px !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 14px !important;
+}
+.epm-inshorts-hero-banner {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
 }
 .epm-inshorts-title {
+    font-family: var(--font-sans) !important;
+    font-size: 18px !important;
+    font-weight: 800 !important;
+    line-height: 1.35 !important;
     color: #F1F5F9 !important;
+    letter-spacing: -0.02em !important;
+    margin: 0 !important;
 }
 .epm-inshorts-section {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 6px !important;
     background: #151B27 !important;
     border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 8px !important;
+    padding: 12px 14px !important;
+}
+.epm-inshorts-section-heading {
+    font-size: 10.5px !important;
+    font-weight: 800 !important;
+    color: #64748B !important;
+    letter-spacing: 0.04em !important;
+    text-transform: uppercase !important;
 }
 .epm-inshorts-reasoning-text {
+    font-family: var(--font-sans) !important;
+    font-size: 13.5px !important;
+    line-height: 1.55 !important;
     color: #CBD5E1 !important;
 }
-.epm-inshorts-bottom-bar {
-    background: #151B27 !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
-}
-.epm-inshorts-dismiss-btn {
-    background: #181F2C !important;
-    border: 1px solid rgba(255, 255, 255, 0.12) !important;
-    color: #CBD5E1 !important;
+.epm-inshorts-metrics-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 8px !important;
 }
 .epm-metric-card {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
     background: #181F2C !important;
     border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 6px !important;
+    padding: 8px 4px !important;
+    text-align: center !important;
 }
 .epm-metric-card.highlight {
     background: rgba(16, 185, 129, 0.12) !important;
     border-color: rgba(16, 185, 129, 0.3) !important;
 }
+.epm-metric-card .m-label {
+    font-size: 9px !important;
+    font-weight: 700 !important;
+    color: #64748B !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.03em !important;
+}
 .epm-metric-card .m-val {
+    font-family: var(--font-mono) !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
     color: #F1F5F9 !important;
+    margin-top: 2px !important;
+}
+.epm-metric-card.highlight .m-val {
+    color: #10B981 !important;
+}
+.epm-inshorts-footer-note {
+    font-size: 10px !important;
+    color: #64748B !important;
+    text-align: center !important;
+    padding: 8px 0 !important;
+}
+.epm-inshorts-bottom-bar {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 10px 16px !important;
+    background: #151B27 !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+    flex-shrink: 0 !important;
+}
+.epm-inshorts-primary-action {
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 8px 12px !important;
+    background: #0052FF !important;
+    color: #FFFFFF !important;
+    border-radius: 8px !important;
+    text-decoration: none !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
+}
+.epm-inshorts-primary-action:hover {
+    background: #1A66FF !important;
+}
+.epm-inshorts-primary-action .action-txt {
+    font-size: 12.5px !important;
+    font-weight: 700 !important;
+}
+.epm-inshorts-primary-action .action-sub {
+    font-size: 9.5px !important;
+    opacity: 0.85 !important;
+}
+.epm-inshorts-dismiss-btn {
+    height: 38px !important;
+    padding: 0 14px !important;
+    background: #181F2C !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    color: #CBD5E1 !important;
+    border-radius: 8px !important;
+    cursor: pointer !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+}
+.epm-inshorts-dismiss-btn:hover {
+    border-color: #0052FF !important;
+    color: #FFFFFF !important;
 }
 
-/* Desktop: Mobile triggers hidden */
-.epm-mobile-menu-trigger,
-.epm-mobile-bottom-nav {
-    display: none !important;
+/* Desktop: Mobile drawers, triggers, bottom bar hidden */
+@media (min-width: 768px) {
+    .epm-mobile-drawer,
+    .epm-drawer-backdrop,
+    .epm-inshorts-drawer,
+    .epm-inshorts-backdrop,
+    .epm-mobile-menu-trigger,
+    .epm-mobile-bottom-nav {
+        display: none !important;
+    }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -3492,7 +3778,41 @@ TERMINAL_CLIENT_JS = r"""
 
         wireTableInshortsClicks();
         setupInshortsSwipeDismiss();
+        window.epmInitPasswordToggles();
     }
+
+    // 15. Password Reveal Toggle Controller for Settings Hub
+    window.epmInitPasswordToggles = function() {
+        const passwordInputs = document.querySelectorAll('input[type="password"], input[data-has-reveal="true"]');
+        passwordInputs.forEach(input => {
+            if (input.dataset.hasReveal === "true") return;
+            input.dataset.hasReveal = "true";
+            
+            const wrapper = input.parentElement;
+            if (!wrapper) return;
+            wrapper.style.position = 'relative';
+            
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.innerHTML = '👁️';
+            btn.title = 'Reveal / Mask credential';
+            btn.style.cssText = 'position:absolute; right:10px; top:50%; transform:translateY(-50%); background:transparent; border:none; cursor:pointer; font-size:14px; opacity:0.6; z-index:10; padding:2px 4px; border-radius:4px;';
+            btn.addEventListener('mouseenter', () => btn.style.opacity = '1');
+            btn.addEventListener('mouseleave', () => btn.style.opacity = '0.6');
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (input.type === 'password') {
+                    input.type = 'text';
+                    btn.innerHTML = '🔒';
+                } else {
+                    input.type = 'password';
+                    btn.innerHTML = '👁️';
+                }
+            });
+            wrapper.appendChild(btn);
+        });
+    };
 
     // 11. Fast Server-Sent Events (SSE) Delta Stream
     function initTerminalStream() {
@@ -3965,6 +4285,10 @@ TERMINAL_CLIENT_JS = r"""
                 el.style.setProperty('overflow', 'hidden', 'important');
             }
         });
+
+        if (window.epmInitPasswordToggles) {
+            window.epmInitPasswordToggles();
+        }
     }, 1500);
 })();
 """
