@@ -32,23 +32,22 @@ MARGIN_BOTTOM = 38
 USABLE_WIDTH = PAGE_WIDTH - (MARGIN_LEFT + MARGIN_RIGHT) # ~801.89 pt
 
 # Column Widths Budget (Total = ~802 pt)
-# Matching user spreadsheet with 15-column schema including Outcome / Results:
+# Streamlined 14-column institutional layout (Source merged into Reg., Results, Impact):
 COL_WIDTHS = [
     18,  # 0: #
     42,  # 1: Time (IST)
     30,  # 2: Day (Mon, Tue, Wed...)
-    60,  # 3: Event Type (Earning Cal., Corp. Board Meet...)
+    62,  # 3: Event Type (Earning Cal., Corp. Board Meet...)
     36,  # 4: Country
-    44,  # 5: Regulator / Issuer
-    46,  # 6: Sector
-    155, # 7: Event (Expanded)
+    44,  # 5: Reg. (Regulator / Issuer)
+    48,  # 6: Sector
+    165, # 7: Event (Expanded)
     38,  # 8: Impact (1-5)
-    42,  # 9: Previous Related Data
-    42,  # 10: Consensus / Forecast
-    68,  # 11: Outcome / Results (NEW!)
+    44,  # 9: Previous Related Data
+    44,  # 10: Consensus / Forecast
+    72,  # 11: Results (Unfolded Actuals)
     38,  # 12: Sentiment
-    130, # 13: AI Reasoning (Expanded)
-    36   # 14: Source
+    140  # 13: AI Reasoning (Expanded)
 ]
 
 # Scaling to fit exactly USABLE_WIDTH = 801.89 pt
@@ -528,15 +527,15 @@ class CalendarPDFEngine:
             date_banner_data = [
                 [
                     Paragraph(f"<b>Date:</b> {formatted_date}", self.style_section_date),
-                    "", "", "", "", "", "",
+                    "", "", "", "", "",
                     Paragraph(f"<b>Day:</b> {day_name}", self.style_section_date),
                     "", "", "", "", "", "", ""
                 ]
             ]
             date_table = Table(date_banner_data, colWidths=COLUMN_WIDTHS)
             date_table.setStyle(TableStyle([
-                ('SPAN', (0, 0), (6, 0)),
-                ('SPAN', (7, 0), (14, 0)),
+                ('SPAN', (0, 0), (5, 0)),
+                ('SPAN', (6, 0), (13, 0)),
                 ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor("#FEF3C7")), # Warm soft buff/yellow
                 ('TOPPADDING', (0, 0), (-1, -1), 4),
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
@@ -547,8 +546,7 @@ class CalendarPDFEngine:
             ]))
             flowables.append(date_table)
 
-            # ── Main 15-Column Data Table ──
-            # Header Row matching user's spreadsheet
+            # ── Main 14-Column Data Table (Streamlined) ──
             table_data = [
                 [
                     Paragraph("<b>#</b>", self.style_th),
@@ -556,16 +554,15 @@ class CalendarPDFEngine:
                     Paragraph("<b>Day</b>", self.style_th),
                     Paragraph("<b>Event Type</b>", self.style_th),
                     Paragraph("<b>Country</b>", self.style_th),
-                    Paragraph("<b>Regulator / Issuer</b>", self.style_th),
+                    Paragraph("<b>Reg.</b>", self.style_th),
                     Paragraph("<b>Sector</b>", self.style_th),
                     Paragraph("<b>Event</b>", self.style_th_left),
-                    Paragraph("<b>Impact / Importance (1-5)</b>", self.style_th),
+                    Paragraph("<b>Impact</b>", self.style_th),
                     Paragraph("<b>Previous Related Data</b>", self.style_th),
                     Paragraph("<b>Consensus / Forecast</b>", self.style_th),
-                    Paragraph("<b>Outcome / Results</b>", self.style_th),
+                    Paragraph("<b>Results</b>", self.style_th),
                     Paragraph("<b>Sentiment</b>", self.style_th),
-                    Paragraph("<b>AI Reasoning</b>", self.style_th_left),
-                    Paragraph("<b>Source</b>", self.style_th)
+                    Paragraph("<b>AI Reasoning</b>", self.style_th_left)
                 ]
             ]
 
@@ -592,7 +589,6 @@ class CalendarPDFEngine:
 
                 sent_text, sent_style = self._format_sentiment(ev)
                 reasoning = clean_text(self._build_ai_reasoning(ev))
-                source_val = clean_text(str(ev.get("source", regulator or "Wire"))[:12])
 
                 # Event type paragraph styling
                 is_holiday = (ev_type == "Holiday")
@@ -617,8 +613,7 @@ class CalendarPDFEngine:
                     Paragraph(fore_val, self.style_cell_center),
                     Paragraph(actual_val, outcome_style),
                     Paragraph(sent_text, sent_style),
-                    Paragraph(reasoning, self.style_cell),
-                    Paragraph(source_val, self.style_cell_center)
+                    Paragraph(reasoning, self.style_cell)
                 ]
                 table_data.append(row)
                 global_row_idx += 1
