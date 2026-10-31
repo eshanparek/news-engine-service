@@ -1011,12 +1011,12 @@ def render_calendar_dossier_html(events: List[Dict]) -> str:
                 <thead>
                     <tr>
                         <th class="col-idx">#</th>
-                        <th class="col-date">Date</th>
+                        <th class="col-date col-clickable-filter" onclick="window.epmFocusFilter('date')" title="Click to filter by date window">Date ▾</th>
                         <th class="col-time">Time (IST)</th>
                         <th class="col-day">Day</th>
                         <th class="col-type">Type</th>
                         <th class="col-country">Country</th>
-                        <th class="col-reg">Reg.</th>
+                        <th class="col-reg col-clickable-filter" onclick="window.epmFocusFilter('reg')" title="Click to filter by regulator / market">Reg. ▾</th>
                         <th class="col-sec">Sector</th>
                         <th class="col-event">Event Catalyst</th>
                         <th class="col-imp">Impact</th>
@@ -1630,34 +1630,19 @@ def render_table_ribbon(
     count_badge: str = "",
     section_id: str = "",
     show_csv: bool = True,
-    show_focus: bool = True,
+    show_refresh: bool = False,
     show_reorder: bool = True,
     show_collapse: bool = True,
-    show_refresh: bool = False,
-    show_density: bool = True,
 ) -> str:
     sec_id = section_id or f"sec_{table_id}"
     sub_badge = f'<span class="epm-ribbon-badge">{subtitle}</span>' if subtitle else ""
     cnt_badge = f'<span class="epm-ribbon-count" id="{table_id}_count">{count_badge}</span>' if count_badge else ""
-
-    density_html = f"""
-    <div class="epm-density-segmented" title="Table Row Density">
-        <button type="button" class="epm-density-btn active" onclick="window.epmSetDensity('{table_id}', 'compact', this)">Compact</button>
-        <button type="button" class="epm-density-btn" onclick="window.epmSetDensity('{table_id}', 'standard', this)">Standard</button>
-    </div>
-    """ if show_density else ""
 
     csv_btn = f"""
     <button type="button" class="epm-ribbon-btn" onclick="window.epmExportCSV('{table_id}')" title="Download table records as standard RFC-4180 CSV">
         📥 <span>CSV</span>
     </button>
     """ if show_csv else ""
-
-    focus_btn = f"""
-    <button type="button" class="epm-ribbon-btn" onclick="window.epmToggleFocus('{table_id}')" title="Full-Screen Focus Mode (Press ESC to exit)">
-        ⛶ <span>Focus</span>
-    </button>
-    """ if show_focus else ""
 
     refresh_btn_html = f"""
     <button type="button" class="epm-ribbon-btn epm-ribbon-btn-refresh" onclick="window.epmTriggerRefresh()" title="Force Refresh News Feeds">
@@ -1676,9 +1661,7 @@ def render_table_ribbon(
             {cnt_badge}
         </div>
         <div class="epm-ribbon-controls">
-            {density_html}
             {csv_btn}
-            {focus_btn}
             {refresh_btn_html}
             {controls_html}
         </div>
@@ -1927,43 +1910,33 @@ button.epm-hdr-action-btn:hover {
     border-color: #1A66FF !important;
 }
 
-/* Segmented Density Toggle */
-.epm-density-segmented {
+/* In-Table Header Filters & Dropdowns */
+.epm-tbl-hdr-filters {
     display: inline-flex !important;
     align-items: center !important;
-    background: #E2E8F0 !important;
-    border-radius: 5px !important;
-    padding: 2px !important;
-    height: 32px !important;
-    box-sizing: border-box !important;
+    gap: 8px !important;
+    margin: 0 10px !important;
     flex-shrink: 0 !important;
 }
-.epm-density-btn {
-    height: 28px !important;
-    padding: 0 10px !important;
+.epm-filter-dropdown {
+    min-width: 150px !important;
+    max-width: 200px !important;
+}
+.epm-filter-dropdown select, 
+.epm-filter-dropdown input, 
+.epm-filter-dropdown .wrap-inner,
+.epm-filter-dropdown div[data-testid="block-label"] + div {
+    height: 26px !important;
+    min-height: 26px !important;
+    max-height: 26px !important;
     font-size: 11px !important;
     font-weight: 600 !important;
-    border: none !important;
-    border-radius: 4px !important;
-    background: transparent !important;
-    color: #475569 !important;
-    cursor: pointer !important;
-    transition: all 0.15s ease !important;
-    white-space: nowrap !important;
-}
-.epm-density-btn.active {
+    padding: 2px 8px !important;
     background: #FFFFFF !important;
-    color: #0052FF !important;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
-}
-
-.density-compact td {
-    padding: 3px 6px !important;
-    font-size: 11px !important;
-}
-.density-standard td {
-    padding: 7px 10px !important;
-    font-size: 12px !important;
+    border: 1px solid #CBD5E1 !important;
+    border-radius: 5px !important;
+    color: #0F172A !important;
+    box-sizing: border-box !important;
 }
 
 /* 4. Table Headers (1 Line Sleek Height, No Word Wrapping) */
@@ -1989,21 +1962,38 @@ th, thead th, .gradio-container thead th, div[data-testid="dataframe"] thead th 
     vertical-align: middle !important;
 }
 
-/* Table Containers */
+.col-clickable-filter {
+    cursor: pointer !important;
+    user-select: none !important;
+    transition: all 0.15s ease !important;
+}
+.col-clickable-filter:hover {
+    background: #EFF6FF !important;
+    color: #0052FF !important;
+}
+
+/* Table Containers & Giant Vertical Void Elimination */
 .gradio-container .table-wrap,
 .gradio-container .table-container,
 .gradio-container .wrap,
 .gradio-container .wrap.default,
 .gradio-container .dataframe,
 .gradio-container div[data-testid="dataframe"],
+.gradio-container div[data-testid="dataframe"] > div,
 div[class*="table"],
-table {
+table,
+tbody {
+    height: auto !important;
+    min-height: 0 !important;
     background: #FFFFFF !important;
     background-color: #FFFFFF !important;
-    border: 1px solid #E2E8F0 !important;
     color: #0F172A !important;
-    border-radius: 0 0 6px 6px !important;
     margin-top: 0 !important;
+}
+
+tbody tr, .gradio-container tbody tr {
+    height: auto !important;
+    min-height: 34px !important;
 }
 
 /* Tab 2 Multi-Market Catalyst Dossier Visual Feed Table (Light Mode) */
@@ -2020,14 +2010,14 @@ table {
 
 .epm-dossier-table-wrap {
     width: 100% !important;
-    overflow-x: auto !important;
-    max-height: 75vh !important;
+    overflow-x: hidden !important;
+    max-height: 80vh !important;
     background: #FFFFFF !important;
 }
 
 .epm-dossier-table {
-    min-width: 1720px !important;
-    width: 1720px !important;
+    width: 100% !important;
+    min-width: 0 !important;
     table-layout: fixed !important;
     border-collapse: collapse !important;
     font-family: var(--font-sans) !important;
@@ -2035,6 +2025,39 @@ table {
     text-align: left !important;
     background: #FFFFFF !important;
 }
+
+/* 15-Column Exact Desktop Fit (100% Window Width, Zero Horizontal Scroll) */
+.epm-dossier-table th.col-idx, .epm-dossier-table td.col-idx { width: 2.5% !important; max-width: 2.5% !important; text-align: center !important; }
+.epm-dossier-table th.col-date, .epm-dossier-table td.col-date { width: 6.5% !important; max-width: 6.5% !important; }
+.epm-dossier-table th.col-time, .epm-dossier-table td.col-time { width: 5.5% !important; max-width: 5.5% !important; }
+.epm-dossier-table th.col-day, .epm-dossier-table td.col-day { width: 2.5% !important; max-width: 2.5% !important; text-align: center !important; }
+.epm-dossier-table th.col-type, .epm-dossier-table td.col-type { width: 5.5% !important; max-width: 5.5% !important; }
+.epm-dossier-table th.col-country, .epm-dossier-table td.col-country { width: 4.5% !important; max-width: 4.5% !important; }
+.epm-dossier-table th.col-reg, .epm-dossier-table td.col-reg { width: 4.5% !important; max-width: 4.5% !important; }
+.epm-dossier-table th.col-sec, .epm-dossier-table td.col-sec { width: 6.0% !important; max-width: 6.0% !important; }
+.epm-dossier-table th.col-event, .epm-dossier-table td.col-event { width: 27.0% !important; max-width: 27.0% !important; }
+.epm-dossier-table th.col-imp, .epm-dossier-table td.col-imp { width: 4.5% !important; max-width: 4.5% !important; text-align: center !important; }
+.epm-dossier-table th.col-num:nth-of-type(11), .epm-dossier-table td.col-num:nth-of-type(11) { width: 4.0% !important; max-width: 4.0% !important; }
+.epm-dossier-table th.col-fore, .epm-dossier-table td.col-fore { width: 4.0% !important; max-width: 4.0% !important; }
+.epm-dossier-table th.col-outcome, .epm-dossier-table td.col-outcome { width: 5.0% !important; max-width: 5.0% !important; text-align: center !important; }
+.epm-dossier-table th.col-sent, .epm-dossier-table td.col-sent { width: 5.5% !important; max-width: 5.5% !important; text-align: center !important; }
+.epm-dossier-table th.col-reason, .epm-dossier-table td.col-reason { width: 13.0% !important; max-width: 13.0% !important; }
+
+#calendar_table th:nth-child(1), #calendar_table td:nth-child(1) { width: 2.5% !important; max-width: 2.5% !important; text-align: center !important; }
+#calendar_table th:nth-child(2), #calendar_table td:nth-child(2) { width: 6.5% !important; max-width: 6.5% !important; }
+#calendar_table th:nth-child(3), #calendar_table td:nth-child(3) { width: 5.5% !important; max-width: 5.5% !important; }
+#calendar_table th:nth-child(4), #calendar_table td:nth-child(4) { width: 2.5% !important; max-width: 2.5% !important; text-align: center !important; }
+#calendar_table th:nth-child(5), #calendar_table td:nth-child(5) { width: 5.5% !important; max-width: 5.5% !important; }
+#calendar_table th:nth-child(6), #calendar_table td:nth-child(6) { width: 4.5% !important; max-width: 4.5% !important; }
+#calendar_table th:nth-child(7), #calendar_table td:nth-child(7) { width: 4.5% !important; max-width: 4.5% !important; }
+#calendar_table th:nth-child(8), #calendar_table td:nth-child(8) { width: 6.0% !important; max-width: 6.0% !important; }
+#calendar_table th:nth-child(9), #calendar_table td:nth-child(9) { width: 27.0% !important; max-width: 27.0% !important; }
+#calendar_table th:nth-child(10), #calendar_table td:nth-child(10) { width: 4.5% !important; max-width: 4.5% !important; text-align: center !important; }
+#calendar_table th:nth-child(11), #calendar_table td:nth-child(11) { width: 4.0% !important; max-width: 4.0% !important; }
+#calendar_table th:nth-child(12), #calendar_table td:nth-child(12) { width: 4.0% !important; max-width: 4.0% !important; }
+#calendar_table th:nth-child(13), #calendar_table td:nth-child(13) { width: 5.0% !important; max-width: 5.0% !important; text-align: center !important; }
+#calendar_table th:nth-child(14), #calendar_table td:nth-child(14) { width: 5.5% !important; max-width: 5.5% !important; text-align: center !important; }
+#calendar_table th:nth-child(15), #calendar_table td:nth-child(15) { width: 13.0% !important; max-width: 13.0% !important; }
 
 .epm-dossier-table thead th {
     position: sticky !important;
@@ -2462,21 +2485,37 @@ tbody tr:hover td {
     color: #0F172A !important;
 }
 
-/* Macro Ticker Strip (Center) */
-.epm-telemetry-strip {
+/* Continuous Sliding Ticker Ribbon */
+.epm-ticker-container {
+    flex: 1 1 auto !important;
+    overflow: hidden !important;
+    position: relative !important;
+    white-space: nowrap !important;
+    mask-image: linear-gradient(to right, transparent, black 3%, black 97%, transparent) !important;
+    -webkit-mask-image: linear-gradient(to right, transparent, black 3%, black 97%, transparent) !important;
+    height: 32px !important;
     display: flex !important;
     align-items: center !important;
-    gap: 12px !important;
-    padding: 0 12px !important;
     border-left: 1px solid #E2E8F0 !important;
     border-right: 1px solid #E2E8F0 !important;
-    overflow-x: auto !important;
-    scrollbar-width: none !important;
-    flex-grow: 1 !important;
-    justify-content: center !important;
+    padding: 0 10px !important;
 }
-.epm-telemetry-strip::-webkit-scrollbar {
-    display: none !important;
+
+.epm-ticker-track {
+    display: inline-flex !important;
+    align-items: center !important;
+    white-space: nowrap !important;
+    will-change: transform !important;
+    animation: epmTickerSlide 30s linear infinite !important;
+}
+
+.epm-ticker-container:hover .epm-ticker-track {
+    animation-play-state: paused !important;
+}
+
+@keyframes epmTickerSlide {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
 }
 
 .epm-ticker-item {
@@ -2514,7 +2553,7 @@ tbody tr:hover td {
     flex-shrink: 0 !important;
 }
 
-.epm-cmd-launcher-btn, .epm-top-btn {
+.epm-top-btn {
     display: inline-flex !important;
     align-items: center !important;
     gap: 5px !important;
@@ -2529,21 +2568,10 @@ tbody tr:hover td {
     cursor: pointer !important;
     transition: all 0.15s ease !important;
 }
-.epm-cmd-launcher-btn:hover, .epm-top-btn:hover {
+.epm-top-btn:hover {
     background: #F1F5F9 !important;
     color: #0F172A !important;
     border-color: #94A3B8 !important;
-}
-
-.epm-cmd-badge {
-    font-family: var(--font-mono) !important;
-    font-size: 10px !important;
-    background: #F1F5F9 !important;
-    border: 1px solid #E2E8F0 !important;
-    padding: 1px 4px !important;
-    border-radius: 3px !important;
-    color: #0052FF !important;
-    font-weight: 700 !important;
 }
 
 /* Right-Side Prominent Menu Button */
@@ -2559,25 +2587,6 @@ tbody tr:hover td {
     background: #1A66FF !important;
     color: #FFFFFF !important;
     border-color: #1A66FF !important;
-}
-
-.epm-nav-search-wrap {
-    display: inline-flex !important;
-    align-items: center !important;
-    height: 30px !important;
-    background: #FFFFFF !important;
-    border: 1px solid #CBD5E1 !important;
-    border-radius: 5px !important;
-    padding: 0 8px !important;
-    gap: 5px !important;
-}
-.epm-nav-search-wrap input {
-    background: transparent !important;
-    border: none !important;
-    color: #0F172A !important;
-    font-size: 11.5px !important;
-    outline: none !important;
-    width: 105px !important;
 }
 
 /* 9. Bento Cards (Settings Hub & User Guide Light Theme) */
@@ -3027,9 +3036,7 @@ tbody tr:hover td {
     .epm-nav-brand-cluster {
         gap: 5px !important;
     }
-    .epm-nav-telemetry,
-    .epm-nav-search-wrap,
-    .epm-cmd-launcher-btn {
+    .epm-nav-telemetry {
         display: none !important;
     }
     #epm-telemetry-ticker {
@@ -3040,8 +3047,7 @@ tbody tr:hover td {
         border-left: none !important;
         border-right: none !important;
         border-top: 1px solid #E2E8F0 !important;
-        overflow-x: auto !important;
-        scrollbar-width: none !important;
+        overflow: hidden !important;
     }
     .epm-nav-controls {
         gap: 4px !important;
@@ -3206,7 +3212,6 @@ TOP_NAVBAR_HTML = """
         <div class="epm-nav-brand-cluster">
             <span class="epm-nav-bolt">⚡</span>
             <span class="epm-nav-title">EPM<span class="epm-title-highlight">PRO</span></span>
-            <span class="epm-nav-version">v3.5 WIRE</span>
             <div class="epm-nav-status-badge">
                 <span class="epm-live-dot"></span>
                 <span>ONLINE</span>
@@ -3216,66 +3221,99 @@ TOP_NAVBAR_HTML = """
             </div>
         </div>
 
-        <!-- Center: Auto-Scrolling Macro Ticker Strip -->
-        <div class="epm-telemetry-strip" id="epm-telemetry-ticker">
-            <div class="epm-ticker-item" title="Nifty 50 Index (NSE)">
-                <span class="epm-ticker-sym">NIFTY 50</span>
-                <span class="epm-ticker-val">24,850.35</span>
-                <span class="epm-ticker-chg up">▲ +0.42%</span>
-            </div>
-            <div class="epm-ticker-divider"></div>
-            <div class="epm-ticker-item" title="BSE Sensex">
-                <span class="epm-ticker-sym">SENSEX</span>
-                <span class="epm-ticker-val">81,420.10</span>
-                <span class="epm-ticker-chg up">▲ +0.38%</span>
-            </div>
-            <div class="epm-ticker-divider"></div>
-            <div class="epm-ticker-item" title="India Volatility Index">
-                <span class="epm-ticker-sym">INDIA VIX</span>
-                <span class="epm-ticker-val">13.15</span>
-                <span class="epm-ticker-chg down">▼ -2.10%</span>
-            </div>
-            <div class="epm-ticker-divider"></div>
-            <div class="epm-ticker-item" title="Brent Crude Oil Spot ($/bbl)">
-                <span class="epm-ticker-sym">BRENT</span>
-                <span class="epm-ticker-val">$74.20</span>
-                <span class="epm-ticker-chg up">▲ +0.54%</span>
-            </div>
-            <div class="epm-ticker-divider"></div>
-            <div class="epm-ticker-item" title="Spot Gold ($/oz)">
-                <span class="epm-ticker-sym">GOLD</span>
-                <span class="epm-ticker-val">$2,654.80</span>
-                <span class="epm-ticker-chg up">▲ +0.15%</span>
-            </div>
-            <div class="epm-ticker-divider"></div>
-            <div class="epm-ticker-item" title="US Dollar vs Indian Rupee">
-                <span class="epm-ticker-sym">USD/INR</span>
-                <span class="epm-ticker-val">₹84.05</span>
-                <span class="epm-ticker-chg down">▼ -0.02%</span>
-            </div>
-            <div class="epm-ticker-divider"></div>
-            <div class="epm-ticker-item" title="US Dollar Index">
-                <span class="epm-ticker-sym">DXY</span>
-                <span class="epm-ticker-val">103.85</span>
-                <span class="epm-ticker-chg up">▲ +0.12%</span>
+        <!-- Center: Continuous Sliding Ticker Ribbon -->
+        <div class="epm-ticker-container" id="epm-telemetry-ticker">
+            <div class="epm-ticker-track">
+                <div class="epm-ticker-item" title="Nifty 50 Index (NSE)">
+                    <span class="epm-ticker-sym">NIFTY 50</span>
+                    <span class="epm-ticker-val">24,850.35</span>
+                    <span class="epm-ticker-chg up">▲ +0.42%</span>
+                </div>
+                <div class="epm-ticker-divider"></div>
+                <div class="epm-ticker-item" title="BSE Sensex">
+                    <span class="epm-ticker-sym">SENSEX</span>
+                    <span class="epm-ticker-val">81,420.10</span>
+                    <span class="epm-ticker-chg up">▲ +0.38%</span>
+                </div>
+                <div class="epm-ticker-divider"></div>
+                <div class="epm-ticker-item" title="India Volatility Index">
+                    <span class="epm-ticker-sym">INDIA VIX</span>
+                    <span class="epm-ticker-val">13.15</span>
+                    <span class="epm-ticker-chg down">▼ -2.10%</span>
+                </div>
+                <div class="epm-ticker-divider"></div>
+                <div class="epm-ticker-item" title="Brent Crude Oil Spot ($/bbl)">
+                    <span class="epm-ticker-sym">BRENT</span>
+                    <span class="epm-ticker-val">$74.20</span>
+                    <span class="epm-ticker-chg up">▲ +0.54%</span>
+                </div>
+                <div class="epm-ticker-divider"></div>
+                <div class="epm-ticker-item" title="Spot Gold ($/oz)">
+                    <span class="epm-ticker-sym">GOLD</span>
+                    <span class="epm-ticker-val">$2,654.80</span>
+                    <span class="epm-ticker-chg up">▲ +0.15%</span>
+                </div>
+                <div class="epm-ticker-divider"></div>
+                <div class="epm-ticker-item" title="US Dollar vs Indian Rupee">
+                    <span class="epm-ticker-sym">USD/INR</span>
+                    <span class="epm-ticker-val">₹84.05</span>
+                    <span class="epm-ticker-chg down">▼ -0.02%</span>
+                </div>
+                <div class="epm-ticker-divider"></div>
+                <div class="epm-ticker-item" title="US Dollar Index">
+                    <span class="epm-ticker-sym">DXY</span>
+                    <span class="epm-ticker-val">103.85</span>
+                    <span class="epm-ticker-chg up">▲ +0.12%</span>
+                </div>
+                <div class="epm-ticker-divider"></div>
+                <!-- Continuous clone set -->
+                <div class="epm-ticker-item" title="Nifty 50 Index (NSE)">
+                    <span class="epm-ticker-sym">NIFTY 50</span>
+                    <span class="epm-ticker-val">24,850.35</span>
+                    <span class="epm-ticker-chg up">▲ +0.42%</span>
+                </div>
+                <div class="epm-ticker-divider"></div>
+                <div class="epm-ticker-item" title="BSE Sensex">
+                    <span class="epm-ticker-sym">SENSEX</span>
+                    <span class="epm-ticker-val">81,420.10</span>
+                    <span class="epm-ticker-chg up">▲ +0.38%</span>
+                </div>
+                <div class="epm-ticker-divider"></div>
+                <div class="epm-ticker-item" title="India Volatility Index">
+                    <span class="epm-ticker-sym">INDIA VIX</span>
+                    <span class="epm-ticker-val">13.15</span>
+                    <span class="epm-ticker-chg down">▼ -2.10%</span>
+                </div>
+                <div class="epm-ticker-divider"></div>
+                <div class="epm-ticker-item" title="Brent Crude Oil Spot ($/bbl)">
+                    <span class="epm-ticker-sym">BRENT</span>
+                    <span class="epm-ticker-val">$74.20</span>
+                    <span class="epm-ticker-chg up">▲ +0.54%</span>
+                </div>
+                <div class="epm-ticker-divider"></div>
+                <div class="epm-ticker-item" title="Spot Gold ($/oz)">
+                    <span class="epm-ticker-sym">GOLD</span>
+                    <span class="epm-ticker-val">$2,654.80</span>
+                    <span class="epm-ticker-chg up">▲ +0.15%</span>
+                </div>
+                <div class="epm-ticker-divider"></div>
+                <div class="epm-ticker-item" title="US Dollar vs Indian Rupee">
+                    <span class="epm-ticker-sym">USD/INR</span>
+                    <span class="epm-ticker-val">₹84.05</span>
+                    <span class="epm-ticker-chg down">▼ -0.02%</span>
+                </div>
+                <div class="epm-ticker-divider"></div>
+                <div class="epm-ticker-item" title="US Dollar Index">
+                    <span class="epm-ticker-sym">DXY</span>
+                    <span class="epm-ticker-val">103.85</span>
+                    <span class="epm-ticker-chg up">▲ +0.12%</span>
+                </div>
+                <div class="epm-ticker-divider"></div>
             </div>
         </div>
 
-        <!-- Right: Command Launcher, Highlighter, Audio Toggle & Hamburger Menu -->
+        <!-- Right: Audio Toggle & Hamburger Menu -->
         <div class="epm-nav-controls">
-            <!-- Bloomberg Command Launcher -->
-            <button type="button" class="epm-cmd-launcher-btn" onclick="window.epmOpenPalette()" title="Press Cmd+K or / to open Command Palette">
-                <span class="epm-cmd-badge">⌘K /</span>
-                <span class="epm-cmd-label">Quick Jump</span>
-            </button>
-
-            <!-- Watchlist Highlighter Input -->
-            <div class="epm-nav-search-wrap" title="Highlight table rows matching keywords/tickers">
-                <span class="epm-nav-search-icon">⌕</span>
-                <input id="epm-watchlist-input" type="text" placeholder="Highlight Ticker..." oninput="window.epmApplyWatchlist(this.value)">
-                <button type="button" class="epm-watchlist-clear-btn" onclick="window.epmClearWatchlist()" title="Clear highlighter">✕</button>
-            </div>
-
             <!-- Audio Alert Toggle -->
             <button type="button" id="epm-audio-toggle-btn" class="epm-top-btn epm-btn-active" onclick="window.epmToggleAudio()" title="Toggle Web Audio Flash Chime">
                 <span class="epm-btn-icon">⚡</span>
@@ -3291,66 +3329,6 @@ TOP_NAVBAR_HTML = """
     </div>
 </div>
 
-<!-- 2035 Institutional Command Palette Modal -->
-<div id="epm-command-palette-modal" class="epm-palette-backdrop" style="display:none;" onclick="if(event.target===this)window.epmClosePalette()">
-    <div class="epm-palette-dialog">
-        <div class="epm-palette-input-wrap">
-            <span class="epm-palette-search-icon">⚡</span>
-            <input id="epm-palette-input" type="text" placeholder="Search ticker (RELIANCE, NIFTY, CRUDE), jump to page, or run action..." oninput="window.epmFilterPalette(this.value)" autocomplete="off">
-            <kbd class="epm-palette-esc-hint" onclick="window.epmClosePalette()">ESC</kbd>
-        </div>
-        <div id="epm-palette-results" class="epm-palette-results">
-            <div class="epm-palette-section-title">NAVIGATION WORKSPACES</div>
-            <div class="epm-palette-item" onclick="window.epmSwitchTab(0);window.epmClosePalette()">
-                <span class="epm-item-icon">📰</span>
-                <div class="epm-item-text"><span class="epm-item-main">Live Wire News Stream</span><span class="epm-item-sub">Real-time multi-market intelligence feed</span></div>
-                <span class="epm-item-shortcut">Tab 1</span>
-            </div>
-            <div class="epm-palette-item" onclick="window.epmSwitchTab(1);window.epmClosePalette()">
-                <span class="epm-item-icon">📅</span>
-                <div class="epm-item-text"><span class="epm-item-main">Unified Catalyst Ledger & Calendar</span><span class="epm-item-sub">15-column date-enriched institutional dossier</span></div>
-                <span class="epm-item-shortcut">Tab 2</span>
-            </div>
-            <div class="epm-palette-item" onclick="window.epmSwitchTab(2);window.epmClosePalette()">
-                <span class="epm-item-icon">📜</span>
-                <div class="epm-item-text"><span class="epm-item-main">Official Regulatory Directives</span><span class="epm-item-sub">SEBI, RBI, NSE, BSE, MCX official circulars</span></div>
-                <span class="epm-item-shortcut">Tab 3</span>
-            </div>
-            <div class="epm-palette-section-title">DOSSIER DISPATCH & EXPORTS</div>
-            <div class="epm-palette-item" onclick="window.epmPaletteAction('download_5pm');window.epmClosePalette()">
-                <span class="epm-item-icon">📄</span>
-                <div class="epm-item-text"><span class="epm-item-main">Download 5 PM Daily Outcomes PDF</span><span class="epm-item-sub">Rolling outcomes since previous 5 PM</span></div>
-                <span class="epm-item-shortcut">5PM</span>
-            </div>
-            <div class="epm-palette-item" onclick="window.epmPaletteAction('download_weekly');window.epmClosePalette()">
-                <span class="epm-item-icon">📥</span>
-                <div class="epm-item-text"><span class="epm-item-main">Download Weekly Snapshot PDF</span><span class="epm-item-sub">Next Sunday to Saturday (A4 Landscape Print-Ready)</span></div>
-                <span class="epm-item-shortcut">PDF</span>
-            </div>
-            <div class="epm-palette-item" onclick="window.epmPaletteAction('download_monthly');window.epmClosePalette()">
-                <span class="epm-item-icon">📥</span>
-                <div class="epm-item-text"><span class="epm-item-main">Download Monthly Outlook PDF</span><span class="epm-item-sub">Upcoming Full Month Outlook (A4 Landscape)</span></div>
-                <span class="epm-item-shortcut">PDF</span>
-            </div>
-            <div class="epm-palette-item" onclick="window.epmPaletteAction('push_weekly');window.epmClosePalette()">
-                <span class="epm-item-icon">✈️</span>
-                <div class="epm-item-text"><span class="epm-item-main">Push Weekly Dossier to Telegram</span><span class="epm-item-sub">Manual execution of Friday 6 AM scheduled dispatch</span></div>
-                <span class="epm-item-shortcut">Dispatch</span>
-            </div>
-            <div class="epm-palette-item" onclick="window.epmPaletteAction('push_monthly');window.epmClosePalette()">
-                <span class="epm-item-icon">✈️</span>
-                <div class="epm-item-text"><span class="epm-item-main">Push Monthly Dossier to Telegram</span><span class="epm-item-sub">Manual execution of 25th 6 AM scheduled dispatch</span></div>
-                <span class="epm-item-shortcut">Dispatch</span>
-            </div>
-            <div class="epm-palette-item" onclick="window.epmToggleAudio();window.epmClosePalette()">
-                <span class="epm-item-icon">🔔</span>
-                <div class="epm-item-text"><span class="epm-item-main">Toggle Web Audio Alert Synthesizer</span><span class="epm-item-sub">Dual-tone harmonic 880Hz to 1320Hz chime</span></div>
-                <span class="epm-item-shortcut">Audio</span>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- Universal Right-Side Flyout Menu Drawer (Desktop & Mobile) -->
 <div id="epm-side-menu-backdrop" class="epm-menu-backdrop epm-drawer-backdrop" onclick="window.epmCloseSideMenu()"></div>
 <div id="epm-side-menu-drawer" class="epm-side-drawer epm-mobile-drawer">
@@ -3358,7 +3336,6 @@ TOP_NAVBAR_HTML = """
         <div class="epm-side-drawer-brand">
             <span class="epm-nav-bolt">⚡</span>
             <span class="epm-side-drawer-title">EPM<span class="epm-title-highlight">PRO</span></span>
-            <span class="epm-side-drawer-badge">v3.5 WIRE</span>
         </div>
         <button type="button" class="epm-side-drawer-close" onclick="window.epmCloseSideMenu()" title="Close Menu">✕</button>
     </div>
@@ -3428,9 +3405,6 @@ TOP_NAVBAR_HTML = """
             </button>
             <button type="button" class="epm-side-tool-btn" onclick="window.epmToggleAudio()">
                 <span>🔔</span> Toggle Audio Alert Chime
-            </button>
-            <button type="button" class="epm-side-tool-btn" onclick="window.epmOpenPalette();window.epmCloseSideMenu()">
-                <span>⚡</span> Command Palette (⌘K)
             </button>
         </div>
     </div>
@@ -3680,26 +3654,11 @@ TERMINAL_CLIENT_JS = r"""
         }
     }
 
-    // 3. Segmented Density Engine & Feed Refresh
-    window.epmSetDensity = function(tableId, density, btnEl) {
-        const tableEl = document.getElementById(tableId);
-        if (!tableEl) return;
-        const wrapper = tableEl.closest('.epm-modular-section') || tableEl;
-        wrapper.classList.remove('density-compact', 'density-standard');
-        wrapper.classList.add('density-' + density);
-
-        if (btnEl && btnEl.parentElement) {
-            btnEl.parentElement.querySelectorAll('.epm-density-btn').forEach(b => b.classList.remove('active'));
-            btnEl.classList.add('active');
-        }
-    };
-
+    // 3. Feed Refresh Engine
     window.epmTriggerRefresh = function() {
         const btn = document.getElementById('tab1_refresh_btn') || document.querySelector('button[id*="refresh"]');
         if (btn) btn.click();
     };
-    window.epmCycleGlobalDensity = function() {};
-    window.epmSetGlobalDensity = function() {};
 
     // 4. Modular Section Reordering & Drag/Shift Engine
     window.epmMoveSection = function(sectionId, direction) {
@@ -3920,99 +3879,6 @@ TERMINAL_CLIENT_JS = r"""
         URL.revokeObjectURL(url);
     };
 
-    // 6. Full-Screen Focus Mode
-    let currentFocusedTable = null;
-
-    window.epmToggleFocus = function(tableId) {
-        const tableWrap = document.getElementById(tableId);
-        if (!tableWrap) return;
-        
-        if (currentFocusedTable === tableId) {
-            window.epmExitFocus();
-            return;
-        }
-        
-        window.epmExitFocus();
-        
-        currentFocusedTable = tableId;
-        tableWrap.classList.add("epm-fullscreen-active");
-        document.body.classList.add("epm-focus-body-lock");
-        
-        let banner = document.getElementById("epm-focus-banner");
-        if (!banner) {
-            banner = document.createElement("div");
-            banner.id = "epm-focus-banner";
-            banner.className = "epm-focus-banner";
-            document.body.appendChild(banner);
-        }
-        banner.innerHTML = `
-            <div class="epm-focus-banner-content">
-                <span>⛶ <b>INSTITUTIONAL FULL-SCREEN FOCUS:</b> <code>${tableId.toUpperCase()}</code> · Press <kbd style="background:#334155;color:#fff;padding:1px 5px;border-radius:3px;">ESC</kbd> to return</span>
-                <button onclick="window.epmExitFocus()" class="epm-focus-exit-btn">✕ Exit Focus</button>
-            </div>
-        `;
-        banner.style.display = "flex";
-    };
-
-    window.epmExitFocus = function() {
-        if (!currentFocusedTable) return;
-        const target = document.getElementById(currentFocusedTable);
-        if (target) target.classList.remove("epm-fullscreen-active");
-        currentFocusedTable = null;
-        document.body.classList.remove("epm-focus-body-lock");
-        const banner = document.getElementById("epm-focus-banner");
-        if (banner) banner.style.display = "none";
-    };
-
-    // 7. Watchlist / Ticker Highlighter
-    window.epmApplyWatchlist = function(val) {
-        let query = (typeof val === 'string') ? val : (localStorage.getItem("epm_watchlist") || "");
-        localStorage.setItem("epm_watchlist", query);
-        
-        const input = document.getElementById("epm-watchlist-input");
-        if (input && input.value !== query) input.value = query;
-        
-        const tokens = query.toLowerCase().split(/[,\s]+/).map(s => s.trim()).filter(s => s.length >= 2);
-        const tables = ['top_news_table', 'bottom_news_table', 'calendar_table', 'holidays_table', 'circ_table'];
-        let totalMatches = 0;
-        
-        tables.forEach(tid => {
-            const wrap = document.getElementById(tid);
-            if (!wrap) return;
-            const rows = wrap.querySelectorAll("tbody tr");
-            rows.forEach(tr => {
-                if (tokens.length === 0) {
-                    tr.classList.remove("epm-highlight-row");
-                    return;
-                }
-                const text = tr.innerText.toLowerCase();
-                const matched = tokens.some(tok => text.includes(tok));
-                if (matched) {
-                    tr.classList.add("epm-highlight-row");
-                    totalMatches++;
-                } else {
-                    tr.classList.remove("epm-highlight-row");
-                }
-            });
-        });
-        
-        const badge = document.getElementById("epm-watchlist-count");
-        if (badge) {
-            if (tokens.length > 0) {
-                badge.textContent = `${totalMatches} match${totalMatches === 1 ? '' : 'es'}`;
-                badge.style.display = "inline-flex";
-            } else {
-                badge.style.display = "none";
-            }
-        }
-    };
-
-    window.epmClearWatchlist = function() {
-        const input = document.getElementById("epm-watchlist-input");
-        if (input) input.value = "";
-        window.epmApplyWatchlist("");
-    };
-
     // 8. Action Drawers (Legacy compatibility stubs)
     window.epmToggleCalDrawer = function() {};
     window.epmToggleCircDrawer = function() {};
@@ -4048,26 +3914,12 @@ TERMINAL_CLIENT_JS = r"""
     }
     setInterval(syncTelemetryFromStatusBox, 2000);
 
-    window.addEventListener("keydown", function(e) {
-        if (e.key === "Escape") {
-            if (currentFocusedTable) {
-                window.epmExitFocus();
-                return;
-            }
-        }
-    });
-
     // 10. Initialization & Observer
     function epmInitTerminal() {
         epmUpdateAudioUI();
         updateISTClock();
         syncTelemetryFromStatusBox();
         initTerminalStream();
-
-        const savedQuery = localStorage.getItem("epm_watchlist") || "";
-        if (savedQuery) {
-            window.epmApplyWatchlist(savedQuery);
-        }
 
         window.epmRestoreSectionOrder();
         window.epmRestoreCollapseStates();
@@ -4167,32 +4019,15 @@ TERMINAL_CLIENT_JS = r"""
         } catch(err) {}
     }
 
-    // 12. Bloomberg-Style Command Palette (Cmd+K / '/')
-    window.epmOpenPalette = function() {
-        const modal = document.getElementById('epm-command-palette-modal');
-        const input = document.getElementById('epm-palette-input');
-        if (modal) {
-            modal.classList.add('is-active');
-            if (input) {
-                input.value = '';
-                setTimeout(() => input.focus(), 50);
-                window.epmFilterPalette('');
-            }
+    // In-Table Column Filter Focus
+    window.epmFocusFilter = function(type) {
+        if (type === 'date') {
+            const dd = document.querySelector('#cal_date_filter_dd input') || document.querySelector('#cal_date_filter_dd select');
+            if (dd) { dd.focus(); dd.click(); }
+        } else if (type === 'reg') {
+            const dd = document.querySelector('#cal_reg_filter_dd input') || document.querySelector('#cal_reg_filter_dd select');
+            if (dd) { dd.focus(); dd.click(); }
         }
-    };
-
-    window.epmClosePalette = function() {
-        const modal = document.getElementById('epm-command-palette-modal');
-        if (modal) modal.classList.remove('is-active');
-    };
-
-    window.epmFilterPalette = function(query) {
-        const items = document.querySelectorAll('#epm-palette-results .epm-palette-item');
-        const q = (query || '').toLowerCase().trim();
-        items.forEach(el => {
-            const txt = el.innerText.toLowerCase();
-            el.style.display = (!q || txt.includes(q)) ? 'flex' : 'none';
-        });
     };
 
     window.epmPaletteAction = function(action) {
@@ -4589,19 +4424,6 @@ TERMINAL_CLIENT_JS = r"""
 
     window.addEventListener('keydown', function(e) {
         const tag = (document.activeElement && document.activeElement.tagName) ? document.activeElement.tagName.toLowerCase() : '';
-        const isInput = tag === 'input' || tag === 'textarea';
-        
-        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-            e.preventDefault();
-            window.epmOpenPalette();
-        } else if (e.key === '/' && !isInput) {
-            e.preventDefault();
-            window.epmOpenPalette();
-        } else if (e.key === 'Escape') {
-            window.epmClosePalette();
-        }
-    });
-
     if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", epmInitTerminal);
     } else {
@@ -4610,9 +4432,6 @@ TERMINAL_CLIENT_JS = r"""
     window.addEventListener("load", epmInitTerminal);
     
     setInterval(() => {
-        const savedQuery = localStorage.getItem("epm_watchlist");
-        if (savedQuery) window.epmApplyWatchlist(savedQuery);
-        
         const dossierWrap = document.getElementById("calendar_dossier_wrap");
         if (dossierWrap && dossierWrap.style.display !== "block") {
             dossierWrap.style.setProperty('display', 'block', 'important');
@@ -4654,7 +4473,7 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
         with gr.TabItem("📰 Live Financial Wire & Breaking Catalysts"):
             with gr.Column(elem_id="sec_breaking_wire", elem_classes=["epm-modular-section"]):
                 with gr.Row(elem_id="tab1_header_strip"):
-                    gr.HTML(render_table_ribbon("top_news_table", "Institutional Breaking Wire", subtitle="AI Scored ≥ 7", count_badge="Primary Catalysts", section_id="sec_breaking_wire", show_refresh=True, show_density=True))
+                    gr.HTML(render_table_ribbon("top_news_table", "Institutional Breaking Wire", subtitle="AI Scored ≥ 7", count_badge="Primary Catalysts", section_id="sec_breaking_wire", show_refresh=True))
                     refresh_btn = gr.Button("🔄 Force Refresh Feeds", variant="primary", elem_id="tab1_refresh_btn", scale=0)
 
                 top_table = gr.Dataframe(
@@ -4695,35 +4514,6 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
         with gr.TabItem("📅 Market Calendar, Timers & Outcomes"):
             cal_info_bar = gr.Markdown(value=init_cal_summary, elem_id="cal_info_bar", visible=False)
 
-            with gr.Row(elem_id="cal_filters_row"):
-                cal_market_filter = gr.Radio(
-                    choices=[
-                        ("🌐 ALL", "ALL"),
-                        ("🇮🇳 NSE", "NSE"),
-                        ("🇮🇳 BSE", "BSE"),
-                        ("⛽ MCX", "MCX"),
-                        ("₿ CRYPTO", "CRYPTO"),
-                        ("🇺🇸 NYSE", "NYSE")
-                    ],
-                    value="ALL",
-                    label="",
-                    show_label=False,
-                    scale=3
-                )
-                cal_filter = gr.Radio(
-                    choices=[
-                        ("All Scheduled", "all"),
-                        ("Today (7 AM)", "today"),
-                        ("Tomorrow (7 AM)", "tomorrow"),
-                        ("7 Days", "week"),
-                        ("Active Timers", "upcoming")
-                    ],
-                    value="all",
-                    label="",
-                    show_label=False,
-                    scale=3
-                )
-
             with gr.Column(elem_id="sec_catalyst_ledger", elem_classes=["epm-modular-section"]):
                 with gr.Column(elem_id="calendar_dossier_wrap"):
                     with gr.Row(elem_id="cal_table_header_strip", elem_classes=["epm-table-header-integrated"]):
@@ -4736,6 +4526,38 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                                 <span class="epm-tbl-hdr-badge-sub">Auto: Daily 5 PM · Fri 6 AM · 25th 6 AM</span>
                             </div>
                             """)
+                        with gr.Row(elem_classes=["epm-tbl-hdr-filters"]):
+                            cal_filter = gr.Dropdown(
+                                choices=[
+                                    ("📅 Date: All Scheduled", "all"),
+                                    ("📅 Date: Today (7 AM)", "today"),
+                                    ("📅 Date: Tomorrow (7 AM)", "tomorrow"),
+                                    ("📅 Date: Next 7 Days", "week"),
+                                    ("📅 Date: Active Timers", "upcoming")
+                                ],
+                                value="all",
+                                show_label=False,
+                                elem_id="cal_date_filter_dd",
+                                elem_classes=["epm-filter-dropdown", "epm-date-filter-dd"],
+                                container=False,
+                                scale=1
+                            )
+                            cal_market_filter = gr.Dropdown(
+                                choices=[
+                                    ("🏛️ Reg: ALL Markets", "ALL"),
+                                    ("🇮🇳 Reg: NSE", "NSE"),
+                                    ("🇮🇳 Reg: BSE", "BSE"),
+                                    ("⛽ Reg: MCX", "MCX"),
+                                    ("₿ Reg: CRYPTO", "CRYPTO"),
+                                    ("🇺🇸 Reg: SEC / NYSE", "NYSE")
+                                ],
+                                value="ALL",
+                                show_label=False,
+                                elem_id="cal_reg_filter_dd",
+                                elem_classes=["epm-filter-dropdown", "epm-reg-filter-dd"],
+                                container=False,
+                                scale=1
+                            )
                         with gr.Row(elem_classes=["epm-tbl-hdr-actions"]):
                             btn_download_daily_outcomes = gr.Button("📥 5 PM PDF", variant="primary", elem_classes=["epm-hdr-action-btn", "btn-primary-emerald"])
                             btn_push_daily_outcomes = gr.Button("✈️ Push 5 PM", variant="secondary", elem_classes=["epm-hdr-action-btn", "btn-secondary-light"])
@@ -4757,20 +4579,20 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
             calendar_table = gr.Dataframe(
                 headers=[
                     "#",
-                    "Date",
+                    "Date ▾",
                     "Time (IST)",
                     "Day",
                     "Event Type",
                     "Country",
-                    "Reg.",
+                    "Reg. ▾",
                     "Sector",
-                    "Event",
+                    "Event Catalyst",
                     "Impact",
                     "Previous",
                     "Forecast",
                     "Results",
                     "Sentiment",
-                    "AI Reasoning"
+                    "AI Quantitative Reasoning"
                 ],
                 datatype=["str"] * 15,
                 value=init_cal_rows,
