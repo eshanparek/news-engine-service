@@ -2465,7 +2465,7 @@ th button[aria-label*="menu"] {
     background: #ffffff !important;
     border-bottom: 1px solid #e2e8f0 !important;
     box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04) !important;
-    margin: -3px -16px 2px -16px !important;
+    margin: -3px -16px 0 -16px !important;
     padding: 2px 14px 2px 14px !important;
 }
 
@@ -3379,7 +3379,13 @@ div[id*="_table"].density-expanded tbody td:nth-child(13) > *,
     width: auto !important;
 }
 
+#cal_table_header_strip .epm-tbl-hdr-actions button,
+#cal_table_header_strip button.epm-hdr-action-btn,
 .epm-hdr-action-btn {
+    flex: 0 0 auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: fit-content !important;
     font-family: var(--font-sans) !important;
     font-size: 10px !important;
     font-weight: 600 !important;
