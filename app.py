@@ -4442,8 +4442,6 @@ TERMINAL_CLIENT_JS = r"""
         });
     }
 
-    window.addEventListener('keydown', function(e) {
-        const tag = (document.activeElement && document.activeElement.tagName) ? document.activeElement.tagName.toLowerCase() : '';
     if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", epmInitTerminal);
     } else {
