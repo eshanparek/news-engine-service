@@ -606,7 +606,7 @@ def render_circulars_feed_html(circulars: List[Dict]) -> str:
         title = html.escape(str(c.get("title", "")))
         circ_no = html.escape(str(c.get("circular_no", "")))
         date_str = html.escape(str(c.get("date", "")))
-        pdf_url = c.get("pdf_url") or c.get("web_url", "#")
+        doc_url = html.escape(str(c.get("pdf_url") or c.get("web_url") or "").strip())
         category = html.escape(str(c.get("category", "Regulatory Disclosure")))
         impact = str(c.get("impact", "MEDIUM")).upper()
         bullets = c.get("bullets", [])
@@ -616,6 +616,8 @@ def render_circulars_feed_html(circulars: List[Dict]) -> str:
         impact_badge = f'<span class="epm-badge impact-{"high" if is_high else "medium"}">{"🚨 CRITICAL IMPACT" if is_high else "📌 OFFICIAL DIRECTIVE"}</span>'
 
         bullet_items = "".join(f'<li>{html.escape(str(b))}</li>' for b in bullets) if bullets else f'<li>{title}</li>'
+        pdf_btn_html = f'<a href="{doc_url}" target="_blank" rel="noopener noreferrer" class="epm-pdf-btn">📥 Download Official Document ↗</a>' if doc_url else '<span class="epm-pdf-btn-disabled">📄 In Repository</span>'
+        title_html = f'<a href="{doc_url}" target="_blank" rel="noopener noreferrer" class="epm-circ-title-link">{title}</a>' if doc_url else f'<span class="epm-circ-title">{title}</span>'
 
         card = f'''
         <div class="epm-card epm-circ-card regulator-{reg.lower()} {'is-high-impact' if is_high else ''}">
@@ -627,12 +629,12 @@ def render_circulars_feed_html(circulars: List[Dict]) -> str:
                     {impact_badge}
                 </div>
                 <div class="epm-meta-right">
-                    <a href="{pdf_url}" target="_blank" class="epm-pdf-btn">📄 Open Official PDF ↗</a>
+                    {pdf_btn_html}
                 </div>
             </div>
             <div class="epm-card-body">
                 <div class="epm-circ-title-row">
-                    <span class="epm-circ-title">{title}</span>
+                    {title_html}
                 </div>
                 <div class="epm-circ-bullets-box">
                     <div class="epm-circ-bullets-head">🧠 <b>Institutional Impact & Actionable Breakdown (AI 3-5 Bullets):</b></div>
@@ -655,19 +657,23 @@ def render_circulars_feed_html(circulars: List[Dict]) -> str:
 
 def get_circulars_view(regulator_filter: str = "ALL", impact_filter: str = "ALL", search_query: str = ""):
     try:
+        search_str = "" if search_query is None else str(search_query).strip()
+        reg_filter = "ALL" if regulator_filter is None else str(regulator_filter).strip()
+        imp_filter = "ALL" if impact_filter is None else str(impact_filter).strip()
+
         items = circular_engine.get_circulars(
-            regulator_filter=regulator_filter,
-            impact_filter=impact_filter,
-            search_query=search_query
+            regulator_filter=reg_filter,
+            impact_filter=imp_filter,
+            search_query=search_str
         )
         visual_html = render_circulars_feed_html(items)
         
         table_rows = []
         for it in items:
             meta = REGULATOR_META.get(it.get("regulator", "NSE"), {"badge": it.get("regulator", "NSE")})
-            pdf_link = it.get("pdf_url") or it.get("web_url") or ""
+            pdf_link = str(it.get("pdf_url") or it.get("web_url") or "").strip()
             if pdf_link:
-                pdf_display = f"[📄 Open PDF ↗]({pdf_link})"
+                pdf_display = f"[📥 Download PDF ↗]({pdf_link})"
             else:
                 pdf_display = "—"
             bullets = it.get("bullets", []) or []
@@ -700,8 +706,8 @@ def get_circulars_view(regulator_filter: str = "ALL", impact_filter: str = "ALL"
             table_rows.append(["-", "-", "-", "-", "No official circulars matching current filters", "-", "-", "-"] )
 
         summary_text = (
-            f"🏛️ **Authority Filter:** `{regulator_filter}` &nbsp;|&nbsp; "
-            f"🚨 **Impact Filter:** `{impact_filter}` &nbsp;|&nbsp; "
+            f"🏛️ **Authority Filter:** `{reg_filter}` &nbsp;|&nbsp; "
+            f"🚨 **Impact Filter:** `{imp_filter}` &nbsp;|&nbsp; "
             f"📜 **Official Documents Indexed:** `{len(items)}` &nbsp;|&nbsp; "
             f"🔒 **Storage:** Verified PDF Repository"
         )
@@ -742,13 +748,16 @@ def dispatch_circular_to_telegram(regulator_filter: str = "ALL"):
                     title=row["title"],
                     pdf_url=row["pdf_url"] or row["web_url"],
                     category=row["category"],
+                    impact=row["impact"],
                     bullets=bullets,
                     action_takeaway=row["action_takeaway"]
                 )
-                ok, err = telegram_notifier.send_calendar_alert(msg)
+                ok, err = telegram_notifier.send_calendar_digest(msg)
                 if ok:
-                    return f"✅ **Dispatched Official [{row['regulator']}] Circular `{row['circular_no']}` with 3-5 Bullets & PDF Link to Telegram!**"
-                return f"⚠️ **Telegram Dispatch Error:** {err} *(Verify Calendar Telegram Chat ID in Tab 4)*"
+                    conn.execute("UPDATE circulars SET dispatched_tg = 1 WHERE id = ?", (row["id"],))
+                    conn.commit()
+                    return f"✅ **Dispatched Official [{row['regulator']}] Circular `{row['circular_no']}` with 3-5 Bullets & PDF Download Link to Telegram!**"
+                return f"⚠️ **Telegram Dispatch Notice:** {err} *(Verify Telegram settings in Tab 4)*"
     except Exception as e:
         return f"⚠️ **Dispatch Exception:** {str(e)}"
 
@@ -5113,7 +5122,7 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                     "AI Executive Summary",
                     "Official PDF Document"
                 ],
-                datatype=["str", "str", "str", "str", "str", "str", "str", "markdown"],
+                datatype=["str", "str", "str", "str", "markdown", "str", "str", "markdown"],
                 value=init_circ_rows,
                 interactive=False,
                 wrap=True,

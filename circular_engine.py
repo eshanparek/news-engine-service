@@ -129,7 +129,8 @@ class CircularEngine:
 
         # Generate AI impact & 3-5 bullet executive takeaways
         analysis = ai_analyzer.analyze_circular(title, raw_text or title, regulator)
-        bullets_json = json.dumps(analysis.get("bullets", []))
+        bullets = analysis.get("bullets", [])
+        bullets_json = json.dumps(bullets)
         impact = analysis.get("impact", "MEDIUM")
         category = analysis.get("category", "Regulatory Notice")
         action_takeaway = analysis.get("action_takeaway", "")
@@ -149,6 +150,23 @@ class CircularEngine:
                 conn.commit()
 
         logger.info(f"✅ Added {regulator} circular: {circular_no or circular_id} - {title[:60]}")
+
+        # Float directly to Telegram in real-time when circular is published!
+        try:
+            self._dispatch_single_circular_to_telegram(
+                circular_id=circular_id,
+                regulator=regulator,
+                circ_no=circular_no,
+                title=title,
+                pdf_url=pdf_url or web_url,
+                category=category,
+                impact=impact,
+                bullets=bullets,
+                action_takeaway=action_takeaway
+            )
+        except Exception as ex:
+            logger.debug(f"Telegram real-time dispatch note: {ex}")
+
         return True
 
     # ─────────────────────────────────────────────────────────────
@@ -296,10 +314,10 @@ class CircularEngine:
                 data = resp.json()
                 items = data.get("data", [])
                 for it in items[:15]:
-                    circ_no = it.get("circNumber", "").strip()
-                    subject = it.get("sub", "").strip() or it.get("circSubject", "").strip()
-                    circ_date = it.get("circDate", "").strip()
-                    file_url = it.get("circFilelink", "").strip()
+                    circ_no = str(it.get("circNumber") or "").strip()
+                    subject = str(it.get("sub") or it.get("circSubject") or "").strip()
+                    circ_date = str(it.get("circDate") or "").strip()
+                    file_url = str(it.get("circFilelink") or "").strip()
                     
                     if not file_url.startswith("http"):
                         file_url = f"https://archives.nseindia.com/content/circulars/{file_url.lstrip('/')}"
@@ -436,8 +454,8 @@ class CircularEngine:
             query += " AND impact = ?"
             params.append(impact_filter.upper())
 
-        if search_query.strip():
-            sq = f"%{search_query.strip()}%"
+        if search_query and str(search_query).strip():
+            sq = f"%{str(search_query).strip()}%"
             query += " AND (title LIKE ? OR circular_no LIKE ? OR action_takeaway LIKE ?)"
             params.extend([sq, sq, sq])
 
@@ -466,31 +484,80 @@ class CircularEngine:
                     })
                 return results
 
-    def _check_and_dispatch_high_impact_telegram(self):
-        """Auto-dispatch high impact circulars that haven't been forwarded yet."""
-        from telegram_notifier import telegram_notifier
-        if not telegram_notifier.calendar_enabled or not telegram_notifier.is_calendar_configured():
-            return
+    def _dispatch_single_circular_to_telegram(
+        self,
+        circular_id: str,
+        regulator: str,
+        circ_no: str,
+        title: str,
+        pdf_url: str,
+        category: str,
+        impact: str = "MEDIUM",
+        bullets: List[str] = None,
+        action_takeaway: str = ""
+    ) -> bool:
+        """Immediately floats a newly published circular to the official Telegram channel."""
+        try:
+            from telegram_notifier import telegram_notifier
+            if not telegram_notifier.calendar_enabled or not telegram_notifier.is_calendar_configured():
+                if not telegram_notifier.is_configured():
+                    return False
 
-        with self._lock:
-            with sqlite3.connect(self.db_path) as conn:
-                conn.row_factory = sqlite3.Row
-                rows = conn.execute("SELECT * FROM circulars WHERE impact = 'HIGH' AND dispatched_tg = 0 ORDER BY timestamp ASC LIMIT 5").fetchall()
-                for r in rows:
-                    bullets = json.loads(r["bullets_json"]) if r["bullets_json"] else []
-                    msg = self.format_telegram_circular_alert(
-                        regulator=r["regulator"],
-                        circ_no=r["circular_no"],
-                        title=r["title"],
-                        pdf_url=r["pdf_url"] or r["web_url"],
-                        category=r["category"],
-                        bullets=bullets,
-                        action_takeaway=r["action_takeaway"]
-                    )
-                    ok, _ = telegram_notifier.send_calendar_alert(msg)
-                    if ok:
-                        conn.execute("UPDATE circulars SET dispatched_tg = 1 WHERE id = ?", (r["id"],))
-                conn.commit()
+            msg = self.format_telegram_circular_alert(
+                regulator=regulator,
+                circ_no=circ_no,
+                title=title,
+                pdf_url=pdf_url,
+                category=category,
+                impact=impact,
+                bullets=bullets,
+                action_takeaway=action_takeaway
+            )
+            ok, err = telegram_notifier.send_calendar_digest(msg)
+            if ok:
+                with self._lock:
+                    with sqlite3.connect(self.db_path) as conn:
+                        conn.execute("UPDATE circulars SET dispatched_tg = 1 WHERE id = ?", (circular_id,))
+                        conn.commit()
+                logger.info(f"✈️ Floated [{regulator}] circular {circ_no or circular_id} directly to Telegram!")
+                return True
+            else:
+                logger.warning(f"⚠️ Telegram circular dispatch error: {err}")
+                return False
+        except Exception as e:
+            logger.debug(f"Telegram dispatch note: {e}")
+            return False
+
+    def _check_and_dispatch_high_impact_telegram(self):
+        """Auto-dispatch pending circulars that haven't been forwarded yet."""
+        try:
+            from telegram_notifier import telegram_notifier
+            if not telegram_notifier.calendar_enabled or not telegram_notifier.is_calendar_configured():
+                if not telegram_notifier.is_configured():
+                    return
+
+            with self._lock:
+                with sqlite3.connect(self.db_path) as conn:
+                    conn.row_factory = sqlite3.Row
+                    rows = conn.execute("SELECT * FROM circulars WHERE dispatched_tg = 0 ORDER BY timestamp ASC LIMIT 5").fetchall()
+                    for r in rows:
+                        bullets = json.loads(r["bullets_json"]) if r["bullets_json"] else []
+                        msg = self.format_telegram_circular_alert(
+                            regulator=r["regulator"],
+                            circ_no=r["circular_no"],
+                            title=r["title"],
+                            pdf_url=r["pdf_url"] or r["web_url"],
+                            category=r["category"],
+                            impact=r["impact"],
+                            bullets=bullets,
+                            action_takeaway=r["action_takeaway"]
+                        )
+                        ok, _ = telegram_notifier.send_calendar_digest(msg)
+                        if ok:
+                            conn.execute("UPDATE circulars SET dispatched_tg = 1 WHERE id = ?", (r["id"],))
+                    conn.commit()
+        except Exception as e:
+            logger.debug(f"Telegram dispatch check error: {e}")
 
     def format_telegram_circular_alert(
         self,
@@ -499,29 +566,37 @@ class CircularEngine:
         title: str,
         pdf_url: str,
         category: str,
-        bullets: List[str],
-        action_takeaway: str
+        impact: str = "MEDIUM",
+        bullets: List[str] = None,
+        action_takeaway: str = ""
     ) -> str:
         """Format an institutional Telegram alert for official circulars with 3-5 bullets and direct PDF link."""
         meta = REGULATOR_META.get(regulator.upper(), {"badge": regulator, "name": regulator})
+        bullets = bullets or []
+        impact_icon = "🚨 CRITICAL IMPACT" if str(impact).upper() == "HIGH" else "📌 OFFICIAL DIRECTIVE"
         lines = [
-            f"📜 <b>{meta['badge']} OFFICIAL REGULATORY CIRCULAR</b>",
+            f"📜 <b>{meta['badge']} OFFICIAL REGULATORY DIRECTIVE</b>",
             f"━━━━━━━━━━━━━━━━━━━━━━━━━",
+            f"<b>Authority:</b> <b>{meta.get('name', regulator)}</b>",
             f"<b>Subject:</b> {title}",
-            f"<b>Ref No:</b> <code>{circ_no or 'OFFICIAL NOTICE'}</code>  |  <b>Category:</b> {category}",
+            f"<b>Ref No:</b> <code>{circ_no or 'OFFICIAL NOTICE'}</code>  |  <b>Status:</b> <b>{impact_icon}</b>",
+            f"<b>Category:</b> {category}",
             f"",
             f"<b>🧠 AI Institutional Impact Breakdown:</b>"
         ]
-        for b in bullets:
-            lines.append(f"• {b}")
+        if bullets:
+            for b in bullets[:5]:
+                lines.append(f"• {b}")
+        else:
+            lines.append(f"• Official regulatory directive published by {regulator}; review attached document.")
 
         if action_takeaway:
-            lines.append(f"\n⚡ <b>Takeaway:</b> <i>{action_takeaway}</i>")
+            lines.append(f"\n⚡ <b>Operational Takeaway:</b> <i>{action_takeaway}</i>")
 
         if pdf_url:
-            lines.append(f"\n📄 <b>Official Document Link:</b> <a href=\"{pdf_url}\">Open Native PDF ↗</a>")
+            lines.append(f"\n📄 <b>Official Document Download:</b>\n👉 <a href=\"{pdf_url}\"><b>Download Official Circular (PDF) ↗</b></a>")
 
-        lines.append(f"\n<i>🏛️ Verified Direct Release • EPM Pro Regulatory Intelligence</i>")
+        lines.append(f"\n<i>Global News Feed Room is Powered by EPMC Pvt. Ltd.</i>")
         return "\n".join(lines)
 
 

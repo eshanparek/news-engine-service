@@ -209,11 +209,11 @@ class TelegramNotifier:
 
     def get_effective_calendar_token(self) -> str:
         """Uses dedicated calendar bot token if provided, otherwise falls back to main bot token."""
-        return (self.calendar_bot_token or self.bot_token).strip()
+        return (self.calendar_bot_token or self.bot_token or "").strip()
 
     def get_effective_calendar_chat_id(self) -> str:
         """Uses dedicated calendar chat ID if provided, otherwise falls back to main news chat ID."""
-        return (self.calendar_chat_id or self.chat_id).strip()
+        return (self.calendar_chat_id or self.chat_id or "").strip()
 
     def is_configured(self) -> bool:
         return bool(self.bot_token and self.chat_id)
