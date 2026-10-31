@@ -4155,14 +4155,18 @@ TERMINAL_CLIENT_JS = r"""
         const secWrap = document.getElementById('epm-inshorts-sectors');
         if (secWrap) {
             secWrap.innerHTML = '';
-            if (data.sectors && data.sectors.length > 0) {
-                data.sectors.forEach(s => {
-                    const tag = document.createElement('span');
-                    tag.className = 'epm-inshorts-tag';
-                    tag.textContent = s;
-                    secWrap.appendChild(tag);
-                });
+            let sectorsList = [];
+            if (Array.isArray(data.sectors)) {
+                sectorsList = data.sectors;
+            } else if (typeof data.sectors === 'string' && data.sectors.trim()) {
+                sectorsList = data.sectors.split(/[,/]+/).map(s => s.trim()).filter(Boolean);
             }
+            sectorsList.forEach(s => {
+                const tag = document.createElement('span');
+                tag.className = 'epm-inshorts-tag';
+                tag.textContent = s;
+                secWrap.appendChild(tag);
+            });
         }
 
         // Title
