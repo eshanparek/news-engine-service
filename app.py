@@ -4569,29 +4569,29 @@ tbody tr.epm-highlight-row td:first-child {
 }
 
 .epm-inshorts-backdrop.is-open {
-    opacity: 1;
-    pointer-events: auto;
+    opacity: 1 !important;
+    pointer-events: auto !important;
 }
 
 .epm-inshorts-drawer {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: -110vh;
-    max-height: 94vh;
-    height: 90vh;
-    background: #ffffff;
-    border-radius: 18px 18px 0 0;
-    box-shadow: 0 -12px 36px rgba(15, 23, 42, 0.25);
-    z-index: 1070;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    transition: bottom 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    position: fixed !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: -110vh !important;
+    max-height: 94vh !important;
+    height: 90vh !important;
+    background: #ffffff !important;
+    border-radius: 18px 18px 0 0 !important;
+    box-shadow: 0 -12px 36px rgba(15, 23, 42, 0.25) !important;
+    z-index: 99999 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    transition: bottom 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
 .epm-inshorts-drawer.is-open {
-    bottom: 0;
+    bottom: 0 !important;
 }
 
 .epm-inshorts-handle-bar {
