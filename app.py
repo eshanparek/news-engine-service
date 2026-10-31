@@ -4480,8 +4480,17 @@ init_status_str, init_news_html, init_top_rows, init_bottom_rows = get_dashboard
 init_cal_summary, init_cal_html, init_cal_rows, init_hol_rows = get_calendar_tables()
 init_circ_summary, init_circ_html, init_circ_rows = get_circulars_view()
 
-with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence Terminal", fill_width=True) as demo:
-    gr.HTML("<style>" + CUSTOM_CSS + "</style>" + TOP_NAVBAR_HTML + "<script>" + TERMINAL_CLIENT_JS + "</script>")
+with gr.Blocks(
+    title="EPM Pro Global Financial News & Multi-Market Intelligence Terminal",
+    fill_width=True,
+    head=(
+        '<link rel="preconnect" href="https://fonts.googleapis.com">'
+        '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
+        '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">'
+        f"<style>{CUSTOM_CSS}</style><script>{TERMINAL_CLIENT_JS}</script>"
+    )
+) as demo:
+    gr.HTML(f"<style>{CUSTOM_CSS}</style>{TOP_NAVBAR_HTML}<script>{TERMINAL_CLIENT_JS}</script>")
     status_box = gr.Markdown(value=init_status_str, elem_id="epm-status-box", visible=False)
 
     with gr.Tabs(overflow_behavior="wrap"):
