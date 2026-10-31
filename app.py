@@ -986,8 +986,8 @@ def render_calendar_dossier_html(events: List[Dict]) -> str:
                 <td class="col-sec">{html.escape(sector)}</td>
                 <td class="col-event"><b>{html.escape(raw_ev_name)}</b></td>
                 <td class="col-imp">{pip_badge}</td>
-                <td class="col-num">{html.escape(prev_val)}</td>
-                <td class="col-num col-fore">{html.escape(fore_val)}</td>
+                <td class="col-prev">{html.escape(prev_val)}</td>
+                <td class="col-fore">{html.escape(fore_val)}</td>
                 <td class="col-outcome">{outcome_badge}</td>
                 <td class="col-sent"><span class="epm-sent-badge {sent_class}">● {html.escape(sent_text.upper())}</span></td>
                 <td class="col-reason"><div class="epm-reason-text">{html.escape(reasoning)}</div></td>
@@ -1020,8 +1020,8 @@ def render_calendar_dossier_html(events: List[Dict]) -> str:
                         <th class="col-sec">Sector</th>
                         <th class="col-event">Event Catalyst</th>
                         <th class="col-imp">Impact</th>
-                        <th class="col-num">Prev</th>
-                        <th class="col-num">Fcst</th>
+                        <th class="col-prev">Prev</th>
+                        <th class="col-fore">Fcst</th>
                         <th class="col-outcome">Results</th>
                         <th class="col-sent">Sent.</th>
                         <th class="col-reason">AI Reasoning</th>
@@ -2180,12 +2180,12 @@ tbody tr, .gradio-container tbody tr {
 .epm-dossier-table th.col-reg, .epm-dossier-table td.col-reg { width: 4.0% !important; max-width: 4.0% !important; }
 .epm-dossier-table th.col-sec, .epm-dossier-table td.col-sec { width: 5.0% !important; max-width: 5.0% !important; }
 .epm-dossier-table th.col-event, .epm-dossier-table td.col-event { width: 36.0% !important; max-width: 36.0% !important; }
-.epm-dossier-table th.col-imp, .epm-dossier-table td.col-imp { width: 3.5% !important; max-width: 3.5% !important; text-align: center !important; }
-.epm-dossier-table th.col-num:nth-of-type(11), .epm-dossier-table td.col-num:nth-of-type(11) { width: 3.5% !important; max-width: 3.5% !important; }
-.epm-dossier-table th.col-fore, .epm-dossier-table td.col-fore { width: 3.5% !important; max-width: 3.5% !important; }
+.epm-dossier-table th.col-imp, .epm-dossier-table td.col-imp { width: 4.0% !important; max-width: 4.0% !important; text-align: center !important; }
+.epm-dossier-table th.col-prev, .epm-dossier-table td.col-prev { width: 3.5% !important; max-width: 3.5% !important; text-align: center !important; }
+.epm-dossier-table th.col-fore, .epm-dossier-table td.col-fore { width: 3.5% !important; max-width: 3.5% !important; text-align: center !important; }
 .epm-dossier-table th.col-outcome, .epm-dossier-table td.col-outcome { width: 4.5% !important; max-width: 4.5% !important; text-align: center !important; }
 .epm-dossier-table th.col-sent, .epm-dossier-table td.col-sent { width: 4.5% !important; max-width: 4.5% !important; text-align: center !important; }
-.epm-dossier-table th.col-reason, .epm-dossier-table td.col-reason { width: 17.0% !important; max-width: 17.0% !important; }
+.epm-dossier-table th.col-reason, .epm-dossier-table td.col-reason { width: 14.5% !important; max-width: 14.5% !important; }
 
 #calendar_table th:nth-child(1), #calendar_table td:nth-child(1) { width: 2.0% !important; max-width: 2.0% !important; text-align: center !important; }
 #calendar_table th:nth-child(2), #calendar_table td:nth-child(2) { width: 5.5% !important; max-width: 5.5% !important; }
@@ -2196,12 +2196,12 @@ tbody tr, .gradio-container tbody tr {
 #calendar_table th:nth-child(7), #calendar_table td:nth-child(7) { width: 4.0% !important; max-width: 4.0% !important; }
 #calendar_table th:nth-child(8), #calendar_table td:nth-child(8) { width: 5.0% !important; max-width: 5.0% !important; }
 #calendar_table th:nth-child(9), #calendar_table td:nth-child(9) { width: 36.0% !important; max-width: 36.0% !important; }
-#calendar_table th:nth-child(10), #calendar_table td:nth-child(10) { width: 3.5% !important; max-width: 3.5% !important; text-align: center !important; }
-#calendar_table th:nth-child(11), #calendar_table td:nth-child(11) { width: 3.5% !important; max-width: 3.5% !important; }
-#calendar_table th:nth-child(12), #calendar_table td:nth-child(12) { width: 3.5% !important; max-width: 3.5% !important; }
+#calendar_table th:nth-child(10), #calendar_table td:nth-child(10) { width: 4.0% !important; max-width: 4.0% !important; text-align: center !important; }
+#calendar_table th:nth-child(11), #calendar_table td:nth-child(11) { width: 3.5% !important; max-width: 3.5% !important; text-align: center !important; }
+#calendar_table th:nth-child(12), #calendar_table td:nth-child(12) { width: 3.5% !important; max-width: 3.5% !important; text-align: center !important; }
 #calendar_table th:nth-child(13), #calendar_table td:nth-child(13) { width: 4.5% !important; max-width: 4.5% !important; text-align: center !important; }
 #calendar_table th:nth-child(14), #calendar_table td:nth-child(14) { width: 4.5% !important; max-width: 4.5% !important; text-align: center !important; }
-#calendar_table th:nth-child(15), #calendar_table td:nth-child(15) { width: 17.0% !important; max-width: 17.0% !important; }
+#calendar_table th:nth-child(15), #calendar_table td:nth-child(15) { width: 14.5% !important; max-width: 14.5% !important; }
 
 .epm-dossier-table thead th {
     position: sticky !important;
@@ -3284,6 +3284,19 @@ tbody tr:hover td {
         overflow-x: auto !important;
         -webkit-overflow-scrolling: touch !important;
     }
+    #top_news_table table, #bottom_news_table table {
+        width: 820px !important;
+        min-width: 820px !important;
+        table-layout: fixed !important;
+    }
+    #top_news_table th, #bottom_news_table th,
+    #top_news_table .header-row, #bottom_news_table .header-row {
+        white-space: nowrap !important;
+        word-break: keep-all !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        text-transform: uppercase !important;
+    }
     #top_news_table .virtual-table-viewport,
     #bottom_news_table .virtual-table-viewport {
         overflow-x: auto !important;
@@ -3293,7 +3306,8 @@ tbody tr:hover td {
     }
     #top_news_table .virtual-row,
     #bottom_news_table .virtual-row {
-        min-width: 720px !important;
+        width: 820px !important;
+        min-width: 820px !important;
         height: 44px !important;
         min-height: 44px !important;
         display: flex !important;
