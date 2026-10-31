@@ -1633,10 +1633,19 @@ def render_table_ribbon(
     show_focus: bool = True,
     show_reorder: bool = True,
     show_collapse: bool = True,
+    show_refresh: bool = False,
+    show_density: bool = True,
 ) -> str:
     sec_id = section_id or f"sec_{table_id}"
     sub_badge = f'<span class="epm-ribbon-badge">{subtitle}</span>' if subtitle else ""
     cnt_badge = f'<span class="epm-ribbon-count" id="{table_id}_count">{count_badge}</span>' if count_badge else ""
+
+    density_html = f"""
+    <div class="epm-density-segmented" title="Table Row Density">
+        <button type="button" class="epm-density-btn active" onclick="window.epmSetDensity('{table_id}', 'compact', this)">Compact</button>
+        <button type="button" class="epm-density-btn" onclick="window.epmSetDensity('{table_id}', 'standard', this)">Standard</button>
+    </div>
+    """ if show_density else ""
 
     csv_btn = f"""
     <button type="button" class="epm-ribbon-btn" onclick="window.epmExportCSV('{table_id}')" title="Download table records as standard RFC-4180 CSV">
@@ -1650,6 +1659,12 @@ def render_table_ribbon(
     </button>
     """ if show_focus else ""
 
+    refresh_btn_html = f"""
+    <button type="button" class="epm-ribbon-btn epm-ribbon-btn-refresh" onclick="window.epmTriggerRefresh()" title="Force Refresh News Feeds">
+        🔄 <span>Force Refresh Feeds</span>
+    </button>
+    """ if show_refresh else ""
+
     controls_html = render_section_controls(sec_id, show_reorder=show_reorder, show_collapse=show_collapse)
 
     return f"""
@@ -1661,8 +1676,10 @@ def render_table_ribbon(
             {cnt_badge}
         </div>
         <div class="epm-ribbon-controls">
+            {density_html}
             {csv_btn}
             {focus_btn}
+            {refresh_btn_html}
             {controls_html}
         </div>
     </div>
@@ -1766,9 +1783,40 @@ div[class*="gradio-container"],
     margin: 0 0 10px 0 !important;
 }
 
-/* 3. Sleek, Minimal 1-Line Table Ribbons / Headers */
-.epm-table-ribbon, 
-#tab1_header_strip, 
+/* 3. Sleek, Minimal 1-Line Table Ribbons / Action Bars */
+.epm-table-ribbon {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    background: #F8FAFC !important;
+    border: 1px solid #E2E8F0 !important;
+    border-bottom: none !important;
+    border-radius: 6px 6px 0 0 !important;
+    padding: 4px 12px !important;
+    min-height: 40px !important;
+    height: auto !important;
+    box-sizing: border-box !important;
+    gap: 8px !important;
+    flex-wrap: nowrap !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+}
+
+#tab1_header_strip {
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    min-height: 0 !important;
+}
+
+#tab1_refresh_btn {
+    display: none !important;
+}
+
 #cal_table_header_strip, 
 #circ_table_header_strip {
     display: flex !important;
@@ -1778,29 +1826,29 @@ div[class*="gradio-container"],
     border: 1px solid #E2E8F0 !important;
     border-bottom: none !important;
     border-radius: 6px 6px 0 0 !important;
-    padding: 0 10px !important;
-    height: 30px !important;
-    min-height: 30px !important;
-    max-height: 30px !important;
-    line-height: 28px !important;
+    padding: 4px 12px !important;
+    min-height: 40px !important;
+    height: auto !important;
     margin: 0 !important;
     box-shadow: none !important;
+    gap: 8px !important;
+    flex-wrap: wrap !important;
 }
 
 .epm-ribbon-left, .epm-tbl-hdr-left, .epm-tbl-hdr-title-group {
     display: flex !important;
     align-items: center !important;
-    gap: 6px !important;
-    height: 100% !important;
+    gap: 8px !important;
+    flex-shrink: 0 !important;
 }
 
 .epm-ribbon-bullet {
     color: #0052FF !important;
-    font-size: 8px !important;
+    font-size: 9px !important;
 }
 
 .epm-ribbon-title, .epm-tbl-hdr-title {
-    font-size: 11px !important;
+    font-size: 11.5px !important;
     font-weight: 700 !important;
     color: #0F172A !important;
     letter-spacing: 0.02em !important;
@@ -1809,73 +1857,113 @@ div[class*="gradio-container"],
 }
 
 .epm-ribbon-badge, .epm-tbl-hdr-badge {
-    font-size: 9.5px !important;
+    font-size: 10px !important;
     font-weight: 700 !important;
     background: #EFF6FF !important;
     color: #0052FF !important;
     border: 1px solid #BFDBFE !important;
-    padding: 0 5px !important;
-    height: 18px !important;
-    line-height: 16px !important;
-    border-radius: 3px !important;
+    padding: 1px 6px !important;
+    height: 20px !important;
+    line-height: 18px !important;
+    border-radius: 4px !important;
     white-space: nowrap !important;
 }
 
 .epm-ribbon-count, .epm-tbl-hdr-badge-sub {
-    font-size: 9.5px !important;
+    font-size: 10px !important;
     color: #64748B !important;
-    font-weight: 500 !important;
+    font-weight: 600 !important;
     white-space: nowrap !important;
 }
 
 .epm-ribbon-controls, .epm-tbl-hdr-actions {
     display: flex !important;
     align-items: center !important;
-    gap: 4px !important;
-    height: 100% !important;
+    gap: 6px !important;
+    flex-wrap: nowrap !important;
+    flex-shrink: 0 !important;
 }
 
-/* Sleek Micro Action Buttons inside Table Ribbon */
+/* Action Buttons inside Table Ribbon */
 .epm-ribbon-btn, 
 button.epm-hdr-action-btn, 
-#tab1_refresh_btn,
 .epm-section-ctrl-btn {
-    height: 22px !important;
-    min-height: 22px !important;
-    max-height: 22px !important;
+    height: 32px !important;
+    min-height: 32px !important;
     line-height: 20px !important;
-    padding: 0 7px !important;
-    font-size: 10.5px !important;
+    padding: 6px 12px !important;
+    font-size: 11.5px !important;
     font-weight: 600 !important;
     background: #FFFFFF !important;
     border: 1px solid #CBD5E1 !important;
-    border-radius: 4px !important;
+    border-radius: 5px !important;
     color: #334155 !important;
     cursor: pointer !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    gap: 3px !important;
+    gap: 5px !important;
     margin: 0 !important;
-    transition: all 0.12s ease !important;
+    flex-shrink: 0 !important;
+    transition: all 0.15s ease !important;
+    box-sizing: border-box !important;
 }
 
 .epm-ribbon-btn:hover, 
-button.epm-hdr-action-btn:hover, 
-#tab1_refresh_btn:hover {
+button.epm-hdr-action-btn:hover {
     background: #F1F5F9 !important;
     color: #0F172A !important;
     border-color: #94A3B8 !important;
 }
 
-#tab1_refresh_btn, .btn-primary-emerald {
+.epm-ribbon-btn-refresh, .btn-primary-emerald {
     background: #0052FF !important;
     color: #FFFFFF !important;
-    border: none !important;
+    border: 1px solid #0052FF !important;
 }
-#tab1_refresh_btn:hover, .btn-primary-emerald:hover {
+.epm-ribbon-btn-refresh:hover, .btn-primary-emerald:hover {
     background: #1A66FF !important;
     color: #FFFFFF !important;
+    border-color: #1A66FF !important;
+}
+
+/* Segmented Density Toggle */
+.epm-density-segmented {
+    display: inline-flex !important;
+    align-items: center !important;
+    background: #E2E8F0 !important;
+    border-radius: 5px !important;
+    padding: 2px !important;
+    height: 32px !important;
+    box-sizing: border-box !important;
+    flex-shrink: 0 !important;
+}
+.epm-density-btn {
+    height: 28px !important;
+    padding: 0 10px !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    border: none !important;
+    border-radius: 4px !important;
+    background: transparent !important;
+    color: #475569 !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
+    white-space: nowrap !important;
+}
+.epm-density-btn.active {
+    background: #FFFFFF !important;
+    color: #0052FF !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+}
+
+.density-compact td {
+    padding: 3px 6px !important;
+    font-size: 11px !important;
+}
+.density-standard td {
+    padding: 7px 10px !important;
+    font-size: 12px !important;
 }
 
 /* 4. Table Headers (1 Line Sleek Height, No Word Wrapping) */
@@ -2083,34 +2171,106 @@ table {
     }
 }
 
-/* Table Column Widths */
-#top_news_table th:nth-child(1), #top_news_table td:nth-child(1) { min-width: 74px !important; width: 74px !important; text-align: center !important; }
-#top_news_table th:nth-child(2), #top_news_table td:nth-child(2) { min-width: 90px !important; width: 90px !important; text-align: center !important; }
-#top_news_table th:nth-child(3), #top_news_table td:nth-child(3) { min-width: 80px !important; width: 80px !important; text-align: center !important; }
-#top_news_table th:nth-child(4), #top_news_table td:nth-child(4) { min-width: 300px !important; }
-#top_news_table th:nth-child(5), #top_news_table td:nth-child(5) { min-width: 125px !important; width: 125px !important; }
-#top_news_table th:nth-child(6), #top_news_table td:nth-child(6) { min-width: 240px !important; }
-#top_news_table th:nth-child(7), #top_news_table td:nth-child(7) { min-width: 100px !important; width: 100px !important; }
-#top_news_table th:nth-child(8), #top_news_table td:nth-child(8) { min-width: 74px !important; width: 74px !important; text-align: center !important; }
-#top_news_table th:nth-child(9), #top_news_table td:nth-child(9) { min-width: 90px !important; width: 90px !important; text-align: center !important; }
+/* Table Fit & Zero Horizontal Scroll (100% Window Width Budget) */
+#top_news_table, 
+#bottom_news_table,
+#calendar_table,
+#circ_table,
+.gradio-container .table-wrap,
+.gradio-container .table-container,
+div[data-testid="dataframe"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
+}
 
-/* 6. Pure Light Table Rows */
+#top_news_table table,
+#bottom_news_table table,
+#calendar_table table,
+#circ_table table {
+    width: 100% !important;
+    max-width: 100% !important;
+    table-layout: fixed !important;
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 0 0 6px 6px !important;
+    box-sizing: border-box !important;
+}
+
+/* All table headers: white-space nowrap to prevent single-letter vertical column headers */
+th, thead th, .gradio-container thead th, div[data-testid="dataframe"] thead th {
+    white-space: nowrap !important;
+    word-break: keep-all !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    text-transform: uppercase !important;
+    font-family: var(--font-sans) !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.04em !important;
+    color: #475569 !important;
+    background: #F8FAFC !important;
+    border-top: 1px solid #E2E8F0 !important;
+    border-bottom: 1px solid #CBD5E1 !important;
+    padding: 6px 8px !important;
+    height: 30px !important;
+    min-height: 30px !important;
+    vertical-align: middle !important;
+}
+
+/* Clean 1px borders between rows and columns & subtle zebra striping */
 tbody tr td, .gradio-container tbody td {
     background-color: #FFFFFF !important;
     color: #0F172A !important;
-    border-bottom: 1px solid #F1F5F9 !important;
+    border-bottom: 1px solid #E2E8F0 !important;
+    border-right: 1px solid #F1F5F9 !important;
     border-top: none !important;
+    border-left: none !important;
     padding: 4px 8px !important;
     font-size: 12px !important;
     vertical-align: middle !important;
 }
 
 tbody tr:nth-child(even) td {
-    background-color: #FAFAFC !important;
+    background-color: #F8FAFC !important;
 }
 
 tbody tr:hover td {
     background-color: #F1F5F9 !important;
+}
+
+/* Desktop Exact Proportional Column Budgets */
+@media (min-width: 768px) {
+    /* Primary Breaking Wire: SCORE 5%, SENTIMENT 9%, IMPACT 7%, HEADLINE 44%, SECTORS 12%, REASONING 23% = 100% */
+    #top_news_table th:nth-child(1), #top_news_table td:nth-child(1) { width: 5% !important; max-width: 5% !important; text-align: center !important; white-space: nowrap !important; }
+    #top_news_table th:nth-child(2), #top_news_table td:nth-child(2) { width: 9% !important; max-width: 9% !important; text-align: center !important; white-space: nowrap !important; }
+    #top_news_table th:nth-child(3), #top_news_table td:nth-child(3) { width: 7% !important; max-width: 7% !important; text-align: center !important; white-space: nowrap !important; }
+    #top_news_table th:nth-child(4), #top_news_table td:nth-child(4) { width: 44% !important; max-width: 44% !important; }
+    #top_news_table th:nth-child(5), #top_news_table td:nth-child(5) { width: 12% !important; max-width: 12% !important; }
+    #top_news_table th:nth-child(6), #top_news_table td:nth-child(6) { width: 23% !important; max-width: 23% !important; }
+    #top_news_table th:nth-child(7), #top_news_table td:nth-child(7),
+    #top_news_table th:nth-child(8), #top_news_table td:nth-child(8),
+    #top_news_table th:nth-child(9), #top_news_table td:nth-child(9) { display: none !important; }
+
+    /* Secondary Stream: TIME 12%, SOURCE 15%, HEADLINE 53%, RELEVANCE 10%, SENTIMENT 10% = 100% */
+    #bottom_news_table th:nth-child(1), #bottom_news_table td:nth-child(1) { width: 12% !important; max-width: 12% !important; }
+    #bottom_news_table th:nth-child(2), #bottom_news_table td:nth-child(2) { width: 15% !important; max-width: 15% !important; }
+    #bottom_news_table th:nth-child(3), #bottom_news_table td:nth-child(3) { width: 53% !important; max-width: 53% !important; }
+    #bottom_news_table th:nth-child(4), #bottom_news_table td:nth-child(4) { width: 10% !important; max-width: 10% !important; text-align: center !important; }
+    #bottom_news_table th:nth-child(5), #bottom_news_table td:nth-child(5) { width: 10% !important; max-width: 10% !important; text-align: center !important; }
+    #bottom_news_table th:nth-child(6), #bottom_news_table td:nth-child(6) { display: none !important; }
+
+    /* Tab 3 Circulars Directory: Exact 100% Budget */
+    #circ_table th:nth-child(1), #circ_table td:nth-child(1) { width: 8% !important; }
+    #circ_table th:nth-child(2), #circ_table td:nth-child(2) { width: 10% !important; }
+    #circ_table th:nth-child(3), #circ_table td:nth-child(3) { width: 8% !important; }
+    #circ_table th:nth-child(4), #circ_table td:nth-child(4) { width: 7% !important; }
+    #circ_table th:nth-child(5), #circ_table td:nth-child(5) { width: 27% !important; }
+    #circ_table th:nth-child(6), #circ_table td:nth-child(6) { width: 10% !important; }
+    #circ_table th:nth-child(7), #circ_table td:nth-child(7) { width: 20% !important; }
+    #circ_table th:nth-child(8), #circ_table td:nth-child(8) { width: 10% !important; text-align: center !important; }
 }
 
 /* Numerical Cells */
@@ -2186,37 +2346,41 @@ tbody tr:hover td {
     font-weight: 700 !important;
 }
 
-/* 8. Top Navigation Bar (Pure Light White) */
+/* 8. Top Navigation Bar (Single-Row Sticky Institutional Header) */
 .epm-top-navbar {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 1000 !important;
     background: #FFFFFF !important;
     border: 1px solid #E2E8F0 !important;
     border-radius: 8px !important;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04) !important;
-    padding: 5px 12px !important;
+    padding: 6px 14px !important;
     margin-bottom: 8px !important;
 }
 
-.epm-nav-row-1 {
+.epm-nav-single-row {
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
     gap: 12px !important;
-    min-height: 30px !important;
+    min-height: 36px !important;
 }
 
 .epm-nav-brand-cluster {
     display: flex !important;
     align-items: center !important;
-    gap: 7px !important;
+    gap: 8px !important;
+    flex-shrink: 0 !important;
 }
 
 .epm-nav-bolt {
-    font-size: 15px !important;
+    font-size: 16px !important;
     color: #0052FF !important;
 }
 
 .epm-nav-title {
-    font-size: 14px !important;
+    font-size: 15px !important;
     font-weight: 800 !important;
     color: #0F172A !important;
     letter-spacing: -0.02em !important;
@@ -2228,12 +2392,12 @@ tbody tr:hover td {
 
 .epm-nav-version {
     font-family: var(--font-mono) !important;
-    font-size: 9px !important;
+    font-size: 9.5px !important;
     font-weight: 700 !important;
     background: #EFF6FF !important;
     color: #0052FF !important;
     border: 1px solid #BFDBFE !important;
-    padding: 1px 4px !important;
+    padding: 1px 5px !important;
     border-radius: 3px !important;
 }
 
@@ -2260,29 +2424,37 @@ tbody tr:hover td {
 .epm-nav-telemetry {
     display: flex !important;
     align-items: center !important;
-    gap: 5px !important;
+    gap: 6px !important;
 }
 
 .epm-telem-pill {
     font-family: var(--font-mono) !important;
-    font-size: 9.5px !important;
+    font-size: 10px !important;
     background: #F8FAFC !important;
     border: 1px solid #E2E8F0 !important;
     color: #475569 !important;
-    padding: 1px 5px !important;
-    border-radius: 3px !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
 }
 .epm-telem-pill b {
     color: #0F172A !important;
 }
 
-/* Macro Ticker Strip */
+/* Macro Ticker Strip (Center) */
 .epm-telemetry-strip {
     display: flex !important;
     align-items: center !important;
     gap: 12px !important;
-    padding-left: 12px !important;
+    padding: 0 12px !important;
     border-left: 1px solid #E2E8F0 !important;
+    border-right: 1px solid #E2E8F0 !important;
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
+    flex-grow: 1 !important;
+    justify-content: center !important;
+}
+.epm-telemetry-strip::-webkit-scrollbar {
+    display: none !important;
 }
 
 .epm-ticker-item {
@@ -2290,6 +2462,7 @@ tbody tr:hover td {
     align-items: center !important;
     gap: 5px !important;
     font-size: 11px !important;
+    white-space: nowrap !important;
 }
 .epm-ticker-sym {
     font-weight: 700 !important;
@@ -2311,76 +2484,28 @@ tbody tr:hover td {
     font-weight: 600 !important;
 }
 
-/* Row 2: Unified Navigation Tabs + Right-Side Controls & Menu */
-.epm-nav-row-2 {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    padding-top: 5px !important;
-    margin-top: 4px !important;
-    border-top: 1px solid #F1F5F9 !important;
-}
-
-.epm-quick-tabs-container {
-    display: flex !important;
-    align-items: center !important;
-    gap: 5px !important;
-}
-
-.epm-tab-pill {
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 5px !important;
-    padding: 3px 10px !important;
-    background: #FFFFFF !important;
-    border: 1px solid #E2E8F0 !important;
-    border-radius: 6px !important;
-    color: #475569 !important;
-    font-size: 11.5px !important;
-    font-weight: 600 !important;
-    cursor: pointer !important;
-    transition: all 0.12s ease !important;
-}
-.epm-tab-pill:hover {
-    background: #F8FAFC !important;
-    color: #0F172A !important;
-    border-color: #CBD5E1 !important;
-}
-.epm-tab-pill.active {
-    background: #EFF6FF !important;
-    color: #0052FF !important;
-    border-color: #0052FF !important;
-    font-weight: 700 !important;
-}
-
-.epm-tab-pill-bullet {
-    width: 5px !important;
-    height: 5px !important;
-    border-radius: 50% !important;
-    background: #94A3B8 !important;
-}
-.epm-tab-pill.active .epm-tab-pill-bullet {
-    background: #0052FF !important;
-}
-
+/* Right Controls */
 .epm-nav-controls {
     display: flex !important;
     align-items: center !important;
-    gap: 5px !important;
+    gap: 8px !important;
+    flex-shrink: 0 !important;
 }
 
 .epm-cmd-launcher-btn, .epm-top-btn {
     display: inline-flex !important;
     align-items: center !important;
-    gap: 4px !important;
-    height: 25px !important;
-    padding: 0 8px !important;
+    gap: 5px !important;
+    height: 30px !important;
+    padding: 0 10px !important;
     background: #FFFFFF !important;
     border: 1px solid #CBD5E1 !important;
     border-radius: 5px !important;
     color: #334155 !important;
-    font-size: 11px !important;
+    font-size: 11.5px !important;
+    font-weight: 600 !important;
     cursor: pointer !important;
+    transition: all 0.15s ease !important;
 }
 .epm-cmd-launcher-btn:hover, .epm-top-btn:hover {
     background: #F1F5F9 !important;
@@ -2388,36 +2513,49 @@ tbody tr:hover td {
     border-color: #94A3B8 !important;
 }
 
-/* Right-Side Menu Button on Header */
-.epm-menu-btn {
+.epm-cmd-badge {
+    font-family: var(--font-mono) !important;
+    font-size: 10px !important;
+    background: #F1F5F9 !important;
+    border: 1px solid #E2E8F0 !important;
+    padding: 1px 4px !important;
+    border-radius: 3px !important;
+    color: #0052FF !important;
+    font-weight: 700 !important;
+}
+
+/* Right-Side Prominent Menu Button */
+.epm-nav-menu-main {
     background: #0052FF !important;
     color: #FFFFFF !important;
-    border: none !important;
+    border: 1px solid #0052FF !important;
     font-weight: 700 !important;
-    padding: 0 10px !important;
+    padding: 0 12px !important;
+    box-shadow: 0 1px 3px rgba(0, 82, 255, 0.2) !important;
 }
-.epm-menu-btn:hover {
+.epm-nav-menu-main:hover {
     background: #1A66FF !important;
     color: #FFFFFF !important;
+    border-color: #1A66FF !important;
 }
 
 .epm-nav-search-wrap {
     display: inline-flex !important;
     align-items: center !important;
-    height: 25px !important;
+    height: 30px !important;
     background: #FFFFFF !important;
     border: 1px solid #CBD5E1 !important;
     border-radius: 5px !important;
-    padding: 0 6px !important;
-    gap: 4px !important;
+    padding: 0 8px !important;
+    gap: 5px !important;
 }
 .epm-nav-search-wrap input {
     background: transparent !important;
     border: none !important;
     color: #0F172A !important;
-    font-size: 11px !important;
+    font-size: 11.5px !important;
     outline: none !important;
-    width: 100px !important;
+    width: 105px !important;
 }
 
 /* 9. Bento Cards (Settings Hub & User Guide Light Theme) */
@@ -2857,41 +2995,34 @@ tbody tr:hover td {
     body {
         padding-bottom: 60px !important;
     }
-    .epm-nav-telemetry {
-        display: none !important;
+    .epm-top-navbar {
+        padding: 6px 10px !important;
     }
-    .epm-mobile-menu-trigger {
-        display: flex !important;
-        background: #0052FF !important;
-        border: none !important;
-        color: #FFFFFF !important;
-        border-radius: 5px !important;
-        padding: 4px 8px !important;
-        align-items: center !important;
-        gap: 4px !important;
-        cursor: pointer !important;
+    .epm-nav-single-row {
+        flex-wrap: wrap !important;
+        gap: 6px !important;
     }
-    .epm-mobile-menu-trigger .epm-hamburger-line {
-        background: #FFFFFF !important;
+    .epm-nav-brand-cluster {
+        gap: 5px !important;
     }
-    .epm-mobile-menu-trigger .epm-menu-text {
-        color: #FFFFFF !important;
-        font-size: 11px !important;
-        font-weight: 700 !important;
-    }
-    .epm-nav-row-2 {
+    .epm-nav-telemetry,
+    .epm-nav-search-wrap,
+    .epm-cmd-launcher-btn {
         display: none !important;
     }
     #epm-telemetry-ticker {
-        display: flex !important;
+        order: 3 !important;
         width: 100% !important;
-        background: #F8FAFC !important;
+        margin-top: 4px !important;
+        padding: 4px 0 !important;
+        border-left: none !important;
+        border-right: none !important;
         border-top: 1px solid #E2E8F0 !important;
-        border-bottom: 1px solid #E2E8F0 !important;
-        padding: 4px 6px !important;
         overflow-x: auto !important;
         scrollbar-width: none !important;
-        gap: 12px !important;
+    }
+    .epm-nav-controls {
+        gap: 4px !important;
     }
 
     /* Mobile News Streams: High-Density Card List */
@@ -2912,7 +3043,7 @@ tbody tr:hover td {
         flex-direction: column !important;
         gap: 8px !important;
     }
-    #top_news_table tbody tr, #bottom_news_table tbody tr {
+    #top_news_table tbody tr {
         display: flex !important;
         flex-direction: column !important;
         background: #FFFFFF !important;
@@ -2920,11 +3051,87 @@ tbody tr:hover td {
         border-radius: 8px !important;
         padding: 10px 12px !important;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
+        gap: 4px !important;
+    }
+    #bottom_news_table tbody tr {
+        display: flex !important;
+        flex-direction: column !important;
+        background: #FFFFFF !important;
+        border: 1px solid #E2E8F0 !important;
+        border-radius: 8px !important;
+        padding: 10px 12px !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
+        gap: 4px !important;
     }
     #top_news_table tbody td, #bottom_news_table tbody td {
         background: transparent !important;
         border: none !important;
         padding: 2px 0 !important;
+    }
+
+    /* Card Order: Line 1 (Sentiment, Score, Impact) */
+    #top_news_table td:nth-child(2) { order: 1 !important; display: inline-flex !important; align-items: center !important; font-weight: 700 !important; font-size: 11px !important; }
+    #top_news_table td:nth-child(1) { order: 2 !important; display: inline-flex !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #0052FF !important; }
+    #top_news_table td:nth-child(3) { order: 3 !important; display: inline-flex !important; font-size: 10px !important; }
+
+    /* Card Order: Line 2 (Headline) */
+    #top_news_table td:nth-child(4) {
+        order: 4 !important;
+        display: -webkit-box !important;
+        -webkit-line-clamp: 2 !important;
+        -webkit-box-orient: vertical !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        font-size: 13.5px !important;
+        font-weight: 600 !important;
+        line-height: 1.4 !important;
+        color: #0F172A !important;
+        margin: 4px 0 !important;
+    }
+
+    /* Card Order: Line 3 (Sectors & Reasoning) */
+    #top_news_table td:nth-child(5) { order: 5 !important; font-size: 11px !important; color: #64748B !important; }
+    #top_news_table td:nth-child(6) {
+        order: 6 !important;
+        display: -webkit-box !important;
+        -webkit-line-clamp: 2 !important;
+        -webkit-box-orient: vertical !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        font-size: 11.5px !important;
+        color: #475569 !important;
+        background: #F8FAFC !important;
+        border: 1px solid #E2E8F0 !important;
+        border-radius: 4px !important;
+        padding: 6px 8px !important;
+        cursor: pointer !important;
+    }
+    #top_news_table td:nth-child(7),
+    #top_news_table td:nth-child(8),
+    #top_news_table td:nth-child(9) {
+        display: none !important;
+    }
+
+    /* Bottom Table Card Order */
+    #bottom_news_table td:nth-child(1) { order: 1 !important; display: inline-flex !important; font-family: var(--font-mono) !important; font-size: 10.5px !important; color: #64748B !important; }
+    #bottom_news_table td:nth-child(2) { order: 2 !important; display: inline-flex !important; font-size: 10.5px !important; font-weight: 600 !important; color: #0052FF !important; }
+    #bottom_news_table td:nth-child(5) { order: 3 !important; display: inline-flex !important; font-size: 10.5px !important; }
+    #bottom_news_table td:nth-child(3) {
+        order: 4 !important;
+        display: -webkit-box !important;
+        -webkit-line-clamp: 2 !important;
+        -webkit-box-orient: vertical !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        font-size: 13px !important;
+        font-weight: 600 !important;
+        line-height: 1.4 !important;
+        color: #0F172A !important;
+        margin: 4px 0 !important;
+    }
+    #bottom_news_table td:nth-child(4),
+    #bottom_news_table td:nth-child(6) {
+        display: none !important;
     }
 
     /* Sticky Bottom Nav on Mobile */
@@ -2972,8 +3179,8 @@ tbody tr:hover td {
 
 TOP_NAVBAR_HTML = """
 <div id="epm-top-navbar" class="epm-top-navbar">
-    <!-- Row 1: Brand Identity, Live Telemetry & Macro Ticker Strip -->
-    <div class="epm-nav-row-1">
+    <div class="epm-nav-single-row">
+        <!-- Left: Brand Identity, Live Dot, IST Telemetry -->
         <div class="epm-nav-brand-cluster">
             <span class="epm-nav-bolt">⚡</span>
             <span class="epm-nav-title">EPM<span class="epm-title-highlight">PRO</span></span>
@@ -2983,23 +3190,11 @@ TOP_NAVBAR_HTML = """
                 <span>ONLINE</span>
             </div>
             <div class="epm-nav-telemetry">
-                <span class="epm-telem-pill" title="Cached Live News Catalysts">NEWS <b id="epm-hdr-news">88</b></span>
-                <span class="epm-telem-pill" title="5-Market Scheduled Events">CAL <b id="epm-hdr-cal">872</b></span>
-                <span class="epm-telem-pill" title="Official Regulatory Circulars">CIRC <b id="epm-hdr-circ">23</b></span>
-                <span class="epm-telem-pill epm-telem-tg" title="Telegram Forwarder Status">TG <b id="epm-hdr-tg">ACTIVE</b></span>
                 <span class="epm-telem-pill epm-telem-time" title="Current Time (IST)"><b id="epm-hdr-ist">12:50:00 IST</b></span>
             </div>
         </div>
 
-        <!-- Mobile Menu Trigger Button -->
-        <button type="button" id="epm-mobile-menu-btn" class="epm-mobile-menu-trigger" onclick="window.epmToggleSideMenu()" title="Open Navigation Menu">
-            <span class="epm-hamburger-line"></span>
-            <span class="epm-hamburger-line"></span>
-            <span class="epm-hamburger-line"></span>
-            <span class="epm-menu-text">MENU</span>
-        </button>
-
-        <!-- Live Macro Ticker Ribbon -->
+        <!-- Center: Auto-Scrolling Macro Ticker Strip -->
         <div class="epm-telemetry-strip" id="epm-telemetry-ticker">
             <div class="epm-ticker-item" title="Nifty 50 Index (NSE)">
                 <span class="epm-ticker-sym">NIFTY 50</span>
@@ -3043,33 +3238,8 @@ TOP_NAVBAR_HTML = """
                 <span class="epm-ticker-chg up">▲ +0.12%</span>
             </div>
         </div>
-    </div>
 
-    <!-- Row 2: Unified Navigation Tabs (Left) + Command Bar & Right-Side Menu (Right) -->
-    <div class="epm-nav-row-2">
-        <div class="epm-quick-tabs-container">
-            <button type="button" class="epm-tab-pill active" onclick="window.epmSwitchTab(0, this)">
-                <span class="epm-tab-pill-bullet"></span>
-                <span>Live Wire</span>
-            </button>
-            <button type="button" class="epm-tab-pill" onclick="window.epmSwitchTab(1, this)">
-                <span class="epm-tab-pill-bullet"></span>
-                <span>Market Calendar</span>
-            </button>
-            <button type="button" class="epm-tab-pill" onclick="window.epmSwitchTab(2, this)">
-                <span class="epm-tab-pill-bullet"></span>
-                <span>Regulatory Circulars</span>
-            </button>
-            <button type="button" class="epm-tab-pill" onclick="window.epmSwitchTab(3, this)">
-                <span class="epm-tab-pill-bullet"></span>
-                <span>Settings Hub</span>
-            </button>
-            <button type="button" class="epm-tab-pill" onclick="window.epmSwitchTab(4, this)">
-                <span class="epm-tab-pill-bullet"></span>
-                <span>User Guide</span>
-            </button>
-        </div>
-
+        <!-- Right: Command Launcher, Highlighter, Audio Toggle & Hamburger Menu -->
         <div class="epm-nav-controls">
             <!-- Bloomberg Command Launcher -->
             <button type="button" class="epm-cmd-launcher-btn" onclick="window.epmOpenPalette()" title="Press Cmd+K or / to open Command Palette">
@@ -3090,8 +3260,8 @@ TOP_NAVBAR_HTML = """
                 <span id="epm-audio-status-lbl">Audio ON</span>
             </button>
 
-            <!-- Prominent Right-Side Menu Trigger Button -->
-            <button type="button" id="epm-desktop-menu-btn" class="epm-top-btn epm-menu-btn" onclick="window.epmToggleSideMenu()" title="Open Workspaces & Actions Menu">
+            <!-- Prominent High-Visibility Menu Button (Sidebar Drawer) -->
+            <button type="button" id="epm-desktop-menu-btn" class="epm-top-btn epm-menu-btn epm-nav-menu-main" onclick="window.epmToggleSideMenu()" title="Open Workspaces & Actions Menu">
                 <span class="epm-menu-icon">☰</span>
                 <span class="epm-menu-btn-text">Menu ▾</span>
             </button>
@@ -3470,15 +3640,17 @@ TERMINAL_CLIENT_JS = r"""
             if (idx === tabIdx) p.classList.add('active');
             else p.classList.remove('active');
         });
-        const drawerItems = document.querySelectorAll('.epm-drawer-nav-item');
-        drawerItems.forEach((d, idx) => {
-            if (idx === tabIdx) d.classList.add('active');
-            else d.classList.remove('active');
+        const drawerItems = document.querySelectorAll('.epm-drawer-nav-item, .epm-side-nav-item');
+        drawerItems.forEach((d) => {
+            const dt = d.getAttribute('data-tab');
+            if (dt !== null && parseInt(dt) === tabIdx) d.classList.add('active');
+            else if (dt !== null) d.classList.remove('active');
         });
         const bottomBtns = document.querySelectorAll('.epm-mobile-bottom-btn');
-        bottomBtns.forEach((b, idx) => {
-            if (idx === tabIdx) b.classList.add('active');
-            else b.classList.remove('active');
+        bottomBtns.forEach((b) => {
+            const dt = b.getAttribute('data-tab');
+            if (dt !== null && parseInt(dt) === tabIdx) b.classList.add('active');
+            else if (dt !== null) b.classList.remove('active');
         });
         const badge = document.getElementById("epm-active-tab-indicator");
         if (badge && TAB_NAMES[tabIdx]) {
@@ -3486,8 +3658,24 @@ TERMINAL_CLIENT_JS = r"""
         }
     }
 
-    // 3. Single Standard High-Density View (Controls Eradicated)
-    window.epmSetDensity = function() {};
+    // 3. Segmented Density Engine & Feed Refresh
+    window.epmSetDensity = function(tableId, density, btnEl) {
+        const tableEl = document.getElementById(tableId);
+        if (!tableEl) return;
+        const wrapper = tableEl.closest('.epm-modular-section') || tableEl;
+        wrapper.classList.remove('density-compact', 'density-standard');
+        wrapper.classList.add('density-' + density);
+
+        if (btnEl && btnEl.parentElement) {
+            btnEl.parentElement.querySelectorAll('.epm-density-btn').forEach(b => b.classList.remove('active'));
+            btnEl.classList.add('active');
+        }
+    };
+
+    window.epmTriggerRefresh = function() {
+        const btn = document.getElementById('tab1_refresh_btn') || document.querySelector('button[id*="refresh"]');
+        if (btn) btn.click();
+    };
     window.epmCycleGlobalDensity = function() {};
     window.epmSetGlobalDensity = function() {};
 
@@ -4444,7 +4632,7 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
         with gr.TabItem("📰 Live Financial Wire & Breaking Catalysts"):
             with gr.Column(elem_id="sec_breaking_wire", elem_classes=["epm-modular-section"]):
                 with gr.Row(elem_id="tab1_header_strip"):
-                    gr.HTML(render_table_ribbon("top_news_table", "Institutional Breaking Wire", subtitle="AI Scored ≥ 7", count_badge="Primary Catalysts", section_id="sec_breaking_wire"))
+                    gr.HTML(render_table_ribbon("top_news_table", "Institutional Breaking Wire", subtitle="AI Scored ≥ 7", count_badge="Primary Catalysts", section_id="sec_breaking_wire", show_refresh=True, show_density=True))
                     refresh_btn = gr.Button("🔄 Force Refresh Feeds", variant="primary", elem_id="tab1_refresh_btn", scale=0)
 
                 top_table = gr.Dataframe(
