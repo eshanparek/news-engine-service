@@ -1757,6 +1757,33 @@ div[class*="gradio-container"],
     background: transparent !important;
 }
 
+/* Gradio Table Wrappers & Loading States Dark Mode */
+.gradio-container .table-wrap,
+.gradio-container .table-container,
+.gradio-container .wrap,
+.gradio-container .wrap.default,
+.gradio-container .dataframe,
+.gradio-container .empty,
+.gradio-container .loading,
+.gradio-container .pending,
+.gradio-container .paginate,
+.gradio-container div[data-testid="dataframe"],
+.gradio-container .eta-bar,
+.gradio-container .meta-text,
+.gradio-container div[class*="table"],
+.gradio-container table {
+    background: #0B0E14 !important;
+    background-color: #0B0E14 !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+    color: #F1F5F9 !important;
+}
+.gradio-container .loading svg,
+.gradio-container .pending svg,
+.gradio-container .loading-status {
+    background: transparent !important;
+    color: #0052FF !important;
+}
+
 /* 3. Typography & Section Headers */
 h1, h2, h3, h4 {
     font-family: var(--font-sans) !important;
