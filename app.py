@@ -1592,12 +1592,68 @@ default_wa_selected = [s["name"] for s in news_worker.sources if s.get("forward_
 # ─── Clean Modern Financial Terminal (Crisp White Theme, Uniform Typography) ──
 
 
-def render_table_ribbon(table_id: str, title: str, subtitle: str = "", count_badge: str = "") -> str:
+def render_section_controls(section_id: str, show_reorder: bool = True, show_collapse: bool = True) -> str:
+    """Renders ultra-compact institutional Move Up / Move Down / Collapse controls."""
+    reorder_html = ""
+    if show_reorder:
+        reorder_html = f"""
+        <div class="epm-section-reorder-group" title="Reorder section (Move Up / Down)">
+            <button type="button" class="epm-ribbon-btn epm-reorder-btn epm-move-up" onclick="window.epmMoveSection('{section_id}', 'up')" title="Move Section Up">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+            </button>
+            <button type="button" class="epm-ribbon-btn epm-reorder-btn epm-move-down" onclick="window.epmMoveSection('{section_id}', 'down')" title="Move Section Down">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+        </div>
+        """
+
+    collapse_html = ""
+    if show_collapse:
+        collapse_html = f"""
+        <button type="button" class="epm-ribbon-btn epm-collapse-btn" onclick="window.epmToggleCollapse('{section_id}', this)" title="Collapse or Expand this section">
+            <svg class="epm-chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        """
+
+    return f"""
+    <div class="epm-section-ctrl-wrap">
+        {reorder_html}
+        {collapse_html}
+    </div>
+    """
+
+
+def render_table_ribbon(
+    table_id: str,
+    title: str,
+    subtitle: str = "",
+    count_badge: str = "",
+    section_id: str = "",
+    show_csv: bool = True,
+    show_focus: bool = True,
+    show_reorder: bool = True,
+    show_collapse: bool = True,
+) -> str:
+    sec_id = section_id or f"sec_{table_id}"
     sub_badge = f'<span class="epm-ribbon-badge">{subtitle}</span>' if subtitle else ""
     cnt_badge = f'<span class="epm-ribbon-count" id="{table_id}_count">{count_badge}</span>' if count_badge else ""
 
+    csv_btn = f"""
+    <button type="button" class="epm-ribbon-btn" onclick="window.epmExportCSV('{table_id}')" title="Download table records as standard RFC-4180 CSV">
+        📥 <span>CSV</span>
+    </button>
+    """ if show_csv else ""
+
+    focus_btn = f"""
+    <button type="button" class="epm-ribbon-btn" onclick="window.epmToggleFocus('{table_id}')" title="Full-Screen Focus Mode (Press ESC to exit)">
+        ⛶ <span>Focus</span>
+    </button>
+    """ if show_focus else ""
+
+    controls_html = render_section_controls(sec_id, show_reorder=show_reorder, show_collapse=show_collapse)
+
     return f"""
-    <div class="epm-table-ribbon" data-target="{table_id}">
+    <div class="epm-table-ribbon" data-target="{table_id}" data-section="{sec_id}">
         <div class="epm-ribbon-left">
             <span class="epm-ribbon-bullet">●</span>
             <span class="epm-ribbon-title">{title}</span>
@@ -1605,21 +1661,9 @@ def render_table_ribbon(table_id: str, title: str, subtitle: str = "", count_bad
             {cnt_badge}
         </div>
         <div class="epm-ribbon-controls">
-            <div class="epm-density-group" title="Adjust visible row density and line clamping">
-                <span class="epm-control-label">Density:</span>
-                <button type="button" class="epm-density-btn active" data-density="compact" onclick="window.epmSetDensity('{table_id}', 'compact', this)" title="Compact (2-Line Clamp)">Compact</button>
-                <button type="button" class="epm-density-btn" data-density="standard" onclick="window.epmSetDensity('{table_id}', 'standard', this)" title="Standard (4-Line Clamp)">Standard</button>
-                <button type="button" class="epm-density-btn" data-density="expanded" onclick="window.epmSetDensity('{table_id}', 'expanded', this)" title="Full Text (Unconstrained)">Expanded</button>
-            </div>
-            <button type="button" class="epm-ribbon-btn" onclick="window.epmExportCSV('{table_id}')" title="Download table records as standard RFC-4180 CSV">
-                📥 <span>CSV</span>
-            </button>
-            <button type="button" class="epm-ribbon-btn" onclick="window.epmToggleFocus('{table_id}')" title="Full-Screen Focus Mode (Press ESC to exit)">
-                ⛶ <span>Focus</span>
-            </button>
-            <button type="button" class="epm-ribbon-btn epm-collapse-btn" onclick="window.epmToggleCollapse('{table_id}', this)" title="Collapse or Expand this data table">
-                <span>−</span>
-            </button>
+            {csv_btn}
+            {focus_btn}
+            {controls_html}
         </div>
     </div>
     """
@@ -1637,8 +1681,8 @@ CUSTOM_CSS = """
    ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
-    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Inter", "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     
     --bg-page: #ffffff;
     --bg-surface: #ffffff;
@@ -1892,7 +1936,7 @@ div[data-testid="dataframe"],
     border: 1px solid #e2e8f0 !important;
     background: #ffffff !important;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02) !important;
-    margin-bottom: 12px !important;
+    margin-bottom: 6px !important;
 }
 
 table {
@@ -1902,6 +1946,7 @@ table {
     border-collapse: collapse !important;
     font-family: var(--font-sans) !important;
     background: #ffffff !important;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11" !important;
 }
 
 thead th {
@@ -1909,13 +1954,13 @@ thead th {
     color: #475569 !important;
     font-family: var(--font-sans) !important;
     font-size: 11px !important;
-    font-weight: 700 !important;
+    font-weight: 600 !important;
     text-transform: uppercase !important;
-    letter-spacing: 0.05em !important;
-    padding: 7px 8px !important;
-    border-bottom: 1.5px solid #cbd5e1 !important;
+    letter-spacing: 0.02em !important;
+    padding: 5px 8px !important;
+    border-bottom: 1px solid #cbd5e1 !important;
     border-right: 1px solid #f1f5f9 !important;
-    white-space: normal !important;
+    white-space: nowrap !important;
     vertical-align: middle !important;
     position: sticky !important;
     top: 0 !important;
@@ -1923,17 +1968,18 @@ thead th {
 }
 
 tbody td {
-    padding: 5px 8px !important;
-    font-size: 12px !important;
+    padding: 4px 8px !important;
+    font-size: 11.5px !important;
     color: #0f172a !important;
     border-bottom: 1px solid #f1f5f9 !important;
     border-right: 1px solid #f8fafc !important;
     vertical-align: middle !important;
-    line-height: 1.35 !important;
+    line-height: 1.32 !important;
     word-break: break-word !important;
     overflow-wrap: anywhere !important;
     background: #ffffff !important;
     height: auto !important;
+    font-family: var(--font-sans) !important;
 }
 
 tbody tr:nth-child(even) td {
@@ -1941,10 +1987,10 @@ tbody tr:nth-child(even) td {
 }
 
 tbody tr:hover td {
-    background-color: #f0f7ff !important;
+    background-color: #f8fafc !important;
 }
 
-/* 9. Monospace Elements for Numbers, Dates, Timers */
+/* 9. Monospace Elements for Raw Code / Hash Tokens Only */
 code, .timer-cell, pre {
     font-family: var(--font-mono) !important;
     font-size: 11px !important;
@@ -1970,8 +2016,8 @@ code, .timer-cell, pre {
     -webkit-box-orient: vertical !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
-    max-height: 2.7em !important;
-    line-height: 1.35 !important;
+    max-height: 2.65em !important;
+    line-height: 1.32 !important;
     word-break: break-word !important;
 }
 
@@ -1981,30 +2027,30 @@ code, .timer-cell, pre {
 #bottom_news_table tbody td:nth-child(3),
 #circ_table tbody td:nth-child(5),
 #circ_table tbody td:nth-child(7) {
-    max-height: 3.1em !important;
+    max-height: 2.85em !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
-    line-height: 1.35 !important;
+    line-height: 1.32 !important;
 }
 
-/* 11. Column Allocations for Tables */
+/* 11. Column Allocations for Tables (Institutional Sans-Serif + Tabular Figures) */
 
 /* Top News Table */
-#top_news_table th:nth-child(1), #top_news_table td:nth-child(1) { width: 5.5% !important; text-align: center !important; font-family: var(--font-mono) !important; font-weight: 700 !important; color: #b45309 !important; }
+#top_news_table th:nth-child(1), #top_news_table td:nth-child(1) { width: 5.5% !important; text-align: center !important; font-family: var(--font-sans) !important; font-variant-numeric: tabular-nums !important; font-feature-settings: "tnum" 1 !important; font-weight: 700 !important; color: #b45309 !important; }
 #top_news_table th:nth-child(2), #top_news_table td:nth-child(2) { width: 8.5% !important; text-align: center !important; font-weight: 600 !important; }
 #top_news_table th:nth-child(3), #top_news_table td:nth-child(3) { width: 7% !important; text-align: center !important; font-weight: 700 !important; }
 #top_news_table th:nth-child(4), #top_news_table td:nth-child(4) { width: 32% !important; font-weight: 600 !important; color: #0f172a !important; }
-#top_news_table th:nth-child(5), #top_news_table td:nth-child(5) { width: 11% !important; color: #475569 !important; font-size: 11.5px !important; }
-#top_news_table th:nth-child(6), #top_news_table td:nth-child(6) { width: 20% !important; color: #334155 !important; font-style: italic !important; font-size: 11.5px !important; }
+#top_news_table th:nth-child(5), #top_news_table td:nth-child(5) { width: 11% !important; color: #475569 !important; font-size: 11px !important; }
+#top_news_table th:nth-child(6), #top_news_table td:nth-child(6) { width: 20% !important; color: #334155 !important; font-size: 11px !important; }
 #top_news_table th:nth-child(7), #top_news_table td:nth-child(7) { width: 7% !important; font-size: 11px !important; color: #0284c7 !important; font-weight: 600 !important; }
-#top_news_table th:nth-child(8), #top_news_table td:nth-child(8) { width: 4% !important; text-align: center !important; font-family: var(--font-mono) !important; color: #475569 !important; }
-#top_news_table th:nth-child(9), #top_news_table td:nth-child(9) { width: 5% !important; text-align: center !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #64748b !important; }
+#top_news_table th:nth-child(8), #top_news_table td:nth-child(8) { width: 4% !important; text-align: center !important; font-family: var(--font-sans) !important; font-variant-numeric: tabular-nums !important; font-feature-settings: "tnum" 1 !important; font-weight: 600 !important; color: #475569 !important; }
+#top_news_table th:nth-child(9), #top_news_table td:nth-child(9) { width: 5% !important; text-align: center !important; font-family: var(--font-sans) !important; font-variant-numeric: tabular-nums !important; font-feature-settings: "tnum" 1 !important; font-size: 11px !important; color: #64748b !important; }
 
 /* Bottom News Table */
-#bottom_news_table th:nth-child(1), #bottom_news_table td:nth-child(1) { width: 8% !important; text-align: center !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #64748b !important; }
+#bottom_news_table th:nth-child(1), #bottom_news_table td:nth-child(1) { width: 8% !important; text-align: center !important; font-family: var(--font-sans) !important; font-variant-numeric: tabular-nums !important; font-feature-settings: "tnum" 1 !important; font-size: 11px !important; color: #64748b !important; }
 #bottom_news_table th:nth-child(2), #bottom_news_table td:nth-child(2) { width: 12% !important; color: #0284c7 !important; font-weight: 600 !important; }
 #bottom_news_table th:nth-child(3), #bottom_news_table td:nth-child(3) { width: 56% !important; font-weight: 500 !important; color: #0f172a !important; }
-#bottom_news_table th:nth-child(4), #bottom_news_table td:nth-child(4) { width: 6% !important; text-align: center !important; font-family: var(--font-mono) !important; color: #475569 !important; }
+#bottom_news_table th:nth-child(4), #bottom_news_table td:nth-child(4) { width: 6% !important; text-align: center !important; font-family: var(--font-sans) !important; font-variant-numeric: tabular-nums !important; font-feature-settings: "tnum" 1 !important; font-weight: 600 !important; color: #475569 !important; }
 #bottom_news_table th:nth-child(5), #bottom_news_table td:nth-child(5) { width: 8% !important; text-align: center !important; }
 #bottom_news_table th:nth-child(6), #bottom_news_table td:nth-child(6) { width: 10% !important; text-align: center !important; font-size: 11px !important; color: #2563eb !important; }
 
@@ -2042,10 +2088,10 @@ th button[aria-label*="menu"] {
 
 #calendar_table th {
     vertical-align: middle !important;
-    padding: 6px 8px !important;
+    padding: 5px 8px !important;
     font-size: 10.5px !important;
-    font-weight: 700 !important;
-    letter-spacing: 0.3px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.02em !important;
     white-space: nowrap !important;
     text-overflow: ellipsis !important;
     overflow: hidden !important;
@@ -2059,17 +2105,17 @@ th button[aria-label*="menu"] {
 }
 
 #calendar_table tbody tr {
-    height: 38px !important;
-    max-height: 42px !important;
+    height: 34px !important;
+    max-height: 38px !important;
 }
 
 #calendar_table tbody td {
-    height: 38px !important;
-    max-height: 42px !important;
+    height: 34px !important;
+    max-height: 38px !important;
     padding: 3px 6px !important;
     vertical-align: middle !important;
     font-size: 11.5px !important;
-    line-height: 1.35 !important;
+    line-height: 1.32 !important;
     overflow: hidden !important;
 }
 
@@ -2083,29 +2129,29 @@ th button[aria-label*="menu"] {
     -webkit-box-orient: vertical !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
-    line-height: 1.35 !important;
-    max-height: 2.7em !important;
+    line-height: 1.32 !important;
+    max-height: 2.65em !important;
     word-break: break-word !important;
 }
 
-#calendar_table th:nth-child(1), #calendar_table td:nth-child(1) { width: 38px !important; text-align: center !important; font-family: var(--font-mono) !important; color: #64748b !important; white-space: nowrap !important; }
-#calendar_table th:nth-child(2), #calendar_table td:nth-child(2) { width: 95px !important; text-align: center !important; font-family: var(--font-mono) !important; color: #0f172a !important; font-size: 11px !important; font-weight: 700 !important; white-space: nowrap !important; }
-#calendar_table th:nth-child(3), #calendar_table td:nth-child(3) { width: 85px !important; text-align: center !important; font-family: var(--font-mono) !important; color: #0f172a !important; font-size: 11px !important; white-space: nowrap !important; }
+#calendar_table th:nth-child(1), #calendar_table td:nth-child(1) { width: 38px !important; text-align: center !important; font-family: var(--font-sans) !important; font-variant-numeric: tabular-nums !important; font-feature-settings: "tnum" 1 !important; color: #64748b !important; white-space: nowrap !important; }
+#calendar_table th:nth-child(2), #calendar_table td:nth-child(2) { width: 95px !important; text-align: center !important; font-family: var(--font-sans) !important; font-variant-numeric: tabular-nums !important; font-feature-settings: "tnum" 1 !important; color: #0f172a !important; font-size: 11px !important; font-weight: 600 !important; white-space: nowrap !important; }
+#calendar_table th:nth-child(3), #calendar_table td:nth-child(3) { width: 85px !important; text-align: center !important; font-family: var(--font-sans) !important; font-variant-numeric: tabular-nums !important; font-feature-settings: "tnum" 1 !important; color: #0f172a !important; font-size: 11px !important; white-space: nowrap !important; }
 #calendar_table th:nth-child(4), #calendar_table td:nth-child(4) { width: 48px !important; text-align: center !important; font-weight: 600 !important; color: #475569 !important; white-space: nowrap !important; }
 #calendar_table th:nth-child(5), #calendar_table td:nth-child(5) { width: 120px !important; text-align: left !important; font-weight: 600 !important; }
 #calendar_table th:nth-child(6), #calendar_table td:nth-child(6) { width: 65px !important; text-align: center !important; font-weight: 600 !important; color: #334155 !important; white-space: nowrap !important; }
 #calendar_table th:nth-child(7), #calendar_table td:nth-child(7) { width: 75px !important; text-align: center !important; font-weight: 600 !important; color: #0284c7 !important; }
 #calendar_table th:nth-child(8), #calendar_table td:nth-child(8) { width: 110px !important; text-align: left !important; color: #475569 !important; }
 #calendar_table th:nth-child(9), #calendar_table td:nth-child(9) { width: 320px !important; text-align: left !important; font-weight: 600 !important; color: #0f172a !important; }
-#calendar_table th:nth-child(10), #calendar_table td:nth-child(10) { width: 60px !important; text-align: center !important; font-family: var(--font-mono) !important; font-weight: 700 !important; color: #d97706 !important; white-space: nowrap !important; }
-#calendar_table th:nth-child(11), #calendar_table td:nth-child(11) { width: 85px !important; text-align: center !important; font-family: var(--font-mono) !important; color: #475569 !important; font-size: 11px !important; }
-#calendar_table th:nth-child(12), #calendar_table td:nth-child(12) { width: 85px !important; text-align: center !important; font-family: var(--font-mono) !important; font-weight: 600 !important; color: #059669 !important; font-size: 11px !important; }
+#calendar_table th:nth-child(10), #calendar_table td:nth-child(10) { width: 60px !important; text-align: center !important; font-family: var(--font-sans) !important; font-weight: 600 !important; color: #d97706 !important; white-space: nowrap !important; }
+#calendar_table th:nth-child(11), #calendar_table td:nth-child(11) { width: 85px !important; text-align: center !important; font-family: var(--font-sans) !important; font-variant-numeric: tabular-nums !important; font-feature-settings: "tnum" 1 !important; color: #475569 !important; font-size: 11px !important; }
+#calendar_table th:nth-child(12), #calendar_table td:nth-child(12) { width: 85px !important; text-align: center !important; font-family: var(--font-sans) !important; font-variant-numeric: tabular-nums !important; font-feature-settings: "tnum" 1 !important; font-weight: 600 !important; color: #059669 !important; font-size: 11px !important; }
 #calendar_table th:nth-child(13), #calendar_table td:nth-child(13) { width: 140px !important; text-align: left !important; font-weight: 600 !important; }
 #calendar_table th:nth-child(14), #calendar_table td:nth-child(14) { width: 75px !important; text-align: center !important; font-weight: 700 !important; white-space: nowrap !important; }
-#calendar_table th:nth-child(15), #calendar_table td:nth-child(15) { width: 275px !important; text-align: left !important; color: #334155 !important; font-size: 11.5px !important; }
+#calendar_table th:nth-child(15), #calendar_table td:nth-child(15) { width: 275px !important; text-align: left !important; color: #334155 !important; font-size: 11px !important; }
 
 /* Holidays Table */
-#holidays_table th:nth-child(1), #holidays_table td:nth-child(1) { width: 8% !important; text-align: center !important; font-family: var(--font-mono) !important; }
+#holidays_table th:nth-child(1), #holidays_table td:nth-child(1) { width: 8% !important; text-align: center !important; font-family: var(--font-sans) !important; font-variant-numeric: tabular-nums !important; font-feature-settings: "tnum" 1 !important; font-weight: 600 !important; }
 #holidays_table th:nth-child(2), #holidays_table td:nth-child(2) { width: 7% !important; text-align: center !important; }
 #holidays_table th:nth-child(3), #holidays_table td:nth-child(3) { width: 23% !important; font-weight: 600 !important; color: #0f172a !important; }
 #holidays_table th:nth-child(4), #holidays_table td:nth-child(4) { width: 12% !important; text-align: center !important; }
@@ -2116,12 +2162,12 @@ th button[aria-label*="menu"] {
 
 /* Regulatory Circulars Table */
 #circ_table th:nth-child(1), #circ_table td:nth-child(1) { width: 6% !important; text-align: center !important; font-weight: 700 !important; }
-#circ_table th:nth-child(2), #circ_table td:nth-child(2) { width: 9% !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #0f172a !important; font-weight: 600 !important; text-align: center !important; }
-#circ_table th:nth-child(3), #circ_table td:nth-child(3) { width: 6% !important; text-align: center !important; font-family: var(--font-mono) !important; color: #475569 !important; font-size: 11px !important; }
+#circ_table th:nth-child(2), #circ_table td:nth-child(2) { width: 9% !important; font-family: var(--font-sans) !important; font-variant-numeric: tabular-nums !important; font-feature-settings: "tnum" 1 !important; font-size: 11px !important; color: #0f172a !important; font-weight: 600 !important; text-align: center !important; }
+#circ_table th:nth-child(3), #circ_table td:nth-child(3) { width: 6% !important; text-align: center !important; font-family: var(--font-sans) !important; font-variant-numeric: tabular-nums !important; font-feature-settings: "tnum" 1 !important; color: #475569 !important; font-size: 11px !important; }
 #circ_table th:nth-child(4), #circ_table td:nth-child(4) { width: 6% !important; text-align: center !important; font-weight: 700 !important; }
-#circ_table th:nth-child(5), #circ_table td:nth-child(5) { width: 28% !important; font-weight: 600 !important; color: #0f172a !important; line-height: 1.35 !important; }
-#circ_table th:nth-child(6), #circ_table td:nth-child(6) { width: 9% !important; color: #475569 !important; font-size: 11.5px !important; }
-#circ_table th:nth-child(7), #circ_table td:nth-child(7) { width: 27% !important; color: #334155 !important; font-size: 11.5px !important; line-height: 1.35 !important; }
+#circ_table th:nth-child(5), #circ_table td:nth-child(5) { width: 28% !important; font-weight: 600 !important; color: #0f172a !important; line-height: 1.32 !important; }
+#circ_table th:nth-child(6), #circ_table td:nth-child(6) { width: 9% !important; color: #475569 !important; font-size: 11px !important; }
+#circ_table th:nth-child(7), #circ_table td:nth-child(7) { width: 27% !important; color: #334155 !important; font-size: 11px !important; line-height: 1.32 !important; }
 #circ_table th:nth-child(8), #circ_table td:nth-child(8) { width: 9% !important; text-align: center !important; }
 #circ_table td:nth-child(8) a {
     display: inline-flex !important;
@@ -2904,11 +2950,11 @@ th button[aria-label*="menu"] {
 .epm-toolbar-card {
     background: #ffffff !important;
     border: 1px solid #e2e8f0 !important;
-    border-radius: 6px !important;
-    padding: 4px 10px !important;
+    border-radius: 4px !important;
+    padding: 3px 8px !important;
     margin-top: 2px !important;
-    margin-bottom: 4px !important;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
+    margin-bottom: 3px !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02) !important;
 }
 
 #cal_action_deck button, #circ_action_toolbar button {
@@ -2916,8 +2962,8 @@ th button[aria-label*="menu"] {
     font-size: 11px !important;
     font-weight: 600 !important;
     border-radius: 4px !important;
-    min-height: 28px !important;
-    height: 28px !important;
+    min-height: 26px !important;
+    height: 26px !important;
     padding: 0 8px !important;
     transition: all 0.15s ease !important;
 }
@@ -2947,28 +2993,28 @@ th button[aria-label*="menu"] {
 }
 
 #cal_pdf_file {
-    margin-top: 3px !important;
-    margin-bottom: 3px !important;
+    margin-top: 2px !important;
+    margin-bottom: 2px !important;
     border: 1px dashed #38bdf8 !important;
     border-radius: 4px !important;
     background: #f0f9ff !important;
     padding: 3px 6px !important;
 }
 
-/* 17. Table Header Ribbons & Multi-Density Engine */
+/* 17. Table Header Ribbons & High-Density Integration */
 .epm-table-ribbon {
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
     background: #f8fafc !important;
-    border: 1px solid #e2e8f0 !important;
+    border: 1px solid #cbd5e1 !important;
     border-bottom: none !important;
     border-radius: 4px 4px 0 0 !important;
     padding: 2px 8px !important;
     margin-top: 2px !important;
     margin-bottom: 0 !important;
-    min-height: 25px !important;
-    height: 25px !important;
+    min-height: 24px !important;
+    height: 24px !important;
     gap: 6px !important;
     flex-wrap: nowrap !important;
 }
@@ -2991,7 +3037,7 @@ th button[aria-label*="menu"] {
     font-weight: 700 !important;
     color: #0f172a !important;
     text-transform: uppercase !important;
-    letter-spacing: 0.03em !important;
+    letter-spacing: 0.02em !important;
 }
 
 .epm-ribbon-badge {
@@ -3006,8 +3052,11 @@ th button[aria-label*="menu"] {
 }
 
 .epm-ribbon-count {
-    font-family: var(--font-mono) !important;
+    font-family: var(--font-sans) !important;
+    font-variant-numeric: tabular-nums !important;
+    font-feature-settings: "tnum" 1 !important;
     font-size: 9.5px !important;
+    font-weight: 600 !important;
     color: #64748b !important;
 }
 
@@ -3018,54 +3067,11 @@ th button[aria-label*="menu"] {
     flex-wrap: nowrap !important;
 }
 
-.epm-density-group {
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 2px !important;
-    background: #ffffff !important;
-    border: 1px solid #cbd5e1 !important;
-    border-radius: 3px !important;
-    padding: 1px 3px !important;
-    height: 22px !important;
-}
-
-.epm-control-label {
-    font-family: var(--font-sans) !important;
-    font-size: 9px !important;
-    font-weight: 700 !important;
-    color: #64748b !important;
-    text-transform: uppercase !important;
-    margin-right: 2px !important;
-}
-
-.epm-density-btn {
-    border: none !important;
-    background: transparent !important;
-    font-family: var(--font-sans) !important;
-    font-size: 9.5px !important;
-    font-weight: 600 !important;
-    color: #475569 !important;
-    padding: 1px 4px !important;
-    border-radius: 2px !important;
-    cursor: pointer !important;
-    transition: all 0.12s ease !important;
-}
-
-.epm-density-btn:hover {
-    color: #0f172a !important;
-    background: #f1f5f9 !important;
-}
-
-.epm-density-btn.active {
-    background: #2563eb !important;
-    color: #ffffff !important;
-}
-
 .epm-ribbon-btn {
     display: inline-flex !important;
     align-items: center !important;
     gap: 3px !important;
-    height: 22px !important;
+    height: 20px !important;
     padding: 0 6px !important;
     font-family: var(--font-sans) !important;
     font-size: 10px !important;
@@ -3085,7 +3091,7 @@ th button[aria-label*="menu"] {
 }
 
 .epm-collapse-btn {
-    width: 22px !important;
+    width: 20px !important;
     padding: 0 !important;
     justify-content: center !important;
     font-size: 12px !important;
@@ -3098,7 +3104,7 @@ th button[aria-label*="menu"] {
     align-items: center !important;
     justify-content: space-between !important;
     gap: 8px !important;
-    margin-top: 4px !important;
+    margin-top: 2px !important;
     margin-bottom: 0 !important;
 }
 
@@ -3108,8 +3114,8 @@ th button[aria-label*="menu"] {
 }
 
 #tab1_refresh_btn {
-    height: 28px !important;
-    min-height: 28px !important;
+    height: 24px !important;
+    min-height: 24px !important;
     font-size: 11px !important;
     padding: 0 10px !important;
     margin: 0 !important;
@@ -3123,11 +3129,11 @@ th button[aria-label*="menu"] {
     display: flex !important;
     align-items: center !important;
     gap: 6px !important;
-    margin: 3px 0 !important;
+    margin: 2px 0 3px 0 !important;
     padding: 0 !important;
     flex-wrap: nowrap !important;
     overflow-x: auto !important;
-    min-height: 28px !important;
+    min-height: 26px !important;
 }
 
 #cal_filters_row .gradio-radio, #circ_filters_row .gradio-radio {
@@ -3210,104 +3216,57 @@ th button[aria-label*="menu"] {
     border-radius: 4px !important;
 }
 
-/* Table container styling directly under ribbon */
-.epm-table-ribbon + div[id*="_table"] .table-wrap,
-.epm-table-ribbon + div[id*="_table"] .gradio-dataframe,
-.epm-table-ribbon + div[id*="_table"] div[data-testid="dataframe"],
-.epm-table-ribbon + div[id*="_table"] .table-container {
+/* Gapless Ribbon-to-Table Anchor Rules */
+div:has(> .epm-table-ribbon),
+div:has(> * > .epm-table-ribbon) {
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+div[id*="_table"] {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+div[id*="_table"] .table-wrap,
+div[id*="_table"] .gradio-dataframe,
+div[id*="_table"] div[data-testid="dataframe"],
+div[id*="_table"] .table-container {
     border-top-left-radius: 0 !important;
     border-top-right-radius: 0 !important;
     border-top: none !important;
+    margin-top: 0 !important;
+    margin-bottom: 6px !important;
 }
 
-/* Multi-Density Rules */
-/* Density Compact (2-line clamp) */
-div[id*="_table"].density-compact tbody td,
-#calendar_table.density-compact tbody td,
-.density-compact tbody td,
-.density-compact .epm-dossier-table td {
-    padding: 3px 6px !important;
-    font-size: 11px !important;
-    line-height: 1.25 !important;
+/* Zero-Height Collapsed Action Messages */
+#cal_action_msg,
+#circ_action_msg {
+    margin: 0 !important;
+    padding: 0 !important;
 }
 
-div[id*="_table"].density-compact tbody td:nth-child(4) > *,
-div[id*="_table"].density-compact tbody td:nth-child(4) a,
-div[id*="_table"].density-compact tbody td:nth-child(5) > *,
-div[id*="_table"].density-compact tbody td:nth-child(6) > *,
-div[id*="_table"].density-compact tbody td:nth-child(7) > *,
-div[id*="_table"].density-compact tbody td:nth-child(8) > *,
-div[id*="_table"].density-compact tbody td:nth-child(13) > *,
-#calendar_table.density-compact tbody td:nth-child(9) > *,
-#calendar_table.density-compact tbody td:nth-child(14) > *,
-.density-compact .epm-dossier-table .col-event,
-.density-compact .epm-dossier-table .col-reason {
-    display: -webkit-box !important;
-    -webkit-line-clamp: 2 !important;
-    -webkit-box-orient: vertical !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    max-height: 2.5em !important;
-    line-height: 1.25 !important;
+#cal_action_msg:not(:has(.prose:not(:empty))),
+#cal_action_msg:has(.prose:empty),
+#circ_action_msg:not(:has(.prose:not(:empty))),
+#circ_action_msg:has(.prose:empty) {
+    display: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    max-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
 }
 
-/* Density Standard (4-line clamp) */
-div[id*="_table"].density-standard tbody td,
-#calendar_table.density-standard tbody td,
-.density-standard tbody td,
-.density-standard .epm-dossier-table td {
-    padding: 6px 8px !important;
+#cal_action_msg:has(.prose:not(:empty)),
+#circ_action_msg:has(.prose:not(:empty)) {
+    margin: 3px 0 !important;
+    padding: 4px 8px !important;
     font-size: 11.5px !important;
-    line-height: 1.35 !important;
-}
-
-div[id*="_table"].density-standard tbody td:nth-child(4) > *,
-div[id*="_table"].density-standard tbody td:nth-child(4) a,
-div[id*="_table"].density-standard tbody td:nth-child(5) > *,
-div[id*="_table"].density-standard tbody td:nth-child(6) > *,
-div[id*="_table"].density-standard tbody td:nth-child(7) > *,
-div[id*="_table"].density-standard tbody td:nth-child(8) > *,
-div[id*="_table"].density-standard tbody td:nth-child(13) > *,
-#calendar_table.density-standard tbody td:nth-child(9) > *,
-#calendar_table.density-standard tbody td:nth-child(14) > *,
-.density-standard .epm-dossier-table .col-event,
-.density-standard .epm-dossier-table .col-reason {
-    display: -webkit-box !important;
-    -webkit-line-clamp: 4 !important;
-    -webkit-box-orient: vertical !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    max-height: 5.4em !important;
-    line-height: 1.35 !important;
-}
-
-/* Density Expanded (Full Unconstrained Text) */
-div[id*="_table"].density-expanded tbody td,
-#calendar_table.density-expanded tbody td,
-.density-expanded tbody td,
-.density-expanded .epm-dossier-table td {
-    padding: 9px 12px !important;
-    font-size: 12.5px !important;
-    line-height: 1.45 !important;
-}
-
-div[id*="_table"].density-expanded tbody td:nth-child(4) > *,
-div[id*="_table"].density-expanded tbody td:nth-child(4) a,
-div[id*="_table"].density-expanded tbody td:nth-child(5) > *,
-div[id*="_table"].density-expanded tbody td:nth-child(6) > *,
-div[id*="_table"].density-expanded tbody td:nth-child(7) > *,
-div[id*="_table"].density-expanded tbody td:nth-child(8) > *,
-div[id*="_table"].density-expanded tbody td:nth-child(13) > *,
-#calendar_table.density-expanded tbody td:nth-child(9) > *,
-#calendar_table.density-expanded tbody td:nth-child(14) > *,
-.density-expanded .epm-dossier-table .col-event,
-.density-expanded .epm-dossier-table .col-reason {
-    display: block !important;
-    -webkit-line-clamp: unset !important;
-    max-height: none !important;
-    overflow: visible !important;
-    text-overflow: clip !important;
-    line-height: 1.45 !important;
+    border-radius: 4px !important;
+    background: #f0fdf4 !important;
+    border: 1px solid #bbf7d0 !important;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -3469,7 +3428,7 @@ div[id*="_table"].density-expanded tbody td:nth-child(13) > *,
     display: flex;
     flex-direction: column;
     margin-top: 0 !important;
-    margin-bottom: 12px;
+    margin-bottom: 6px !important;
     padding-top: 0 !important;
     border: 1px solid #cbd5e1 !important;
     border-top: none !important;
@@ -3500,18 +3459,18 @@ div[id*="_table"].density-expanded tbody td:nth-child(13) > *,
     top: 0 !important;
     z-index: 20 !important;
     background: #f8fafc !important;
-    color: #0f172a !important;
-    font-family: var(--font-mono) !important;
-    font-size: 10px !important;
-    font-weight: 700 !important;
+    color: #475569 !important;
+    font-family: var(--font-sans) !important;
+    font-size: 10.5px !important;
+    font-weight: 600 !important;
     text-transform: uppercase !important;
-    letter-spacing: 0.5px !important;
-    padding: 6px 8px !important;
-    border-bottom: 1.5px solid #cbd5e1 !important;
+    letter-spacing: 0.02em !important;
+    padding: 5px 8px !important;
+    border-bottom: 1px solid #cbd5e1 !important;
     border-right: 1px solid #e2e8f0 !important;
     white-space: nowrap !important;
     vertical-align: middle !important;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.02) !important;
 }
 
 .epm-dossier-table thead th:last-child {
@@ -3535,7 +3494,7 @@ div[id*="_table"].density-expanded tbody td:nth-child(13) > *,
     justify-content: space-between !important;
     background: #f1f5f9 !important;
     color: #0f172a !important;
-    padding: 4px 12px !important;
+    padding: 3px 10px !important;
     border-top: 1px solid #cbd5e1 !important;
     border-bottom: 1px solid #cbd5e1 !important;
     box-shadow: 0 1px 2px rgba(0,0,0,0.02) !important;
@@ -3557,10 +3516,11 @@ div[id*="_table"].density-expanded tbody td:nth-child(13) > *,
 }
 
 .epm-ribbon-date {
-    font-family: var(--font-mono) !important;
+    font-family: var(--font-sans) !important;
+    font-variant-numeric: tabular-nums !important;
+    font-feature-settings: "tnum" 1 !important;
     font-size: 11px !important;
-    font-weight: 800 !important;
-    letter-spacing: 0.5px !important;
+    font-weight: 700 !important;
     color: #0f172a !important;
 }
 
@@ -3573,20 +3533,21 @@ div[id*="_table"].density-expanded tbody td:nth-child(13) > *,
 }
 
 .epm-ribbon-tally {
-    font-family: var(--font-mono) !important;
-    font-size: 10px !important;
-    font-weight: 700 !important;
-    letter-spacing: 0.4px !important;
+    font-family: var(--font-sans) !important;
+    font-variant-numeric: tabular-nums !important;
+    font-feature-settings: "tnum" 1 !important;
+    font-size: 9.5px !important;
+    font-weight: 600 !important;
     background: #e0f2fe !important;
     color: #0284c7 !important;
     border: 1px solid #bae6fd !important;
-    padding: 2px 7px !important;
-    border-radius: 4px !important;
+    padding: 1px 6px !important;
+    border-radius: 3px !important;
 }
 
 .epm-dossier-row {
-    height: 38px !important;
-    max-height: 42px !important;
+    height: 34px !important;
+    max-height: 38px !important;
     border-bottom: 1px solid #f1f5f9 !important;
     transition: background 0.1s ease !important;
 }
@@ -3608,10 +3569,12 @@ div[id*="_table"].density-expanded tbody td:nth-child(13) > *,
     vertical-align: middle !important;
     border-right: 1px solid #f1f5f9 !important;
     color: #334155 !important;
-    line-height: 1.35 !important;
-    height: 38px !important;
-    max-height: 42px !important;
+    line-height: 1.32 !important;
+    height: 34px !important;
+    max-height: 38px !important;
     overflow: hidden !important;
+    font-family: var(--font-sans) !important;
+    font-variant-numeric: tabular-nums !important;
     font-feature-settings: "tnum" 1 !important;
 }
 
@@ -3626,7 +3589,7 @@ div[id*="_table"].density-expanded tbody td:nth-child(13) > *,
     gap: 3px !important;
     padding: 2px 6px !important;
     border-radius: 4px !important;
-    font-family: var(--font-mono) !important;
+    font-family: var(--font-sans) !important;
     font-size: 10px !important;
     font-weight: 700 !important;
     white-space: nowrap !important;
@@ -3689,13 +3652,13 @@ div[id*="_table"].density-expanded tbody td:nth-child(13) > *,
     -webkit-box-orient: vertical !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
-    line-height: 1.35 !important;
-    max-height: 2.7em !important;
+    line-height: 1.32 !important;
+    max-height: 2.65em !important;
 }
 
-.epm-dossier-table .col-idx { width: 36px !important; min-width: 36px; text-align: center !important; font-family: var(--font-mono) !important; font-size: 10.5px !important; color: #64748b !important; }
-.epm-dossier-table .col-date { width: 92px !important; min-width: 92px; text-align: center !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #0f172a !important; white-space: nowrap !important; font-weight: 700 !important; }
-.epm-dossier-table .col-time { width: 78px !important; min-width: 78px; text-align: center !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #0f172a !important; white-space: nowrap !important; }
+.epm-dossier-table .col-idx { width: 36px !important; min-width: 36px; text-align: center !important; font-family: var(--font-sans) !important; font-variant-numeric: tabular-nums !important; font-feature-settings: "tnum" 1 !important; font-size: 10.5px !important; color: #64748b !important; }
+.epm-dossier-table .col-date { width: 92px !important; min-width: 92px; text-align: center !important; font-family: var(--font-sans) !important; font-variant-numeric: tabular-nums !important; font-feature-settings: "tnum" 1 !important; font-size: 11px !important; color: #0f172a !important; white-space: nowrap !important; font-weight: 600 !important; }
+.epm-dossier-table .col-time { width: 78px !important; min-width: 78px; text-align: center !important; font-family: var(--font-sans) !important; font-variant-numeric: tabular-nums !important; font-feature-settings: "tnum" 1 !important; font-size: 11px !important; color: #0f172a !important; white-space: nowrap !important; }
 .epm-dossier-table .col-day { width: 46px !important; min-width: 46px; text-align: center !important; font-weight: 600 !important; color: #475569 !important; white-space: nowrap !important; }
 .epm-dossier-table .col-type { width: 115px !important; min-width: 115px; white-space: nowrap !important; }
 .epm-dossier-table .col-country { width: 64px !important; min-width: 64px; text-align: center !important; font-weight: 700 !important; color: #1e293b !important; white-space: nowrap !important; }
@@ -3703,7 +3666,7 @@ div[id*="_table"].density-expanded tbody td:nth-child(13) > *,
 .epm-dossier-table .col-sec { width: 110px !important; min-width: 110px; color: #475569 !important; }
 .epm-dossier-table .col-event { width: 325px !important; min-width: 325px !important; color: #0f172a !important; }
 .epm-dossier-table .col-imp { width: 58px !important; min-width: 58px !important; text-align: center !important; white-space: nowrap !important; }
-.epm-dossier-table .col-num { width: 88px !important; min-width: 88px; text-align: center !important; font-family: var(--font-mono) !important; font-size: 11px !important; color: #475569 !important; white-space: nowrap !important; }
+.epm-dossier-table .col-num { width: 88px !important; min-width: 88px; text-align: center !important; font-family: var(--font-sans) !important; font-variant-numeric: tabular-nums !important; font-feature-settings: "tnum" 1 !important; font-size: 11px !important; color: #475569 !important; white-space: nowrap !important; }
 .epm-dossier-table .col-fore { color: #059669 !important; font-weight: 600 !important; }
 .epm-dossier-table .col-outcome { width: 175px !important; min-width: 175px !important; vertical-align: middle !important; }
 .epm-dossier-table .col-sent { width: 80px !important; min-width: 80px; text-align: center !important; white-space: nowrap !important; }
@@ -3716,7 +3679,9 @@ div[id*="_table"].density-expanded tbody td:nth-child(13) > *,
     gap: 4px !important;
     padding: 2px 7px !important;
     border-radius: 4px !important;
-    font-family: var(--font-mono) !important;
+    font-family: var(--font-sans) !important;
+    font-variant-numeric: tabular-nums !important;
+    font-feature-settings: "tnum" 1 !important;
     font-size: 10.5px !important;
     font-weight: 600 !important;
     line-height: 1.3 !important;
@@ -3794,7 +3759,7 @@ div[id*="_table"].density-expanded tbody td:nth-child(13) > *,
     letter-spacing: 0.2px !important;
 }
 .epm-daily-pdf-floater .floater-tag {
-    font-family: var(--font-mono) !important;
+    font-family: var(--font-sans) !important;
     font-size: 9.5px !important;
     font-weight: 700 !important;
     background: #ecfdf5 !important;
@@ -3822,9 +3787,9 @@ div[id*="_table"].density-expanded tbody td:nth-child(13) > *,
 
 .epm-stars {
     color: #d97706 !important;
-    font-family: var(--font-mono) !important;
-    font-weight: 800 !important;
-    letter-spacing: 1px !important;
+    font-family: var(--font-sans) !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.05em !important;
 }
 
 .epm-sent-badge {
@@ -4104,11 +4069,11 @@ tbody tr.epm-highlight-row td:first-child {
 }
 
 .epm-palette-section-title {
-    font-family: var(--font-mono) !important;
+    font-family: var(--font-sans) !important;
     font-size: 9.5px !important;
     font-weight: 700 !important;
     color: #64748b !important;
-    letter-spacing: 0.8px !important;
+    letter-spacing: 0.04em !important;
     padding: 8px 10px 4px !important;
     text-transform: uppercase !important;
 }
@@ -4158,6 +4123,576 @@ tbody tr.epm-highlight-row td:first-child {
     border: 1px solid #bfdbfe !important;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   2035 INSTITUTIONAL TABLE TYPOGRAPHY & ZERO MONOSPACE OVERRIDE
+   ═══════════════════════════════════════════════════════════════════════════ */
+.gradio-container table,
+.gradio-container table *,
+.gradio-container div[data-testid="dataframe"],
+.gradio-container div[data-testid="dataframe"] *,
+.gradio-container .table-wrap,
+.gradio-container .table-wrap *,
+.gradio-container td,
+.gradio-container td *,
+.gradio-container th,
+.gradio-container th *,
+.epm-dossier-table,
+.epm-dossier-table * {
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+}
+
+/* Explicitly reserve tabular figures for numbers & timestamps */
+.gradio-container td.col-idx,
+.gradio-container td.col-date,
+.gradio-container td.col-time,
+.gradio-container td.col-num,
+.epm-dossier-table .col-idx,
+.epm-dossier-table .col-date,
+.epm-dossier-table .col-time,
+.epm-dossier-table .col-num,
+#calendar_table td:nth-child(1),
+#calendar_table td:nth-child(2),
+#calendar_table td:nth-child(3),
+#calendar_table td:nth-child(11),
+#calendar_table td:nth-child(12),
+#top_news_table td:nth-child(1),
+#top_news_table td:nth-child(8),
+#top_news_table td:nth-child(9),
+#bottom_news_table td:nth-child(1),
+#bottom_news_table td:nth-child(4),
+#circ_table td:nth-child(2),
+#circ_table td:nth-child(3),
+#holidays_table td:nth-child(1) {
+    font-variant-numeric: tabular-nums !important;
+    font-feature-settings: "tnum" 1 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MODULAR WORKSPACE: RE-ORDERABLE & COLLAPSIBLE SECTIONS
+   ═══════════════════════════════════════════════════════════════════════════ */
+.epm-modular-section {
+    display: flex !important;
+    flex-direction: column !important;
+    margin-bottom: 6px !important;
+    padding: 0 !important;
+    position: relative !important;
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, opacity 0.15s ease !important;
+    border-radius: 4px !important;
+}
+
+.epm-modular-section.is-reordering {
+    opacity: 0.8 !important;
+    transform: scale(0.995) !important;
+    background: rgba(37, 99, 235, 0.04) !important;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.3) !important;
+}
+
+/* When a section is collapsed, hide everything inside it EXCEPT the ribbon or header strip */
+.epm-modular-section.is-collapsed > *:not(.epm-table-ribbon):not(#cal_table_header_strip):not(#tab1_header_strip) {
+    display: none !important;
+}
+
+.epm-modular-section.is-collapsed .epm-table-ribbon,
+.epm-modular-section.is-collapsed #cal_table_header_strip,
+.epm-modular-section.is-collapsed #tab1_header_strip {
+    border-radius: 4px !important;
+    border-bottom: 1px solid #cbd5e1 !important;
+    margin-bottom: 2px !important;
+}
+
+/* Controls grouping */
+.epm-section-ctrl-wrap {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 3px !important;
+}
+
+.epm-section-reorder-group {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 1px !important;
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 3px !important;
+    padding: 1px !important;
+}
+
+.epm-reorder-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 17px !important;
+    height: 17px !important;
+    min-height: 17px !important;
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    color: #475569 !important;
+    cursor: pointer !important;
+    border-radius: 2px !important;
+    transition: all 0.12s ease !important;
+}
+
+.epm-reorder-btn:hover:not(:disabled) {
+    background: #f1f5f9 !important;
+    color: #0f172a !important;
+}
+
+.epm-reorder-btn:disabled,
+.epm-reorder-btn[disabled],
+.epm-reorder-btn.is-disabled {
+    opacity: 0.3 !important;
+    cursor: not-allowed !important;
+    pointer-events: none !important;
+}
+
+.epm-collapse-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 19px !important;
+    height: 19px !important;
+    min-height: 19px !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 3px !important;
+    color: #334155 !important;
+    cursor: pointer !important;
+    transition: all 0.12s ease !important;
+}
+
+.epm-collapse-btn:hover {
+    background: #f1f5f9 !important;
+    color: #0f172a !important;
+    border-color: #94a3b8 !important;
+}
+
+.epm-collapse-btn .epm-chevron-icon {
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    display: block !important;
+}
+
+.epm-modular-section.is-collapsed .epm-collapse-btn .epm-chevron-icon {
+    transform: rotate(-90deg) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOBILE & TABLET RESPONSIVE SYSTEM (Dual-Axis Touch Scroller & Layout Adapt)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Tablet & Small Laptops (<= 1024px) ── */
+@media (max-width: 1024px) {
+    .gradio-container, 
+    .gradio-container > .main, 
+    .gradio-container > .wrap,
+    div[class*="gradio-container"] {
+        padding: 2px 8px 10px 8px !important;
+    }
+
+    .epm-nav-row-1 {
+        gap: 6px !important;
+    }
+
+    #epm-telemetry-ticker {
+        gap: 8px !important;
+    }
+
+    .epm-nav-row-2 {
+        gap: 6px !important;
+    }
+
+    .epm-quick-tab-btn {
+        padding: 0 8px !important;
+        font-size: 11px !important;
+    }
+
+    #cal_table_header_strip .epm-tbl-hdr-left {
+        min-width: 280px !important;
+        width: 280px !important;
+        flex: 0 0 280px !important;
+    }
+
+    #cal_table_header_strip button.epm-hdr-action-btn {
+        padding: 0 6px !important;
+        font-size: 10px !important;
+    }
+}
+
+/* ── Mobile Devices & Phablets (<= 767px) ── */
+@media (max-width: 767px) {
+    /* 1. Global Touch Viewport Reset */
+    html, body {
+        width: 100% !important;
+        max-width: 100vw !important;
+        overflow-x: hidden !important;
+    }
+
+    .gradio-container, 
+    .gradio-container > .main, 
+    .gradio-container > .wrap,
+    div[class*="gradio-container"] {
+        padding: 2px 4px 8px 4px !important;
+        width: 100% !important;
+        max-width: 100vw !important;
+    }
+
+    /* 2. Top Navigation Bar Stacking */
+    .epm-top-navbar {
+        height: auto !important;
+        min-height: auto !important;
+        padding: 4px 6px !important;
+        gap: 4px !important;
+    }
+
+    .epm-nav-row-1 {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        height: auto !important;
+        gap: 4px !important;
+    }
+
+    .epm-nav-brand-cluster {
+        width: 100% !important;
+        justify-content: space-between !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        scrollbar-width: none !important;
+    }
+
+    .epm-nav-brand-cluster::-webkit-scrollbar {
+        display: none !important;
+    }
+
+    #epm-telemetry-ticker {
+        width: 100% !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        scrollbar-width: none !important;
+        gap: 6px !important;
+        padding: 2px 0 !important;
+        border-top: 1px solid #f1f5f9 !important;
+    }
+
+    #epm-telemetry-ticker::-webkit-scrollbar {
+        display: none !important;
+    }
+
+    .epm-nav-row-2 {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        height: auto !important;
+        gap: 4px !important;
+    }
+
+    .epm-quick-tabs-container {
+        width: 100% !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        scrollbar-width: none !important;
+        padding-bottom: 2px !important;
+        justify-content: flex-start !important;
+    }
+
+    .epm-quick-tabs-container::-webkit-scrollbar {
+        display: none !important;
+    }
+
+    .epm-quick-tab-btn {
+        flex-shrink: 0 !important;
+        height: 28px !important;
+        min-height: 28px !important;
+        padding: 0 10px !important;
+        font-size: 11px !important;
+    }
+
+    .epm-nav-controls {
+        width: 100% !important;
+        justify-content: space-between !important;
+        gap: 4px !important;
+    }
+
+    .epm-cmd-launcher-btn {
+        flex: 1 1 auto !important;
+        justify-content: center !important;
+        height: 26px !important;
+    }
+
+    .epm-watchlist-wrap {
+        flex: 1.5 1 auto !important;
+        min-width: 120px !important;
+        height: 26px !important;
+    }
+
+    .epm-audio-btn {
+        flex: 0 0 auto !important;
+        height: 26px !important;
+    }
+
+    /* 3. Dual-Axis Table Scrollers with Sticky Headers & Sticky Index Column */
+    .table-wrap,
+    .gradio-dataframe,
+    div[data-testid="dataframe"],
+    .epm-dossier-table-wrap {
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow-x: auto !important;
+        overflow-y: auto !important;
+        max-height: 68vh !important;
+        -webkit-overflow-scrolling: touch !important;
+        overscroll-behavior: contain !important;
+        border-radius: 0 0 4px 4px !important;
+    }
+
+    /* Enforce Min-Widths so table columns never crush on small screens */
+    #top_news_table table {
+        min-width: 890px !important;
+        width: 890px !important;
+        table-layout: fixed !important;
+    }
+
+    #bottom_news_table table {
+        min-width: 780px !important;
+        width: 780px !important;
+        table-layout: fixed !important;
+    }
+
+    #circ_table table {
+        min-width: 950px !important;
+        width: 950px !important;
+        table-layout: fixed !important;
+    }
+
+    #holidays_table table {
+        min-width: 740px !important;
+        width: 740px !important;
+        table-layout: fixed !important;
+    }
+
+    #calendar_table table,
+    .epm-dossier-table {
+        min-width: 1720px !important;
+        width: 1720px !important;
+        table-layout: fixed !important;
+    }
+
+    /* Vertical Sticky Headers */
+    .gradio-container thead th,
+    .epm-dossier-table thead th {
+        position: sticky !important;
+        top: 0 !important;
+        z-index: 10 !important;
+        background-color: #f8fafc !important;
+        box-shadow: 0 2px 4px rgba(15, 23, 42, 0.05) !important;
+    }
+
+    /* Horizontal Sticky Column 1 */
+    #top_news_table th:nth-child(1),
+    #top_news_table td:nth-child(1),
+    #bottom_news_table th:nth-child(1),
+    #bottom_news_table td:nth-child(1),
+    #circ_table th:nth-child(1),
+    #circ_table td:nth-child(1),
+    #holidays_table th:nth-child(1),
+    #holidays_table td:nth-child(1),
+    .epm-dossier-table th.col-idx,
+    .epm-dossier-table td.col-idx {
+        position: sticky !important;
+        left: 0 !important;
+        z-index: 5 !important;
+        background-color: #ffffff !important;
+        box-shadow: 2px 0 4px rgba(15, 23, 42, 0.04) !important;
+    }
+
+    .gradio-container thead th:nth-child(1),
+    .epm-dossier-table thead th.col-idx {
+        z-index: 12 !important;
+        background-color: #f8fafc !important;
+    }
+
+    /* 4. Table Header Ribbons on Mobile */
+    .epm-table-ribbon {
+        padding: 3px 6px !important;
+        gap: 4px !important;
+    }
+
+    .epm-ribbon-title {
+        font-size: 10.5px !important;
+    }
+
+    .epm-ribbon-badge {
+        display: none !important;
+    }
+
+    .epm-ribbon-btn {
+        height: 20px !important;
+        padding: 0 5px !important;
+        font-size: 9.5px !important;
+    }
+
+    /* 5. Mobile Filter Rows */
+    #cal_filters_row, #circ_filters_row {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 4px !important;
+        margin: 2px 0 4px 0 !important;
+        overflow-x: visible !important;
+    }
+
+    #cal_filters_row .gradio-radio, #circ_filters_row .gradio-radio {
+        width: 100% !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        scrollbar-width: none !important;
+    }
+
+    #cal_filters_row .wrap, #circ_filters_row .wrap {
+        display: inline-flex !important;
+        flex-direction: row !important;
+        width: max-content !important;
+        padding: 2px !important;
+        gap: 2px !important;
+    }
+
+    #cal_filters_row .wrap label, #circ_filters_row .wrap label {
+        min-height: 26px !important;
+        height: 26px !important;
+        line-height: 26px !important;
+        padding: 0 8px !important;
+        font-size: 10.5px !important;
+        flex-shrink: 0 !important;
+    }
+
+    #circ_filters_row .gradio-textbox {
+        width: 100% !important;
+        margin-top: 2px !important;
+    }
+
+    #circ_filters_row .gradio-textbox input {
+        height: 28px !important;
+        font-size: 12px !important;
+        width: 100% !important;
+    }
+
+    /* 6. Action Toolbars on Mobile */
+    #cal_table_header_strip {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        height: auto !important;
+        padding: 4px 6px !important;
+        gap: 4px !important;
+    }
+
+    #cal_table_header_strip .epm-tbl-hdr-left {
+        width: 100% !important;
+        min-width: 100% !important;
+        flex: 1 1 100% !important;
+        justify-content: space-between !important;
+    }
+
+    .epm-tbl-hdr-title {
+        font-size: 10.5px !important;
+    }
+
+    .epm-tbl-hdr-badge-sub {
+        display: none !important;
+    }
+
+    #cal_table_header_strip .epm-tbl-hdr-actions {
+        width: 100% !important;
+        justify-content: flex-start !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        scrollbar-width: none !important;
+        gap: 3px !important;
+        padding-bottom: 2px !important;
+    }
+
+    #cal_table_header_strip button.epm-hdr-action-btn {
+        min-height: 24px !important;
+        height: 24px !important;
+        padding: 0 6px !important;
+        font-size: 9.5px !important;
+        flex-shrink: 0 !important;
+    }
+
+    #circ_action_toolbar {
+        flex-direction: column !important;
+        gap: 4px !important;
+        padding: 4px !important;
+    }
+
+    #circ_action_toolbar button {
+        width: 100% !important;
+        min-height: 30px !important;
+        height: auto !important;
+        padding: 4px 8px !important;
+        font-size: 10.5px !important;
+        white-space: normal !important;
+        text-align: center !important;
+        line-height: 1.3 !important;
+    }
+
+    #tab1_header_strip {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 4px !important;
+    }
+
+    #tab1_refresh_btn {
+        width: 100% !important;
+        min-height: 28px !important;
+        justify-content: center !important;
+    }
+
+    /* 7. Floating 5 PM Download Button */
+    .epm-daily-pdf-floater {
+        bottom: 8px !important;
+        right: 8px !important;
+        padding: 4px 8px !important;
+    }
+    .epm-daily-pdf-floater .floater-label {
+        font-size: 10px !important;
+    }
+    .epm-daily-pdf-floater .floater-tag {
+        display: none !important;
+    }
+}
+
+/* ── Ultra-Compact Screen Refinements (<= 430px: iPhone 13/14/15/16 Pro, Galaxy S24) ── */
+@media (max-width: 430px) {
+    .epm-nav-title {
+        font-size: 12px !important;
+    }
+
+    .epm-telem-pill {
+        font-size: 8.5px !important;
+        padding: 0 4px !important;
+        height: 16px !important;
+    }
+
+    .epm-cmd-launcher-btn {
+        padding: 0 4px !important;
+    }
+
+    .epm-cmd-badge {
+        font-size: 9px !important;
+        padding: 0 2px !important;
+    }
+
+    .epm-daily-pdf-floater {
+        bottom: 8px !important;
+        right: 8px !important;
+        padding: 4px 8px !important;
+    }
+    .epm-daily-pdf-floater .floater-label {
+        font-size: 10px !important;
+    }
+    .epm-daily-pdf-floater .floater-tag {
+        display: none !important;
+    }
+}
 """
 
 
@@ -4454,63 +4989,177 @@ TERMINAL_CLIENT_JS = r"""
         }
     }
 
-    // 3. Density Controller (Compact / Standard / Expanded)
-    const DENSITIES = ['compact', 'standard', 'expanded'];
-    let currentGlobalDensity = localStorage.getItem("epm_global_density") || "compact";
+    // 3. Single Standard High-Density View (Controls Eradicated)
+    window.epmSetDensity = function() {};
+    window.epmCycleGlobalDensity = function() {};
+    window.epmSetGlobalDensity = function() {};
 
-    window.epmSetDensity = function(tableId, density, btn) {
-        const target = document.getElementById(tableId);
-        if (!target) return;
-        
-        target.classList.remove("density-compact", "density-standard", "density-expanded");
-        target.classList.add("density-" + density);
-
-        const innerElements = target.querySelectorAll("table, .table-wrap, div[data-testid='dataframe']");
-        innerElements.forEach(el => {
-            el.classList.remove("density-compact", "density-standard", "density-expanded");
-            el.classList.add("density-" + density);
-        });
-        
-        const ribbon = document.querySelector(`.epm-table-ribbon[data-target="${tableId}"]`);
-        if (ribbon) {
-            ribbon.querySelectorAll(".epm-density-btn").forEach(b => {
-                if (b.dataset.density === density) b.classList.add("active");
-                else b.classList.remove("active");
-            });
+    // 4. Modular Section Reordering & Drag/Shift Engine
+    window.epmMoveSection = function(sectionId, direction) {
+        let el = document.getElementById(sectionId) || document.querySelector(`[data-section="${sectionId}"]`);
+        if (!el) {
+            el = document.getElementById('sec_' + sectionId);
         }
-        localStorage.setItem("epm_density_" + tableId, density);
+        if (!el) return;
+
+        // If target is inside an epm-modular-section, find parent container
+        const sec = el.classList.contains('epm-modular-section') ? el : el.closest('.epm-modular-section');
+        if (!sec || !sec.parentElement) return;
+
+        const parent = sec.parentElement;
+        const sections = Array.from(parent.children).filter(c => c.classList.contains('epm-modular-section'));
+        const currentIndex = sections.indexOf(sec);
+
+        if (direction === 'up' && currentIndex > 0) {
+            const targetSec = sections[currentIndex - 1];
+            parent.insertBefore(sec, targetSec);
+            sec.classList.add('is-reordering');
+            setTimeout(() => sec.classList.remove('is-reordering'), 350);
+            window.epmSaveSectionOrder(parent);
+            window.epmUpdateReorderButtons(parent);
+        } else if (direction === 'down' && currentIndex < sections.length - 1) {
+            const targetSec = sections[currentIndex + 1];
+            parent.insertBefore(targetSec, sec);
+            sec.classList.add('is-reordering');
+            setTimeout(() => sec.classList.remove('is-reordering'), 350);
+            window.epmSaveSectionOrder(parent);
+            window.epmUpdateReorderButtons(parent);
+        }
     };
 
-    window.epmCycleGlobalDensity = function() {
-        let idx = DENSITIES.indexOf(currentGlobalDensity);
-        idx = (idx + 1) % DENSITIES.length;
-        const nextDensity = DENSITIES[idx];
-        window.epmSetGlobalDensity(nextDensity);
-    };
-
-    window.epmSetGlobalDensity = function(density) {
-        currentGlobalDensity = density;
-        localStorage.setItem("epm_global_density", density);
-        const lbl = document.getElementById("epm-global-density-lbl");
-        if (lbl) lbl.textContent = density.charAt(0).toUpperCase() + density.slice(1);
-        
-        const tables = ['top_news_table', 'bottom_news_table', 'calendar_table', 'holidays_table', 'circ_table'];
-        tables.forEach(tid => {
-            window.epmSetDensity(tid, density);
+    window.epmUpdateReorderButtons = function(container) {
+        if (!container) return;
+        const sections = Array.from(container.children).filter(c => c.classList.contains('epm-modular-section'));
+        sections.forEach((sec, idx) => {
+            const upBtn = sec.querySelector('.epm-move-up');
+            const downBtn = sec.querySelector('.epm-move-down');
+            if (upBtn) {
+                upBtn.disabled = (idx === 0);
+                upBtn.classList.toggle('is-disabled', idx === 0);
+            }
+            if (downBtn) {
+                downBtn.disabled = (idx === sections.length - 1);
+                downBtn.classList.toggle('is-disabled', idx === sections.length - 1);
+            }
         });
     };
 
-    // 4. Table Collapse / Expand Controller
-    window.epmToggleCollapse = function(tableId, btn) {
-        const target = document.getElementById(tableId);
-        if (!target) return;
-        const isCollapsed = target.classList.toggle("epm-table-collapsed");
+    window.epmSaveSectionOrder = function(container) {
+        if (!container) return;
+        const tabEl = container.closest('.tabitem, [role="tabpanel"], div[id*="tab"]');
+        const tabId = tabEl ? (tabEl.id || tabEl.getAttribute('aria-label') || 'default_tab') : 'default_tab';
+        const sections = Array.from(container.children).filter(c => c.classList.contains('epm-modular-section'));
+        const orderIds = sections.map(s => s.id).filter(id => Boolean(id));
+        if (orderIds.length > 0) {
+            localStorage.setItem('epm_order_' + tabId, JSON.stringify(orderIds));
+        }
+    };
+
+    window.epmRestoreSectionOrder = function() {
+        const containers = document.querySelectorAll('.tabitem, [role="tabpanel"], .gradio-tabitem, div[id*="tab"]');
+        containers.forEach(tabEl => {
+            const tabId = tabEl.id || tabEl.getAttribute('aria-label') || 'default_tab';
+            const saved = localStorage.getItem('epm_order_' + tabId);
+            if (!saved) return;
+            try {
+                const orderIds = JSON.parse(saved);
+                const sectionMap = {};
+                const sections = Array.from(tabEl.querySelectorAll('.epm-modular-section'));
+                if (sections.length <= 1) return;
+                
+                const parent = sections[0].parentElement;
+                sections.forEach(s => { if (s.id) sectionMap[s.id] = s; });
+
+                orderIds.forEach(id => {
+                    if (sectionMap[id] && sectionMap[id].parentElement === parent) {
+                        parent.appendChild(sectionMap[id]);
+                    }
+                });
+                window.epmUpdateReorderButtons(parent);
+            } catch(e) {}
+        });
+    };
+
+    // 5. Section Collapse / Expand Controller with Rotating Chevron & Persistence
+    window.epmToggleCollapse = function(targetId, btn) {
+        let el = document.getElementById(targetId) || document.querySelector(`[data-section="${targetId}"]`);
+        if (!el) {
+            el = document.getElementById('sec_' + targetId);
+        }
+        if (!el) return;
+
+        // If target is or is inside an epm-modular-section, collapse entire section body
+        const sec = el.classList.contains('epm-modular-section') ? el : el.closest('.epm-modular-section');
+        if (sec) {
+            const isCollapsed = sec.classList.toggle('is-collapsed');
+            const secId = sec.id || targetId;
+            localStorage.setItem('epm_collapsed_' + secId, isCollapsed ? 'true' : 'false');
+
+            const chevron = sec.querySelector('.epm-collapse-btn .epm-chevron-icon') || (btn ? btn.querySelector('.epm-chevron-icon') : null);
+            if (chevron) {
+                chevron.style.transform = isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
+            }
+            const b = btn || sec.querySelector('.epm-collapse-btn');
+            if (b) {
+                b.title = isCollapsed ? 'Expand section' : 'Collapse section';
+                b.classList.toggle('is-active', isCollapsed);
+            }
+            return;
+        }
+
+        // Standalone table fallback
+        const isCollapsed = el.classList.toggle('epm-table-collapsed');
+        localStorage.setItem('epm_collapsed_' + targetId, isCollapsed ? 'true' : 'false');
         if (btn) {
-            const sp = btn.querySelector("span") || btn;
-            sp.textContent = isCollapsed ? "+" : "−";
-            btn.title = isCollapsed ? "Expand table" : "Collapse table";
+            const chevron = btn.querySelector('.epm-chevron-icon');
+            if (chevron) chevron.style.transform = isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
+            btn.title = isCollapsed ? 'Expand table' : 'Collapse table';
+            btn.classList.toggle('is-active', isCollapsed);
         }
-        localStorage.setItem("epm_collapsed_" + tableId, isCollapsed ? "true" : "false");
+    };
+
+    // 6. Restore Collapse States
+    window.epmRestoreCollapseStates = function() {
+        const sections = document.querySelectorAll('.epm-modular-section, div[id*="_table"]');
+        sections.forEach(sec => {
+            const secId = sec.id;
+            if (!secId) return;
+            const isCollapsed = localStorage.getItem('epm_collapsed_' + secId) === 'true';
+            if (isCollapsed) {
+                if (sec.classList.contains('epm-modular-section')) {
+                    sec.classList.add('is-collapsed');
+                    const chevron = sec.querySelector('.epm-collapse-btn .epm-chevron-icon');
+                    if (chevron) chevron.style.transform = 'rotate(-90deg)';
+                    const b = sec.querySelector('.epm-collapse-btn');
+                    if (b) {
+                        b.title = 'Expand section';
+                        b.classList.add('is-active');
+                    }
+                } else {
+                    sec.classList.add('epm-table-collapsed');
+                    const ribbon = document.querySelector(`.epm-table-ribbon[data-target="${secId}"]`);
+                    if (ribbon) {
+                        const btn = ribbon.querySelector('.epm-collapse-btn');
+                        if (btn) {
+                            const chevron = btn.querySelector('.epm-chevron-icon');
+                            if (chevron) chevron.style.transform = 'rotate(-90deg)';
+                            btn.title = 'Expand table';
+                            btn.classList.add('is-active');
+                        }
+                    }
+                }
+            }
+        });
+    };
+
+    // 7. Reset Layout to Default
+    window.epmResetLayout = function() {
+        Object.keys(localStorage).forEach(k => {
+            if (k.startsWith('epm_order_') || k.startsWith('epm_collapsed_')) {
+                localStorage.removeItem(k);
+            }
+        });
+        location.reload();
     };
 
     // 5. Table CSV Exporter (RFC-4180 with UTF-8 BOM)
@@ -4704,7 +5353,6 @@ TERMINAL_CLIENT_JS = r"""
     // 10. Initialization & Observer
     function epmInitTerminal() {
         epmUpdateAudioUI();
-        window.epmSetGlobalDensity(currentGlobalDensity);
         updateISTClock();
         syncTelemetryFromStatusBox();
         initTerminalStream();
@@ -4713,6 +5361,9 @@ TERMINAL_CLIENT_JS = r"""
         if (savedQuery) {
             window.epmApplyWatchlist(savedQuery);
         }
+
+        window.epmRestoreSectionOrder();
+        window.epmRestoreCollapseStates();
 
         function hideGradioTabs() {
             const defaultTabs = document.querySelectorAll('.tab-wrapper, div[role="tablist"], .tab-container:not(.visually-hidden), .tab-nav');
@@ -4735,6 +5386,10 @@ TERMINAL_CLIENT_JS = r"""
         tabBtns.forEach((btn, idx) => {
             btn.addEventListener("click", () => {
                 epmSyncActiveTab(idx);
+                setTimeout(() => {
+                    window.epmRestoreSectionOrder();
+                    window.epmRestoreCollapseStates();
+                }, 80);
             });
         });
     }
@@ -4881,31 +5536,34 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
         # TAB 1: Live Financial Wire & Breaking Catalysts
         # ═══════════════════════════════════════════════════════════
         with gr.TabItem("📰 Live Financial Wire & Breaking Catalysts"):
-            with gr.Row(elem_id="tab1_header_strip"):
-                gr.HTML(render_table_ribbon("top_news_table", "Institutional Breaking Wire", subtitle="AI Scored ≥ 7", count_badge="Primary Catalysts"))
-                refresh_btn = gr.Button("🔄 Force Refresh Feeds", variant="primary", elem_id="tab1_refresh_btn", scale=0)
+            with gr.Column(elem_id="sec_breaking_wire", elem_classes=["epm-modular-section"]):
+                with gr.Row(elem_id="tab1_header_strip"):
+                    gr.HTML(render_table_ribbon("top_news_table", "Institutional Breaking Wire", subtitle="AI Scored ≥ 7", count_badge="Primary Catalysts", section_id="sec_breaking_wire"))
+                    refresh_btn = gr.Button("🔄 Force Refresh Feeds", variant="primary", elem_id="tab1_refresh_btn", scale=0)
 
-            top_table = gr.Dataframe(
-                headers=["Score", "Sentiment", "Impact", "Headline", "Sectors/Tickers", "AI Reasoning", "Source", "Relevance", "Time"],
-                datatype=["str", "str", "str", "markdown", "str", "str", "str", "str", "str"],
-                value=init_top_rows,
-                interactive=False,
-                wrap=True,
-                elem_id="top_news_table"
-            )
+                top_table = gr.Dataframe(
+                    headers=["Score", "Sentiment", "Impact", "Headline", "Sectors/Tickers", "AI Reasoning", "Source", "Relevance", "Time"],
+                    datatype=["str", "str", "str", "markdown", "str", "str", "str", "str", "str"],
+                    value=init_top_rows,
+                    interactive=False,
+                    wrap=True,
+                    elem_id="top_news_table"
+                )
 
-            gr.HTML(render_table_ribbon("bottom_news_table", "Broad Market Secondary Stream", subtitle="All Feeds", count_badge="Raw Wire"))
-            bottom_table = gr.Dataframe(
-                headers=["Time", "Source", "Headline", "Relevance", "Sentiment", "URL"],
-                datatype=["str", "str", "markdown", "str", "str", "markdown"],
-                value=init_bottom_rows,
-                interactive=False,
-                wrap=True,
-                elem_id="bottom_news_table"
-            )
+            with gr.Column(elem_id="sec_secondary_wire", elem_classes=["epm-modular-section"]):
+                gr.HTML(render_table_ribbon("bottom_news_table", "Broad Market Secondary Stream", subtitle="All Feeds", count_badge="Raw Wire", section_id="sec_secondary_wire"))
+                bottom_table = gr.Dataframe(
+                    headers=["Time", "Source", "Headline", "Relevance", "Sentiment", "URL"],
+                    datatype=["str", "str", "markdown", "str", "str", "markdown"],
+                    value=init_bottom_rows,
+                    interactive=False,
+                    wrap=True,
+                    elem_id="bottom_news_table"
+                )
 
-            with gr.Accordion("🎴 Visual News Cards Feed (Alternative Expanded View)", open=False):
-                top_news_visual = gr.HTML(value=init_news_html, elem_id="news_visual_feed")
+            with gr.Column(elem_id="sec_visual_news", elem_classes=["epm-modular-section"]):
+                with gr.Accordion("🎴 Visual News Cards Feed (Alternative Expanded View)", open=False):
+                    top_news_visual = gr.HTML(value=init_news_html, elem_id="news_visual_feed")
 
             with gr.Accordion("⚡ Live AI Impact & Sentiment Tester", open=False):
                 with gr.Row():
@@ -4950,29 +5608,31 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                     scale=3
                 )
 
-            with gr.Column(elem_id="calendar_dossier_wrap"):
-                with gr.Row(elem_id="cal_table_header_strip", elem_classes=["epm-table-header-integrated"]):
-                    with gr.Row(elem_classes=["epm-tbl-hdr-left"]):
-                        gr.HTML("""
-                        <div class="epm-tbl-hdr-title-group">
-                            <span class="epm-ribbon-bullet">●</span>
-                            <span class="epm-tbl-hdr-title">MULTI-MARKET CATALYST DOSSIER</span>
-                            <span class="epm-tbl-hdr-badge">15-COLUMN SCHEMA</span>
-                            <span class="epm-tbl-hdr-badge-sub">Auto: Daily 5 PM · Fri 6 AM · 25th 6 AM</span>
-                        </div>
-                        """)
-                    with gr.Row(elem_classes=["epm-tbl-hdr-actions"]):
-                        btn_download_daily_outcomes = gr.Button("📥 5 PM PDF", variant="primary", elem_classes=["epm-hdr-action-btn", "btn-primary-emerald"])
-                        btn_push_daily_outcomes = gr.Button("✈️ Push 5 PM", variant="secondary", elem_classes=["epm-hdr-action-btn", "btn-secondary-light"])
-                        btn_download_weekly = gr.Button("📥 Weekly PDF", variant="primary", elem_classes=["epm-hdr-action-btn", "btn-primary-dark"])
-                        btn_download_monthly = gr.Button("📥 Monthly PDF", variant="primary", elem_classes=["epm-hdr-action-btn", "btn-primary-dark"])
-                        btn_push_weekly_pdf = gr.Button("✈️ Weekly", variant="secondary", elem_classes=["epm-hdr-action-btn", "btn-secondary-light"])
-                        btn_push_monthly_pdf = gr.Button("✈️ Monthly", variant="secondary", elem_classes=["epm-hdr-action-btn", "btn-secondary-light"])
-                        btn_sync_gcal = gr.Button("📅 GCal", variant="secondary", elem_classes=["epm-hdr-action-btn", "btn-secondary-light"])
-                        btn_ics_export = gr.Button("📲 .ICS", variant="secondary", elem_classes=["epm-hdr-action-btn", "btn-secondary-light"])
-                        btn_push_holiday = gr.Button("🏖️ Holidays", variant="secondary", elem_classes=["epm-hdr-action-btn", "btn-secondary-light"])
+            with gr.Column(elem_id="sec_catalyst_ledger", elem_classes=["epm-modular-section"]):
+                with gr.Column(elem_id="calendar_dossier_wrap"):
+                    with gr.Row(elem_id="cal_table_header_strip", elem_classes=["epm-table-header-integrated"]):
+                        with gr.Row(elem_classes=["epm-tbl-hdr-left"]):
+                            gr.HTML("""
+                            <div class="epm-tbl-hdr-title-group">
+                                <span class="epm-ribbon-bullet">●</span>
+                                <span class="epm-tbl-hdr-title">MULTI-MARKET CATALYST DOSSIER</span>
+                                <span class="epm-tbl-hdr-badge">15-COLUMN SCHEMA</span>
+                                <span class="epm-tbl-hdr-badge-sub">Auto: Daily 5 PM · Fri 6 AM · 25th 6 AM</span>
+                            </div>
+                            """)
+                        with gr.Row(elem_classes=["epm-tbl-hdr-actions"]):
+                            btn_download_daily_outcomes = gr.Button("📥 5 PM PDF", variant="primary", elem_classes=["epm-hdr-action-btn", "btn-primary-emerald"])
+                            btn_push_daily_outcomes = gr.Button("✈️ Push 5 PM", variant="secondary", elem_classes=["epm-hdr-action-btn", "btn-secondary-light"])
+                            btn_download_weekly = gr.Button("📥 Weekly PDF", variant="primary", elem_classes=["epm-hdr-action-btn", "btn-primary-dark"])
+                            btn_download_monthly = gr.Button("📥 Monthly PDF", variant="primary", elem_classes=["epm-hdr-action-btn", "btn-primary-dark"])
+                            btn_push_weekly_pdf = gr.Button("✈️ Weekly", variant="secondary", elem_classes=["epm-hdr-action-btn", "btn-secondary-light"])
+                            btn_push_monthly_pdf = gr.Button("✈️ Monthly", variant="secondary", elem_classes=["epm-hdr-action-btn", "btn-secondary-light"])
+                            btn_sync_gcal = gr.Button("📅 GCal", variant="secondary", elem_classes=["epm-hdr-action-btn", "btn-secondary-light"])
+                            btn_ics_export = gr.Button("📲 .ICS", variant="secondary", elem_classes=["epm-hdr-action-btn", "btn-secondary-light"])
+                            btn_push_holiday = gr.Button("🏖️ Holidays", variant="secondary", elem_classes=["epm-hdr-action-btn", "btn-secondary-light"])
+                            gr.HTML(render_section_controls("sec_catalyst_ledger"))
 
-                calendar_visual_feed = gr.HTML(value=init_cal_html, elem_id="calendar_visual_feed")
+                    calendar_visual_feed = gr.HTML(value=init_cal_html, elem_id="calendar_visual_feed")
 
             with gr.Row(elem_classes=["epm-hidden-action-row"]):
                 cal_action_msg = gr.Markdown(elem_id="cal_action_msg")
@@ -5004,24 +5664,25 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                 elem_id="calendar_table"
             )
 
-            gr.HTML(render_table_ribbon("holidays_table", "2026 Authoritative Trading Holidays", subtitle="NSE · BSE · MCX · NYSE · CRYPTO", count_badge="All Sessions"))
-            holidays_table = gr.Dataframe(
-                headers=[
-                    "Date",
-                    "Day",
-                    "Holiday / Occasion",
-                    "🇮🇳 NSE Status",
-                    "🇮🇳 BSE Status",
-                    "⛽ MCX Status (Morning / Evening)",
-                    "🇺🇸 NYSE Status (EST / IST)",
-                    "₿ Crypto Status"
-                ],
-                datatype=["str", "str", "str", "str", "str", "str", "str", "str"],
-                value=init_hol_rows,
-                interactive=False,
-                wrap=True,
-                elem_id="holidays_table"
-            )
+            with gr.Column(elem_id="sec_holidays_ledger", elem_classes=["epm-modular-section"]):
+                gr.HTML(render_table_ribbon("holidays_table", "2026 Authoritative Trading Holidays", subtitle="NSE · BSE · MCX · NYSE · CRYPTO", count_badge="All Sessions", section_id="sec_holidays_ledger"))
+                holidays_table = gr.Dataframe(
+                    headers=[
+                        "Date",
+                        "Day",
+                        "Holiday / Occasion",
+                        "🇮🇳 NSE Status",
+                        "🇮🇳 BSE Status",
+                        "⛽ MCX Status (Morning / Evening)",
+                        "🇺🇸 NYSE Status (EST / IST)",
+                        "₿ Crypto Status"
+                    ],
+                    datatype=["str", "str", "str", "str", "str", "str", "str", "str"],
+                    value=init_hol_rows,
+                    interactive=False,
+                    wrap=True,
+                    elem_id="holidays_table"
+                )
 
             with gr.Accordion("✏️ Record Event Outcome Manually or Add Custom Event", open=False):
                 gr.Markdown("Enter an existing **Event ID** to update its outcome (e.g. `nse_reliance_res`), or leave blank to log a new scheduled release:")
@@ -5104,33 +5765,35 @@ with gr.Blocks(title="EPM Pro Global Financial News & Multi-Market Intelligence 
                     scale=3
                 )
 
-            with gr.Row(elem_id="circ_action_toolbar", elem_classes=["epm-toolbar-card"]):
-                circ_refresh_btn = gr.Button("🔄 Check & Poll Official Circulars (NSE, BSE, MCX, RBI, FINMIN, FOMC)", variant="primary", scale=3)
-                circ_dispatch_btn = gr.Button("📲 Forward Latest Circular to Telegram", variant="secondary", scale=2)
+            with gr.Column(elem_id="sec_circ_directory", elem_classes=["epm-modular-section"]):
+                with gr.Row(elem_id="circ_action_toolbar", elem_classes=["epm-toolbar-card"]):
+                    circ_refresh_btn = gr.Button("🔄 Check & Poll Official Circulars (NSE, BSE, MCX, RBI, FINMIN, FOMC)", variant="primary", scale=3)
+                    circ_dispatch_btn = gr.Button("📲 Forward Latest Circular to Telegram", variant="secondary", scale=2)
 
-            circ_action_msg = gr.Markdown(elem_id="circ_action_msg")
+                circ_action_msg = gr.Markdown(elem_id="circ_action_msg")
 
-            gr.HTML(render_table_ribbon("circ_table", "Official Regulatory Documents Directory", subtitle="Verified PDFs", count_badge="Directives"))
-            circ_table = gr.Dataframe(
-                headers=[
-                    "Regulator",
-                    "Circular Ref No.",
-                    "Date",
-                    "Impact",
-                    "Subject / Directive",
-                    "Category",
-                    "AI Executive Summary",
-                    "Official PDF Document"
-                ],
-                datatype=["str", "str", "str", "str", "markdown", "str", "str", "markdown"],
-                value=init_circ_rows,
-                interactive=False,
-                wrap=True,
-                elem_id="circ_table"
-            )
+                gr.HTML(render_table_ribbon("circ_table", "Official Regulatory Documents Directory", subtitle="Verified PDFs", count_badge="Directives", section_id="sec_circ_directory"))
+                circ_table = gr.Dataframe(
+                    headers=[
+                        "Regulator",
+                        "Circular Ref No.",
+                        "Date",
+                        "Impact",
+                        "Subject / Directive",
+                        "Category",
+                        "AI Executive Summary",
+                        "Official PDF Document"
+                    ],
+                    datatype=["str", "str", "str", "str", "markdown", "str", "str", "markdown"],
+                    value=init_circ_rows,
+                    interactive=False,
+                    wrap=True,
+                    elem_id="circ_table"
+                )
 
-            with gr.Accordion("🎴 Visual Regulatory Stream & AI Breakdown Cards", open=False):
-                circ_visual_feed = gr.HTML(value=init_circ_html, elem_id="circ_visual_feed")
+            with gr.Column(elem_id="sec_circ_visual", elem_classes=["epm-modular-section"]):
+                with gr.Accordion("🎴 Visual Regulatory Stream & AI Breakdown Cards", open=False):
+                    circ_visual_feed = gr.HTML(value=init_circ_html, elem_id="circ_visual_feed")
 
             circ_reg_filter.change(
                 get_circulars_view,

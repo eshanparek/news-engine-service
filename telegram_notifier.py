@@ -30,9 +30,9 @@ class TelegramNotifier:
         self.chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
         self.enabled = os.getenv("ENABLE_TELEGRAM_ALERTS", "true").lower() == "true"
 
-        # 2. Dedicated Calendar & Outcomes Channel Credentials
+        # 2. Dedicated Calendar & Outcomes Channel Credentials (routed to Market Calendar channel)
         self.calendar_bot_token = os.getenv("CALENDAR_TELEGRAM_BOT_TOKEN", "").strip()
-        self.calendar_chat_id = os.getenv("CALENDAR_TELEGRAM_CHAT_ID", "").strip()
+        self.calendar_chat_id = os.getenv("CALENDAR_TELEGRAM_CHAT_ID", "@Marketcalender").strip()
         self.calendar_enabled = os.getenv("ENABLE_CALENDAR_ALERTS", "true").lower() == "true"
 
         # Granular Calendar Automation Toggles - Friday 6 AM Weekly PDF & 25th 6 AM Monthly PDF
@@ -212,8 +212,8 @@ class TelegramNotifier:
         return (self.calendar_bot_token or self.bot_token or "").strip()
 
     def get_effective_calendar_chat_id(self) -> str:
-        """Uses dedicated calendar chat ID if provided, otherwise falls back to main news chat ID."""
-        return (self.calendar_chat_id or self.chat_id or "").strip()
+        """Uses dedicated calendar chat ID (defaults to @Marketcalender); strictly separates from News Room."""
+        return (self.calendar_chat_id or os.getenv("CALENDAR_TELEGRAM_CHAT_ID", "") or "@Marketcalender").strip()
 
     def is_configured(self) -> bool:
         return bool(self.bot_token and self.chat_id)
