@@ -1757,6 +1757,22 @@ div[class*="gradio-container"],
     background: transparent !important;
 }
 
+/* Hide Redundant Gradio Tab Bar Off-Screen */
+div[role="tablist"],
+.tab-nav,
+.tabs > .tab-nav,
+.tabitem > div[role="tablist"],
+.gradio-container .tab-wrapper {
+    position: absolute !important;
+    left: -9999px !important;
+    top: -9999px !important;
+    height: 0 !important;
+    width: 0 !important;
+    overflow: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
 /* Flatten Nested Container Padding across entire site */
 .epm-modular-section {
     background: transparent !important;
@@ -2194,18 +2210,22 @@ tbody tr, .gradio-container tbody tr {
     }
 }
 
-/* Table Fit & Zero Horizontal Scroll (100% Window Width Budget) */
+/* Table Fit & Zero Horizontal Scroll (100% Window Width Budget & Zero Vertical Void) */
 #top_news_table, 
 #bottom_news_table,
 #calendar_table,
 #circ_table,
 .gradio-container .table-wrap,
 .gradio-container .table-container,
-div[data-testid="dataframe"] {
+div[data-testid="dataframe"],
+div[data-testid="dataframe"] > div {
     width: 100% !important;
     max-width: 100% !important;
     overflow-x: hidden !important;
     box-sizing: border-box !important;
+    height: auto !important;
+    min-height: 0 !important;
+    flex: 0 0 auto !important;
 }
 
 #top_news_table table,
