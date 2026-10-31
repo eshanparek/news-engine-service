@@ -3329,9 +3329,9 @@ div[id*="_table"].density-expanded tbody td:nth-child(13) > *,
     display: flex !important;
     align-items: center !important;
     gap: 6px !important;
-    flex: 0 0 auto !important;
-    max-width: fit-content !important;
-    width: auto !important;
+    flex: 0 0 390px !important;
+    min-width: 390px !important;
+    width: 390px !important;
 }
 
 .epm-tbl-hdr-title-group {
@@ -3379,6 +3379,7 @@ div[id*="_table"].density-expanded tbody td:nth-child(13) > *,
     width: auto !important;
 }
 
+#cal_table_header_strip .epm-tbl-hdr-actions > button,
 #cal_table_header_strip .epm-tbl-hdr-actions button,
 #cal_table_header_strip button.epm-hdr-action-btn,
 .epm-hdr-action-btn {
@@ -3392,7 +3393,7 @@ div[id*="_table"].density-expanded tbody td:nth-child(13) > *,
     border-radius: 4px !important;
     min-height: 22px !important;
     height: 22px !important;
-    padding: 0 6px !important;
+    padding: 0 5px !important;
     white-space: nowrap !important;
     transition: all 0.12s ease !important;
 }
