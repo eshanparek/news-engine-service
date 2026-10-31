@@ -4283,7 +4283,7 @@ tbody tr.epm-highlight-row td:first-child {
 
 /* Mobile Hamburger Menu Button */
 .epm-mobile-menu-trigger {
-    display: none;
+    display: none !important;
     align-items: center;
     gap: 6px;
     height: 30px;
