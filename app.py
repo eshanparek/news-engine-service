@@ -1671,54 +1671,54 @@ def render_table_ribbon(
 
 CUSTOM_CSS = """
 /* ═══════════════════════════════════════════════════════════════════════════
-   EPMPRO INSTITUTIONAL FINTECH DESIGN SYSTEM (2026 DARK-MODE ARCHITECTURE)
-   Specialized for Terminal Platforms: Bloomberg, Linear, TradingView, Robinhood
+   EPMPRO LIGHT WHITE INSTITUTIONAL FINTECH DESIGN SYSTEM
+   High-Contrast Modern Financial Terminal (Stripe / Bloomberg / Linear)
    ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
     --font-sans: "Inter", "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     --font-mono: "JetBrains Mono", "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
-    /* Institutional Dark Slate Palette */
-    --bg-page: #0B0E14;              /* Deep Charcoal Slate */
-    --bg-surface: #121721;           /* Surface / Cards / Tables */
-    --bg-surface-elevated: #161D2A;  /* Elevated Panels / Headers */
-    --bg-surface-subtle: #1C2536;    /* Interactive hovers & pills */
+    /* Light White Palette */
+    --bg-page: #F8FAFC;              /* Clean Crisp Off-White Canvas */
+    --bg-surface: #FFFFFF;           /* Pure White Cards / Tables */
+    --bg-surface-elevated: #FFFFFF;  /* Elevated Panels / Headers */
+    --bg-surface-hover: #F1F5F9;     /* Subtle Hover Slate */
+    --bg-surface-subtle: #F8FAFC;    /* Subtle Row Striping */
 
-    --border-subtle: rgba(255, 255, 255, 0.05);
-    --border-color: rgba(255, 255, 255, 0.08);
-    --border-strong: rgba(255, 255, 255, 0.16);
-    --border-focus: #0052FF;
+    --border-color: #E2E8F0;         /* Slate 200 Border */
+    --border-subtle: #F1F5F9;        /* Slate 100 Separator */
+    --border-focus: #0052FF;         /* Focus Ring */
 
-    --text-primary: #F1F5F9;         /* High-contrast crisp white */
-    --text-secondary: #94A3B8;       /* Slate medium text */
-    --text-muted: #64748B;           /* Dim text */
+    --text-primary: #0F172A;         /* Slate 900 - Ultra Sharp Black */
+    --text-secondary: #475569;       /* Slate 600 - Readable Secondary */
+    --text-muted: #64748B;           /* Slate 500 - Timestamps & Microprint */
 
     /* Financial Accents */
     --accent-blue: #0052FF;          /* International Klein Blue */
     --accent-blue-hover: #1A66FF;
-    --accent-amber: #F59E0B;         /* Bloomberg Amber */
-    --accent-emerald: #10B981;       /* Bullish Emerald */
-    --accent-emerald-bg: rgba(16, 185, 129, 0.15);
-    --accent-rose: #F43F5E;          /* Bearish Rose */
-    --accent-rose-bg: rgba(244, 63, 94, 0.15);
-    --accent-slate-bg: rgba(148, 163, 184, 0.12);
+    --accent-amber: #D97706;         /* Amber 600 */
+    --accent-emerald: #059669;       /* Bullish Emerald 600 */
+    --accent-emerald-bg: #ECFDF5;    /* Soft Emerald 50 */
+    --accent-rose: #DC2626;          /* Bearish Rose 600 */
+    --accent-rose-bg: #FEF2F2;       /* Soft Rose 50 */
+    --accent-slate-bg: #F1F5F9;      /* Slate 100 */
 
     --radius-xs: 4px;
     --radius-sm: 6px;
     --radius-md: 8px;
-    --radius-lg: 12px;
+    --radius-lg: 10px;
 }
 
-/* 1. Global Reset & Charcoal Slate Baseline */
+/* 1. Global Reset & Clean Light Slate Baseline */
 html, body {
     width: 100% !important;
     max-width: 100vw !important;
     overflow-x: hidden !important;
     margin: 0 !important;
     padding: 0 !important;
-    background-color: var(--bg-page) !important;
-    color: var(--text-primary) !important;
+    background-color: #F8FAFC !important;
+    color: #0F172A !important;
     font-family: var(--font-sans) !important;
     font-size: 13px !important;
     line-height: 1.45 !important;
@@ -1730,7 +1730,7 @@ html, body {
     box-sizing: border-box !important;
 }
 
-/* 2. Gradio Container (Enforced Institutional Dark Layout) */
+/* 2. Gradio Container (Enforced Pure Light White Layout) */
 .gradio-container, 
 .gradio-container > .main, 
 .gradio-container > .wrap,
@@ -1739,9 +1739,9 @@ div[class*="gradio-container"],
     max-width: 100% !important;
     width: 100% !important;
     margin: 0 !important;
-    padding: 4px 16px 20px 16px !important;
-    background-color: var(--bg-page) !important;
-    color: var(--text-primary) !important;
+    padding: 4px 14px 18px 14px !important;
+    background-color: #F8FAFC !important;
+    color: #0F172A !important;
     overflow-x: hidden !important;
 }
 
@@ -1757,51 +1757,128 @@ div[class*="gradio-container"],
     background: transparent !important;
 }
 
-/* Gradio Table Wrappers & Loading States Dark Mode */
-.gradio-container .table-wrap,
-.gradio-container .table-container,
-.gradio-container .wrap,
-.gradio-container .wrap.default,
-.gradio-container .dataframe,
-.gradio-container .empty,
-.gradio-container .loading,
-.gradio-container .pending,
-.gradio-container .paginate,
-.gradio-container div[data-testid="dataframe"],
-.gradio-container .eta-bar,
-.gradio-container .meta-text,
-.gradio-container div[class*="table"],
-.gradio-container table {
-    background: #0B0E14 !important;
-    background-color: #0B0E14 !important;
-    border-color: rgba(255, 255, 255, 0.08) !important;
-    color: #F1F5F9 !important;
-}
-.gradio-container .loading svg,
-.gradio-container .pending svg,
-.gradio-container .loading-status {
+/* Flatten Nested Container Padding across entire site */
+.epm-modular-section {
     background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 0 10px 0 !important;
+}
+
+/* 3. Sleek, Minimal 1-Line Table Ribbons / Headers */
+.epm-table-ribbon, 
+#tab1_header_strip, 
+#cal_table_header_strip, 
+#circ_table_header_strip {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    background: #F8FAFC !important;
+    border: 1px solid #E2E8F0 !important;
+    border-bottom: none !important;
+    border-radius: 6px 6px 0 0 !important;
+    padding: 0 10px !important;
+    height: 30px !important;
+    min-height: 30px !important;
+    max-height: 30px !important;
+    line-height: 28px !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+}
+
+.epm-ribbon-left, .epm-tbl-hdr-left, .epm-tbl-hdr-title-group {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    height: 100% !important;
+}
+
+.epm-ribbon-bullet {
     color: #0052FF !important;
+    font-size: 8px !important;
 }
 
-/* 3. Typography & Section Headers */
-h1, h2, h3, h4 {
-    font-family: var(--font-sans) !important;
-    color: var(--text-primary) !important;
-    letter-spacing: -0.02em !important;
-    margin-block: 0.4rem 0.5rem !important;
+.epm-ribbon-title, .epm-tbl-hdr-title {
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    color: #0F172A !important;
+    letter-spacing: 0.02em !important;
+    text-transform: uppercase !important;
+    white-space: nowrap !important;
 }
 
-h1 { font-size: 20px !important; font-weight: 800 !important; }
-h2 { font-size: 16px !important; font-weight: 700 !important; }
-h3 { font-size: 13px !important; font-weight: 700 !important; }
-h4 { font-size: 12px !important; font-weight: 600 !important; color: var(--text-secondary) !important; }
-
-p, span, div, label {
-    font-family: var(--font-sans) !important;
+.epm-ribbon-badge, .epm-tbl-hdr-badge {
+    font-size: 9.5px !important;
+    font-weight: 700 !important;
+    background: #EFF6FF !important;
+    color: #0052FF !important;
+    border: 1px solid #BFDBFE !important;
+    padding: 0 5px !important;
+    height: 18px !important;
+    line-height: 16px !important;
+    border-radius: 3px !important;
+    white-space: nowrap !important;
 }
 
-/* 4. Desktop Table Headers - Zero Single-Letter Word Wrapping */
+.epm-ribbon-count, .epm-tbl-hdr-badge-sub {
+    font-size: 9.5px !important;
+    color: #64748B !important;
+    font-weight: 500 !important;
+    white-space: nowrap !important;
+}
+
+.epm-ribbon-controls, .epm-tbl-hdr-actions {
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    height: 100% !important;
+}
+
+/* Sleek Micro Action Buttons inside Table Ribbon */
+.epm-ribbon-btn, 
+button.epm-hdr-action-btn, 
+#tab1_refresh_btn,
+.epm-section-ctrl-btn {
+    height: 22px !important;
+    min-height: 22px !important;
+    max-height: 22px !important;
+    line-height: 20px !important;
+    padding: 0 7px !important;
+    font-size: 10.5px !important;
+    font-weight: 600 !important;
+    background: #FFFFFF !important;
+    border: 1px solid #CBD5E1 !important;
+    border-radius: 4px !important;
+    color: #334155 !important;
+    cursor: pointer !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 3px !important;
+    margin: 0 !important;
+    transition: all 0.12s ease !important;
+}
+
+.epm-ribbon-btn:hover, 
+button.epm-hdr-action-btn:hover, 
+#tab1_refresh_btn:hover {
+    background: #F1F5F9 !important;
+    color: #0F172A !important;
+    border-color: #94A3B8 !important;
+}
+
+#tab1_refresh_btn, .btn-primary-emerald {
+    background: #0052FF !important;
+    color: #FFFFFF !important;
+    border: none !important;
+}
+#tab1_refresh_btn:hover, .btn-primary-emerald:hover {
+    background: #1A66FF !important;
+    color: #FFFFFF !important;
+}
+
+/* 4. Table Headers (1 Line Sleek Height, No Word Wrapping) */
 th, thead th, .gradio-container thead th, div[data-testid="dataframe"] thead th {
     white-space: nowrap !important;
     word-break: keep-all !important;
@@ -1812,32 +1889,231 @@ th, thead th, .gradio-container thead th, div[data-testid="dataframe"] thead th 
     font-size: 11px !important;
     font-weight: 700 !important;
     letter-spacing: 0.04em !important;
-    color: #94A3B8 !important;
-    background: #151B27 !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
-    padding: 7px 10px !important;
+    color: #475569 !important;
+    background: #F8FAFC !important;
+    border-top: 1px solid #E2E8F0 !important;
+    border-bottom: 1px solid #CBD5E1 !important;
+    padding: 3px 8px !important;
+    height: 26px !important;
+    min-height: 26px !important;
+    max-height: 26px !important;
+    line-height: 20px !important;
     vertical-align: middle !important;
 }
 
-/* Desktop Sensible Column Minimum Widths */
-#top_news_table th:nth-child(1), #top_news_table td:nth-child(1) { min-width: 78px !important; width: 78px !important; text-align: center !important; }
-#top_news_table th:nth-child(2), #top_news_table td:nth-child(2) { min-width: 96px !important; width: 96px !important; text-align: center !important; }
-#top_news_table th:nth-child(3), #top_news_table td:nth-child(3) { min-width: 84px !important; width: 84px !important; text-align: center !important; }
-#top_news_table th:nth-child(4), #top_news_table td:nth-child(4) { min-width: 320px !important; }
-#top_news_table th:nth-child(5), #top_news_table td:nth-child(5) { min-width: 130px !important; width: 130px !important; }
-#top_news_table th:nth-child(6), #top_news_table td:nth-child(6) { min-width: 260px !important; }
-#top_news_table th:nth-child(7), #top_news_table td:nth-child(7) { min-width: 110px !important; width: 110px !important; }
-#top_news_table th:nth-child(8), #top_news_table td:nth-child(8) { min-width: 78px !important; width: 78px !important; text-align: center !important; }
-#top_news_table th:nth-child(9), #top_news_table td:nth-child(9) { min-width: 95px !important; width: 95px !important; text-align: center !important; }
+/* Table Containers */
+.gradio-container .table-wrap,
+.gradio-container .table-container,
+.gradio-container .wrap,
+.gradio-container .wrap.default,
+.gradio-container .dataframe,
+.gradio-container div[data-testid="dataframe"],
+div[class*="table"],
+table {
+    background: #FFFFFF !important;
+    background-color: #FFFFFF !important;
+    border: 1px solid #E2E8F0 !important;
+    color: #0F172A !important;
+    border-radius: 0 0 6px 6px !important;
+    margin-top: 0 !important;
+}
 
-#bottom_news_table th:nth-child(1), #bottom_news_table td:nth-child(1) { min-width: 90px !important; text-align: center !important; }
-#bottom_news_table th:nth-child(2), #bottom_news_table td:nth-child(2) { min-width: 110px !important; }
-#bottom_news_table th:nth-child(3), #bottom_news_table td:nth-child(3) { min-width: 340px !important; }
-#bottom_news_table th:nth-child(4), #bottom_news_table td:nth-child(4) { min-width: 80px !important; text-align: center !important; }
-#bottom_news_table th:nth-child(5), #bottom_news_table td:nth-child(5) { min-width: 96px !important; text-align: center !important; }
-#bottom_news_table th:nth-child(6), #bottom_news_table td:nth-child(6) { min-width: 100px !important; text-align: center !important; }
+/* Tab 2 Multi-Market Catalyst Dossier Visual Feed Table (Light Mode) */
+.epm-dossier-container {
+    margin-top: 0 !important;
+    margin-bottom: 6px !important;
+    padding-top: 0 !important;
+    border: 1px solid #E2E8F0 !important;
+    border-top: none !important;
+    border-radius: 0 0 6px 6px !important;
+    overflow: hidden !important;
+    background: #FFFFFF !important;
+}
 
-/* 5. Numerical & Data Cells (JetBrains / Geist Mono + Tabular Figures) */
+.epm-dossier-table-wrap {
+    width: 100% !important;
+    overflow-x: auto !important;
+    max-height: 75vh !important;
+    background: #FFFFFF !important;
+}
+
+.epm-dossier-table {
+    min-width: 1720px !important;
+    width: 1720px !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+    font-family: var(--font-sans) !important;
+    font-size: 11.5px !important;
+    text-align: left !important;
+    background: #FFFFFF !important;
+}
+
+.epm-dossier-table thead th {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 20 !important;
+    background: #F8FAFC !important;
+    color: #475569 !important;
+    font-family: var(--font-sans) !important;
+    font-size: 10.5px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.02em !important;
+    padding: 3px 8px !important;
+    height: 26px !important;
+    border-bottom: 1px solid #E2E8F0 !important;
+    border-right: 1px solid #E2E8F0 !important;
+    white-space: nowrap !important;
+    vertical-align: middle !important;
+}
+
+.epm-day-ribbon-row td {
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    height: auto !important;
+}
+
+.epm-day-ribbon {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 3px 10px !important;
+    background: #F1F5F9 !important;
+    border-top: 1px solid #E2E8F0 !important;
+    border-bottom: 1px solid #E2E8F0 !important;
+    font-weight: 700 !important;
+    font-size: 11px !important;
+    color: #0F172A !important;
+}
+
+.epm-dossier-row {
+    background: #FFFFFF !important;
+    cursor: pointer !important;
+    transition: background-color 0.1s ease !important;
+}
+
+.epm-dossier-row-odd {
+    background: #FAFAFC !important;
+}
+
+.epm-dossier-row:hover {
+    background: #F1F5F9 !important;
+}
+
+.epm-dossier-table td {
+    padding: 3px 6px !important;
+    vertical-align: middle !important;
+    border-right: 1px solid #F1F5F9 !important;
+    border-bottom: 1px solid #F1F5F9 !important;
+    color: #0F172A !important;
+    line-height: 1.32 !important;
+    height: 34px !important;
+    max-height: 38px !important;
+    overflow: hidden !important;
+    font-family: var(--font-sans) !important;
+}
+
+.epm-dossier-table td.col-event,
+.epm-dossier-table td.col-event b,
+.epm-dossier-table td.col-reason {
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    line-height: 1.32 !important;
+    max-height: 2.65em !important;
+}
+
+/* 5. Desktop View: 2-Line Clamping for Each Item (Fits Best Viewable Window) */
+@media (min-width: 768px) {
+    #top_news_table td:nth-child(4),
+    #top_news_table td:nth-child(4) a,
+    #bottom_news_table td:nth-child(3),
+    #bottom_news_table td:nth-child(3) a,
+    #calendar_table td:nth-child(9),
+    #circ_table td:nth-child(5),
+    #circ_table td:nth-child(5) a,
+    .epm-news-title,
+    .epm-dossier-event-name {
+        display: -webkit-box !important;
+        -webkit-line-clamp: 2 !important;
+        -webkit-box-orient: vertical !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        line-height: 1.32 !important;
+        max-height: 2.65em !important;
+        word-break: break-word !important;
+    }
+
+    #top_news_table td:nth-child(6),
+    #calendar_table td:nth-child(15),
+    #circ_table td:nth-child(7),
+    .epm-news-reasoning,
+    .epm-dossier-reasoning {
+        display: -webkit-box !important;
+        -webkit-line-clamp: 2 !important;
+        -webkit-box-orient: vertical !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        line-height: 1.32 !important;
+        max-height: 2.65em !important;
+        font-size: 11.5px !important;
+        color: #475569 !important;
+        word-break: break-word !important;
+    }
+
+    #top_news_table td:nth-child(5) {
+        display: -webkit-box !important;
+        -webkit-line-clamp: 2 !important;
+        -webkit-box-orient: vertical !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        line-height: 1.3 !important;
+        max-height: 2.6em !important;
+        font-size: 11px !important;
+        word-break: break-word !important;
+    }
+
+    /* Fixed Row Compact Sizing (~44px height) */
+    tbody tr, .gradio-container tbody tr {
+        height: auto !important;
+        max-height: 48px !important;
+    }
+}
+
+/* Table Column Widths */
+#top_news_table th:nth-child(1), #top_news_table td:nth-child(1) { min-width: 74px !important; width: 74px !important; text-align: center !important; }
+#top_news_table th:nth-child(2), #top_news_table td:nth-child(2) { min-width: 90px !important; width: 90px !important; text-align: center !important; }
+#top_news_table th:nth-child(3), #top_news_table td:nth-child(3) { min-width: 80px !important; width: 80px !important; text-align: center !important; }
+#top_news_table th:nth-child(4), #top_news_table td:nth-child(4) { min-width: 300px !important; }
+#top_news_table th:nth-child(5), #top_news_table td:nth-child(5) { min-width: 125px !important; width: 125px !important; }
+#top_news_table th:nth-child(6), #top_news_table td:nth-child(6) { min-width: 240px !important; }
+#top_news_table th:nth-child(7), #top_news_table td:nth-child(7) { min-width: 100px !important; width: 100px !important; }
+#top_news_table th:nth-child(8), #top_news_table td:nth-child(8) { min-width: 74px !important; width: 74px !important; text-align: center !important; }
+#top_news_table th:nth-child(9), #top_news_table td:nth-child(9) { min-width: 90px !important; width: 90px !important; text-align: center !important; }
+
+/* 6. Pure Light Table Rows */
+tbody tr td, .gradio-container tbody td {
+    background-color: #FFFFFF !important;
+    color: #0F172A !important;
+    border-bottom: 1px solid #F1F5F9 !important;
+    border-top: none !important;
+    padding: 4px 8px !important;
+    font-size: 12px !important;
+    vertical-align: middle !important;
+}
+
+tbody tr:nth-child(even) td {
+    background-color: #FAFAFC !important;
+}
+
+tbody tr:hover td {
+    background-color: #F1F5F9 !important;
+}
+
+/* Numerical Cells */
 #top_news_table td:nth-child(1),
 #top_news_table td:nth-child(8),
 #top_news_table td:nth-child(9),
@@ -1846,103 +2122,77 @@ th, thead th, .gradio-container thead th, div[data-testid="dataframe"] thead th 
 #calendar_table td:nth-child(1),
 #calendar_table td:nth-child(2),
 #calendar_table td:nth-child(3),
-#calendar_table td:nth-child(10),
-#calendar_table td:nth-child(11),
-#calendar_table td:nth-child(12),
-#calendar_table td:nth-child(13),
-#circ_table td:nth-child(2),
-#circ_table td:nth-child(3),
 .timer-cell, code, .epm-ticker-val, .epm-ticker-chg {
     font-family: var(--font-mono) !important;
     font-feature-settings: "tnum" 1, "zero" 1 !important;
     font-variant-numeric: tabular-nums !important;
 }
 
-/* 6. Crisp Neutral Headline Links & Hover Glow */
+/* Crisp Headline Links */
 #top_news_table td:nth-child(4) a,
 #bottom_news_table td:nth-child(3) a,
 #circ_table td:nth-child(5) a,
 .epm-news-title {
-    color: #F1F5F9 !important;
+    color: #0F172A !important;
     text-decoration: none !important;
     font-weight: 600 !important;
-    transition: color 0.15s ease !important;
+    transition: color 0.12s ease !important;
 }
 #top_news_table td:nth-child(4) a:hover,
 #bottom_news_table td:nth-child(3) a:hover,
 #circ_table td:nth-child(5) a:hover,
 .epm-news-title:hover {
-    color: #60A5FA !important;
+    color: #0052FF !important;
     text-decoration: underline !important;
 }
 
-/* 7. Institutional Dark Table Rows */
-tbody tr td, .gradio-container tbody td {
-    background-color: var(--bg-surface) !important;
-    color: var(--text-primary) !important;
-    border-bottom: 1px solid var(--border-subtle) !important;
-    border-top: none !important;
-    padding: 7px 10px !important;
-    font-size: 12.5px !important;
-}
-
-tbody tr:nth-child(even) td {
-    background-color: #0E131C !important;
-}
-
-tbody tr:hover td {
-    background-color: #182030 !important;
-}
-
-/* 8. Sleek Sentiment Badge Pills */
+/* 7. Sleek Sentiment Badge Pills (Light Edition) */
 .sent-pill, [data-sent], .sent-bullish {
-    background: rgba(16, 185, 129, 0.15) !important;
-    color: #10B981 !important;
-    border: 1px solid rgba(16, 185, 129, 0.3) !important;
+    background: #ECFDF5 !important;
+    color: #047857 !important;
+    border: 1px solid #A7F3D0 !important;
     border-radius: 4px !important;
-    padding: 2px 7px !important;
-    font-size: 11px !important;
+    padding: 1px 6px !important;
+    font-size: 10.5px !important;
     font-weight: 700 !important;
     display: inline-flex !important;
     align-items: center !important;
 }
 .sent-bearish {
-    background: rgba(244, 63, 94, 0.15) !important;
-    color: #F43F5E !important;
-    border: 1px solid rgba(244, 63, 94, 0.3) !important;
+    background: #FEF2F2 !important;
+    color: #B91C1C !important;
+    border: 1px solid #FECACA !important;
     border-radius: 4px !important;
-    padding: 2px 7px !important;
-    font-size: 11px !important;
+    padding: 1px 6px !important;
+    font-size: 10.5px !important;
     font-weight: 700 !important;
     display: inline-flex !important;
     align-items: center !important;
 }
 .sent-neutral {
-    background: rgba(148, 163, 184, 0.12) !important;
-    color: #94A3B8 !important;
-    border: 1px solid rgba(148, 163, 184, 0.25) !important;
+    background: #F1F5F9 !important;
+    color: #475569 !important;
+    border: 1px solid #CBD5E1 !important;
     border-radius: 4px !important;
-    padding: 2px 7px !important;
-    font-size: 11px !important;
+    padding: 1px 6px !important;
+    font-size: 10.5px !important;
     font-weight: 600 !important;
     display: inline-flex !important;
     align-items: center !important;
 }
 
-/* Color-coded score & impact micro-pills */
 .score-pill, #top_news_table td:nth-child(1) {
-    color: #F59E0B !important;
+    color: #B45309 !important;
     font-weight: 700 !important;
 }
 
-/* 9. Top Navigation Bar & Desk Header (Institutional Dark Mode) */
+/* 8. Top Navigation Bar (Pure Light White) */
 .epm-top-navbar {
-    background: var(--bg-surface-elevated) !important;
-    border: 1px solid var(--border-color) !important;
+    background: #FFFFFF !important;
+    border: 1px solid #E2E8F0 !important;
     border-radius: 8px !important;
-    backdrop-filter: blur(12px) !important;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
-    padding: 6px 12px !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04) !important;
+    padding: 5px 12px !important;
     margin-bottom: 8px !important;
 }
 
@@ -1951,26 +2201,24 @@ tbody tr:hover td {
     align-items: center !important;
     justify-content: space-between !important;
     gap: 12px !important;
-    min-height: 32px !important;
+    min-height: 30px !important;
 }
 
 .epm-nav-brand-cluster {
     display: flex !important;
     align-items: center !important;
-    gap: 8px !important;
+    gap: 7px !important;
 }
 
 .epm-nav-bolt {
-    font-size: 16px !important;
+    font-size: 15px !important;
     color: #0052FF !important;
-    filter: drop-shadow(0 0 6px rgba(0, 82, 255, 0.5));
 }
 
 .epm-nav-title {
-    font-family: var(--font-sans) !important;
-    font-size: 15px !important;
+    font-size: 14px !important;
     font-weight: 800 !important;
-    color: #F1F5F9 !important;
+    color: #0F172A !important;
     letter-spacing: -0.02em !important;
 }
 
@@ -1979,24 +2227,25 @@ tbody tr:hover td {
 }
 
 .epm-nav-version {
-    font-size: 9.5px !important;
+    font-family: var(--font-mono) !important;
+    font-size: 9px !important;
     font-weight: 700 !important;
-    background: rgba(0, 82, 255, 0.15) !important;
-    color: #60A5FA !important;
-    border: 1px solid rgba(0, 82, 255, 0.3) !important;
-    padding: 1px 5px !important;
-    border-radius: 4px !important;
+    background: #EFF6FF !important;
+    color: #0052FF !important;
+    border: 1px solid #BFDBFE !important;
+    padding: 1px 4px !important;
+    border-radius: 3px !important;
 }
 
 .epm-nav-status-badge {
     display: inline-flex !important;
     align-items: center !important;
-    gap: 5px !important;
-    font-size: 10px !important;
+    gap: 4px !important;
+    font-size: 9.5px !important;
     font-weight: 700 !important;
-    color: #10B981 !important;
-    background: rgba(16, 185, 129, 0.15) !important;
-    border: 1px solid rgba(16, 185, 129, 0.3) !important;
+    color: #059669 !important;
+    background: #ECFDF5 !important;
+    border: 1px solid #A7F3D0 !important;
     padding: 1px 6px !important;
     border-radius: 4px !important;
 }
@@ -2006,13 +2255,6 @@ tbody tr:hover td {
     height: 6px !important;
     border-radius: 50% !important;
     background: #10B981 !important;
-    box-shadow: 0 0 6px #10B981 !important;
-    animation: epmPulseDot 1.8s infinite ease-in-out !important;
-}
-
-@keyframes epmPulseDot {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.5; transform: scale(0.85); }
 }
 
 .epm-nav-telemetry {
@@ -2022,20 +2264,16 @@ tbody tr:hover td {
 }
 
 .epm-telem-pill {
+    font-family: var(--font-mono) !important;
     font-size: 9.5px !important;
-    font-weight: 600 !important;
-    background: #181F2C !important;
-    color: #94A3B8 !important;
-    border: 1px solid var(--border-subtle) !important;
-    padding: 2px 6px !important;
-    border-radius: 4px !important;
+    background: #F8FAFC !important;
+    border: 1px solid #E2E8F0 !important;
+    color: #475569 !important;
+    padding: 1px 5px !important;
+    border-radius: 3px !important;
 }
 .epm-telem-pill b {
-    color: #F1F5F9 !important;
-    font-family: var(--font-mono) !important;
-}
-.epm-telem-tg b {
-    color: #10B981 !important;
+    color: #0F172A !important;
 }
 
 /* Macro Ticker Strip */
@@ -2043,116 +2281,132 @@ tbody tr:hover td {
     display: flex !important;
     align-items: center !important;
     gap: 12px !important;
-    background: var(--bg-page) !important;
-    border: 1px solid var(--border-subtle) !important;
-    border-radius: 6px !important;
-    padding: 3px 10px !important;
-    overflow-x: auto !important;
-    scrollbar-width: none !important;
+    padding-left: 12px !important;
+    border-left: 1px solid #E2E8F0 !important;
 }
-.epm-telemetry-strip::-webkit-scrollbar { display: none !important; }
 
 .epm-ticker-item {
     display: flex !important;
     align-items: center !important;
     gap: 5px !important;
     font-size: 11px !important;
-    white-space: nowrap !important;
 }
-.epm-ticker-sym { color: #94A3B8 !important; font-weight: 600 !important; }
-.epm-ticker-val { color: #F1F5F9 !important; font-weight: 700 !important; font-family: var(--font-mono) !important; }
-.epm-ticker-chg.up { color: #10B981 !important; font-family: var(--font-mono) !important; font-weight: 700 !important; }
-.epm-ticker-chg.down { color: #F43F5E !important; font-family: var(--font-mono) !important; font-weight: 700 !important; }
-.epm-ticker-divider { width: 1px !important; height: 12px !important; background: var(--border-color) !important; }
+.epm-ticker-sym {
+    font-weight: 700 !important;
+    color: #475569 !important;
+}
+.epm-ticker-val {
+    font-family: var(--font-mono) !important;
+    font-weight: 700 !important;
+    color: #0F172A !important;
+}
+.epm-ticker-chg.up {
+    color: #059669 !important;
+    font-family: var(--font-mono) !important;
+    font-weight: 600 !important;
+}
+.epm-ticker-chg.down {
+    color: #DC2626 !important;
+    font-family: var(--font-mono) !important;
+    font-weight: 600 !important;
+}
 
-/* Desktop Row 2 Tabs */
+/* Row 2: Unified Navigation Tabs + Right-Side Controls & Menu */
 .epm-nav-row-2 {
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
-    gap: 8px !important;
     padding-top: 5px !important;
-    border-top: 1px solid var(--border-subtle) !important;
+    margin-top: 4px !important;
+    border-top: 1px solid #F1F5F9 !important;
 }
 
 .epm-quick-tabs-container {
     display: flex !important;
     align-items: center !important;
-    gap: 4px !important;
+    gap: 5px !important;
 }
 
 .epm-tab-pill {
     display: inline-flex !important;
     align-items: center !important;
     gap: 5px !important;
-    padding: 4px 10px !important;
+    padding: 3px 10px !important;
+    background: #FFFFFF !important;
+    border: 1px solid #E2E8F0 !important;
     border-radius: 6px !important;
-    background: #181F2C !important;
-    border: 1px solid var(--border-color) !important;
-    color: #94A3B8 !important;
-    font-family: var(--font-sans) !important;
+    color: #475569 !important;
     font-size: 11.5px !important;
     font-weight: 600 !important;
     cursor: pointer !important;
-    transition: all 0.15s ease !important;
+    transition: all 0.12s ease !important;
 }
 .epm-tab-pill:hover {
-    background: #1E2738 !important;
-    color: #F1F5F9 !important;
-    border-color: rgba(255, 255, 255, 0.15) !important;
+    background: #F8FAFC !important;
+    color: #0F172A !important;
+    border-color: #CBD5E1 !important;
 }
 .epm-tab-pill.active {
-    background: rgba(0, 82, 255, 0.18) !important;
-    color: #60A5FA !important;
+    background: #EFF6FF !important;
+    color: #0052FF !important;
     border-color: #0052FF !important;
-    box-shadow: 0 0 10px rgba(0, 82, 255, 0.25) !important;
+    font-weight: 700 !important;
 }
+
 .epm-tab-pill-bullet {
     width: 5px !important;
     height: 5px !important;
     border-radius: 50% !important;
-    background: #64748B !important;
+    background: #94A3B8 !important;
 }
 .epm-tab-pill.active .epm-tab-pill-bullet {
-    background: #60A5FA !important;
-    box-shadow: 0 0 5px #60A5FA !important;
+    background: #0052FF !important;
 }
 
 .epm-nav-controls {
     display: flex !important;
     align-items: center !important;
-    gap: 6px !important;
+    gap: 5px !important;
 }
 
-.epm-cmd-launcher-btn {
+.epm-cmd-launcher-btn, .epm-top-btn {
     display: inline-flex !important;
     align-items: center !important;
-    gap: 5px !important;
-    height: 26px !important;
+    gap: 4px !important;
+    height: 25px !important;
     padding: 0 8px !important;
-    background: #181F2C !important;
-    border: 1px solid var(--border-color) !important;
+    background: #FFFFFF !important;
+    border: 1px solid #CBD5E1 !important;
     border-radius: 5px !important;
-    color: #94A3B8 !important;
+    color: #334155 !important;
     font-size: 11px !important;
     cursor: pointer !important;
 }
-.epm-cmd-badge {
-    font-family: var(--font-mono) !important;
-    font-size: 9.5px !important;
-    background: rgba(0, 82, 255, 0.15) !important;
-    color: #60A5FA !important;
-    border: 1px solid rgba(0, 82, 255, 0.3) !important;
-    padding: 0 4px !important;
-    border-radius: 3px !important;
+.epm-cmd-launcher-btn:hover, .epm-top-btn:hover {
+    background: #F1F5F9 !important;
+    color: #0F172A !important;
+    border-color: #94A3B8 !important;
+}
+
+/* Right-Side Menu Button on Header */
+.epm-menu-btn {
+    background: #0052FF !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    font-weight: 700 !important;
+    padding: 0 10px !important;
+}
+.epm-menu-btn:hover {
+    background: #1A66FF !important;
+    color: #FFFFFF !important;
 }
 
 .epm-nav-search-wrap {
     display: inline-flex !important;
     align-items: center !important;
-    height: 26px !important;
-    background: #181F2C !important;
-    border: 1px solid var(--border-color) !important;
+    height: 25px !important;
+    background: #FFFFFF !important;
+    border: 1px solid #CBD5E1 !important;
     border-radius: 5px !important;
     padding: 0 6px !important;
     gap: 4px !important;
@@ -2160,295 +2414,246 @@ tbody tr:hover td {
 .epm-nav-search-wrap input {
     background: transparent !important;
     border: none !important;
-    color: #F1F5F9 !important;
+    color: #0F172A !important;
     font-size: 11px !important;
     outline: none !important;
-    width: 105px !important;
+    width: 100px !important;
 }
 
-.epm-top-btn {
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 4px !important;
-    height: 26px !important;
-    padding: 0 8px !important;
-    background: #181F2C !important;
-    border: 1px solid var(--border-color) !important;
-    border-radius: 5px !important;
-    color: #F1F5F9 !important;
-    font-size: 11px !important;
-    cursor: pointer !important;
+/* 9. Bento Cards (Settings Hub & User Guide Light Theme) */
+.epm-bento-card {
+    background: #FFFFFF !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 8px !important;
+    padding: 14px 16px !important;
+    margin-bottom: 12px !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
 }
-.epm-top-btn.epm-btn-active {
-    background: rgba(16, 185, 129, 0.15) !important;
-    color: #10B981 !important;
-    border-color: rgba(16, 185, 129, 0.3) !important;
-}
-
-/* 10. Table Ribbons & Modular Workspace Headers */
-.epm-table-ribbon, #cal_table_header_strip, #tab1_header_strip {
+.epm-bento-header {
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
-    background: #151B27 !important;
-    border: 1px solid var(--border-color) !important;
-    border-bottom: 2px solid #0052FF !important;
-    border-radius: 6px 6px 0 0 !important;
-    padding: 4px 10px !important;
-    min-height: 30px !important;
-}
-
-.epm-ribbon-title {
-    font-size: 11.5px !important;
-    font-weight: 700 !important;
-    color: #F1F5F9 !important;
-    letter-spacing: 0.02em !important;
-}
-.epm-ribbon-subtitle {
-    font-size: 10px !important;
-    color: #64748B !important;
-}
-.epm-ribbon-badge {
-    font-size: 9.5px !important;
-    font-weight: 700 !important;
-    background: rgba(0, 82, 255, 0.15) !important;
-    color: #60A5FA !important;
-    border: 1px solid rgba(0, 82, 255, 0.3) !important;
-    padding: 1px 5px !important;
-    border-radius: 3px !important;
-}
-
-.epm-ribbon-btn, button.epm-hdr-action-btn {
-    height: 22px !important;
-    padding: 0 7px !important;
-    font-size: 10px !important;
-    font-weight: 600 !important;
-    background: #181F2C !important;
-    border: 1px solid var(--border-color) !important;
-    border-radius: 4px !important;
-    color: #94A3B8 !important;
-    cursor: pointer !important;
-    transition: all 0.12s ease !important;
-}
-.epm-ribbon-btn:hover, button.epm-hdr-action-btn:hover {
-    background: #1E2738 !important;
-    color: #F1F5F9 !important;
-    border-color: rgba(255, 255, 255, 0.2) !important;
-}
-
-/* 11. Bento Cards (Settings Hub, User Guide & Admin Panels) */
-.epm-bento-card {
-    background: var(--bg-surface) !important;
-    border: 1px solid var(--border-color) !important;
-    border-radius: 10px !important;
-    padding: 18px 20px !important;
-    margin-bottom: 14px !important;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2) !important;
-    transition: border-color 0.15s ease !important;
-}
-.epm-bento-card:hover {
-    border-color: rgba(255, 255, 255, 0.14) !important;
-}
-
-.epm-bento-header {
-    display: flex !important;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 12px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--border-subtle);
+    margin-bottom: 10px !important;
+    padding-bottom: 6px !important;
+    border-bottom: 1px solid #F1F5F9 !important;
 }
 .epm-bento-title {
-    font-size: 14px !important;
+    font-size: 13.5px !important;
     font-weight: 700 !important;
-    color: #F1F5F9 !important;
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    color: #0F172A !important;
 }
 .epm-bento-desc {
     font-size: 11.5px !important;
-    color: #94A3B8 !important;
-    margin-bottom: 14px !important;
-    line-height: 1.5 !important;
+    color: #475569 !important;
+    margin-bottom: 10px !important;
 }
 
-/* Custom Segmented Inputs & Buttons in Dark Mode */
+/* Form Controls in Light Mode */
 .gradio-container button.primary,
 .gradio-container button[variant="primary"] {
     background: #0052FF !important;
-    color: #ffffff !important;
+    color: #FFFFFF !important;
     border: none !important;
-    font-weight: 700 !important;
-    border-radius: 6px !important;
-    box-shadow: 0 2px 10px rgba(0, 82, 255, 0.3) !important;
-    transition: all 0.15s ease !important;
+    font-weight: 600 !important;
+    border-radius: 5px !important;
 }
-.gradio-container button.primary:hover,
-.gradio-container button[variant="primary"]:hover {
-    background: #1A66FF !important;
-    box-shadow: 0 4px 14px rgba(0, 82, 255, 0.45) !important;
-}
-
 .gradio-container input[type="text"],
 .gradio-container input[type="password"],
 .gradio-container textarea,
 .gradio-container select {
-    background-color: #181F2C !important;
-    border: 1px solid var(--border-color) !important;
-    color: #F1F5F9 !important;
-    border-radius: 6px !important;
+    background-color: #FFFFFF !important;
+    border: 1px solid #CBD5E1 !important;
+    color: #0F172A !important;
+    border-radius: 5px !important;
     font-size: 12px !important;
 }
 .gradio-container input:focus,
 .gradio-container textarea:focus {
     border-color: #0052FF !important;
-    box-shadow: 0 0 0 1px #0052FF !important;
+    box-shadow: 0 0 0 2px rgba(0, 82, 255, 0.15) !important;
 }
-
-/* Custom Sleek Checkbox / Toggle Switches */
 .gradio-container input[type="checkbox"] {
     accent-color: #0052FF !important;
     cursor: pointer !important;
 }
 
-/* 12. Inshorts & Mobile Side Drawer Dark Theme */
-.epm-drawer-backdrop {
+/* 10. Universal Right-Side Flyout Menu Drawer (Desktop & Mobile) */
+.epm-menu-backdrop, .epm-drawer-backdrop {
     position: fixed !important;
     inset: 0 !important;
-    background: rgba(0, 0, 0, 0.65) !important;
-    backdrop-filter: blur(4px) !important;
-    z-index: 1040 !important;
+    background: rgba(15, 23, 42, 0.35) !important;
+    backdrop-filter: blur(3px) !important;
+    z-index: 99990 !important;
     opacity: 0 !important;
     pointer-events: none !important;
-    transition: opacity 0.25s ease !important;
+    transition: opacity 0.22s ease !important;
 }
-.epm-drawer-backdrop.is-open {
+.epm-menu-backdrop.is-open, .epm-drawer-backdrop.is-open {
     opacity: 1 !important;
     pointer-events: auto !important;
 }
 
-.epm-mobile-drawer {
+.epm-side-drawer, .epm-mobile-drawer {
     position: fixed !important;
     top: 0 !important;
-    right: -320px !important;
-    width: 300px !important;
-    max-width: 86vw !important;
+    right: -360px !important;
+    width: 330px !important;
+    max-width: 88vw !important;
     height: 100vh !important;
-    background: #121721 !important;
-    z-index: 1050 !important;
-    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.5) !important;
-    border-left: 1px solid rgba(255, 255, 255, 0.1) !important;
-    transition: right 0.28s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    background: #FFFFFF !important;
+    z-index: 100000 !important;
+    box-shadow: -8px 0 28px rgba(15, 23, 42, 0.12) !important;
+    border-left: 1px solid #E2E8F0 !important;
+    transition: right 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
     display: flex !important;
     flex-direction: column !important;
     overflow-y: auto !important;
     -webkit-overflow-scrolling: touch !important;
 }
-.epm-mobile-drawer.is-open {
+.epm-side-drawer.is-open, .epm-mobile-drawer.is-open {
     right: 0 !important;
 }
 
-.epm-drawer-header {
+.epm-side-drawer-header, .epm-drawer-header {
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
-    padding: 14px 16px !important;
-    background: #151B27 !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+    padding: 12px 14px !important;
+    background: #F8FAFC !important;
+    border-bottom: 1px solid #E2E8F0 !important;
 }
-.epm-drawer-title {
-    color: #F1F5F9 !important;
+.epm-side-drawer-title, .epm-drawer-title {
+    font-size: 13.5px !important;
+    font-weight: 800 !important;
+    color: #0F172A !important;
 }
-.epm-drawer-close-btn {
-    width: 28px !important;
-    height: 28px !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    background: #181F2C !important;
-    color: #94A3B8 !important;
-    border-radius: 6px !important;
+.epm-side-drawer-badge, .epm-drawer-badge {
+    font-size: 9px !important;
+    font-weight: 700 !important;
+    background: #EFF6FF !important;
+    color: #0052FF !important;
+    border: 1px solid #BFDBFE !important;
+    padding: 1px 5px !important;
+    border-radius: 3px !important;
+}
+.epm-side-drawer-close, .epm-drawer-close-btn {
+    width: 26px !important;
+    height: 26px !important;
+    border: 1px solid #CBD5E1 !important;
+    background: #FFFFFF !important;
+    color: #64748B !important;
+    border-radius: 5px !important;
     cursor: pointer !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
 }
-.epm-drawer-close-btn:hover {
-    color: #F1F5F9 !important;
+.epm-side-drawer-close:hover, .epm-drawer-close-btn:hover {
+    color: #0F172A !important;
     border-color: #0052FF !important;
 }
-.epm-drawer-body {
-    padding: 14px 16px !important;
+
+.epm-side-drawer-body, .epm-drawer-body {
+    padding: 12px 14px !important;
     display: flex !important;
     flex-direction: column !important;
-    gap: 12px !important;
+    gap: 10px !important;
     flex: 1 !important;
 }
-.epm-drawer-section-label {
-    font-size: 10px !important;
+.epm-side-section-label, .epm-drawer-section-label {
+    font-size: 9.5px !important;
     font-weight: 700 !important;
-    letter-spacing: 0.06em !important;
+    letter-spacing: 0.05em !important;
     color: #64748B !important;
     text-transform: uppercase !important;
-    margin-bottom: 4px !important;
+    margin-bottom: 2px !important;
 }
-.epm-drawer-nav-list {
+.epm-side-nav-list, .epm-drawer-nav-list {
     display: flex !important;
     flex-direction: column !important;
-    gap: 6px !important;
+    gap: 5px !important;
 }
-.epm-drawer-nav-item {
+.epm-side-nav-item, .epm-drawer-nav-item {
     display: flex !important;
     align-items: center !important;
-    gap: 10px !important;
-    padding: 8px 12px !important;
-    background: #181F2C !important;
-    border: 1px solid rgba(255, 255, 255, 0.08) !important;
-    border-radius: 8px !important;
+    gap: 9px !important;
+    padding: 7px 10px !important;
+    background: #FFFFFF !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 6px !important;
     cursor: pointer !important;
     text-align: left !important;
-    transition: all 0.15s ease !important;
+    transition: all 0.12s ease !important;
 }
-.epm-drawer-nav-item:hover, .epm-drawer-nav-item.active {
-    background: rgba(0, 82, 255, 0.15) !important;
+.epm-side-nav-item:hover, .epm-drawer-nav-item:hover {
+    background: #F8FAFC !important;
+    border-color: #CBD5E1 !important;
+}
+.epm-side-nav-item.active, .epm-drawer-nav-item.active {
+    background: #EFF6FF !important;
     border-color: #0052FF !important;
 }
-.epm-drawer-item-name { color: #F1F5F9 !important; font-size: 12px !important; font-weight: 700 !important; }
-.epm-drawer-item-desc { color: #94A3B8 !important; font-size: 10px !important; }
-.epm-drawer-tool-btn {
+.epm-side-item-name, .epm-drawer-item-name { 
+    color: #0F172A !important; 
+    font-size: 11.5px !important; 
+    font-weight: 700 !important; 
+}
+.epm-side-item-desc, .epm-drawer-item-desc { 
+    color: #64748B !important; 
+    font-size: 9.5px !important; 
+}
+.epm-side-item-tag {
+    margin-left: auto !important;
+    font-family: var(--font-mono) !important;
+    font-size: 9px !important;
+    background: #F1F5F9 !important;
+    color: #475569 !important;
+    border: 1px solid #E2E8F0 !important;
+    padding: 1px 4px !important;
+    border-radius: 3px !important;
+}
+
+.epm-side-tools-grid {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 5px !important;
+}
+.epm-side-tool-btn, .epm-drawer-tool-btn {
     display: flex !important;
     align-items: center !important;
-    gap: 8px !important;
-    padding: 8px 12px !important;
-    background: #181F2C !important;
-    border: 1px solid rgba(255, 255, 255, 0.08) !important;
-    border-radius: 8px !important;
-    color: #F1F5F9 !important;
-    font-size: 11.5px !important;
+    gap: 6px !important;
+    padding: 6px 10px !important;
+    background: #FFFFFF !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 6px !important;
+    color: #0F172A !important;
+    font-size: 11px !important;
     font-weight: 600 !important;
     cursor: pointer !important;
 }
-.epm-drawer-tool-btn:hover {
+.epm-side-tool-btn:hover, .epm-drawer-tool-btn:hover {
     border-color: #0052FF !important;
-    background: rgba(0, 82, 255, 0.1) !important;
+    background: #EFF6FF !important;
+    color: #0052FF !important;
 }
-.epm-drawer-footer {
-    padding: 12px 16px !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+.epm-side-drawer-footer, .epm-drawer-footer {
+    padding: 10px 14px !important;
+    border-top: 1px solid #E2E8F0 !important;
     font-size: 9.5px !important;
     color: #64748B !important;
     text-align: center !important;
 }
 
-/* Inshorts Full-Page / Bottom-Sheet Drawer */
+/* 11. Inshorts Full-Page / Bottom-Sheet Drawer (Light Edition) */
 .epm-inshorts-backdrop {
     position: fixed !important;
     inset: 0 !important;
-    background: rgba(0, 0, 0, 0.65) !important;
-    backdrop-filter: blur(5px) !important;
-    z-index: 1060 !important;
+    background: rgba(15, 23, 42, 0.4) !important;
+    backdrop-filter: blur(4px) !important;
+    z-index: 100060 !important;
     opacity: 0 !important;
     pointer-events: none !important;
-    transition: opacity 0.25s ease !important;
+    transition: opacity 0.22s ease !important;
 }
 .epm-inshorts-backdrop.is-open {
     opacity: 1 !important;
@@ -2462,20 +2667,19 @@ tbody tr:hover td {
     bottom: -110vh !important;
     max-height: 94vh !important;
     height: 90vh !important;
-    background: #121721 !important;
-    border-radius: 18px 18px 0 0 !important;
-    box-shadow: 0 -12px 36px rgba(0, 0, 0, 0.6) !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.12) !important;
-    z-index: 99999 !important;
+    background: #FFFFFF !important;
+    border-radius: 16px 16px 0 0 !important;
+    box-shadow: 0 -12px 36px rgba(15, 23, 42, 0.15) !important;
+    border-top: 1px solid #E2E8F0 !important;
+    z-index: 100099 !important;
     display: flex !important;
     flex-direction: column !important;
     overflow: hidden !important;
-    transition: bottom 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    transition: bottom 0.28s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 .epm-inshorts-drawer.is-open {
     bottom: 0 !important;
 }
-
 .epm-inshorts-handle-bar {
     width: 100% !important;
     display: flex !important;
@@ -2487,7 +2691,7 @@ tbody tr:hover td {
 .epm-inshorts-handle {
     width: 36px !important;
     height: 4px !important;
-    background: #334155 !important;
+    background: #CBD5E1 !important;
     border-radius: 2px !important;
 }
 .epm-inshorts-header {
@@ -2495,94 +2699,81 @@ tbody tr:hover td {
     align-items: center !important;
     justify-content: space-between !important;
     padding: 6px 16px 10px 16px !important;
-    background: #151B27 !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+    background: #F8FAFC !important;
+    border-bottom: 1px solid #E2E8F0 !important;
     flex-shrink: 0 !important;
-}
-.epm-inshorts-meta-strip {
-    display: flex !important;
-    align-items: center !important;
-    gap: 6px !important;
-    flex-wrap: wrap !important;
 }
 .epm-inshorts-source {
     font-size: 10.5px !important;
     font-weight: 700 !important;
-    color: #60A5FA !important;
-    background: rgba(37, 99, 235, 0.15) !important;
-    border: 1px solid rgba(59, 130, 246, 0.3) !important;
+    color: #0052FF !important;
+    background: #EFF6FF !important;
+    border: 1px solid #BFDBFE !important;
     padding: 2px 7px !important;
     border-radius: 4px !important;
 }
 .epm-inshorts-time {
     font-size: 10px !important;
-    color: #94A3B8 !important;
+    color: #64748B !important;
     font-family: var(--font-mono) !important;
 }
 .epm-inshorts-close {
-    width: 28px !important;
-    height: 28px !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    border-radius: 6px !important;
-    background: #181F2C !important;
+    width: 26px !important;
+    height: 26px !important;
+    border: 1px solid #CBD5E1 !important;
+    border-radius: 5px !important;
+    background: #FFFFFF !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    font-size: 13px !important;
+    font-size: 12px !important;
     font-weight: 700 !important;
-    color: #94A3B8 !important;
+    color: #64748B !important;
     cursor: pointer !important;
 }
 .epm-inshorts-close:hover {
-    color: #F1F5F9 !important;
+    color: #0F172A !important;
     border-color: #0052FF !important;
 }
 .epm-inshorts-body-scroll {
-    padding: 16px 18px !important;
+    padding: 14px 16px !important;
     overflow-y: auto !important;
     -webkit-overflow-scrolling: touch !important;
     flex: 1 !important;
     display: flex !important;
     flex-direction: column !important;
-    gap: 14px !important;
-}
-.epm-inshorts-hero-banner {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    flex-wrap: wrap !important;
-    gap: 8px !important;
+    gap: 12px !important;
 }
 .epm-inshorts-title {
     font-family: var(--font-sans) !important;
-    font-size: 18px !important;
+    font-size: 17px !important;
     font-weight: 800 !important;
     line-height: 1.35 !important;
-    color: #F1F5F9 !important;
+    color: #0F172A !important;
     letter-spacing: -0.02em !important;
     margin: 0 !important;
 }
 .epm-inshorts-section {
     display: flex !important;
     flex-direction: column !important;
-    gap: 6px !important;
-    background: #151B27 !important;
-    border: 1px solid rgba(255, 255, 255, 0.08) !important;
-    border-radius: 8px !important;
-    padding: 12px 14px !important;
+    gap: 5px !important;
+    background: #F8FAFC !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 7px !important;
+    padding: 10px 12px !important;
 }
 .epm-inshorts-section-heading {
-    font-size: 10.5px !important;
+    font-size: 10px !important;
     font-weight: 800 !important;
-    color: #64748B !important;
+    color: #475569 !important;
     letter-spacing: 0.04em !important;
     text-transform: uppercase !important;
 }
 .epm-inshorts-reasoning-text {
     font-family: var(--font-sans) !important;
-    font-size: 13.5px !important;
-    line-height: 1.55 !important;
-    color: #CBD5E1 !important;
+    font-size: 13px !important;
+    line-height: 1.5 !important;
+    color: #1E293B !important;
 }
 .epm-inshorts-metrics-grid {
     display: grid !important;
@@ -2594,46 +2785,39 @@ tbody tr:hover td {
     flex-direction: column !important;
     align-items: center !important;
     justify-content: center !important;
-    background: #181F2C !important;
-    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    background: #FFFFFF !important;
+    border: 1px solid #E2E8F0 !important;
     border-radius: 6px !important;
-    padding: 8px 4px !important;
+    padding: 6px 4px !important;
     text-align: center !important;
 }
 .epm-metric-card.highlight {
-    background: rgba(16, 185, 129, 0.12) !important;
-    border-color: rgba(16, 185, 129, 0.3) !important;
+    background: #ECFDF5 !important;
+    border-color: #A7F3D0 !important;
 }
 .epm-metric-card .m-label {
-    font-size: 9px !important;
+    font-size: 8.5px !important;
     font-weight: 700 !important;
     color: #64748B !important;
     text-transform: uppercase !important;
-    letter-spacing: 0.03em !important;
 }
 .epm-metric-card .m-val {
     font-family: var(--font-mono) !important;
-    font-size: 12px !important;
+    font-size: 11.5px !important;
     font-weight: 700 !important;
-    color: #F1F5F9 !important;
-    margin-top: 2px !important;
+    color: #0F172A !important;
+    margin-top: 1px !important;
 }
 .epm-metric-card.highlight .m-val {
-    color: #10B981 !important;
-}
-.epm-inshorts-footer-note {
-    font-size: 10px !important;
-    color: #64748B !important;
-    text-align: center !important;
-    padding: 8px 0 !important;
+    color: #059669 !important;
 }
 .epm-inshorts-bottom-bar {
     display: flex !important;
     align-items: center !important;
     gap: 8px !important;
-    padding: 10px 16px !important;
-    background: #151B27 !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+    padding: 8px 14px !important;
+    background: #F8FAFC !important;
+    border-top: 1px solid #E2E8F0 !important;
     flex-shrink: 0 !important;
 }
 .epm-inshorts-primary-action {
@@ -2642,215 +2826,122 @@ tbody tr:hover td {
     flex-direction: column !important;
     align-items: center !important;
     justify-content: center !important;
-    padding: 8px 12px !important;
+    padding: 7px 12px !important;
     background: #0052FF !important;
     color: #FFFFFF !important;
-    border-radius: 8px !important;
+    border-radius: 6px !important;
     text-decoration: none !important;
     cursor: pointer !important;
-    transition: all 0.15s ease !important;
 }
 .epm-inshorts-primary-action:hover {
     background: #1A66FF !important;
 }
 .epm-inshorts-primary-action .action-txt {
-    font-size: 12.5px !important;
+    font-size: 12px !important;
     font-weight: 700 !important;
 }
-.epm-inshorts-primary-action .action-sub {
-    font-size: 9.5px !important;
-    opacity: 0.85 !important;
-}
 .epm-inshorts-dismiss-btn {
-    height: 38px !important;
-    padding: 0 14px !important;
-    background: #181F2C !important;
-    border: 1px solid rgba(255, 255, 255, 0.12) !important;
-    color: #CBD5E1 !important;
-    border-radius: 8px !important;
+    height: 34px !important;
+    padding: 0 12px !important;
+    background: #FFFFFF !important;
+    border: 1px solid #CBD5E1 !important;
+    color: #475569 !important;
+    border-radius: 6px !important;
     cursor: pointer !important;
-    font-size: 12px !important;
+    font-size: 11.5px !important;
     font-weight: 600 !important;
 }
-.epm-inshorts-dismiss-btn:hover {
-    border-color: #0052FF !important;
-    color: #FFFFFF !important;
-}
 
-/* Desktop: Mobile drawers, triggers, bottom bar hidden */
-@media (min-width: 768px) {
-    .epm-mobile-drawer,
-    .epm-drawer-backdrop,
-    .epm-inshorts-drawer,
-    .epm-inshorts-backdrop,
-    .epm-mobile-menu-trigger,
-    .epm-mobile-bottom-nav {
-        display: none !important;
-    }
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   13. MOBILE-FIRST RESPONSIVE ARCHITECTURE (< 768px Viewports)
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* 12. Mobile Responsive Architecture (< 768px Viewports) */
 @media (max-width: 767px) {
     body {
-        padding-bottom: 66px !important; /* Space for Sticky Bottom Nav */
-    }
-
-    /* 1. Header & MENU trigger */
-    .epm-top-navbar {
-        padding: 6px 10px !important;
-        margin-bottom: 4px !important;
-    }
-    .epm-nav-row-1 {
-        flex-direction: row !important;
-        align-items: center !important;
-        justify-content: space-between !important;
+        padding-bottom: 60px !important;
     }
     .epm-nav-telemetry {
         display: none !important;
     }
     .epm-mobile-menu-trigger {
         display: flex !important;
-        background: #181F2C !important;
-        border: 1px solid var(--border-color) !important;
-        color: #F1F5F9 !important;
+        background: #0052FF !important;
+        border: none !important;
+        color: #FFFFFF !important;
+        border-radius: 5px !important;
+        padding: 4px 8px !important;
+        align-items: center !important;
+        gap: 4px !important;
+        cursor: pointer !important;
     }
-    .epm-hamburger-line {
-        background: #F1F5F9 !important;
+    .epm-mobile-menu-trigger .epm-hamburger-line {
+        background: #FFFFFF !important;
     }
-    .epm-menu-text {
-        color: #F1F5F9 !important;
+    .epm-mobile-menu-trigger .epm-menu-text {
+        color: #FFFFFF !important;
+        font-size: 11px !important;
+        font-weight: 700 !important;
     }
     .epm-nav-row-2 {
         display: none !important;
     }
-
-    /* 2. Smooth Auto-Scrolling Marquee Ticker Pinned Beneath Header */
     #epm-telemetry-ticker {
         display: flex !important;
         width: 100% !important;
-        background: #0B0E14 !important;
-        border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+        background: #F8FAFC !important;
+        border-top: 1px solid #E2E8F0 !important;
+        border-bottom: 1px solid #E2E8F0 !important;
         padding: 4px 6px !important;
         overflow-x: auto !important;
         scrollbar-width: none !important;
         gap: 12px !important;
     }
 
-    /* 3. News Streams: High-Density Card List (Never Raw Crushed Tables) */
-    #top_news_table thead,
-    #bottom_news_table thead {
+    /* Mobile News Streams: High-Density Card List */
+    #top_news_table thead, #bottom_news_table thead {
         display: none !important;
     }
-
     #top_news_table, #bottom_news_table {
         background: transparent !important;
         border: none !important;
-        width: 100% !important;
-        max-width: 100% !important;
     }
-
     #top_news_table table, #bottom_news_table table {
-        width: 100% !important;
-        min-width: 100% !important;
         display: block !important;
         border: none !important;
+        width: 100% !important;
     }
-
     #top_news_table tbody, #bottom_news_table tbody {
         display: flex !important;
         flex-direction: column !important;
         gap: 8px !important;
-        width: 100% !important;
     }
-
     #top_news_table tbody tr, #bottom_news_table tbody tr {
         display: flex !important;
         flex-direction: column !important;
-        background: #121721 !important;
-        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        background: #FFFFFF !important;
+        border: 1px solid #E2E8F0 !important;
         border-radius: 8px !important;
-        padding: 12px 14px !important;
-        gap: 6px !important;
-        width: 100% !important;
-        cursor: pointer !important;
-        transition: transform 0.15s ease, border-color 0.15s ease !important;
+        padding: 10px 12px !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
     }
-
-    #top_news_table tbody tr:active, #bottom_news_table tbody tr:active {
-        transform: scale(0.99) !important;
-        border-color: #0052FF !important;
-    }
-
     #top_news_table tbody td, #bottom_news_table tbody td {
-        display: block !important;
-        width: 100% !important;
-        padding: 0 !important;
-        border: none !important;
         background: transparent !important;
+        border: none !important;
+        padding: 2px 0 !important;
     }
 
-    /* Top row meta strip (Score, Sentiment, Impact, Time, Source) */
-    #top_news_table tbody td:nth-child(1),
-    #top_news_table tbody td:nth-child(2),
-    #top_news_table tbody td:nth-child(3),
-    #top_news_table tbody td:nth-child(7),
-    #top_news_table tbody td:nth-child(9),
-    #bottom_news_table tbody td:nth-child(1),
-    #bottom_news_table tbody td:nth-child(2),
-    #bottom_news_table tbody td:nth-child(5) {
-        display: inline-flex !important;
-        width: auto !important;
-        order: 1 !important;
-        margin-right: 6px !important;
-    }
-
-    /* Middle bold headline */
-    #top_news_table tbody td:nth-child(4),
-    #bottom_news_table tbody td:nth-child(3) {
-        font-size: 14px !important;
-        font-weight: 700 !important;
-        line-height: 1.4 !important;
-        color: #F1F5F9 !important;
-        order: 2 !important;
-        margin: 4px 0 !important;
-    }
-
-    /* Bottom row: AI Reasoning & Sectors */
-    #top_news_table tbody td:nth-child(6) {
-        order: 3 !important;
-        font-size: 12px !important;
-        color: #94A3B8 !important;
-        line-height: 1.45 !important;
-    }
-    #top_news_table tbody td:nth-child(5),
-    #top_news_table tbody td:nth-child(8) {
-        display: inline-flex !important;
-        width: auto !important;
-        order: 4 !important;
-        margin-right: 6px !important;
-    }
-
-    /* 4. Thumb-Accessible Sticky Bottom Navigation Bar */
+    /* Sticky Bottom Nav on Mobile */
     .epm-mobile-bottom-nav {
+        display: flex !important;
         position: fixed !important;
         bottom: 0 !important;
         left: 0 !important;
         right: 0 !important;
-        height: 56px !important;
-        background: rgba(15, 19, 28, 0.96) !important;
-        backdrop-filter: blur(16px) !important;
-        -webkit-backdrop-filter: blur(16px) !important;
-        border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
-        display: flex !important;
+        height: 52px !important;
+        background: #FFFFFF !important;
+        border-top: 1px solid #E2E8F0 !important;
+        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05) !important;
         align-items: center !important;
         justify-content: space-around !important;
         z-index: 1030 !important;
-        padding-bottom: env(safe-area-inset-bottom, 0px) !important;
     }
-
     .epm-mobile-bottom-btn {
         display: flex !important;
         flex-direction: column !important;
@@ -2858,34 +2949,22 @@ tbody tr:hover td {
         justify-content: center !important;
         background: transparent !important;
         border: none !important;
-        color: #94A3B8 !important;
-        padding: 6px 12px !important;
+        color: #64748B !important;
+        padding: 4px 10px !important;
         font-family: var(--font-sans) !important;
         cursor: pointer !important;
-        gap: 2px !important;
-        transition: color 0.15s ease !important;
-    }
-    .epm-mobile-bottom-btn .m-icon {
-        font-size: 16px !important;
-    }
-    .epm-mobile-bottom-btn .m-label {
-        font-size: 10px !important;
-        font-weight: 600 !important;
-        letter-spacing: 0.02em !important;
     }
     .epm-mobile-bottom-btn.active {
         color: #0052FF !important;
     }
     .epm-mobile-bottom-btn.active .m-label {
-        color: #60A5FA !important;
         font-weight: 700 !important;
     }
-
-    /* 5. Mobile Filter Rows */
-    #cal_filters_row, #circ_filters_row {
-        flex-direction: column !important;
-        align-items: stretch !important;
-        gap: 4px !important;
+}
+@media (min-width: 768px) {
+    .epm-mobile-menu-trigger,
+    .epm-mobile-bottom-nav {
+        display: none !important;
     }
 }
 """
@@ -2895,7 +2974,6 @@ TOP_NAVBAR_HTML = """
 <div id="epm-top-navbar" class="epm-top-navbar">
     <!-- Row 1: Brand Identity, Live Telemetry & Macro Ticker Strip -->
     <div class="epm-nav-row-1">
-        <!-- Brand Cluster & Compact System Telemetry -->
         <div class="epm-nav-brand-cluster">
             <span class="epm-nav-bolt">⚡</span>
             <span class="epm-nav-title">EPM<span class="epm-title-highlight">PRO</span></span>
@@ -2904,7 +2982,6 @@ TOP_NAVBAR_HTML = """
                 <span class="epm-live-dot"></span>
                 <span>ONLINE</span>
             </div>
-            <!-- High-Density Inline System Telemetry -->
             <div class="epm-nav-telemetry">
                 <span class="epm-telem-pill" title="Cached Live News Catalysts">NEWS <b id="epm-hdr-news">88</b></span>
                 <span class="epm-telem-pill" title="5-Market Scheduled Events">CAL <b id="epm-hdr-cal">872</b></span>
@@ -2914,8 +2991,8 @@ TOP_NAVBAR_HTML = """
             </div>
         </div>
 
-        <!-- Mobile Menu Trigger Button (Visible strictly on mobile screens) -->
-        <button type="button" id="epm-mobile-menu-btn" class="epm-mobile-menu-trigger" onclick="window.epmToggleMobileMenu()" title="Open Navigation Menu">
+        <!-- Mobile Menu Trigger Button -->
+        <button type="button" id="epm-mobile-menu-btn" class="epm-mobile-menu-trigger" onclick="window.epmToggleSideMenu()" title="Open Navigation Menu">
             <span class="epm-hamburger-line"></span>
             <span class="epm-hamburger-line"></span>
             <span class="epm-hamburger-line"></span>
@@ -2968,9 +3045,8 @@ TOP_NAVBAR_HTML = """
         </div>
     </div>
 
-    <!-- Row 2: Unified Navigation Tabs (Left) + Command Bar & Controls (Right) -->
+    <!-- Row 2: Unified Navigation Tabs (Left) + Command Bar & Right-Side Menu (Right) -->
     <div class="epm-nav-row-2">
-        <!-- 5 Page Navigation Tabs -->
         <div class="epm-quick-tabs-container">
             <button type="button" class="epm-tab-pill active" onclick="window.epmSwitchTab(0, this)">
                 <span class="epm-tab-pill-bullet"></span>
@@ -2994,26 +3070,30 @@ TOP_NAVBAR_HTML = """
             </button>
         </div>
 
-        <!-- Quick Utilities & Actions -->
         <div class="epm-nav-controls">
             <!-- Bloomberg Command Launcher -->
             <button type="button" class="epm-cmd-launcher-btn" onclick="window.epmOpenPalette()" title="Press Cmd+K or / to open Command Palette">
                 <span class="epm-cmd-badge">⌘K /</span>
-                <span class="epm-cmd-label">Quick Jump & Tickers</span>
+                <span class="epm-cmd-label">Quick Jump</span>
             </button>
 
             <!-- Watchlist Highlighter Input -->
             <div class="epm-nav-search-wrap" title="Highlight table rows matching keywords/tickers">
                 <span class="epm-nav-search-icon">⌕</span>
                 <input id="epm-watchlist-input" type="text" placeholder="Highlight Ticker..." oninput="window.epmApplyWatchlist(this.value)">
-                <span id="epm-watchlist-count" class="epm-watchlist-badge" style="display:none;">0</span>
                 <button type="button" class="epm-watchlist-clear-btn" onclick="window.epmClearWatchlist()" title="Clear highlighter">✕</button>
             </div>
 
             <!-- Audio Alert Toggle -->
-            <button type="button" id="epm-audio-toggle-btn" class="epm-top-btn epm-btn-active" onclick="window.epmToggleAudio()" title="Toggle Web Audio Flash Chime (880Hz -> 1320Hz)">
+            <button type="button" id="epm-audio-toggle-btn" class="epm-top-btn epm-btn-active" onclick="window.epmToggleAudio()" title="Toggle Web Audio Flash Chime">
                 <span class="epm-btn-icon">⚡</span>
                 <span id="epm-audio-status-lbl">Audio ON</span>
+            </button>
+
+            <!-- Prominent Right-Side Menu Trigger Button -->
+            <button type="button" id="epm-desktop-menu-btn" class="epm-top-btn epm-menu-btn" onclick="window.epmToggleSideMenu()" title="Open Workspaces & Actions Menu">
+                <span class="epm-menu-icon">☰</span>
+                <span class="epm-menu-btn-text">Menu ▾</span>
             </button>
         </div>
     </div>
@@ -3045,6 +3125,11 @@ TOP_NAVBAR_HTML = """
                 <span class="epm-item-shortcut">Tab 3</span>
             </div>
             <div class="epm-palette-section-title">DOSSIER DISPATCH & EXPORTS</div>
+            <div class="epm-palette-item" onclick="window.epmPaletteAction('download_5pm');window.epmClosePalette()">
+                <span class="epm-item-icon">📄</span>
+                <div class="epm-item-text"><span class="epm-item-main">Download 5 PM Daily Outcomes PDF</span><span class="epm-item-sub">Rolling outcomes since previous 5 PM</span></div>
+                <span class="epm-item-shortcut">5PM</span>
+            </div>
             <div class="epm-palette-item" onclick="window.epmPaletteAction('download_weekly');window.epmClosePalette()">
                 <span class="epm-item-icon">📥</span>
                 <div class="epm-item-text"><span class="epm-item-main">Download Weekly Snapshot PDF</span><span class="epm-item-sub">Next Sunday to Saturday (A4 Landscape Print-Ready)</span></div>
@@ -3074,90 +3159,92 @@ TOP_NAVBAR_HTML = """
     </div>
 </div>
 
-<!-- Mobile Slide-Out Side Navigation Drawer -->
-<div id="epm-mobile-drawer-backdrop" class="epm-drawer-backdrop" onclick="window.epmCloseMobileMenu()"></div>
-<div id="epm-mobile-drawer" class="epm-mobile-drawer">
-    <div class="epm-drawer-header">
-        <div class="epm-drawer-brand">
+<!-- Universal Right-Side Flyout Menu Drawer (Desktop & Mobile) -->
+<div id="epm-side-menu-backdrop" class="epm-menu-backdrop epm-drawer-backdrop" onclick="window.epmCloseSideMenu()"></div>
+<div id="epm-side-menu-drawer" class="epm-side-drawer epm-mobile-drawer">
+    <div class="epm-side-drawer-header">
+        <div class="epm-side-drawer-brand">
             <span class="epm-nav-bolt">⚡</span>
-            <span class="epm-drawer-title">EPM<span class="epm-title-highlight">PRO</span></span>
-            <span class="epm-drawer-badge">v3.5 WIRE</span>
+            <span class="epm-side-drawer-title">EPM<span class="epm-title-highlight">PRO</span></span>
+            <span class="epm-side-drawer-badge">v3.5 WIRE</span>
         </div>
-        <button type="button" class="epm-drawer-close-btn" onclick="window.epmCloseMobileMenu()">✕</button>
+        <button type="button" class="epm-side-drawer-close" onclick="window.epmCloseSideMenu()" title="Close Menu">✕</button>
     </div>
 
-    <div class="epm-drawer-body">
-        <div class="epm-drawer-section-label">SELECT WORKSPACE VIEW</div>
-        <div class="epm-drawer-nav-list">
-            <button type="button" class="epm-drawer-nav-item active" data-tab="0" onclick="window.epmSwitchTab(0);window.epmCloseMobileMenu()">
-                <span class="epm-drawer-item-icon">📰</span>
-                <div class="epm-drawer-item-info">
-                    <span class="epm-drawer-item-name">Live Financial Wire</span>
-                    <span class="epm-drawer-item-desc">Breaking news catalysts & AI sentiment</span>
+    <div class="epm-side-drawer-body">
+        <div class="epm-side-section-label">WORKSPACES & SCREENS</div>
+        <div class="epm-side-nav-list">
+            <button type="button" class="epm-side-nav-item active" data-tab="0" onclick="window.epmSwitchTab(0);window.epmCloseSideMenu()">
+                <span class="epm-side-item-icon">📰</span>
+                <div class="epm-side-item-info">
+                    <span class="epm-side-item-name">Live Breaking Wire</span>
+                    <span class="epm-side-item-desc">Real-time multi-market intelligence feed</span>
                 </div>
-                <span class="epm-drawer-tag">Feed</span>
+                <span class="epm-side-item-tag">Tab 1</span>
             </button>
-            <button type="button" class="epm-drawer-nav-item" data-tab="1" onclick="window.epmSwitchTab(1);window.epmCloseMobileMenu()">
-                <span class="epm-drawer-item-icon">📅</span>
-                <div class="epm-drawer-item-info">
-                    <span class="epm-drawer-item-name">Market Calendar & Outcomes</span>
-                    <span class="epm-drawer-item-desc">15-column catalyst ledger & 5 PM results</span>
+            <button type="button" class="epm-side-nav-item" data-tab="1" onclick="window.epmSwitchTab(1);window.epmCloseSideMenu()">
+                <span class="epm-side-item-icon">📅</span>
+                <div class="epm-side-item-info">
+                    <span class="epm-side-item-name">Market Calendar & Outcomes</span>
+                    <span class="epm-side-item-desc">5-market event dossier & timers</span>
                 </div>
-                <span class="epm-drawer-tag">Ledger</span>
+                <span class="epm-side-item-tag">Tab 2</span>
             </button>
-            <button type="button" class="epm-drawer-nav-item" data-tab="2" onclick="window.epmSwitchTab(2);window.epmCloseMobileMenu()">
-                <span class="epm-drawer-item-icon">📜</span>
-                <div class="epm-drawer-item-info">
-                    <span class="epm-drawer-item-name">Regulatory Circulars & PDFs</span>
-                    <span class="epm-drawer-item-desc">NSE, BSE, MCX, RBI, FINMIN, FOMC</span>
+            <button type="button" class="epm-side-nav-item" data-tab="2" onclick="window.epmSwitchTab(2);window.epmCloseSideMenu()">
+                <span class="epm-side-item-icon">🏛️</span>
+                <div class="epm-side-item-info">
+                    <span class="epm-side-item-name">Regulatory Circulars</span>
+                    <span class="epm-side-item-desc">SEBI, RBI, NSE, BSE, MCX directives</span>
                 </div>
-                <span class="epm-drawer-tag">Directives</span>
+                <span class="epm-side-item-tag">Tab 3</span>
             </button>
-            <button type="button" class="epm-drawer-nav-item" data-tab="3" onclick="window.epmSwitchTab(3);window.epmCloseMobileMenu()">
-                <span class="epm-drawer-item-icon">⚙️</span>
-                <div class="epm-drawer-item-info">
-                    <span class="epm-drawer-item-name">Portal Settings & Integrations</span>
-                    <span class="epm-drawer-item-desc">Telegram channels & automated alerts</span>
+            <button type="button" class="epm-side-nav-item" data-tab="3" onclick="window.epmSwitchTab(3);window.epmCloseSideMenu()">
+                <span class="epm-side-item-icon">⚙️</span>
+                <div class="epm-side-item-info">
+                    <span class="epm-side-item-name">Settings & Dispatches Hub</span>
+                    <span class="epm-side-item-desc">Telegram bots & calendar configuration</span>
                 </div>
-                <span class="epm-drawer-tag">Admin</span>
+                <span class="epm-side-item-tag">Tab 4</span>
             </button>
-            <button type="button" class="epm-drawer-nav-item" data-tab="4" onclick="window.epmSwitchTab(4);window.epmCloseMobileMenu()">
-                <span class="epm-drawer-item-icon">❓</span>
-                <div class="epm-drawer-item-info">
-                    <span class="epm-drawer-item-name">User Guide & Shortcuts</span>
-                    <span class="epm-drawer-item-desc">Terminal manual & quick commands</span>
+            <button type="button" class="epm-side-nav-item" data-tab="4" onclick="window.epmSwitchTab(4);window.epmCloseSideMenu()">
+                <span class="epm-side-item-icon">📖</span>
+                <div class="epm-side-item-info">
+                    <span class="epm-side-item-name">Developer Docs & User Guide</span>
+                    <span class="epm-side-item-desc">Interactive API endpoints & cron schedule</span>
                 </div>
-                <span class="epm-drawer-tag">Docs</span>
+                <span class="epm-side-item-tag">Tab 5</span>
             </button>
         </div>
 
-        <div class="epm-drawer-section-label">INSTITUTIONAL TOOLS & EXPORTS</div>
-        <div class="epm-drawer-tools">
-            <button type="button" class="epm-drawer-tool-btn" onclick="window.epmCloseMobileMenu();window.epmOpenPalette()">
-                <span class="tool-left"><span class="tool-icon">⚡</span> ⌘K Quick Jump & Search</span>
-                <span class="tool-kbd">⌘K /</span>
+        <div class="epm-side-section-label">QUICK DOSSIER EXPORTS</div>
+        <div class="epm-side-tools-grid">
+            <button type="button" class="epm-side-tool-btn" onclick="window.epmPaletteAction('download_5pm');window.epmCloseSideMenu()">
+                <span>📄</span> 5 PM Daily Outcomes PDF
             </button>
-            <button type="button" class="epm-drawer-tool-btn" onclick="window.epmToggleAudio()">
-                <span class="tool-left"><span class="tool-icon">🔔</span> Audio Flash Chime</span>
-                <span id="epm-drawer-audio-state" class="tool-badge">ON</span>
+            <button type="button" class="epm-side-tool-btn" onclick="window.epmPaletteAction('download_weekly');window.epmCloseSideMenu()">
+                <span>📥</span> Weekly Snapshot PDF
             </button>
-            <a href="/api/calendar/pdf/daily-outcomes" download class="epm-drawer-tool-btn" onclick="window.epmCloseMobileMenu()">
-                <span class="tool-left"><span class="tool-icon">📥</span> 5 PM Daily Outcomes PDF</span>
-                <span class="tool-badge emerald">A4 PDF</span>
-            </a>
-            <a href="/api/calendar/pdf/weekly" download class="epm-drawer-tool-btn" onclick="window.epmCloseMobileMenu()">
-                <span class="tool-left"><span class="tool-icon">📥</span> Weekly Snapshot PDF</span>
-                <span class="tool-badge">A4 PDF</span>
-            </a>
-            <a href="/api/calendar/pdf/monthly" download class="epm-drawer-tool-btn" onclick="window.epmCloseMobileMenu()">
-                <span class="tool-left"><span class="tool-icon">📥</span> Monthly Outlook PDF</span>
-                <span class="tool-badge">A4 PDF</span>
-            </a>
+            <button type="button" class="epm-side-tool-btn" onclick="window.epmPaletteAction('download_monthly');window.epmCloseSideMenu()">
+                <span>📥</span> Monthly Outlook PDF
+            </button>
         </div>
 
-        <div class="epm-drawer-footer">
-            <span>Global News Feed Room is Powered by EPMC Pvt. Ltd.</span>
+        <div class="epm-side-section-label">ACTIONS & UTILITIES</div>
+        <div class="epm-side-tools-grid">
+            <button type="button" class="epm-side-tool-btn" onclick="window.epmPaletteAction('refresh_all');window.epmCloseSideMenu()">
+                <span>🔄</span> Force Refresh All Feeds
+            </button>
+            <button type="button" class="epm-side-tool-btn" onclick="window.epmToggleAudio()">
+                <span>🔔</span> Toggle Audio Alert Chime
+            </button>
+            <button type="button" class="epm-side-tool-btn" onclick="window.epmOpenPalette();window.epmCloseSideMenu()">
+                <span>⚡</span> Command Palette (⌘K)
+            </button>
         </div>
+    </div>
+
+    <div class="epm-side-drawer-footer">
+        <span>Global News Feed Room is Powered by EPMC Pvt. Ltd.</span>
     </div>
 </div>
 
@@ -3237,6 +3324,7 @@ TOP_NAVBAR_HTML = """
         <button type="button" class="epm-inshorts-dismiss-btn" onclick="window.epmCloseInshortsDrawer()">✕ Close</button>
     </div>
 </div>
+
 <!-- Mobile Sticky Bottom Navigation Bar (Thumb-Accessible, Fixed to Bottom on Mobile) -->
 <div id="epm-mobile-bottom-nav" class="epm-mobile-bottom-nav">
     <button type="button" class="epm-mobile-bottom-btn active" data-tab="0" onclick="window.epmSwitchTab(0)">
@@ -3260,7 +3348,6 @@ TOP_NAVBAR_HTML = """
         <span class="m-label">Docs</span>
     </button>
 </div>
-
 """
 
 
@@ -3899,7 +3986,17 @@ TERMINAL_CLIENT_JS = r"""
     };
 
     window.epmPaletteAction = function(action) {
-        if (action === 'download_weekly') {
+        if (action === 'download_5pm') {
+            const btns = document.querySelectorAll('button');
+            for (let b of btns) {
+                if (b.innerText.includes('5 PM PDF') || b.innerText.includes('5 PM Outcomes')) { b.click(); break; }
+            }
+        } else if (action === 'push_5pm') {
+            const btns = document.querySelectorAll('button');
+            for (let b of btns) {
+                if (b.innerText.includes('Push 5 PM')) { b.click(); break; }
+            }
+        } else if (action === 'download_weekly') {
             const btns = document.querySelectorAll('button');
             for (let b of btns) {
                 if (b.innerText.includes('Weekly PDF')) { b.click(); break; }
@@ -3919,35 +4016,42 @@ TERMINAL_CLIENT_JS = r"""
             for (let b of btns) {
                 if (b.innerText.includes('Push Monthly')) { b.click(); break; }
             }
+        } else if (action === 'refresh_all') {
+            const btn = document.getElementById('tab1_refresh_btn') || document.querySelector('button[id*="refresh"]');
+            if (btn) btn.click();
         }
     };
 
-    // 13. Mobile Navigation Menu Side Drawer Controller
-    window.epmToggleMobileMenu = function() {
-        const drawer = document.getElementById('epm-mobile-drawer');
+    // 13. Universal Right-Side Menu Flyout Controller (Desktop & Mobile)
+    window.epmToggleSideMenu = function() {
+        const drawer = document.getElementById('epm-side-menu-drawer') || document.getElementById('epm-mobile-drawer');
         if (!drawer) return;
         if (drawer.classList.contains('is-open')) {
-            window.epmCloseMobileMenu();
+            window.epmCloseSideMenu();
         } else {
-            window.epmOpenMobileMenu();
+            window.epmOpenSideMenu();
         }
     };
 
-    window.epmOpenMobileMenu = function() {
-        const drawer = document.getElementById('epm-mobile-drawer');
-        const backdrop = document.getElementById('epm-mobile-drawer-backdrop');
+    window.epmOpenSideMenu = function() {
+        const drawer = document.getElementById('epm-side-menu-drawer') || document.getElementById('epm-mobile-drawer');
+        const backdrop = document.getElementById('epm-side-menu-backdrop') || document.getElementById('epm-mobile-drawer-backdrop');
         if (drawer) drawer.classList.add('is-open');
         if (backdrop) backdrop.classList.add('is-open');
         document.body.classList.add('epm-drawer-locked');
     };
 
-    window.epmCloseMobileMenu = function() {
-        const drawer = document.getElementById('epm-mobile-drawer');
-        const backdrop = document.getElementById('epm-mobile-drawer-backdrop');
+    window.epmCloseSideMenu = function() {
+        const drawer = document.getElementById('epm-side-menu-drawer') || document.getElementById('epm-mobile-drawer');
+        const backdrop = document.getElementById('epm-side-menu-backdrop') || document.getElementById('epm-mobile-drawer-backdrop');
         if (drawer) drawer.classList.remove('is-open');
         if (backdrop) backdrop.classList.remove('is-open');
         document.body.classList.remove('epm-drawer-locked');
     };
+
+    window.epmToggleMobileMenu = window.epmToggleSideMenu;
+    window.epmOpenMobileMenu = window.epmOpenSideMenu;
+    window.epmCloseMobileMenu = window.epmCloseSideMenu;
 
     // 14. Inshorts-Style Mobile Page View Drawer (Bottom Sheet) Controller
     window.epmOpenInshortsDrawer = function(data) {
