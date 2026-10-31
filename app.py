@@ -4278,6 +4278,599 @@ tbody tr.epm-highlight-row td:first-child {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   MOBILE SIDE DRAWER & INSHORTS PAGE VIEW DRAWER STYLING
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Mobile Hamburger Menu Button */
+.epm-mobile-menu-trigger {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+    padding: 0 10px;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+}
+
+.epm-mobile-menu-trigger:hover,
+.epm-mobile-menu-trigger:active {
+    background: #f1f5f9;
+    border-color: #94a3b8;
+}
+
+.epm-hamburger-line {
+    display: block;
+    width: 14px;
+    height: 2px;
+    background-color: #0f172a;
+    border-radius: 1px;
+    margin: 2px 0;
+}
+
+.epm-menu-text {
+    font-family: var(--font-sans);
+    font-size: 11px;
+    font-weight: 700;
+    color: #0f172a;
+    letter-spacing: 0.04em;
+}
+
+/* Mobile Slide-Out Side Navigation Drawer */
+.epm-drawer-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.5);
+    backdrop-filter: blur(4px);
+    z-index: 1040;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+}
+
+.epm-drawer-backdrop.is-open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.epm-mobile-drawer {
+    position: fixed;
+    top: 0;
+    right: -320px;
+    width: 300px;
+    max-width: 86vw;
+    height: 100vh;
+    background: #ffffff;
+    z-index: 1050;
+    box-shadow: -8px 0 24px rgba(15, 23, 42, 0.15);
+    transition: right 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.epm-mobile-drawer.is-open {
+    right: 0;
+}
+
+.epm-drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    background: #f8fafc;
+}
+
+.epm-drawer-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.epm-drawer-title {
+    font-family: var(--font-sans);
+    font-size: 15px;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: -0.01em;
+}
+
+.epm-drawer-badge {
+    font-size: 9px;
+    font-weight: 700;
+    background: #eff6ff;
+    color: #2563eb;
+    border: 1px solid #bfdbfe;
+    padding: 1px 5px;
+    border-radius: 4px;
+}
+
+.epm-drawer-close-btn {
+    width: 28px;
+    height: 28px;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    border-radius: 6px;
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.epm-drawer-body {
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex: 1;
+}
+
+.epm-drawer-section-label {
+    font-family: var(--font-sans);
+    font-size: 10px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 4px;
+}
+
+.epm-drawer-nav-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.epm-drawer-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s ease;
+    width: 100%;
+}
+
+.epm-drawer-nav-item:hover,
+.epm-drawer-nav-item.active {
+    background: #eff6ff;
+    border-color: #2563eb;
+}
+
+.epm-drawer-item-icon {
+    font-size: 18px;
+}
+
+.epm-drawer-item-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.epm-drawer-item-name {
+    font-family: var(--font-sans);
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.epm-drawer-item-desc {
+    font-family: var(--font-sans);
+    font-size: 10.5px;
+    color: #64748b;
+}
+
+.epm-drawer-tag {
+    font-size: 9.5px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: #e2e8f0;
+    color: #475569;
+}
+
+.epm-drawer-nav-item.active .epm-drawer-tag {
+    background: #2563eb;
+    color: #ffffff;
+}
+
+.epm-drawer-tools {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.epm-drawer-tool-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-family: var(--font-sans);
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #0f172a;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.15s ease;
+}
+
+.epm-drawer-tool-btn:hover {
+    background: #f1f5f9;
+    border-color: #94a3b8;
+}
+
+.epm-drawer-tool-btn .tool-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.epm-drawer-tool-btn .tool-kbd {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    background: #eff6ff;
+    color: #2563eb;
+    border: 1px solid #bfdbfe;
+    padding: 1px 5px;
+    border-radius: 3px;
+}
+
+.epm-drawer-tool-btn .tool-badge {
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: #eff6ff;
+    color: #2563eb;
+    border: 1px solid #bfdbfe;
+}
+
+.epm-drawer-tool-btn .tool-badge.emerald {
+    background: #ecfdf5;
+    color: #059669;
+    border-color: #a7f3d0;
+}
+
+.epm-drawer-footer {
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px solid #f1f5f9;
+    font-size: 9.5px;
+    color: #94a3b8;
+    text-align: center;
+}
+
+/* Inshorts Full-Page / Bottom-Sheet Drawer */
+.epm-inshorts-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(5px);
+    z-index: 1060;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+}
+
+.epm-inshorts-backdrop.is-open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.epm-inshorts-drawer {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: -110vh;
+    max-height: 94vh;
+    height: 90vh;
+    background: #ffffff;
+    border-radius: 18px 18px 0 0;
+    box-shadow: 0 -12px 36px rgba(15, 23, 42, 0.25);
+    z-index: 1070;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: bottom 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.epm-inshorts-drawer.is-open {
+    bottom: 0;
+}
+
+.epm-inshorts-handle-bar {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    padding: 8px 0 4px 0;
+    cursor: grab;
+    flex-shrink: 0;
+}
+
+.epm-inshorts-handle {
+    width: 36px;
+    height: 4px;
+    background: #cbd5e1;
+    border-radius: 2px;
+}
+
+.epm-inshorts-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 16px 10px 16px;
+    border-bottom: 1px solid #f1f5f9;
+    flex-shrink: 0;
+}
+
+.epm-inshorts-meta-strip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.epm-inshorts-source {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #0284c7;
+    background: #f0f9ff;
+    border: 1px solid #bae6fd;
+    padding: 2px 7px;
+    border-radius: 4px;
+}
+
+.epm-inshorts-time {
+    font-size: 10px;
+    color: #64748b;
+    font-family: var(--font-sans);
+    font-variant-numeric: tabular-nums;
+}
+
+.epm-inshorts-sentiment {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: #f1f5f9;
+}
+
+.epm-inshorts-sentiment.bullish {
+    background: #ecfdf5;
+    color: #059669;
+}
+
+.epm-inshorts-sentiment.bearish {
+    background: #fef2f2;
+    color: #dc2626;
+}
+
+.epm-inshorts-score {
+    font-size: 10px;
+    font-weight: 700;
+    background: #fef3c7;
+    color: #b45309;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.epm-inshorts-close {
+    width: 28px;
+    height: 28px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: #64748b;
+    cursor: pointer;
+}
+
+.epm-inshorts-body-scroll {
+    padding: 16px 18px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.epm-inshorts-hero-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.epm-inshorts-impact-pill {
+    font-size: 10.5px;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+    letter-spacing: 0.02em;
+}
+
+.epm-inshorts-sectors {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.epm-inshorts-tag {
+    font-size: 10px;
+    font-weight: 600;
+    background: #f1f5f9;
+    color: #334155;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.epm-inshorts-title {
+    font-family: var(--font-sans);
+    font-size: 18px;
+    font-weight: 800;
+    line-height: 1.35;
+    color: #0f172a;
+    letter-spacing: -0.02em;
+    margin: 0;
+}
+
+.epm-inshorts-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 12px 14px;
+}
+
+.epm-inshorts-section-heading {
+    font-size: 10.5px;
+    font-weight: 800;
+    color: #475569;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.epm-inshorts-reasoning-text {
+    font-family: var(--font-sans);
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: #1e293b;
+}
+
+.epm-inshorts-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+
+.epm-metric-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 8px 4px;
+    text-align: center;
+}
+
+.epm-metric-card.highlight {
+    background: #f0fdf4;
+    border-color: #86efac;
+}
+
+.epm-metric-card .m-label {
+    font-size: 9px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.epm-metric-card .m-val {
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-top: 2px;
+}
+
+.epm-metric-card.highlight .m-val {
+    color: #166534;
+}
+
+.epm-inshorts-footer-note {
+    font-size: 10px;
+    color: #94a3b8;
+    text-align: center;
+    padding: 8px 0;
+}
+
+/* Inshorts Fixed Bottom Bar */
+.epm-inshorts-bottom-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: #ffffff;
+    border-top: 1px solid #e2e8f0;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.03);
+    flex-shrink: 0;
+}
+
+.epm-inshorts-primary-action {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 12px;
+    background: linear-gradient(135deg, #1d4ed8, #2563eb);
+    color: #ffffff;
+    border-radius: 8px;
+    text-decoration: none;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+    transition: all 0.15s ease;
+}
+
+.epm-inshorts-primary-action .action-txt {
+    font-size: 12.5px;
+    font-weight: 700;
+}
+
+.epm-inshorts-primary-action .action-sub {
+    font-size: 9.5px;
+    opacity: 0.85;
+}
+
+.epm-inshorts-dismiss-btn {
+    height: 38px;
+    padding: 0 12px;
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #334155;
+    cursor: pointer;
+}
+
+/* Body lock when drawer is open */
+body.epm-drawer-locked {
+    overflow: hidden !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    MOBILE & TABLET RESPONSIVE SYSTEM (Dual-Axis Touch Scroller & Layout Adapt)
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -4337,97 +4930,69 @@ tbody tr.epm-highlight-row td:first-child {
         max-width: 100vw !important;
     }
 
-    /* 2. Top Navigation Bar Stacking */
+    /* 2. Top Navigation Bar on Mobile (Header + MENU Button only, clean news dashboard) */
     .epm-top-navbar {
         height: auto !important;
         min-height: auto !important;
-        padding: 4px 6px !important;
-        gap: 4px !important;
+        padding: 6px 10px !important;
+        margin-bottom: 6px !important;
+        gap: 0 !important;
     }
 
     .epm-nav-row-1 {
-        flex-direction: column !important;
-        align-items: stretch !important;
-        height: auto !important;
-        gap: 4px !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        height: 36px !important;
+        gap: 8px !important;
+        padding: 0 !important;
     }
 
     .epm-nav-brand-cluster {
-        width: 100% !important;
-        justify-content: space-between !important;
-        flex-wrap: nowrap !important;
-        overflow-x: auto !important;
-        -webkit-overflow-scrolling: touch !important;
-        scrollbar-width: none !important;
+        width: auto !important;
+        flex: 1 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        gap: 6px !important;
+        overflow: hidden !important;
     }
 
-    .epm-nav-brand-cluster::-webkit-scrollbar {
+    .epm-nav-brand-cluster .epm-nav-telemetry {
         display: none !important;
     }
 
-    #epm-telemetry-ticker {
-        width: 100% !important;
-        overflow-x: auto !important;
-        -webkit-overflow-scrolling: touch !important;
-        scrollbar-width: none !important;
-        gap: 6px !important;
-        padding: 2px 0 !important;
-        border-top: 1px solid #f1f5f9 !important;
+    .epm-mobile-menu-trigger {
+        display: flex !important;
+        flex-shrink: 0 !important;
     }
 
-    #epm-telemetry-ticker::-webkit-scrollbar {
+    #epm-telemetry-ticker {
         display: none !important;
     }
 
     .epm-nav-row-2 {
-        flex-direction: column !important;
-        align-items: stretch !important;
-        height: auto !important;
-        gap: 4px !important;
-    }
-
-    .epm-quick-tabs-container {
-        width: 100% !important;
-        overflow-x: auto !important;
-        -webkit-overflow-scrolling: touch !important;
-        scrollbar-width: none !important;
-        padding-bottom: 2px !important;
-        justify-content: flex-start !important;
-    }
-
-    .epm-quick-tabs-container::-webkit-scrollbar {
         display: none !important;
     }
 
-    .epm-quick-tab-btn {
-        flex-shrink: 0 !important;
-        height: 28px !important;
-        min-height: 28px !important;
-        padding: 0 10px !important;
-        font-size: 11px !important;
+    /* Interactive Touch Card & Row Feedback (Mobile List to Inshorts Drawer) */
+    #top_news_table tbody tr,
+    #bottom_news_table tbody tr,
+    #circ_table tbody tr,
+    #calendar_table tbody tr,
+    .epm-dossier-row,
+    .epm-card.epm-news-card {
+        cursor: pointer !important;
+        -webkit-tap-highlight-color: rgba(37, 99, 235, 0.15) !important;
+        transition: background-color 0.15s ease, transform 0.15s ease !important;
     }
 
-    .epm-nav-controls {
-        width: 100% !important;
-        justify-content: space-between !important;
-        gap: 4px !important;
-    }
-
-    .epm-cmd-launcher-btn {
-        flex: 1 1 auto !important;
-        justify-content: center !important;
-        height: 26px !important;
-    }
-
-    .epm-watchlist-wrap {
-        flex: 1.5 1 auto !important;
-        min-width: 120px !important;
-        height: 26px !important;
-    }
-
-    .epm-audio-btn {
-        flex: 0 0 auto !important;
-        height: 26px !important;
+    #top_news_table tbody tr:active,
+    #bottom_news_table tbody tr:active,
+    #circ_table tbody tr:active,
+    #calendar_table tbody tr:active,
+    .epm-dossier-row:active {
+        background-color: #eff6ff !important;
     }
 
     /* 3. Dual-Axis Table Scrollers with Sticky Headers & Sticky Index Column */
@@ -4719,6 +5284,14 @@ TOP_NAVBAR_HTML = """
             </div>
         </div>
 
+        <!-- Mobile Menu Trigger Button (Visible strictly on mobile screens) -->
+        <button type="button" id="epm-mobile-menu-btn" class="epm-mobile-menu-trigger" onclick="window.epmToggleMobileMenu()" title="Open Navigation Menu">
+            <span class="epm-hamburger-line"></span>
+            <span class="epm-hamburger-line"></span>
+            <span class="epm-hamburger-line"></span>
+            <span class="epm-menu-text">MENU</span>
+        </button>
+
         <!-- Live Macro Ticker Ribbon -->
         <div class="epm-telemetry-strip" id="epm-telemetry-ticker">
             <div class="epm-ticker-item" title="Nifty 50 Index (NSE)">
@@ -4870,6 +5443,170 @@ TOP_NAVBAR_HTML = """
         </div>
     </div>
 </div>
+
+<!-- Mobile Slide-Out Side Navigation Drawer -->
+<div id="epm-mobile-drawer-backdrop" class="epm-drawer-backdrop" onclick="window.epmCloseMobileMenu()"></div>
+<div id="epm-mobile-drawer" class="epm-mobile-drawer">
+    <div class="epm-drawer-header">
+        <div class="epm-drawer-brand">
+            <span class="epm-nav-bolt">⚡</span>
+            <span class="epm-drawer-title">EPM<span class="epm-title-highlight">PRO</span></span>
+            <span class="epm-drawer-badge">v3.5 WIRE</span>
+        </div>
+        <button type="button" class="epm-drawer-close-btn" onclick="window.epmCloseMobileMenu()">✕</button>
+    </div>
+
+    <div class="epm-drawer-body">
+        <div class="epm-drawer-section-label">SELECT WORKSPACE VIEW</div>
+        <div class="epm-drawer-nav-list">
+            <button type="button" class="epm-drawer-nav-item active" data-tab="0" onclick="window.epmSwitchTab(0);window.epmCloseMobileMenu()">
+                <span class="epm-drawer-item-icon">📰</span>
+                <div class="epm-drawer-item-info">
+                    <span class="epm-drawer-item-name">Live Financial Wire</span>
+                    <span class="epm-drawer-item-desc">Breaking news catalysts & AI sentiment</span>
+                </div>
+                <span class="epm-drawer-tag">Feed</span>
+            </button>
+            <button type="button" class="epm-drawer-nav-item" data-tab="1" onclick="window.epmSwitchTab(1);window.epmCloseMobileMenu()">
+                <span class="epm-drawer-item-icon">📅</span>
+                <div class="epm-drawer-item-info">
+                    <span class="epm-drawer-item-name">Market Calendar & Outcomes</span>
+                    <span class="epm-drawer-item-desc">15-column catalyst ledger & 5 PM results</span>
+                </div>
+                <span class="epm-drawer-tag">Ledger</span>
+            </button>
+            <button type="button" class="epm-drawer-nav-item" data-tab="2" onclick="window.epmSwitchTab(2);window.epmCloseMobileMenu()">
+                <span class="epm-drawer-item-icon">📜</span>
+                <div class="epm-drawer-item-info">
+                    <span class="epm-drawer-item-name">Regulatory Circulars & PDFs</span>
+                    <span class="epm-drawer-item-desc">NSE, BSE, MCX, RBI, FINMIN, FOMC</span>
+                </div>
+                <span class="epm-drawer-tag">Directives</span>
+            </button>
+            <button type="button" class="epm-drawer-nav-item" data-tab="3" onclick="window.epmSwitchTab(3);window.epmCloseMobileMenu()">
+                <span class="epm-drawer-item-icon">⚙️</span>
+                <div class="epm-drawer-item-info">
+                    <span class="epm-drawer-item-name">Portal Settings & Integrations</span>
+                    <span class="epm-drawer-item-desc">Telegram channels & automated alerts</span>
+                </div>
+                <span class="epm-drawer-tag">Admin</span>
+            </button>
+            <button type="button" class="epm-drawer-nav-item" data-tab="4" onclick="window.epmSwitchTab(4);window.epmCloseMobileMenu()">
+                <span class="epm-drawer-item-icon">❓</span>
+                <div class="epm-drawer-item-info">
+                    <span class="epm-drawer-item-name">User Guide & Shortcuts</span>
+                    <span class="epm-drawer-item-desc">Terminal manual & quick commands</span>
+                </div>
+                <span class="epm-drawer-tag">Docs</span>
+            </button>
+        </div>
+
+        <div class="epm-drawer-section-label">INSTITUTIONAL TOOLS & EXPORTS</div>
+        <div class="epm-drawer-tools">
+            <button type="button" class="epm-drawer-tool-btn" onclick="window.epmCloseMobileMenu();window.epmOpenPalette()">
+                <span class="tool-left"><span class="tool-icon">⚡</span> ⌘K Quick Jump & Search</span>
+                <span class="tool-kbd">⌘K /</span>
+            </button>
+            <button type="button" class="epm-drawer-tool-btn" onclick="window.epmToggleAudio()">
+                <span class="tool-left"><span class="tool-icon">🔔</span> Audio Flash Chime</span>
+                <span id="epm-drawer-audio-state" class="tool-badge">ON</span>
+            </button>
+            <a href="/api/calendar/pdf/daily-outcomes" download class="epm-drawer-tool-btn" onclick="window.epmCloseMobileMenu()">
+                <span class="tool-left"><span class="tool-icon">📥</span> 5 PM Daily Outcomes PDF</span>
+                <span class="tool-badge emerald">A4 PDF</span>
+            </a>
+            <a href="/api/calendar/pdf/weekly" download class="epm-drawer-tool-btn" onclick="window.epmCloseMobileMenu()">
+                <span class="tool-left"><span class="tool-icon">📥</span> Weekly Snapshot PDF</span>
+                <span class="tool-badge">A4 PDF</span>
+            </a>
+            <a href="/api/calendar/pdf/monthly" download class="epm-drawer-tool-btn" onclick="window.epmCloseMobileMenu()">
+                <span class="tool-left"><span class="tool-icon">📥</span> Monthly Outlook PDF</span>
+                <span class="tool-badge">A4 PDF</span>
+            </a>
+        </div>
+
+        <div class="epm-drawer-footer">
+            <span>Global News Feed Room is Powered by EPMC Pvt. Ltd.</span>
+        </div>
+    </div>
+</div>
+
+<!-- Inshorts-Style Mobile Page View Drawer (Bottom Sheet) -->
+<div id="epm-inshorts-backdrop" class="epm-inshorts-backdrop" onclick="window.epmCloseInshortsDrawer()"></div>
+<div id="epm-inshorts-drawer" class="epm-inshorts-drawer">
+    <div class="epm-inshorts-handle-bar">
+        <div class="epm-inshorts-handle"></div>
+    </div>
+    
+    <div class="epm-inshorts-header">
+        <div class="epm-inshorts-meta-strip">
+            <span id="epm-inshorts-source" class="epm-inshorts-source">REUTERS</span>
+            <span id="epm-inshorts-time" class="epm-inshorts-time">⏱️ 14:30 IST</span>
+            <span id="epm-inshorts-sentiment" class="epm-inshorts-sentiment">🟢 BULLISH</span>
+            <span id="epm-inshorts-score" class="epm-inshorts-score">AI 9/10</span>
+        </div>
+        <button type="button" class="epm-inshorts-close" onclick="window.epmCloseInshortsDrawer()" title="Close Page View">✕</button>
+    </div>
+
+    <div class="epm-inshorts-body-scroll">
+        <div id="epm-inshorts-hero-banner" class="epm-inshorts-hero-banner">
+            <div id="epm-inshorts-impact-pill" class="epm-inshorts-impact-pill">🚨 HIGH IMPACT MARKET CATALYST</div>
+            <div id="epm-inshorts-sectors" class="epm-inshorts-sectors"></div>
+        </div>
+
+        <h2 id="epm-inshorts-title" class="epm-inshorts-title">Market Headline Loading...</h2>
+
+        <div class="epm-inshorts-section">
+            <div class="epm-inshorts-section-heading">💡 AI EXECUTIVE BREAKDOWN & REASONING</div>
+            <div id="epm-inshorts-reasoning" class="epm-inshorts-reasoning-text"></div>
+        </div>
+
+        <!-- Optional fields for Calendar Events (Previous, Forecast, Results) -->
+        <div id="epm-inshorts-cal-metrics" class="epm-inshorts-metrics-grid" style="display:none;">
+            <div class="epm-metric-card">
+                <span class="m-label">PREVIOUS</span>
+                <span id="epm-metric-prev" class="m-val">—</span>
+            </div>
+            <div class="epm-metric-card">
+                <span class="m-label">FORECAST</span>
+                <span id="epm-metric-fore" class="m-val">—</span>
+            </div>
+            <div class="epm-metric-card highlight">
+                <span class="m-label">ACTUAL RESULTS</span>
+                <span id="epm-metric-act" class="m-val">⏳ Pending</span>
+            </div>
+        </div>
+
+        <!-- Optional fields for Regulatory Circulars -->
+        <div id="epm-inshorts-circ-metrics" class="epm-inshorts-metrics-grid" style="display:none;">
+            <div class="epm-metric-card">
+                <span class="m-label">AUTHORITY</span>
+                <span id="epm-metric-reg" class="m-val">NSE</span>
+            </div>
+            <div class="epm-metric-card">
+                <span class="m-label">CIRCULAR NO.</span>
+                <span id="epm-metric-circno" class="m-val">—</span>
+            </div>
+            <div class="epm-metric-card highlight">
+                <span class="m-label">CLASSIFICATION</span>
+                <span id="epm-metric-cat" class="m-val">Directive</span>
+            </div>
+        </div>
+
+        <div class="epm-inshorts-footer-note">
+            <span>Verified Institutional Feed · Powered by EPMC Pvt. Ltd.</span>
+        </div>
+    </div>
+
+    <!-- Fixed Bottom Inshorts Action Bar ("Tap to know more") -->
+    <div class="epm-inshorts-bottom-bar">
+        <a id="epm-inshorts-action-link" href="#" target="_blank" rel="noopener noreferrer" class="epm-inshorts-primary-action">
+            <span class="action-txt">Tap to Read Full Story / Official Document ↗</span>
+            <span class="action-sub">Opens original authenticated source directly</span>
+        </a>
+        <button type="button" class="epm-inshorts-dismiss-btn" onclick="window.epmCloseInshortsDrawer()">✕ Close</button>
+    </div>
+</div>
 """
 
 
@@ -4958,6 +5695,15 @@ TERMINAL_CLIENT_JS = r"""
                 btn.classList.add("epm-btn-active");
             }
         }
+        const drawerAudioState = document.getElementById("epm-drawer-audio-state");
+        if (drawerAudioState) {
+            drawerAudioState.textContent = audioMuted ? "OFF" : "ON";
+            if (audioMuted) {
+                drawerAudioState.classList.remove("emerald");
+            } else {
+                drawerAudioState.classList.add("emerald");
+            }
+        }
     }
 
     // 2. Tab Navigation Sync & Active Tab Indicator
@@ -4982,6 +5728,11 @@ TERMINAL_CLIENT_JS = r"""
         pills.forEach((p, idx) => {
             if (idx === tabIdx) p.classList.add('active');
             else p.classList.remove('active');
+        });
+        const drawerItems = document.querySelectorAll('.epm-drawer-nav-item');
+        drawerItems.forEach((d, idx) => {
+            if (idx === tabIdx) d.classList.add('active');
+            else d.classList.remove('active');
         });
         const badge = document.getElementById("epm-active-tab-indicator");
         if (badge && TAB_NAMES[tabIdx]) {
@@ -5392,6 +6143,9 @@ TERMINAL_CLIENT_JS = r"""
                 }, 80);
             });
         });
+
+        wireTableInshortsClicks();
+        setupInshortsSwipeDismiss();
     }
 
     // 11. Fast Server-Sent Events (SSE) Delta Stream
@@ -5474,6 +6228,357 @@ TERMINAL_CLIENT_JS = r"""
             }
         }
     };
+
+    // 13. Mobile Navigation Menu Side Drawer Controller
+    window.epmToggleMobileMenu = function() {
+        const drawer = document.getElementById('epm-mobile-drawer');
+        if (!drawer) return;
+        if (drawer.classList.contains('is-open')) {
+            window.epmCloseMobileMenu();
+        } else {
+            window.epmOpenMobileMenu();
+        }
+    };
+
+    window.epmOpenMobileMenu = function() {
+        const drawer = document.getElementById('epm-mobile-drawer');
+        const backdrop = document.getElementById('epm-mobile-drawer-backdrop');
+        if (drawer) drawer.classList.add('is-open');
+        if (backdrop) backdrop.classList.add('is-open');
+        document.body.classList.add('epm-drawer-locked');
+    };
+
+    window.epmCloseMobileMenu = function() {
+        const drawer = document.getElementById('epm-mobile-drawer');
+        const backdrop = document.getElementById('epm-mobile-drawer-backdrop');
+        if (drawer) drawer.classList.remove('is-open');
+        if (backdrop) backdrop.classList.remove('is-open');
+        document.body.classList.remove('epm-drawer-locked');
+    };
+
+    // 14. Inshorts-Style Mobile Page View Drawer (Bottom Sheet) Controller
+    window.epmOpenInshortsDrawer = function(data) {
+        if (!data) return;
+        const drawer = document.getElementById('epm-inshorts-drawer');
+        const backdrop = document.getElementById('epm-inshorts-backdrop');
+        if (!drawer || !backdrop) return;
+
+        // Source
+        const srcEl = document.getElementById('epm-inshorts-source');
+        if (srcEl) srcEl.textContent = (data.source || 'WIRE').toUpperCase();
+
+        // Time
+        const timeEl = document.getElementById('epm-inshorts-time');
+        if (timeEl) timeEl.textContent = data.time ? `⏱️ ${data.time}` : '⏱️ Live';
+
+        // Sentiment
+        const sentEl = document.getElementById('epm-inshorts-sentiment');
+        if (sentEl) {
+            const sent = (data.sentiment || 'NEUTRAL').toUpperCase();
+            sentEl.textContent = sent;
+            sentEl.className = 'epm-inshorts-sentiment';
+            if (sent.includes('BULL')) sentEl.classList.add('bullish');
+            else if (sent.includes('BEAR')) sentEl.classList.add('bearish');
+        }
+
+        // Score
+        const scoreEl = document.getElementById('epm-inshorts-score');
+        if (scoreEl) scoreEl.textContent = data.score || 'AI 8/10';
+
+        // Impact Banner
+        const impactEl = document.getElementById('epm-inshorts-impact-pill');
+        if (impactEl) impactEl.textContent = (data.impact || 'MARKET CATALYST').toUpperCase();
+
+        // Sectors
+        const secWrap = document.getElementById('epm-inshorts-sectors');
+        if (secWrap) {
+            secWrap.innerHTML = '';
+            if (data.sectors && data.sectors.length > 0) {
+                data.sectors.forEach(s => {
+                    const tag = document.createElement('span');
+                    tag.className = 'epm-inshorts-tag';
+                    tag.textContent = s;
+                    secWrap.appendChild(tag);
+                });
+            }
+        }
+
+        // Title
+        const titleEl = document.getElementById('epm-inshorts-title');
+        if (titleEl) titleEl.textContent = data.title || 'Market Catalyst';
+
+        // AI Reasoning
+        const reasEl = document.getElementById('epm-inshorts-reasoning');
+        if (reasEl) {
+            reasEl.textContent = data.reasoning || 'Detailed AI quantitative reasoning analyzed across multi-market financial news feeds.';
+        }
+
+        // Calendar Metrics Grid
+        const calGrid = document.getElementById('epm-inshorts-cal-metrics');
+        if (calGrid) {
+            if (data.type === 'calendar') {
+                calGrid.style.display = 'grid';
+                const p = document.getElementById('epm-metric-prev');
+                const f = document.getElementById('epm-metric-fore');
+                const a = document.getElementById('epm-metric-act');
+                if (p) p.textContent = data.prev || '—';
+                if (f) f.textContent = data.fore || '—';
+                if (a) a.textContent = data.act || '⏳ Pending';
+            } else {
+                calGrid.style.display = 'none';
+            }
+        }
+
+        // Circular Metrics Grid
+        const circGrid = document.getElementById('epm-inshorts-circ-metrics');
+        if (circGrid) {
+            if (data.type === 'circular') {
+                circGrid.style.display = 'grid';
+                const r = document.getElementById('epm-metric-reg');
+                const c = document.getElementById('epm-metric-circno');
+                const k = document.getElementById('epm-metric-cat');
+                if (r) r.textContent = data.reg || data.source || 'NSE';
+                if (c) c.textContent = data.circNo || '—';
+                if (k) k.textContent = data.cat || 'Directive';
+            } else {
+                circGrid.style.display = 'none';
+            }
+        }
+
+        // Action Link
+        const linkEl = document.getElementById('epm-inshorts-action-link');
+        if (linkEl) {
+            const link = data.link && data.link !== '#' ? data.link : '';
+            if (link) {
+                linkEl.href = link;
+                linkEl.style.display = 'flex';
+                const txtEl = linkEl.querySelector('.action-txt');
+                if (txtEl) {
+                    txtEl.textContent = data.type === 'circular' ? 'Tap to View / Download Official PDF ↗' : 'Tap to Read Full Story / Document ↗';
+                }
+            } else {
+                linkEl.style.display = 'none';
+            }
+        }
+
+        // Open drawer
+        drawer.classList.add('is-open');
+        backdrop.classList.add('is-open');
+        document.body.classList.add('epm-drawer-locked');
+    };
+
+    window.epmCloseInshortsDrawer = function() {
+        const drawer = document.getElementById('epm-inshorts-drawer');
+        const backdrop = document.getElementById('epm-inshorts-backdrop');
+        if (drawer) {
+            drawer.classList.remove('is-open');
+            drawer.style.transform = '';
+        }
+        if (backdrop) backdrop.classList.remove('is-open');
+        document.body.classList.remove('epm-drawer-locked');
+    };
+
+    function wireTableInshortsClicks() {
+        document.addEventListener('click', function(e) {
+            const isMobile = window.innerWidth <= 820;
+
+            const row = e.target.closest('#top_news_table tbody tr, #bottom_news_table tbody tr, #circ_table tbody tr, #calendar_table tbody tr');
+            const card = e.target.closest('.epm-card.epm-news-card, .epm-circ-card, .epm-dossier-row');
+
+            if (!row && !card) return;
+
+            let data = null;
+
+            if (row) {
+                const tableWrap = row.closest('[id]');
+                const tid = tableWrap ? tableWrap.id : '';
+                const cells = Array.from(row.querySelectorAll('td'));
+                if (!cells || cells.length === 0) return;
+
+                if (tid === 'top_news_table' && cells.length >= 7) {
+                    const score = cells[0]?.innerText.trim() || 'AI 8/10';
+                    const sent = cells[1]?.innerText.trim() || 'NEUTRAL';
+                    const impact = cells[2]?.innerText.trim() || 'HIGH';
+                    const titleAnchor = cells[3]?.querySelector('a');
+                    const title = titleAnchor ? titleAnchor.innerText.trim() : (cells[3]?.innerText.trim() || '');
+                    const link = titleAnchor ? titleAnchor.getAttribute('href') : '#';
+                    const sectors = cells[4]?.innerText.trim() || '';
+                    const reasoning = cells[5]?.innerText.trim() || '';
+                    const source = cells[6]?.innerText.trim() || 'Live Wire';
+                    const time = cells[8]?.innerText.trim() || '';
+
+                    data = {
+                        type: 'news',
+                        title: title,
+                        link: link,
+                        source: source,
+                        time: time,
+                        score: score.startsWith('AI') ? score : `AI ${score}`,
+                        sentiment: sent,
+                        impact: impact,
+                        sectors: sectors ? sectors.split(/[,/]+/).map(s => s.trim()).filter(Boolean) : [],
+                        reasoning: reasoning
+                    };
+                } else if (tid === 'bottom_news_table' && cells.length >= 5) {
+                    const time = cells[0]?.innerText.trim() || '';
+                    const source = cells[1]?.innerText.trim() || 'Market Feed';
+                    const titleAnchor = cells[2]?.querySelector('a');
+                    const title = titleAnchor ? titleAnchor.innerText.trim() : (cells[2]?.innerText.trim() || '');
+                    const link = titleAnchor ? titleAnchor.getAttribute('href') : (cells[5]?.querySelector('a')?.getAttribute('href') || '#');
+                    const sent = cells[4]?.innerText.trim() || 'NEUTRAL';
+
+                    data = {
+                        type: 'news',
+                        title: title,
+                        link: link,
+                        source: source,
+                        time: time,
+                        score: 'Standard',
+                        sentiment: sent,
+                        impact: 'GENERAL WIRE',
+                        sectors: [],
+                        reasoning: 'Automated news feed wire monitored across global institutional market desks.'
+                    };
+                } else if (tid === 'circ_table' && cells.length >= 7) {
+                    const reg = cells[0]?.innerText.trim() || 'Official';
+                    const circNo = cells[1]?.innerText.trim() || '—';
+                    const date = cells[2]?.innerText.trim() || '';
+                    const impact = cells[3]?.innerText.trim() || 'Directive';
+                    const titleAnchor = cells[4]?.querySelector('a');
+                    const title = titleAnchor ? titleAnchor.innerText.trim() : (cells[4]?.innerText.trim() || '');
+                    const link = titleAnchor ? titleAnchor.getAttribute('href') : (cells[7]?.querySelector('a')?.getAttribute('href') || '#');
+                    const cat = cells[5]?.innerText.trim() || 'Regulatory Filing';
+                    const summary = cells[6]?.innerText.trim() || '';
+
+                    data = {
+                        type: 'circular',
+                        title: title,
+                        link: link,
+                        source: reg,
+                        time: date,
+                        score: impact,
+                        sentiment: '⚪ OFFICIAL',
+                        impact: `${reg} REGULATORY DIRECTIVE`,
+                        sectors: [cat],
+                        reasoning: summary,
+                        circNo: circNo,
+                        reg: reg,
+                        cat: cat
+                    };
+                } else if (tid === 'calendar_table' && cells.length >= 14) {
+                    const date = cells[1]?.innerText.trim() || '';
+                    const time = cells[2]?.innerText.trim() || '';
+                    const evType = cells[4]?.innerText.trim() || 'Event';
+                    const reg = cells[6]?.innerText.trim() || '';
+                    const sector = cells[7]?.innerText.trim() || '';
+                    const rawName = cells[8]?.innerText.trim() || '';
+                    const prev = cells[10]?.innerText.trim() || '—';
+                    const fore = cells[11]?.innerText.trim() || '—';
+                    const act = cells[12]?.innerText.trim() || '⏳ Pending';
+                    const sent = cells[13]?.innerText.trim() || 'NEUTRAL';
+                    const reasoning = cells[14]?.innerText.trim() || '';
+
+                    data = {
+                        type: 'calendar',
+                        title: rawName,
+                        link: '#',
+                        source: reg || evType,
+                        time: `${date} ${time}`.trim(),
+                        score: evType,
+                        sentiment: sent,
+                        impact: `${reg || 'MARKET'} CATALYST`,
+                        sectors: sector ? [sector] : [],
+                        reasoning: reasoning,
+                        prev: prev,
+                        fore: fore,
+                        act: act
+                    };
+                }
+            } else if (card) {
+                if (card.classList.contains('epm-news-card')) {
+                    const titleAnchor = card.querySelector('.epm-news-title');
+                    const title = titleAnchor ? titleAnchor.innerText.replace('↗', '').trim() : '';
+                    const link = titleAnchor ? titleAnchor.getAttribute('href') : '#';
+                    const source = card.querySelector('.epm-source-chip')?.innerText.trim() || 'Wire';
+                    const time = card.querySelector('.epm-time-chip')?.innerText.trim() || '';
+                    const score = card.querySelector('.epm-score-pill')?.innerText.trim() || 'AI 8/10';
+                    const sent = card.querySelector('.epm-badge[class*="sent-"]')?.innerText.trim() || 'NEUTRAL';
+                    const impact = card.querySelector('.epm-badge[class*="impact-"]')?.innerText.trim() || 'CATALYST';
+                    const reasoning = card.querySelector('.epm-news-reasoning')?.innerText.trim() || '';
+                    const sectorEls = card.querySelectorAll('.epm-sector-tag');
+                    const sectors = Array.from(sectorEls).map(el => el.innerText.trim()).filter(Boolean);
+
+                    data = {
+                        type: 'news',
+                        title: title,
+                        link: link,
+                        source: source,
+                        time: time,
+                        score: score,
+                        sentiment: sent,
+                        impact: impact,
+                        sectors: sectors,
+                        reasoning: reasoning
+                    };
+                } else if (card.classList.contains('epm-circ-card')) {
+                    const titleAnchor = card.querySelector('a');
+                    const title = titleAnchor ? titleAnchor.innerText.trim() : (card.querySelector('h3, h4')?.innerText.trim() || '');
+                    const link = titleAnchor ? titleAnchor.getAttribute('href') : '#';
+                    const source = card.querySelector('.regulator, .badge')?.innerText.trim() || 'Regulator';
+                    const summary = card.innerText;
+
+                    data = {
+                        type: 'circular',
+                        title: title,
+                        link: link,
+                        source: source,
+                        time: 'Official Notice',
+                        score: 'Directive',
+                        sentiment: '⚪ OFFICIAL',
+                        impact: 'REGULATORY DIRECTIVE',
+                        sectors: [],
+                        reasoning: summary
+                    };
+                }
+            }
+
+            if (data && data.title && data.title !== '-' && !data.title.includes('Awaiting incoming')) {
+                if (isMobile || e.target.tagName !== 'A') {
+                    e.preventDefault();
+                    window.epmOpenInshortsDrawer(data);
+                }
+            }
+        }, true);
+    }
+
+    function setupInshortsSwipeDismiss() {
+        const drawer = document.getElementById('epm-inshorts-drawer');
+        if (!drawer) return;
+
+        let startY = 0;
+        let currentY = 0;
+
+        drawer.addEventListener('touchstart', function(e) {
+            startY = e.touches[0].clientY;
+            currentY = startY;
+        }, { passive: true });
+
+        drawer.addEventListener('touchmove', function(e) {
+            currentY = e.touches[0].clientY;
+            const diff = currentY - startY;
+            if (diff > 0 && drawer.scrollTop <= 0) {
+                drawer.style.transform = `translateY(${Math.min(diff, 180)}px)`;
+            }
+        }, { passive: true });
+
+        drawer.addEventListener('touchend', function() {
+            const diff = currentY - startY;
+            drawer.style.transform = '';
+            if (diff > 80) {
+                window.epmCloseInshortsDrawer();
+            }
+        });
+    }
 
     window.addEventListener('keydown', function(e) {
         const tag = (document.activeElement && document.activeElement.tagName) ? document.activeElement.tagName.toLowerCase() : '';
