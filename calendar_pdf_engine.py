@@ -157,9 +157,9 @@ class NumberedCanvas(CanvasBase):
         self.drawString(MARGIN_LEFT, 16, f"Synchronized: {now_str}  |  Multi-Market Intelligence")
 
         # Center: Mandatory Microprint Disclaimer
-        self.setFont("Helvetica-Bold", 7.5)
+        self.setFont("Helvetica-Bold", 6.5)
         self.setFillColor(colors.HexColor("#334155"))
-        disclaimer = "Global News Feed Room is Powered by EPMC Pvt. Ltd."
+        disclaimer = "Disclaimer: This document and information in this document is not a investment advise, the creator and publisher are not responsible of your actions, for knowledge and information purpose only."
         self.drawCentredString(PAGE_WIDTH / 2.0, 16, disclaimer)
 
         # Right: Dynamic Page X of Y

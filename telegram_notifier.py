@@ -46,7 +46,7 @@ class TelegramNotifier:
         self.auto_monthly_pdf_25th_6am = True  # Enabled: 25th of month 06:00 AM IST Monthly A4 Outlook PDF
         self.auto_daily_outcomes_pdf_5pm = True # Enabled: Daily 05:00 PM IST Outcomes & Results A4 Dossier
         self.auto_weekly_fri_7am = False       # Disabled: Replaced by A4 Dossier
-        self.auto_circulars_tg = False         # Disabled: Circulars separate
+        self.auto_circulars_tg = False         # Disabled: Circulars separate (Suppressed by policy)
         self.send_as_photos = True             # Deliver morning calendar as high-definition infographic photos
         self.public_app_url = os.getenv("PUBLIC_APP_URL", "").strip()
         self._send_lock = threading.Lock()
@@ -502,6 +502,7 @@ class TelegramNotifier:
             if bullets_txt:
                 caption += f"\n💡 <b>Key Directives & Takeaways:</b>\n<i>{html.escape(bullets_txt)}</i>\n"
             caption += f"\n🔗 <a href=\"{html.escape(link)}\">Read Full Telemetry & Analysis ↗</a>\n<i>Archived by Global News Feed Room (GNC)</i>"
+            caption += "\n\n⚖️ <i>Disclaimer: This document and information in this document is not a investment advise, the creator and publisher are not responsible of your actions, for knowledge and information purpose only.</i>"
 
             return self.send_photo(token, chat_id, photo_bytes, caption=caption)
         except Exception as e:
@@ -560,7 +561,8 @@ class TelegramNotifier:
             f"🎯 <b>Affected:</b> {safe_sectors}"
             f"{context_block}\n\n"
             f"🏛 <b>Source:</b> {safe_source} | <b>Relevance:</b> {relevance}%\n"
-            f"🔗 <a href='{link}'>Read Full Article</a>"
+            f"🔗 <a href='{link}'>Read Full Article</a>\n\n"
+            f"⚖️ <i>Disclaimer: This document and information in this document is not a investment advise, the creator and publisher are not responsible of your actions, for knowledge and information purpose only.</i>"
         )
 
         # Generate Publication-Grade News Graphic Card
@@ -581,7 +583,8 @@ class TelegramNotifier:
                 f"<b>{safe_title}</b>\n\n"
                 f"{score_line} | {sentiment_label}\n"
                 f"🎯 <b>Affected:</b> {safe_sectors}\n"
-                f"🏛 <b>Source:</b> {safe_source} | 🔗 <a href='{link}'>Read Article</a>"
+                f"🏛 <b>Source:</b> {safe_source} | 🔗 <a href='{link}'>Read Article</a>\n\n"
+                f"⚖️ <i>Disclaimer: This document and information in this document is not a investment advise, the creator and publisher are not responsible of your actions, for knowledge and information purpose only.</i>"
             )
             ok, err = self.send_photo(self.bot_token, self.chat_id, card_bytes, photo_caption)
             if ok:

@@ -1024,6 +1024,7 @@ def render_news_feed_html(items: List[Dict]) -> str:
             <div class="epm-chron-feed" id="epm-chron-feed">
                 {feed_joined}
             </div>
+            {render_site_disclaimer_html(is_mobile=False)}
         </div>
 
         <!-- Column 2: On-Demand Dismissible AI Impact & Sentiment Drawer -->
@@ -1264,22 +1265,49 @@ def build_story_items(kind: str = "news", limit: int = 100) -> List[Dict]:
     return out
 
 
+def render_site_disclaimer_html(is_mobile: bool = False) -> str:
+    """Renders mandatory educational & legal compliance disclaimer across all site pages in desktop and mobile views."""
+    mb_cls = " is-mobile" if is_mobile else ""
+    return f"""
+    <div class="epm-site-legal-disclaimer{mb_cls}">
+        <div class="epm-disclaimer-inner">
+            <div class="epm-disclaimer-hdr">
+                <span class="epm-disclaimer-shield">🛡️ REGULATORY & COMPLIANCE NOTICE</span>
+            </div>
+            <p class="epm-disclaimer-p1">This site is created for educational purpose, any information is not a direct or indirect investment advise, any loss incurred by you out of using this site is not entirely your look out.</p>
+            <p class="epm-disclaimer-p2">This entire site is for knowledge and information purpose only.</p>
+        </div>
+    </div>
+    """
+
+
 def render_story_strip_html(stories: List[Dict], kind: str, is_desktop: bool = False) -> str:
-    """Renders Instagram-style circular story bubbles for both mobile and desktop views."""
+    """Renders sleek rectangular story preview thumbnails with authority tags, live scores, and headlines."""
     cls = "epm-story-strip desktop-strip" if is_desktop else "epm-story-strip"
-    bubbles = []
-    for i, s in enumerate(stories):
+    thumbs = []
+    for i, s in enumerate(stories[:30]):
         sk = _sent_key(s.get("sentiment", "NEUTRAL")).lower()
-        title = s.get("title", "Market Story")
-        short_title = title[:15] + "…" if len(title) > 15 else title
-        badge_text = str(s.get("metric1", "AI"))[:7]
-        bubbles.append(
-            f'<button type="button" class="epm-story-bubble tone-{sk}" onclick="window.epmOpenStory(\'{kind}\',{i})">'
-            f'<span class="epm-story-ring"><span class="epm-story-inner">{html.escape(badge_text)}</span></span>'
-            f'<span class="epm-story-label">{html.escape(short_title)}</span>'
-            f'</button>'
+        title = html.escape(clean_table_text(s.get("title", "Market Story")))
+        emblem = html.escape(str(s.get("emblem") or s.get("source") or "GNC").upper()[:8])
+        score = html.escape(str(s.get("metric1", "8.5/10")).split("/")[0])
+        sent_label = html.escape(str(s.get("sentiment", "NEUTRAL")).upper())
+        thumbs.append(
+            f'<div class="epm-story-thumbnail tone-{sk}" onclick="window.epmOpenStory(\'{kind}\',{i})">'
+            f'  <div class="epm-thumb-inner">'
+            f'    <div class="epm-thumb-top">'
+            f'      <span class="epm-thumb-auth">{emblem}</span>'
+            f'      <span class="epm-thumb-score">{score}</span>'
+            f'    </div>'
+            f'    <div class="epm-thumb-mid">'
+            f'      <div class="epm-thumb-title">{title}</div>'
+            f'    </div>'
+            f'    <div class="epm-thumb-btm">'
+            f'      <span class="epm-thumb-pill">{sent_label}</span>'
+            f'    </div>'
+            f'  </div>'
+            f'</div>'
         )
-    return f'<div class="{cls}">{ "".join(bubbles) }</div>'
+    return f'<div class="{cls}">{"".join(thumbs)}</div>'
 
 
 def _story_attr(items: List[Dict]) -> str:
@@ -1316,6 +1344,10 @@ def render_mobile_news_feed_html(pool: List[Dict]) -> str:
                 <span class="epm-pc-chev">⌄</span>
             </div>
             <div class="epm-pc-body">
+                <div class="epm-pc-full-headline">
+                    <span class="epm-full-hl-badge">FULL CATALYST HEADLINE</span>
+                    <div class="epm-full-hl-text">{title}</div>
+                </div>
                 <div class="epm-pc-metrics">
                     <div><span>AI Score</span><b>{score}/10</b></div>
                     <div><span>Relevance</span><b>{rel}%</b></div>
@@ -1333,17 +1365,15 @@ def render_mobile_news_feed_html(pool: List[Dict]) -> str:
     if not rows:
         rows.append('<div class="epm-empty-state"><div class="epm-empty-title">Connecting to live wire…</div></div>')
 
-    bubbles = "".join(
-        f'<button type="button" class="epm-story-bubble tone-{_sent_key(s["sentiment"])}" onclick="window.epmOpenStory(\'news\',{i})">'
-        f'<span class="epm-story-ring"><span class="epm-story-inner">{html.escape(str(s["metric1"]))}</span></span>'
-        f'<span class="epm-story-label">{html.escape(s["title"][:14])}</span></button>'
-        for i, s in enumerate(stories)
-    )
+    stories_strip_html = render_story_strip_html(stories, "news", is_desktop=False)
+    disclaimer_html = render_site_disclaimer_html(is_mobile=True)
+
     return f"""
     <div class="epm-mobile-feed" data-stories-news="{_story_attr(stories)}">
-        <div class="epm-story-strip">{bubbles}</div>
+        {stories_strip_html}
         <div class="epm-pc-section-title"><span class="epm-ribbon-bullet">●</span> Breaking Wire <span class="epm-live-pill">LIVE</span></div>
         <div class="epm-pc-list">{''.join(rows)}</div>
+        {disclaimer_html}
     </div>"""
 
 
@@ -1416,6 +1446,10 @@ def render_calendar_timeline_html(events: List[Dict]) -> str:
                     <span class="epm-signal-pips tier-{stars}">{pips}</span>
                 </div>
                 <div class="epm-pc-body">
+                    <div class="epm-pc-full-headline">
+                        <span class="epm-full-hl-badge">FULL SCHEDULED EVENT</span>
+                        <div class="epm-full-hl-text">{html.escape(name)}</div>
+                    </div>
                     <div class="epm-pc-metrics">
                         <div><span>Prev</span><b>{html.escape(prev[:16])}</b></div>
                         <div><span>Fcst</span><b>{html.escape(fore[:16])}</b></div>
@@ -1431,19 +1465,17 @@ def render_calendar_timeline_html(events: List[Dict]) -> str:
     if not now_inserted:
         parts.append(f'<div class="epm-tl-now"><span>LIVE · {now.strftime("%H:%M")} IST</span></div>')
 
-    bubbles = "".join(
-        f'<button type="button" class="epm-story-bubble tone-{_sent_key(s["sentiment"])}" onclick="window.epmOpenStory(\'calendar\',{i})">'
-        f'<span class="epm-story-ring"><span class="epm-story-inner">{html.escape(str(s["metric1"])[:8])}</span></span>'
-        f'<span class="epm-story-label">{html.escape(s["title"][:14])}</span></button>'
-        for i, s in enumerate(stories)
-    )
+    stories_strip_html = render_story_strip_html(stories, "calendar", is_desktop=False)
+    disclaimer_html = render_site_disclaimer_html(is_mobile=True)
+
     return f"""
     <div class="epm-mobile-timeline" data-stories-calendar="{_story_attr(stories)}">
-        <div class="epm-story-strip">{bubbles}</div>
+        {stories_strip_html}
         <div class="epm-tl-header">
             <span class="epm-pc-section-title"><span class="epm-ribbon-bullet">●</span> Chronological Timeline <span class="epm-live-pill">LIVE</span></span>
         </div>
         {''.join(parts)}
+        {disclaimer_html}
     </div>"""
 
 
@@ -1504,6 +1536,10 @@ def render_mobile_circulars_feed_html(items: List[Dict]) -> str:
                 <span class="epm-pc-chev">⌄</span>
             </div>
             <div class="epm-pc-body">
+                <div class="epm-pc-full-headline">
+                    <span class="epm-full-hl-badge">OFFICIAL REGULATORY DIRECTIVE TITLE</span>
+                    <div class="epm-full-hl-text">{title}</div>
+                </div>
                 <div class="epm-pc-metrics">
                     <div><span>Authority</span><b>{reg}</b></div>
                     <div><span>Classification</span><b>{category[:12]}</b></div>
@@ -1522,12 +1558,16 @@ def render_mobile_circulars_feed_html(items: List[Dict]) -> str:
             </div>
         </div>""")
 
+    stories_strip_html = render_story_strip_html(stories, "circulars", is_desktop=False)
+    disclaimer_html = render_site_disclaimer_html(is_mobile=True)
+
     return f"""
     <div class="epm-mobile-feed" data-stories-circulars="{_story_attr(stories)}">
-        <div class="epm-story-strip">{bubbles}</div>
+        {stories_strip_html}
         <div class="epm-circ-chips-strip">{chip_html}</div>
         <div class="epm-pc-section-title"><span class="epm-ribbon-bullet">●</span> Official Regulatory Directives</div>
         <div class="epm-pc-list" id="epm-circ-mobile-list">{''.join(cards)}</div>
+        {disclaimer_html}
     </div>"""
 
 
@@ -1593,13 +1633,17 @@ def render_mobile_holidays_timeline_html(holidays: List[Dict]) -> str:
             </div>
         </div>""")
 
+    stories_strip_html = render_story_strip_html(stories, "holidays", is_desktop=False)
+    disclaimer_html = render_site_disclaimer_html(is_mobile=True)
+
     return f"""
     <div class="epm-mobile-timeline" data-stories-holidays="{_story_attr(stories)}">
-        <div class="epm-story-strip">{bubbles}</div>
+        {stories_strip_html}
         <div class="epm-tl-header" style="padding-top:8px;">
             <span class="epm-pc-section-title"><span class="epm-ribbon-bullet">●</span> 2026 Authoritative Holidays Timeline</span>
         </div>
         {''.join(parts)}
+        {disclaimer_html}
     </div>"""
 
 
@@ -2182,6 +2226,7 @@ def render_desktop_calendar_html(events: List[Dict]) -> str:
             <div class="epm-chron-feed" id="epm-cal-cards-list">
                 {''.join(rows_html)}
             </div>
+            {render_site_disclaimer_html(is_mobile=False)}
         </div>
         
         <!-- On-Demand Dismissible AI Impact & Sentiment Drawer -->
@@ -2330,9 +2375,6 @@ def render_desktop_circulars_html(circulars: List[Dict]) -> str:
                     <a href="/api/calendar/pdf/monthly" download target="_blank" class="epm-cal-hdr-btn" style="text-decoration:none;">
                         Export PDF Directory 📥
                     </a>
-                    <button type="button" class="epm-cal-hdr-btn" onclick="window.epmPushDeskTelegram('circular')">
-                        Forward to Telegram ✈️
-                    </button>
                     <button type="button" class="epm-cal-hdr-icon-btn" onclick="window.epmToggleCircFilters()" title="Filters">⚙️</button>
                 </div>
             </div>
@@ -2342,6 +2384,7 @@ def render_desktop_circulars_html(circulars: List[Dict]) -> str:
             <div class="epm-chron-feed" id="epm-circ-cards-list">
                 {''.join(rows_html)}
             </div>
+            {render_site_disclaimer_html(is_mobile=False)}
         </div>
         
         <!-- On-Demand Dismissible AI Executive Summary & Impact Analysis Drawer -->
@@ -2370,12 +2413,6 @@ def render_desktop_circulars_html(circulars: List[Dict]) -> str:
                         <li>Official regulatory communication released by authority.</li>
                         <li>Streamlines administrative processes while imposing stricter oversight on participants.</li>
                     </ul>
-                </div>
-                
-                <div class="epm-ai-share-wrap">
-                    <button type="button" class="epm-ai-share-btn" onclick="window.epmShareDeskCircToTelegram()">
-                        Share Directive Analysis to Telegram
-                    </button>
                 </div>
             </div>
         </div>
@@ -2478,15 +2515,65 @@ def render_desktop_holidays_html(holidays: List[Dict]) -> str:
                 </tbody>
             </table>
         </div>
+        {render_site_disclaimer_html(is_mobile=False)}
     </div>
     '''
 
 
+INSTITUTIONAL_DIRECTORY = [
+    # Regulators
+    {"name": "Securities and Exchange Board of India (SEBI)", "code": "SEBI", "cat": "regulator", "tier": "Tier-1 Sovereign", "jurisdiction": "🇮🇳 India", "scope": "Capital markets oversight, F&O contract lot sizes, peak margins, FPI/FII disclosures, LODR amendments.", "url": "https://www.sebi.gov.in"},
+    {"name": "Reserve Bank of India (RBI)", "code": "RBI", "cat": "regulator", "tier": "Tier-1 Sovereign", "jurisdiction": "🇮🇳 India", "scope": "Monetary Policy Committee (MPC), Repo rate, Liquidity Adjustment Facility (LAF), CRR/SLR, FEMA forex regulations.", "url": "https://www.rbi.org.in"},
+    {"name": "International Financial Services Centres Authority (IFSCA)", "code": "IFSCA", "cat": "regulator", "tier": "Tier-1 Sovereign", "jurisdiction": "🇮🇳 GIFT City", "scope": "Unified regulator for GIFT IFSC offshore banking, capital markets, and India International Bullion Exchange (IIBX).", "url": "https://www.ifsca.gov.in"},
+    {"name": "Insurance Regulatory and Development Authority of India (IRDAI)", "code": "IRDAI", "cat": "regulator", "tier": "Tier-1 Sovereign", "jurisdiction": "🇮🇳 India", "scope": "Supervision of insurance sector, institutional equity/debt investment guidelines, solvency margins.", "url": "https://www.irdai.gov.in"},
+    {"name": "Pension Fund Regulatory and Development Authority (PFRDA)", "code": "PFRDA", "cat": "regulator", "tier": "Tier-1 Sovereign", "jurisdiction": "🇮🇳 India", "scope": "National Pension System (NPS) regulation, pension fund manager investment mandates and asset allocation norms.", "url": "https://www.pfrda.org.in"},
+    {"name": "Federal Open Market Committee / Federal Reserve (FOMC)", "code": "FED", "cat": "regulator", "tier": "Tier-1 Sovereign", "jurisdiction": "🇺🇸 United States", "scope": "Federal funds target rate, open market operations, balance sheet quantitative tightening (QT), discount rate.", "url": "https://www.federalreserve.gov"},
+    {"name": "U.S. Securities and Exchange Commission (SEC)", "code": "SEC", "cat": "regulator", "tier": "Tier-1 Sovereign", "jurisdiction": "🇺🇸 United States", "scope": "Federal securities law enforcement, EDGAR public company filings (10-K, 10-Q, 8-K), market surveillance.", "url": "https://www.sec.gov"},
+    {"name": "U.S. Commodity Futures Trading Commission (CFTC)", "code": "CFTC", "cat": "regulator", "tier": "Tier-1 Sovereign", "jurisdiction": "🇺🇸 United States", "scope": "Commodity futures, options, and swap markets surveillance, Commitments of Traders (COT) report oversight.", "url": "https://www.cftc.gov"},
+    {"name": "Bank of England (BoE)", "code": "BOE", "cat": "regulator", "tier": "Tier-1 Sovereign", "jurisdiction": "🇬🇧 United Kingdom", "scope": "Monetary Policy Committee Bank Rate, quantitative easing/tightening, sterling liquidity facilities.", "url": "https://www.bankofengland.co.uk"},
+    {"name": "European Central Bank (ECB)", "code": "ECB", "cat": "regulator", "tier": "Tier-1 Sovereign", "jurisdiction": "🇪🇺 Eurozone", "scope": "Governing Council monetary decisions, Main Refinancing Operations (MRO), deposit facility rates.", "url": "https://www.ecb.europa.eu"},
+
+    # Exchanges & Clearing Houses
+    {"name": "National Stock Exchange of India (NSE)", "code": "NSE", "cat": "exchange", "tier": "Exchange & SRO", "jurisdiction": "🇮🇳 India", "scope": "Leading equities and derivatives exchange, Nifty 50 benchmark indices, weekly/monthly index option expiries.", "url": "https://www.nseindia.com"},
+    {"name": "BSE Limited (BSE)", "code": "BSE", "cat": "exchange", "tier": "Exchange & SRO", "jurisdiction": "🇮🇳 India", "scope": "Asia's oldest exchange, Sensex index contracts, corporate filing disseminations, cash market equity listings.", "url": "https://www.bseindia.com"},
+    {"name": "Multi Commodity Exchange of India (MCX)", "code": "MCX", "cat": "exchange", "tier": "Exchange & SRO", "jurisdiction": "🇮🇳 India", "scope": "Primary commodity futures & options exchange: Crude Oil, Natural Gas, Gold, Silver, Base Metals.", "url": "https://www.mcxindia.com"},
+    {"name": "National Commodity & Derivatives Exchange (NCDEX)", "code": "NCDEX", "cat": "exchange", "tier": "Exchange & SRO", "jurisdiction": "🇮🇳 India", "scope": "Agricultural commodity derivatives, delivery mechanisms for farm produce and agricultural indices.", "url": "https://www.ncdex.com"},
+    {"name": "CME Group (Chicago Mercantile Exchange)", "code": "CME", "cat": "exchange", "tier": "Exchange & SRO", "jurisdiction": "🇺🇸 United States", "scope": "Global financial derivatives exchange: SOFR interest rate futures, WTI Light Sweet Crude, S&P 500 E-mini contracts.", "url": "https://www.cmegroup.com"},
+    {"name": "Intercontinental Exchange (ICE)", "code": "ICE", "cat": "exchange", "tier": "Exchange & SRO", "jurisdiction": "🌐 Global", "scope": "Benchmark Brent Crude oil futures, global energy contracts, Title Transfer Facility (TTF) natural gas.", "url": "https://www.theice.com"},
+
+    # Government Ministries & Public Departments
+    {"name": "Ministry of Finance, Government of India (FinMin)", "code": "FINMIN", "cat": "ministry", "tier": "Government Ministry", "jurisdiction": "🇮🇳 India", "scope": "Union Budget of India, Department of Economic Affairs, fiscal policy, sovereign market borrowing program.", "url": "https://www.finmin.gov.in"},
+    {"name": "Ministry of Commerce & Industry / DGFT", "code": "DGFT", "cat": "ministry", "tier": "Government Ministry", "jurisdiction": "🇮🇳 India", "scope": "Foreign Trade Policy (FTP), import/export licensing, tariff rate quotas, export duty notifications.", "url": "https://www.commerce.gov.in"},
+    {"name": "Ministry of Petroleum and Natural Gas (MoPNG)", "code": "MOPNG", "cat": "ministry", "tier": "Government Ministry", "jurisdiction": "🇮🇳 India", "scope": "Domestic crude oil pricing, APM natural gas pricing formula, windfall profit tax modifications.", "url": "https://www.mopng.gov.in"},
+    {"name": "U.S. Department of the Treasury", "code": "US-TREASURY", "cat": "ministry", "tier": "Government Ministry", "jurisdiction": "🇺🇸 United States", "scope": "US sovereign debt issuance, Quarterly Refunding Announcements (QRA), Treasury General Account (TGA), sanctions.", "url": "https://home.treasury.gov"},
+
+    # Key Sovereign Officials & Leadership
+    {"name": "Smt. Nirmala Sitharaman", "code": "FM-INDIA", "cat": "person", "tier": "Sovereign Official", "jurisdiction": "🇮🇳 India", "scope": "Minister of Finance and Corporate Affairs, Government of India; Chairperson of the GST Council.", "url": "https://finmin.gov.in"},
+    {"name": "Shri Narendra Modi / PMO", "code": "PMO-INDIA", "cat": "person", "tier": "Sovereign Official", "jurisdiction": "🇮🇳 India", "scope": "Prime Minister of India; Cabinet Committee on Economic Affairs (CCEA), strategic sovereign policies.", "url": "https://www.pmindia.gov.in"},
+    {"name": "Shri Shaktikanta Das", "code": "RBI-GOV", "cat": "person", "tier": "Sovereign Official", "jurisdiction": "🇮🇳 India", "scope": "Governor, Reserve Bank of India; Chair of Monetary Policy Committee, banking stability guidance.", "url": "https://www.rbi.org.in"},
+    {"name": "Smt. Madhabi Puri Buch", "code": "SEBI-CHAIR", "cat": "person", "tier": "Sovereign Official", "jurisdiction": "🇮🇳 India", "scope": "Chairperson, Securities and Exchange Board of India; Market structure directives and retail safeguards.", "url": "https://www.sebi.gov.in"},
+    {"name": "Jerome H. Powell", "code": "FED-CHAIR", "cat": "person", "tier": "Sovereign Official", "jurisdiction": "🇺🇸 United States", "scope": "Chair, Board of Governors of the Federal Reserve System; FOMC press conference forward guidance.", "url": "https://www.federalreserve.gov"},
+    {"name": "Janet L. Yellen", "code": "US-SEC-TREAS", "cat": "person", "tier": "Sovereign Official", "jurisdiction": "🇺🇸 United States", "scope": "Secretary of the U.S. Department of the Treasury; Sovereign debt management and international financial stability.", "url": "https://home.treasury.gov"},
+    {"name": "President of the United States (POTUS)", "code": "POTUS", "cat": "person", "tier": "Sovereign Official", "jurisdiction": "🇺🇸 United States", "scope": "Executive economic orders, tariff announcements, trade policy determinations, sovereign emergency actions.", "url": "https://www.whitehouse.gov"},
+
+    # Commercial News Media (Segregated for Market Sentiment)
+    {"name": "Reuters News Agency", "code": "REUTERS", "cat": "media", "tier": "Secondary Media", "jurisdiction": "🌐 Global", "scope": "Commercial international news wire providing global macro reporting, forex commentary, and market developments.", "url": "https://www.reuters.com"},
+    {"name": "Bloomberg Markets", "code": "BLOOMBERG", "cat": "media", "tier": "Secondary Media", "jurisdiction": "🌐 Global", "scope": "Commercial financial journalism, corporate news, equity analyst consensus, and credit market coverage.", "url": "https://www.bloomberg.com"},
+    {"name": "Livemint (HT Media)", "code": "LIVEMINT", "cat": "media", "tier": "Secondary Media", "jurisdiction": "🇮🇳 India", "scope": "Indian commercial financial news covering corporate earnings, D-Street trading, and economic updates.", "url": "https://www.livemint.com"},
+    {"name": "Moneycontrol (Network18)", "code": "MONEYCONTROL", "cat": "media", "tier": "Secondary Media", "jurisdiction": "🇮🇳 India", "scope": "Domestic retail and institutional financial reporting, brokerage target prices, and derivatives sentiment.", "url": "https://www.moneycontrol.com"},
+    {"name": "CNBC-TV18", "code": "CNBC-TV18", "cat": "media", "tier": "Secondary Media", "jurisdiction": "🇮🇳 India", "scope": "Indian business broadcasting network, corporate executive interviews, and market open commentary.", "url": "https://www.cnbctv18.com"},
+    {"name": "The Economic Times (Times Group)", "code": "ECON-TIMES", "cat": "media", "tier": "Secondary Media", "jurisdiction": "🇮🇳 India", "scope": "Indian financial newspaper covering corporate deals, policy commentary, and sectoral movements.", "url": "https://economictimes.indiatimes.com"},
+    {"name": "MarketWatch (Dow Jones)", "code": "MARKETWATCH", "cat": "media", "tier": "Secondary Media", "jurisdiction": "🇺🇸 United States", "scope": "U.S. financial media covering Wall Street trading sessions, retail investor flows, and treasury rate trends.", "url": "https://www.marketwatch.com"},
+]
+
+
 def render_settings_hub_html() -> str:
     """
-    Renders institutional dual-column Settings & Telegram Hub matching media_1793543656614_201765c0.png:
-    - Left Column: DISPATCH CONFIGURATION (Channel 1, Channel 2, Automated Schedules, Real-Time Triggers, Save Button)
-    - Right Column: ACTIVE DISPATCH LIST & MONITOR (Stats banner, Search filter, 4 Actionable Cards)
+    Renders institutional Settings Hub with:
+    1. Authoritative Institutional & Key Person Registry (Sovereign vs Commercial Media)
+    2. Dispatch Configuration (Channels 1 & 2, Automated Schedules, Triggers) with Circular TG Disabled
+    3. Active Dispatch List & Monitor
+    4. Global Legal & Compliance Notice
     """
     news_tok = html.escape(telegram_notifier.bot_token or "")
     news_chat = html.escape(telegram_notifier.chat_id or "")
@@ -2499,22 +2586,95 @@ def render_settings_hub_html() -> str:
     auto_fri = "checked" if telegram_notifier.auto_weekly_pdf_fri_6am else ""
     auto_25th = "checked" if telegram_notifier.auto_monthly_pdf_25th_6am else ""
     auto_hol = "checked" if telegram_notifier.auto_holiday_7am else ""
-    auto_circ = "checked" if getattr(telegram_notifier, "auto_circulars_tg", False) else ""
 
     trig_t15 = "checked" if telegram_notifier.alert_on_countdown else ""
     trig_out = "checked" if telegram_notifier.alert_on_outcome else ""
     trig_link = "checked" if telegram_notifier.alert_on_linked_news else ""
+
+    # Build Directory Rows
+    dir_rows = []
+    for d in INSTITUTIONAL_DIRECTORY:
+        tier_class = "tier-sovereign" if "Sovereign" in d["tier"] else ("tier-exchange" if "Exchange" in d["tier"] else ("tier-media" if "Media" in d["tier"] else "tier-govt"))
+        dir_rows.append(f'''
+        <tr class="epm-dir-row" data-cat="{d['cat']}">
+            <td class="col-dir-name">
+                <b>{html.escape(d['name'])}</b>
+                <span class="epm-dir-code">{html.escape(d['code'])}</span>
+            </td>
+            <td class="col-dir-tier">
+                <span class="epm-tier-badge {tier_class}">{html.escape(d['tier'])}</span>
+            </td>
+            <td class="col-dir-jur">{html.escape(d['jurisdiction'])}</td>
+            <td class="col-dir-scope">{html.escape(d['scope'])}</td>
+            <td class="col-dir-link">
+                <a href="{html.escape(d['url'])}" target="_blank" rel="noopener" class="epm-dir-portal-btn">Portal ↗</a>
+            </td>
+        </tr>
+        ''')
+
+    disclaimer_html = render_site_disclaimer_html(is_mobile=False)
 
     return f'''
     <div class="epm-settings-hub-container">
         <!-- Top Institutional Header -->
         <div class="epm-settings-header">
             <div class="epm-settings-title-cluster">
-                <span class="epm-settings-main-title">INSTITUTIONAL SETTINGS & EXTERNAL INTEGRATIONS HUB</span>
-                <span class="epm-settings-sub-title">Configure multi-market Telegram bot channels, automated A4 PDF dispatch schedules, and real-time execution monitors.</span>
+                <span class="epm-settings-main-title">INSTITUTIONAL SETTINGS & DIRECTORY HUB</span>
+                <span class="epm-settings-sub-title">Multi-market institutional directory, sovereign vs media segregation, Telegram dispatch channels, and automated cron monitors.</span>
             </div>
             <div class="epm-settings-status-badge">
-                <span class="epm-status-dot pulse-green">●</span> TELEGRAM DISPATCH ENGINE: ONLINE
+                <span class="epm-status-dot pulse-green">●</span> SYSTEM STATUS: OPERATIONAL
+            </div>
+        </div>
+
+        <!-- 1. AUTHORITATIVE INSTITUTIONAL & KEY PERSON REGISTRY -->
+        <div class="epm-settings-card" style="margin-bottom: 24px;">
+            <div class="epm-card-hdr">
+                <div class="epm-card-hdr-left">
+                    <span class="epm-card-hdr-icon">🏛️</span>
+                    <span class="epm-card-hdr-title">AUTHORITATIVE INSTITUTIONAL & KEY PERSON REGISTRY</span>
+                </div>
+                <span class="epm-card-hdr-tag">Tier-1 Sovereign vs Commercial Media Segregation</span>
+            </div>
+
+            <!-- Explanatory Segregation Banner -->
+            <div class="epm-segregation-banner">
+                <span class="epm-segregation-badge">DATA GOVERNANCE ARCHITECTURE</span>
+                <p><b>Statutory Primacy:</b> Tier-1 Sovereign Regulators, Organized Exchanges, Government Ministries, and Key Public Officials (Ministers & Central Bank Governors) possess legal rulemaking and enforcement authority. Their releases represent definitive market reality.</p>
+                <p><b>Secondary Media Benchmark:</b> Commercial wire services (Reuters, Bloomberg, Livemint, CNBC-TV18, Moneycontrol) are segregated and tracked purely for broad market sentiment, journalistic commentary, and secondary price action analysis.</p>
+            </div>
+
+            <!-- Controls: Category Tabs & Search -->
+            <div class="epm-dir-controls">
+                <div class="epm-dir-tabs">
+                    <button type="button" class="epm-dir-tab active" onclick="window.epmFilterDirCat('all', this)">ALL DIRECTORIES ({len(INSTITUTIONAL_DIRECTORY)})</button>
+                    <button type="button" class="epm-dir-tab" onclick="window.epmFilterDirCat('regulator', this)">🏛️ REGULATORS</button>
+                    <button type="button" class="epm-dir-tab" onclick="window.epmFilterDirCat('exchange', this)">📈 EXCHANGES & SROs</button>
+                    <button type="button" class="epm-dir-tab" onclick="window.epmFilterDirCat('ministry', this)">🏢 MINISTRIES & DEPTS</button>
+                    <button type="button" class="epm-dir-tab" onclick="window.epmFilterDirCat('person', this)">👤 KEY SOVEREIGN OFFICIALS</button>
+                    <button type="button" class="epm-dir-tab" onclick="window.epmFilterDirCat('media', this)">📰 COMMERCIAL MEDIA</button>
+                </div>
+                <div class="epm-dir-search-wrap">
+                    <input type="text" class="epm-search-input" placeholder="🔍 Search directory by authority, name, jurisdiction or scope..." onkeyup="window.epmFilterDirectory(this.value)" />
+                </div>
+            </div>
+
+            <!-- Interactive Directory Table -->
+            <div class="epm-dir-table-wrap">
+                <table class="epm-dir-table" id="epm-directory-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 26%;">AUTHORITY / KEY OFFICIAL</th>
+                            <th style="width: 14%;">TIER & CATEGORY</th>
+                            <th style="width: 12%;">JURISDICTION</th>
+                            <th style="width: 38%;">STATUTORY SCOPE & KEY FOCUS</th>
+                            <th style="width: 10%;">REFERENCE</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {''.join(dir_rows)}
+                    </tbody>
+                </table>
             </div>
         </div>
 
@@ -2523,7 +2683,10 @@ def render_settings_hub_html() -> str:
             <div class="epm-settings-col epm-config-col">
                 <div class="epm-settings-card">
                     <div class="epm-card-hdr">
-                        <span class="epm-card-hdr-title">DISPATCH CONFIGURATION</span>
+                        <div class="epm-card-hdr-left">
+                            <span class="epm-card-hdr-icon">⚡</span>
+                            <span class="epm-card-hdr-title">DISPATCH CONFIGURATION</span>
+                        </div>
                         <span class="epm-card-hdr-tag">Telegram & Webhooks</span>
                     </div>
 
@@ -2572,6 +2735,17 @@ def render_settings_hub_html() -> str:
                             <button type="button" class="epm-btn-test" onclick="window.epmSendTestTg('calendar')">Send Test Message</button>
                         </div>
 
+                        <!-- Policy: Circular Telegram Alert Status -->
+                        <div class="epm-circular-policy-box">
+                            <div class="epm-policy-hdr">
+                                <span class="epm-policy-badge">POLICY RESTRICTION</span>
+                                <b>Official Regulatory Circulars Telegram Forwarding</b>
+                            </div>
+                            <div class="epm-policy-desc">
+                                🔴 <b>STATUS: DISABLED (Suppressed by Policy)</b> — Automatic and manual dispatching of official circular notifications to Telegram has been turned off. Users can access official documents directly from the Circulars terminal tab.
+                            </div>
+                        </div>
+
                         <!-- Automated Schedules Toggles -->
                         <div class="epm-subgroup-title">Automated Dispatch Schedules (IST Schedule)</div>
                         <div class="epm-schedule-toggles">
@@ -2586,10 +2760,6 @@ def render_settings_hub_html() -> str:
                             <label class="epm-checkbox-label">
                                 <input type="checkbox" id="cfg_sched_hol" {auto_hol} />
                                 <span>07:00 AM IST — Auto-Forward Next-Day Trading Holiday Alert (1 Day Before Holiday)</span>
-                            </label>
-                            <label class="epm-checkbox-label">
-                                <input type="checkbox" id="cfg_sched_circ" {auto_circ} />
-                                <span>Auto-Forward Critical Regulatory Circulars (NSE, BSE, MCX, RBI, FinMin, FOMC) with 3-5 Bullets & PDF Link</span>
                             </label>
                         </div>
 
@@ -2625,15 +2795,18 @@ def render_settings_hub_html() -> str:
             <div class="epm-settings-col epm-monitor-col">
                 <div class="epm-settings-card">
                     <div class="epm-card-hdr">
-                        <span class="epm-card-hdr-title">ACTIVE DISPATCH LIST & MONITOR</span>
+                        <div class="epm-card-hdr-left">
+                            <span class="epm-card-hdr-icon">⏱️</span>
+                            <span class="epm-card-hdr-title">ACTIVE DISPATCH LIST & MONITOR</span>
+                        </div>
                         <span class="epm-card-hdr-tag">Live Schedulers</span>
                     </div>
 
                     <!-- Summary Stats Bar -->
                     <div class="epm-monitor-stats">
                         <div class="epm-stat-box">
-                            <span class="epm-stat-val">4</span>
-                            <span class="epm-stat-lbl">Active Schedules</span>
+                            <span class="epm-stat-val">3</span>
+                            <span class="epm-stat-lbl">Active Cron Jobs</span>
                         </div>
                         <div class="epm-stat-box">
                             <span class="epm-stat-val">2</span>
@@ -2641,7 +2814,7 @@ def render_settings_hub_html() -> str:
                         </div>
                         <div class="epm-stat-box">
                             <span class="epm-stat-val">100%</span>
-                            <span class="epm-stat-lbl">Cron Uptime</span>
+                            <span class="epm-stat-lbl">Uptime Health</span>
                         </div>
                     </div>
 
@@ -2650,7 +2823,7 @@ def render_settings_hub_html() -> str:
                         <input type="text" class="epm-search-input" placeholder="🔍 Filter schedules..." onkeyup="window.epmFilterSchedules(this.value)" />
                     </div>
 
-                    <!-- 4 Actionable Schedule Cards -->
+                    <!-- Actionable Schedule Cards -->
                     <div class="epm-schedule-cards" id="epm-schedule-cards-list">
                         <!-- Card 1: Weekly Multi-Market PDF Dossier -->
                         <div class="epm-sched-card" data-name="weekly dossier">
@@ -2729,6 +2902,9 @@ def render_settings_hub_html() -> str:
                 </div>
             </div>
         </div>
+
+        <!-- Global Compliance Notice -->
+        {disclaimer_html}
     </div>
     '''
 
@@ -5866,6 +6042,251 @@ tbody tr:hover td {
     }
 }
 
+/* Institutional Directory & Segregation Controls */
+.epm-card-hdr-left {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
+.epm-card-hdr-icon {
+    font-size: 16px !important;
+}
+.epm-segregation-banner {
+    background: #EFF6FF !important;
+    border: 1px solid #BFDBFE !important;
+    border-left: 4px solid #0052FF !important;
+    border-radius: 8px !important;
+    padding: 12px 14px !important;
+    margin-bottom: 16px !important;
+}
+.epm-segregation-badge {
+    display: inline-block !important;
+    font-size: 9.5px !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.06em !important;
+    background: #0052FF !important;
+    color: #FFFFFF !important;
+    padding: 2px 7px !important;
+    border-radius: 4px !important;
+    margin-bottom: 6px !important;
+    text-transform: uppercase !important;
+}
+.epm-segregation-banner p {
+    font-size: 11.5px !important;
+    line-height: 1.5 !important;
+    color: #1E3A8A !important;
+    margin: 4px 0 !important;
+}
+.epm-segregation-banner p b {
+    font-weight: 800 !important;
+    color: #0F172A !important;
+}
+
+.epm-dir-controls {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    gap: 12px !important;
+    margin-bottom: 14px !important;
+    flex-wrap: wrap !important;
+}
+.epm-dir-tabs {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    background: #F1F5F9 !important;
+    padding: 3px !important;
+    border-radius: 8px !important;
+    flex-wrap: wrap !important;
+}
+.epm-dir-tab {
+    border: none !important;
+    background: transparent !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    color: #64748B !important;
+    padding: 5px 11px !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
+}
+.epm-dir-tab.active {
+    background: #FFFFFF !important;
+    color: #0F172A !important;
+    box-shadow: 0 1px 3px rgba(15,23,42,0.08) !important;
+}
+.epm-dir-search-wrap {
+    flex: 1 1 240px !important;
+    max-width: 320px !important;
+}
+
+.epm-dir-table-wrap {
+    overflow-x: auto !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 8px !important;
+}
+.epm-dir-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 11.5px !important;
+    text-align: left !important;
+}
+.epm-dir-table th {
+    background: #F8FAFC !important;
+    color: #334155 !important;
+    font-weight: 800 !important;
+    font-size: 10.5px !important;
+    letter-spacing: 0.05em !important;
+    text-transform: uppercase !important;
+    padding: 10px 12px !important;
+    border-bottom: 1.5px solid #CBD5E1 !important;
+}
+.epm-dir-table td {
+    padding: 10px 12px !important;
+    border-bottom: 1px solid #F1F5F9 !important;
+    vertical-align: middle !important;
+}
+.epm-dir-row:nth-child(even) td {
+    background: #FAFAFA !important;
+}
+.epm-dir-row:hover td {
+    background: #F1F5F9 !important;
+}
+.col-dir-name b {
+    color: #0F172A !important;
+    font-weight: 700 !important;
+    font-size: 12px !important;
+    display: block !important;
+}
+.epm-dir-code {
+    font: 700 9.5px var(--font-mono, monospace) !important;
+    color: #64748B !important;
+    background: #F1F5F9 !important;
+    padding: 1px 5px !important;
+    border-radius: 3px !important;
+    display: inline-block !important;
+    margin-top: 3px !important;
+}
+.epm-tier-badge {
+    font-size: 9.5px !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.04em !important;
+    padding: 2px 8px !important;
+    border-radius: 4px !important;
+    display: inline-block !important;
+    text-transform: uppercase !important;
+}
+.epm-tier-badge.tier-sovereign { background: #EEF2FF !important; color: #4338CA !important; border: 1px solid #C7D2FE !important; }
+.epm-tier-badge.tier-exchange { background: #ECFDF5 !important; color: #047857 !important; border: 1px solid #A7F3D0 !important; }
+.epm-tier-badge.tier-govt { background: #FEF3C7 !important; color: #B45309 !important; border: 1px solid #FDE68A !important; }
+.epm-tier-badge.tier-media { background: #F1F5F9 !important; color: #475569 !important; border: 1px solid #CBD5E1 !important; }
+
+.col-dir-jur {
+    font-weight: 600 !important;
+    color: #334155 !important;
+    white-space: nowrap !important;
+}
+.col-dir-scope {
+    color: #475569 !important;
+    line-height: 1.45 !important;
+}
+.col-dir-link {
+    text-align: center !important;
+}
+.epm-dir-portal-btn {
+    font-size: 10.5px !important;
+    font-weight: 700 !important;
+    color: #0052FF !important;
+    background: #EFF6FF !important;
+    border: 1px solid #BFDBFE !important;
+    padding: 3px 8px !important;
+    border-radius: 4px !important;
+    text-decoration: none !important;
+    display: inline-block !important;
+    white-space: nowrap !important;
+}
+.epm-dir-portal-btn:hover {
+    background: #0052FF !important;
+    color: #FFFFFF !important;
+}
+
+.epm-circular-policy-box {
+    background: #FFF1F2 !important;
+    border: 1px solid #FECDD3 !important;
+    border-radius: 8px !important;
+    padding: 10px 12px !important;
+    margin: 12px 0 !important;
+}
+.epm-policy-hdr {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    font-size: 11.5px !important;
+    color: #9F1239 !important;
+    margin-bottom: 4px !important;
+}
+.epm-policy-badge {
+    background: #E11D48 !important;
+    color: #FFFFFF !important;
+    font-size: 9px !important;
+    font-weight: 800 !important;
+    padding: 1px 5px !important;
+    border-radius: 3px !important;
+    letter-spacing: 0.05em !important;
+}
+.epm-policy-desc {
+    font-size: 11px !important;
+    line-height: 1.45 !important;
+    color: #881337 !important;
+}
+
+/* Global Site Legal Disclaimer */
+.epm-site-legal-disclaimer {
+    margin: 24px 0 16px !important;
+    padding: 14px 18px !important;
+    background: #F8FAFC !important;
+    border: 1px solid #E2E8F0 !important;
+    border-left: 3px solid #64748B !important;
+    border-radius: 8px !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+}
+.epm-site-legal-disclaimer.is-mobile {
+    margin: 18px 0 12px !important;
+    padding: 11px 13px !important;
+}
+.epm-disclaimer-hdr {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    margin-bottom: 6px !important;
+}
+.epm-disclaimer-shield {
+    font-size: 11px !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.06em !important;
+    color: #475569 !important;
+    text-transform: uppercase !important;
+}
+.epm-disclaimer-p1 {
+    font-size: 11.5px !important;
+    line-height: 1.5 !important;
+    color: #64748B !important;
+    margin: 0 0 4px 0 !important;
+}
+.epm-disclaimer-p2 {
+    font-size: 11.5px !important;
+    font-weight: 700 !important;
+    line-height: 1.4 !important;
+    color: #334155 !important;
+    margin: 0 !important;
+}
+@media (max-width: 640px) {
+    .epm-disclaimer-p1, .epm-disclaimer-p2 {
+        font-size: 10.5px !important;
+    }
+}
+
 /* Right Controls */
 .epm-nav-controls {
     display: flex !important;
@@ -6550,15 +6971,127 @@ tbody tr:hover td {
 .epm-pc-section-title { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #0F172A; margin: 4px 2px 8px; }
 .epm-live-pill { font-size: 9px; font-weight: 800; padding: 1px 6px; border-radius: 999px; background: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; }
 
-/* Stories strip */
-.epm-story-strip { display: flex; gap: 12px; overflow-x: auto; padding: 4px 2px 12px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+/* Story Thumbnails (Replacing Circles) */
+.epm-story-strip { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 14px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .epm-story-strip::-webkit-scrollbar { display: none; }
-.epm-story-bubble { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 4px; background: none; border: none; padding: 0; cursor: pointer; width: 64px; }
-.epm-story-ring { width: 58px; height: 58px; border-radius: 50%; padding: 2.5px; background: conic-gradient(#0052FF, #10B981, #F43F5E, #0052FF); display: flex; }
-.epm-story-bubble.tone-bullish .epm-story-ring { background: conic-gradient(#10B981, #34D399, #059669, #10B981); }
-.epm-story-bubble.tone-bearish .epm-story-ring { background: conic-gradient(#F43F5E, #FB7185, #BE123C, #F43F5E); }
-.epm-story-inner { flex: 1; border-radius: 50%; background: #FFFFFF; border: 2px solid #FFFFFF; display: flex; align-items: center; justify-content: center; font: 700 11px var(--font-mono, monospace); color: #0F172A; }
-.epm-story-label { font-size: 10px; color: #475569; max-width: 64px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.epm-story-strip.desktop-strip {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding: 12px 14px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    margin-bottom: 12px;
+}
+.epm-story-thumbnail {
+    flex: 0 0 84px !important;
+    height: 114px !important;
+    border-radius: 10px !important;
+    padding: 2.5px !important;
+    background: linear-gradient(135deg, #0052FF, #4F46E5) !important;
+    cursor: pointer !important;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08) !important;
+    transition: transform 0.18s ease, box-shadow 0.18s ease !important;
+    user-select: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+    display: flex !important;
+    box-sizing: border-box !important;
+}
+.epm-story-thumbnail:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 14px rgba(15, 23, 42, 0.15) !important;
+}
+.epm-story-thumbnail.tone-bullish {
+    background: linear-gradient(135deg, #10B981, #059669) !important;
+}
+.epm-story-thumbnail.tone-bearish {
+    background: linear-gradient(135deg, #F43F5E, #BE123C) !important;
+}
+.epm-story-thumbnail.tone-neutral {
+    background: linear-gradient(135deg, #64748B, #334155) !important;
+}
+
+.epm-thumb-inner {
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 8px !important;
+    background: linear-gradient(180deg, #1E293B 0%, #0F172A 100%) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    padding: 6px !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    position: relative !important;
+}
+.epm-thumb-top {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 2px !important;
+}
+.epm-thumb-auth {
+    font-size: 8px !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.04em !important;
+    color: #93C5FD !important;
+    text-transform: uppercase !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 48px !important;
+}
+.epm-thumb-score {
+    font: 800 8.5px var(--font-mono, monospace) !important;
+    color: #F8FAFC !important;
+    background: rgba(255, 255, 255, 0.15) !important;
+    padding: 1px 4px !important;
+    border-radius: 4px !important;
+}
+.epm-thumb-mid {
+    flex: 1 !important;
+    margin: 3px 0 !important;
+    display: flex !important;
+    align-items: center !important;
+}
+.epm-thumb-title {
+    font-size: 9px !important;
+    font-weight: 700 !important;
+    line-height: 1.25 !important;
+    color: #FFFFFF !important;
+    display: -webkit-box !important;
+    -webkit-line-clamp: 3 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+    word-break: break-word !important;
+}
+.epm-thumb-btm {
+    display: flex !important;
+    align-items: center !important;
+}
+.epm-thumb-pill {
+    font-size: 7.5px !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.05em !important;
+    padding: 1px 4px !important;
+    border-radius: 3px !important;
+    text-transform: uppercase !important;
+}
+.tone-bullish .epm-thumb-pill { background: rgba(16, 185, 129, 0.25) !important; color: #34D399 !important; }
+.tone-bearish .epm-thumb-pill { background: rgba(244, 63, 94, 0.25) !important; color: #FDA4AF !important; }
+.tone-neutral .epm-thumb-pill { background: rgba(148, 163, 184, 0.25) !important; color: #E2E8F0 !important; }
+
+@media (max-width: 640px) {
+    .epm-story-thumbnail {
+        flex: 0 0 76px !important;
+        height: 104px !important;
+    }
+    .epm-thumb-title {
+        font-size: 8.5px !important;
+        -webkit-line-clamp: 3 !important;
+    }
+}
 
 /* Progressive (tap-to-expand) cards */
 .epm-pc-list { display: flex; flex-direction: column; gap: 8px; }
@@ -6567,13 +7100,50 @@ tbody tr:hover td {
 .epm-pc-head { display: flex; align-items: flex-start; gap: 10px; }
 .epm-pc-head-text { flex: 1; min-width: 0; }
 .epm-pc-title { font-size: 13.5px; font-weight: 700; line-height: 1.35; color: #0F172A; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.epm-pc-card.is-open .epm-pc-title,
+.epm-tl-card.is-open .epm-tl-name {
+    display: block !important;
+    -webkit-line-clamp: unset !important;
+    -webkit-box-orient: unset !important;
+    overflow: visible !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+    font-size: 14.5px !important;
+    line-height: 1.4 !important;
+}
+
+.epm-pc-full-headline {
+    background: #F8FAFC !important;
+    border: 1px solid #E2E8F0 !important;
+    border-left: 3px solid #0052FF !important;
+    border-radius: 6px !important;
+    padding: 8px 10px !important;
+    margin-bottom: 10px !important;
+}
+.epm-full-hl-badge {
+    display: inline-block !important;
+    font-size: 9px !important;
+    font-weight: 800 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    color: #0052FF !important;
+    margin-bottom: 4px !important;
+}
+.epm-full-hl-text {
+    font-size: 13.5px !important;
+    font-weight: 700 !important;
+    line-height: 1.4 !important;
+    color: #0F172A !important;
+    word-break: break-word !important;
+}
+
 .epm-pc-meta { margin-top: 4px; font: 500 10.5px var(--font-mono, monospace); color: #64748B; display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .epm-pc-dot { width: 7px; height: 7px; border-radius: 50%; background: #94A3B8; flex: 0 0 auto; }
 .tone-bullish .epm-pc-dot { background: #10B981; }
 .tone-bearish .epm-pc-dot { background: #F43F5E; }
 .epm-pc-chev { color: #94A3B8; font-size: 16px; line-height: 1; transition: transform .2s ease; }
 .epm-pc-body { display: block; max-height: 0; overflow: hidden; opacity: 0; transition: max-height .28s ease, opacity .2s ease, margin .2s ease; }
-.is-open > .epm-pc-body, .is-open .epm-pc-body { max-height: 520px; opacity: 1; margin-top: 10px; }
+.is-open > .epm-pc-body, .is-open .epm-pc-body { max-height: 650px !important; opacity: 1 !important; margin-top: 10px !important; }
 .epm-pc-card.is-open .epm-pc-chev { transform: rotate(180deg); }
 .epm-pc-card.is-open.tone-bullish, .epm-tl-card.is-open.tone-bullish { background: linear-gradient(160deg, #ECFDF5 0%, #FFFFFF 60%); border-color: #A7F3D0; }
 .epm-pc-card.is-open.tone-bearish, .epm-tl-card.is-open.tone-bearish { background: linear-gradient(160deg, #FFF1F2 0%, #FFFFFF 60%); border-color: #FECDD3; }
@@ -7887,8 +8457,7 @@ TERMINAL_CLIENT_JS = r"""
             <div class="epm-sv-foot">
               <div class="epm-sv-actions-row">
                 <a id="epm-sv-doc-link" href="#" target="_blank" rel="noopener" class="epm-sv-btn epm-sv-btn-doc">📥 View Document ↗</a>
-                <button type="button" id="epm-sv-tg-btn" class="epm-sv-btn epm-sv-btn-tg" onclick="window.epmDispatchCurrentStoryToTelegram()">✈️ Forward Story to Telegram</button>
-                <a id="epm-sv-dl" href="#" target="_blank" rel="noopener" class="epm-sv-btn epm-sv-btn-png">⬇ Save PNG</a>
+                <a id="epm-sv-dl" href="#" target="_blank" rel="noopener" class="epm-sv-btn epm-sv-btn-png">⬇ Save Story PNG</a>
               </div>
             </div>
           </div>
@@ -8878,6 +9447,32 @@ TERMINAL_CLIENT_JS = r"""
             }
         });
     };
+
+    let currentDirCat = 'all';
+    window.epmFilterDirCat = function(cat, btn) {
+        currentDirCat = (cat || 'all').toLowerCase();
+        if (btn) {
+            document.querySelectorAll('.epm-dir-tab').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        }
+        applyDirFilters();
+    };
+
+    window.epmFilterDirectory = function(term) {
+        applyDirFilters();
+    };
+
+    function applyDirFilters() {
+        const input = document.querySelector('.epm-dir-search-wrap input');
+        const q = (input ? input.value : '').toLowerCase().trim();
+        document.querySelectorAll('#epm-directory-table tbody tr').forEach(row => {
+            const cat = (row.getAttribute('data-cat') || '').toLowerCase();
+            const text = (row.innerText || '').toLowerCase();
+            const matchCat = (currentDirCat === 'all') || (cat === currentDirCat);
+            const matchQ = !q || text.includes(q);
+            row.style.display = (matchCat && matchQ) ? '' : 'none';
+        });
+    }
 
     if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", epmInitTerminal);

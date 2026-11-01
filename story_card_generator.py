@@ -231,6 +231,12 @@ class StoryCardGenerator:
         cw = d.textlength(cta, font=cf)
         d.text(((W - cw) / 2, H - 110), cta, font=cf, fill=FAINT)
 
+        # Tiny Regulatory Disclaimer
+        disc_font = self._font(17, bold=False)
+        disc_msg = "Disclaimer: This document and information is not a investment advise, creator/publisher not responsible, for knowledge/information only."
+        disc_w = d.textlength(disc_msg, font=disc_font)
+        d.text(((W - disc_w) / 2, H - 55), disc_msg, font=disc_font, fill=(148, 163, 184))
+
         buf = io.BytesIO()
         img.save(buf, format="PNG", optimize=True)
         return buf.getvalue()

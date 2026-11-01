@@ -221,11 +221,11 @@ def build_circular_pdf_bytes(circ: Dict) -> bytes:
 
     story.append(Spacer(1, 14))
 
-    # 6. Institutional Verification Notice & Footer
+    # 6. Institutional Verification Notice & Mandatory Disclaimer
     disclaimer_text = (
-        f"This document is an authoritative digital regulatory brief compiled and archived by the Global News Feed Room (GNC) "
-        f"Market Intelligence Engine. Official records are synchronized directly from {reg} release channels. "
-        f"For official correspondence or legal submission, cross-reference circular reference {cno}."
+        "Disclaimer: This document and information in this document is not a investment advise, "
+        "the creator and publisher are not responsible of your actions, for knowledge and information purpose only. "
+        f"Archived by Global News Feed Room (GNC) for official cross-reference {cno}."
     )
     story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#CBD5E1"), spaceBefore=10, spaceAfter=8))
     story.append(Paragraph(disclaimer_text, ParagraphStyle("Disc", fontName="Helvetica-Oblique", fontSize=7.5, leading=10, textColor=colors.HexColor("#64748B"))))

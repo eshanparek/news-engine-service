@@ -737,9 +737,14 @@ class CircularEngine:
         bullets: List[str] = None,
         action_takeaway: str = ""
     ) -> bool:
-        """Immediately floats a newly published circular to the official Telegram channel."""
+        """Immediately floats a newly published circular to the official Telegram channel if enabled."""
         try:
             from telegram_notifier import telegram_notifier
+            # Strictly disabled per institutional policy
+            if not getattr(telegram_notifier, "auto_circulars_tg", False):
+                logger.debug("Circular telegram forwarding is disabled by policy.")
+                return False
+
             if not telegram_notifier.calendar_enabled or not telegram_notifier.is_calendar_configured():
                 if not telegram_notifier.is_configured():
                     return False
@@ -773,6 +778,8 @@ class CircularEngine:
         """Auto-dispatch pending circulars that haven't been forwarded yet."""
         try:
             from telegram_notifier import telegram_notifier
+            if not getattr(telegram_notifier, "auto_circulars_tg", False):
+                return
             if not telegram_notifier.calendar_enabled or not telegram_notifier.is_calendar_configured():
                 if not telegram_notifier.is_configured():
                     return
@@ -837,7 +844,8 @@ class CircularEngine:
         if pdf_url:
             lines.append(f"\n📄 <b>Official Document Download:</b>\n👉 <a href=\"{pdf_url}\"><b>Download Official Circular (PDF) ↗</b></a>")
 
-        lines.append(f"\n<i>Global News Feed Room is Powered by EPMC Pvt. Ltd.</i>")
+        lines.append(f"\n⚖️ <i>Disclaimer: This document and information in this document is not a investment advise, the creator and publisher are not responsible of your actions, for knowledge and information purpose only.</i>")
+        lines.append(f"<i>Global News Feed Room is Powered by EPMC Pvt. Ltd.</i>")
         return "\n".join(lines)
 
 
