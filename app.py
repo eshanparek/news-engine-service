@@ -1,5 +1,7 @@
 import os
+import io
 import time
+import requests
 import html
 import re
 import sqlite3
