@@ -871,15 +871,20 @@ def render_news_feed_html(items: List[Dict]) -> str:
         link = it.get("link", "#")
 
         # Time format 12:50:30 PM
-        ts = str(it.get("timestamp", ""))
+        ts = str(it.get("timestamp", "")).strip()
         try:
-            if "T" in ts:
+            if " " in ts and ":" in ts and ("AM" in ts or "PM" in ts):
+                time_str = ts.replace("Today ", "").strip()
+            elif "T" in ts:
                 dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
                 time_str = dt.astimezone(ist).strftime("%I:%M:%S %p")
-            elif ":" in ts:
+            elif len(ts) >= 19 and "-" in ts[:10] and ":" in ts[11:]:
+                dt = datetime.strptime(ts[:19], "%Y-%m-%d %H:%M:%S")
+                time_str = dt.strftime("%I:%M:%S %p")
+            elif ":" in ts and len(ts.split(":")) >= 2:
                 time_str = ts.replace("Today ", "").strip()
                 if not time_str.endswith("AM") and not time_str.endswith("PM"):
-                    time_str = now.strftime("%I:%M:%S %p")
+                    time_str = f"{time_str} IST"
             else:
                 time_str = now.strftime("%I:%M:%S %p")
         except Exception:
@@ -948,7 +953,7 @@ def render_news_feed_html(items: List[Dict]) -> str:
         is_inst = it["is_inst"]
         dot_class = "dot-inst" if is_inst else ("dot-secondary" if seen_broad_divider else "dot-live")
 
-        if not is_inst and not seen_broad_divider:
+        if i == 3 and not seen_broad_divider:
             seen_broad_divider = True
             rows_html.append(
                 '<div class="epm-stream-divider broad-stream">'
@@ -2898,13 +2903,13 @@ def get_dashboard_tables():
         live_items = [it for it in items if it.get("title")]
         live_items.sort(key=lambda x: (x.get("ai_score", 5), x.get("relevance", 0)), reverse=True)
 
-        # Merge live feeds with baseline institutional catalysts so the wire always has at least 7-8 rows
-        all_pool = list(live_items)
+        # Merge baseline institutional catalysts first so the wire follows the authoritative timeline
+        all_pool = list(BASELINE_BREAKING_CATALYSTS)
         seen_titles = {clean_table_text(it.get("title", "")) for it in all_pool}
-        for base_it in BASELINE_BREAKING_CATALYSTS:
-            if clean_table_text(base_it["title"]) not in seen_titles:
-                all_pool.append(base_it)
-                seen_titles.add(clean_table_text(base_it["title"]))
+        for live_it in live_items:
+            if clean_table_text(live_it.get("title", "")) not in seen_titles:
+                all_pool.append(live_it)
+                seen_titles.add(clean_table_text(live_it.get("title", "")))
 
         # Institutional Breaking Wire gets all primary and broad catalysts merged into one unified table
         for it in all_pool:
@@ -8507,7 +8512,6 @@ TERMINAL_CLIENT_JS = r"""
             const txt = c.textContent.toLowerCase();
             c.style.display = (!q || txt.includes(q)) ? '' : 'none';
         });
-    };
     };
 
     window.epmSetDeskRegion = function(region, btn) {
