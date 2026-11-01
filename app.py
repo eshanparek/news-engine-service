@@ -566,19 +566,21 @@ def serve_circular_document(circular_id: str, url: Optional[str] = Query(None)):
             }
         )
     except Exception as e:
-        logger.error(f"Failed to generate circular PDF brief: {e}")
+        logger.error(f"Failed to generate circular PDF brief: {e}", exc_info=True)
         # Always build a bulletproof fallback PDF in-memory: NEVER redirect to dead third-party URLs
         try:
-            from reportlab.lib.pagesizes import letter
+            from reportlab.lib.pagesizes import A4
             from reportlab.pdfgen import canvas
             buf = io.BytesIO()
-            c = canvas.Canvas(buf, pagesize=letter)
-            c.setFont("Helvetica-Bold", 16)
-            c.drawString(54, 750, f"GNC MARKET INTELLIGENCE — {regulator} DIRECTIVE")
+            c = canvas.Canvas(buf, pagesize=A4)
+            c.setFont("Helvetica-Bold", 14)
+            c.drawString(50, 800, f"GNC MARKET INTELLIGENCE — {regulator} DIRECTIVE")
             c.setFont("Helvetica", 10)
-            c.drawString(54, 730, f"Reference: {cno_clean} | Date: {now_ist().strftime('%Y-%m-%d')}")
-            c.drawString(54, 700, "Statutory compliance brief archived and verified by GNC Market Intelligence Engine.")
-            c.drawString(54, 680, f"Directive: {circ_data.get('title', 'Official Regulatory Notice')[:90]}")
+            c.drawString(50, 780, f"Reference: {cno_clean}")
+            c.drawString(50, 760, f"Date: {now_ist().strftime('%Y-%m-%d')}")
+            c.drawString(50, 730, "Official Regulatory Directive archived in institutional repository.")
+            t_snip = (circ_data.get("title") or "Regulatory Notice") if isinstance(circ_data, dict) else "Regulatory Notice"
+            c.drawString(50, 700, str(t_snip)[:80])
             c.showPage()
             c.save()
             buf.seek(0)
@@ -592,7 +594,8 @@ def serve_circular_document(circular_id: str, url: Optional[str] = Query(None)):
                 }
             )
         except Exception as fallback_err:
-            raise HTTPException(status_code=500, detail="Could not generate circular document")
+            logger.error(f"Both generators failed: e={e}, fallback_err={fallback_err}")
+            raise HTTPException(status_code=500, detail=f"PDF Error: {str(e)} | Fallback: {str(fallback_err)}")
 
 
 @app.post("/api/news/dispatch-item")

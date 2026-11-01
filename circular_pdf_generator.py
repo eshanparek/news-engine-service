@@ -10,9 +10,15 @@ import logging
 from typing import Dict, List
 
 from reportlab.lib.pagesizes import A4
-from reportlab.platypus import (
-    SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
-)
+try:
+    from reportlab.platypus import (
+        SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
+    )
+except ImportError:
+    from reportlab.platypus import (
+        SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    )
+    from reportlab.platypus.flowables import HRFlowable
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 
@@ -55,7 +61,7 @@ def build_circular_pdf_bytes(circ: Dict) -> bytes:
     title = circ.get("title") or "Regulatory Circular Directive"
     category = circ.get("category") or "Official Regulatory Directive"
     impact = str(circ.get("impact") or "MEDIUM").upper()
-    bullets = circ.get("bullets") or []
+    bullets = circ.get("bullets") or circ.get("bullets_json") or []
     if isinstance(bullets, str):
         try:
             import json
