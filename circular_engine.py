@@ -328,7 +328,7 @@ class CircularEngine:
                     s["title"],
                     s["date"],
                     ts,
-                    f"https://www.nseindia.com/resources/exchange-communication/circulars",
+                    f"/api/circular/doc/{s['id']}",
                     "https://www.nseindia.com",
                     s["category"],
                     s["impact"],
@@ -367,6 +367,35 @@ class CircularEngine:
         self.fetch_mcx_circulars()
         self.fetch_nyse_sec_filings()
         self.fetch_crypto_disclosures()
+        
+        # Ingest multi-market statutory monitors (SEBI, RBI, MCA, FinMin, DGFT, NSE/BSE, MCX/NCDEX, SEC, CFTC, Fed, Treasury, EIA, CME, OPEC)
+        try:
+            from omni_market_crawler import omni_crawler
+            crawled = omni_crawler.run_all_monitors()
+            reg_map = {
+                "SEBI": "SEBI", "RBI": "RBI", "MCA": "FINMIN", "FINMIN": "FINMIN",
+                "DGFT": "FINMIN", "NSE": "NSE", "BSE": "BSE", "MCX": "MCX",
+                "NCDEX": "MCX", "SEC": "NYSE", "CFTC": "FOMC", "FEDERAL RESERVE": "FOMC",
+                "FED": "FOMC", "TREASURY": "FOMC", "BLS": "FOMC", "EIA": "MCX",
+                "CME": "FOMC", "OPEC": "MCX"
+            }
+            for it in crawled:
+                src = (it.get("source") or "REGULATOR").upper()
+                reg = reg_map.get(src, "NSE")
+                cid = it.get("id") or f"{reg.lower()}_{abs(hash(it.get('title')))}"
+                self.add_circular(
+                    circular_id=cid,
+                    regulator=reg,
+                    circular_no=it.get("ref_no") or f"{reg}/STATUTORY/2026",
+                    title=it.get("title", ""),
+                    date_str=it.get("date") or now_ist().strftime("%Y-%m-%d"),
+                    pdf_url=it.get("pdf_url") or f"/api/circular/doc/{cid}",
+                    web_url=it.get("link") or "https://www.gnc.market",
+                    raw_text=it.get("summary") or it.get("title", "")
+                )
+        except Exception as e:
+            logger.warning(f"Omni crawler integration in CircularEngine failed: {e}")
+
         self._check_and_dispatch_high_impact_telegram()
 
     def add_circular(

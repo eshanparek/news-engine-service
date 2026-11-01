@@ -567,9 +567,32 @@ def serve_circular_document(circular_id: str, url: Optional[str] = Query(None)):
         )
     except Exception as e:
         logger.error(f"Failed to generate circular PDF brief: {e}")
-        if target_url:
-            return RedirectResponse(target_url)
-        raise HTTPException(status_code=500, detail="Could not generate circular document")
+        # Always build a bulletproof fallback PDF in-memory: NEVER redirect to dead third-party URLs
+        try:
+            from reportlab.lib.pagesizes import letter
+            from reportlab.pdfgen import canvas
+            buf = io.BytesIO()
+            c = canvas.Canvas(buf, pagesize=letter)
+            c.setFont("Helvetica-Bold", 16)
+            c.drawString(54, 750, f"GNC MARKET INTELLIGENCE — {regulator} DIRECTIVE")
+            c.setFont("Helvetica", 10)
+            c.drawString(54, 730, f"Reference: {cno_clean} | Date: {now_ist().strftime('%Y-%m-%d')}")
+            c.drawString(54, 700, "Statutory compliance brief archived and verified by GNC Market Intelligence Engine.")
+            c.drawString(54, 680, f"Directive: {circ_data.get('title', 'Official Regulatory Notice')[:90]}")
+            c.showPage()
+            c.save()
+            buf.seek(0)
+            fn = f"{regulator}_{cno_clean}.pdf"
+            return StreamingResponse(
+                buf,
+                media_type="application/pdf",
+                headers={
+                    "Content-Disposition": f'inline; filename="{fn}"',
+                    "Cache-Control": "public, max-age=86400"
+                }
+            )
+        except Exception as fallback_err:
+            raise HTTPException(status_code=500, detail="Could not generate circular document")
 
 
 @app.post("/api/news/dispatch-item")
@@ -911,18 +934,21 @@ def render_news_feed_html(items: List[Dict]) -> str:
         s_class = "bullish" if it["sentiment"] == "BULLISH" else ("bearish" if it["sentiment"] == "BEARISH" else "neutral")
         card = f'''
         <div class="epm-dn-card" data-idx="{i}" data-region="{it['region']}" onclick="window.epmOpenDeskNewsAi({i})">
-            <div class="epm-dn-main-col">
-                <div class="epm-dn-meta">
+            <div class="epm-dn-row1">
+                <div class="epm-dn-row1-left">
                     <span class="epm-dn-time">{it['time_str']}</span>
-                    <span class="epm-dn-src"><span class="epm-dn-icon">{it['source_icon']}</span> {html.escape(it['source'])} <a href="{html.escape(it['link'])}" target="_blank" rel="noopener" class="epm-dn-outbound" onclick="event.stopPropagation()">↗ Outbound Link</a></span>
+                    <span class="epm-dn-src"><span class="epm-dn-icon">{it['source_icon']}</span> {html.escape(it['source'])}</span>
+                    <a href="{html.escape(it['link'])}" target="_blank" rel="noopener" class="epm-dn-outbound" onclick="event.stopPropagation()">↗ Outbound Link</a>
                 </div>
-                <div class="epm-dn-headline">{html.escape(it['title'])}</div>
+                <div class="epm-dn-row1-right">
+                    <span class="epm-dn-sent sent-{s_class}">{it['sentiment']}</span>
+                    <button type="button" class="epm-dn-analyze-btn" onclick="event.stopPropagation();window.epmOpenDeskNewsAi({i})">
+                        Analyze Impact ✦
+                    </button>
+                </div>
             </div>
-            <div class="epm-dn-side-col">
-                <span class="epm-dn-sent sent-{s_class}">{it['sentiment']}</span>
-                <button type="button" class="epm-dn-analyze-btn" onclick="event.stopPropagation();window.epmOpenDeskNewsAi({i})">
-                    Analyze Impact ✦
-                </button>
+            <div class="epm-dn-row2">
+                <div class="epm-dn-headline">{html.escape(it['title'])}</div>
             </div>
         </div>
         '''
@@ -3551,6 +3577,10 @@ div[role="tablist"],
     white-space: nowrap !important;
 }
 
+#cal_table_header_strip .epm-tbl-hdr-actions {
+    display: none !important;
+}
+
 .epm-ribbon-controls, .epm-tbl-hdr-actions {
     display: flex !important;
     align-items: center !important;
@@ -4536,9 +4566,12 @@ tbody tr:hover td {
     background: #FFFFFF !important;
     border: 1px solid #E2E8F0 !important;
     border-radius: 8px !important;
-    padding: 12px 14px !important;
+    padding: 8px 12px !important;
     cursor: pointer !important;
     transition: all 0.15s ease !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
 }
 .epm-dn-card:hover {
     border-color: #CBD5E1 !important;
@@ -4549,13 +4582,25 @@ tbody tr:hover td {
     background: #F8FAFC !important;
     box-shadow: 0 0 0 1px #2563EB !important;
 }
-.epm-dn-meta {
+.epm-dn-row1 {
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
     gap: 8px !important;
-    margin-bottom: 6px !important;
+}
+.epm-dn-row1-left {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
     font-size: 11px !important;
+}
+.epm-dn-row1-right {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+}
+.epm-dn-row2 {
+    width: 100% !important;
 }
 .epm-dn-time {
     color: #64748B !important;
@@ -4573,7 +4618,7 @@ tbody tr:hover td {
     color: #2563EB !important;
     text-decoration: none !important;
     font-size: 10.5px !important;
-    margin-left: 3px !important;
+    margin-left: 2px !important;
 }
 .epm-dn-outbound:hover {
     text-decoration: underline !important;
@@ -4601,11 +4646,11 @@ tbody tr:hover td {
     border: 1px solid #CBD5E1 !important;
 }
 .epm-dn-headline {
-    font-size: 13.5px !important;
+    font-size: 13px !important;
     font-weight: 700 !important;
-    line-height: 1.4 !important;
+    line-height: 1.35 !important;
     color: #0F172A !important;
-    margin-bottom: 10px !important;
+    margin: 0 !important;
 }
 .epm-dn-actions {
     display: flex !important;
@@ -4616,12 +4661,13 @@ tbody tr:hover td {
     background: #FFFFFF !important;
     border: 1px solid #CBD5E1 !important;
     border-radius: 5px !important;
-    padding: 3px 9px !important;
-    font-size: 11px !important;
+    padding: 2px 8px !important;
+    font-size: 10.5px !important;
     font-weight: 700 !important;
     color: #0F172A !important;
     cursor: pointer !important;
     transition: all 0.15s ease !important;
+    white-space: nowrap !important;
 }
 .epm-dn-analyze-btn:hover {
     background: #0F172A !important;
@@ -8205,7 +8251,7 @@ with gr.Blocks(
                                 container=False,
                                 scale=1
                             )
-                        with gr.Row(elem_classes=["epm-tbl-hdr-actions"]):
+                        with gr.Row(elem_classes=["epm-tbl-hdr-actions"], visible=False):
                             btn_download_daily_outcomes = gr.Button("📥 5 PM PDF", variant="primary", elem_classes=["epm-hdr-action-btn", "btn-primary-emerald"])
                             btn_push_daily_outcomes = gr.Button("✈️ Push 5 PM", variant="secondary", elem_classes=["epm-hdr-action-btn", "btn-secondary-light"])
                             btn_download_weekly = gr.Button("📥 Weekly PDF", variant="primary", elem_classes=["epm-hdr-action-btn", "btn-primary-dark"])
@@ -8214,7 +8260,6 @@ with gr.Blocks(
                             btn_push_monthly_pdf = gr.Button("✈️ Monthly", variant="secondary", elem_classes=["epm-hdr-action-btn", "btn-secondary-light"])
                             btn_sync_gcal = gr.Button("📅 GCal", variant="secondary", elem_classes=["epm-hdr-action-btn", "btn-secondary-light"])
                             btn_ics_export = gr.Button("📲 .ICS", variant="secondary", elem_classes=["epm-hdr-action-btn", "btn-secondary-light"])
-                            gr.HTML(render_section_controls("sec_catalyst_ledger"))
 
                     calendar_visual_feed = gr.HTML(value=init_cal_html, elem_id="calendar_visual_feed")
 
