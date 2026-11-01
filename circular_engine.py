@@ -706,7 +706,7 @@ class CircularEngine:
                     purl = (r["pdf_url"] or "").strip()
                     wurl = (r["web_url"] or "").strip()
                     doc_link = purl or wurl
-                    if not doc_link or not doc_link.startswith("http") or doc_link.endswith(".zip") or "Mock_" in doc_link:
+                    if not doc_link or (not doc_link.startswith("http") and not doc_link.startswith("/api/")) or doc_link.endswith(".zip") or "Mock_" in doc_link:
                         continue
                     bullets = json.loads(r["bullets_json"]) if r["bullets_json"] else []
                     results.append({
