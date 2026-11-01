@@ -26,6 +26,7 @@ from circular_engine import circular_engine, REGULATORS, REGULATOR_META
 from social_publisher import social_publisher, MEDIA_DIR
 from news_card_generator import news_card_generator
 from calendar_pdf_engine import calendar_pdf_engine
+from story_card_generator import story_card_generator
 
 # 1. Start Background Scraper, Scorer & Multi-Market Calendar Timer Daemons
 news_worker.start()
@@ -58,6 +59,18 @@ async def serve_media(filename: str):
     if os.path.exists(path):
         return FileResponse(path, media_type="image/png")
     return PlainTextResponse("Media card not found", status_code=404)
+
+
+@app.get("/api/story/{kind}/{idx}.png")
+async def serve_story_frame(kind: str, idx: int):
+    """Renders a 1080x1920 Instagram Story flashcard (read-only preview / download)."""
+    kind = "calendar" if kind == "calendar" else "news"
+    items = build_story_items(kind, 8)
+    if not items or idx < 0 or idx >= len(items):
+        return PlainTextResponse("Story frame not found", status_code=404)
+    png = story_card_generator.render_story(items[idx], idx, len(items))
+    from fastapi.responses import Response
+    return Response(content=png, media_type="image/png", headers={"Cache-Control": "no-store"})
 
 
 class NewsItem(BaseModel):
@@ -579,26 +592,229 @@ def render_news_feed_html(items: List[Dict]) -> str:
             </div>
             <div class="epm-card-footer">
                 <div class="epm-sectors-wrap">{sector_pills}</div>
-                <div class="epm-rel-badge">Relevance: <b>{rel}%</b> · <span class="epm-inshorts-tap">📖 Tap for Inshorts View</span></div>
+                <div class="epm-rel-badge">Relevance: <b>{rel}%</b></div>
             </div>
         </div>
         '''
         cards_html.append(card)
 
-    stream_selector = """
-    <div class="epm-mobile-stream-selector">
-        <div class="epm-stream-title">
-            <span class="epm-ribbon-bullet">●</span>
-            <span class="epm-st-text">INSTITUTIONAL BREAKING WIRE</span>
-            <span class="epm-live-pill">LIVE FEED</span>
+    return f'<div class="epm-stream-container">{"".join(cards_html)}</div>'
+
+
+def _sent_key(sent: str) -> str:
+    s = str(sent or "").upper()
+    return "bullish" if "BULL" in s else ("bearish" if "BEAR" in s else "neutral")
+
+
+COUNTRY_FLAGS = {"INDIA": "🇮🇳", "USA": "🇺🇸", "CHINA": "🇨🇳", "GLOBAL": "🌐", "UK": "🇬🇧", "JAPAN": "🇯🇵", "EUROZONE": "🇪🇺"}
+
+
+def get_merged_news_pool() -> List[Dict]:
+    """Live scraped items (sorted by score/relevance) merged with baseline catalysts."""
+    live = [it for it in list(news_worker.news_cache) if it.get("title")]
+    live.sort(key=lambda x: (x.get("ai_score", 5), x.get("relevance", 0)), reverse=True)
+    pool = list(live)
+    seen = {clean_table_text(it.get("title", "")) for it in pool}
+    for b in BASELINE_BREAKING_CATALYSTS:
+        t = clean_table_text(b["title"])
+        if t not in seen:
+            pool.append(b)
+            seen.add(t)
+    return pool
+
+
+def build_story_items(kind: str = "news", limit: int = 6) -> List[Dict]:
+    """Normalised one-catalyst-per-frame story payloads (used by in-app viewer and Instagram PNGs)."""
+    out: List[Dict] = []
+    if kind == "calendar":
+        try:
+            events = calendar_engine.get_enriched_events(filter_range="today", market_filter="ALL") or \
+                     calendar_engine.get_enriched_events(filter_range="all", market_filter="ALL")
+        except Exception:
+            events = []
+        events = sorted(events, key=lambda e: (calendar_pdf_engine._infer_impact_stars(e).count("*") * -1,
+                                               str(e.get("date", "")), str(e.get("time", ""))))
+        for ev in events[:limit]:
+            country, reg = calendar_pdf_engine._infer_country_and_regulator(ev)
+            sent_text, _ = calendar_pdf_engine._format_sentiment(ev)
+            stars = calendar_pdf_engine._infer_impact_stars(ev).count("*") or 3
+            actual = clean_table_text(str(ev.get("actual", "")) or "")
+            if not actual or actual in ("—", "None") or actual.startswith("⏳"):
+                actual = "Pending"
+            out.append({
+                "kind": "calendar",
+                "title": clean_table_text(ev.get("event", "Scheduled Release")),
+                "tag": f"{reg} · {country}",
+                "sentiment": sent_text.upper(),
+                "metric1": clean_table_text(str(ev.get("previous", "—")) or "—")[:14],
+                "metric1_label": "Previous",
+                "metric2": actual[:14],
+                "metric2_label": "Result",
+                "impact": {5: "Critical", 4: "High", 3: "Medium", 2: "Low", 1: "Minor"}.get(stars, "Medium"),
+                "bullets": [clean_table_text(calendar_pdf_engine._build_ai_reasoning(ev))],
+                "source": reg,
+                "time": f"{ev.get('date', '')} {calendar_pdf_engine._format_event_time(ev)} IST".strip(),
+                "link": ev.get("linked_news_url") or "",
+            })
+    else:
+        for it in get_merged_news_pool()[:limit]:
+            sectors = it.get("ai_sectors") or []
+            if isinstance(sectors, str):
+                sectors = [sectors]
+            out.append({
+                "kind": "news",
+                "title": clean_table_text(it.get("title", "")),
+                "tag": ", ".join(str(s) for s in sectors[:2]) or clean_table_text(it.get("source", "")),
+                "sentiment": str(it.get("ai_sentiment", "NEUTRAL")).upper(),
+                "metric1": f"{it.get('ai_score', 5)}/10",
+                "metric1_label": "AI Score",
+                "metric2": f"{it.get('relevance', 0)}%",
+                "metric2_label": "Relevance",
+                "impact": str(it.get("ai_impact", "MEDIUM")).title(),
+                "bullets": [clean_table_text(it.get("ai_reasoning", ""))],
+                "source": clean_table_text(it.get("source", "")),
+                "time": clean_table_text(str(it.get("timestamp", ""))[:16]),
+                "link": it.get("link", ""),
+            })
+    return out
+
+
+def _story_attr(items: List[Dict]) -> str:
+    return html.escape(json.dumps(items, ensure_ascii=False), quote=True)
+
+
+def render_mobile_news_feed_html(pool: List[Dict]) -> str:
+    """Mobile-only progressive (tap-to-expand) news cards with an Instagram-style stories strip."""
+    stories = build_story_items("news", 8)
+    rows = []
+    for i, it in enumerate(pool[:30]):
+        sk = _sent_key(it.get("ai_sentiment"))
+        title = html.escape(clean_table_text(it.get("title", "")))
+        src = html.escape(clean_table_text(it.get("source", "Wire")))
+        ts = html.escape(clean_table_text(str(it.get("timestamp", ""))[:16]))
+        score = it.get("ai_score", 5)
+        rel = it.get("relevance", 0)
+        impact = html.escape(str(it.get("ai_impact", "MEDIUM")).upper())
+        reasoning = html.escape(clean_table_text(it.get("ai_reasoning", "")))
+        sectors = it.get("ai_sectors") or []
+        if isinstance(sectors, str):
+            sectors = [sectors]
+        sec_html = "".join(f'<span class="epm-pc-tag">{html.escape(str(s))}</span>' for s in sectors[:3])
+        link = html.escape(it.get("link", "#") or "#", quote=True)
+        story_btn = f'<button type="button" class="epm-pc-story-btn" onclick="event.stopPropagation();window.epmOpenStory(\'news\',{i})">▶ Story</button>' if i < len(stories) else ""
+        rows.append(f"""
+        <div class="epm-pc-card sent-{sk}" onclick="window.epmToggleProgressive(this)">
+            <div class="epm-pc-head">
+                <div class="epm-pc-head-text">
+                    <div class="epm-pc-title">{title}</div>
+                    <div class="epm-pc-meta"><span class="epm-pc-dot"></span>{src} · {ts}</div>
+                </div>
+                <span class="epm-pc-chev">⌄</span>
+            </div>
+            <div class="epm-pc-body">
+                <div class="epm-pc-metrics">
+                    <div><span>AI Score</span><b>{score}/10</b></div>
+                    <div><span>Relevance</span><b>{rel}%</b></div>
+                    <div><span>Impact</span><b>{impact}</b></div>
+                </div>
+                {f'<div class="epm-pc-reason">• {reasoning}</div>' if reasoning else ''}
+                <div class="epm-pc-tags">{sec_html}</div>
+                <div class="epm-pc-actions">
+                    <span class="epm-pc-sent">{sk.upper()}</span>
+                    {story_btn}
+                    <a class="epm-pc-link" href="{link}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Read ↗</a>
+                </div>
+            </div>
+        </div>""")
+    if not rows:
+        rows.append('<div class="epm-empty-state"><div class="epm-empty-title">Connecting to live wire…</div></div>')
+
+    bubbles = "".join(
+        f'<button type="button" class="epm-story-bubble sent-{_sent_key(s["sentiment"])}" onclick="window.epmOpenStory(\'news\',{i})">'
+        f'<span class="epm-story-ring"><span class="epm-story-inner">{html.escape(str(s["metric1"]))}</span></span>'
+        f'<span class="epm-story-label">{html.escape(s["title"][:14])}</span></button>'
+        for i, s in enumerate(stories)
+    )
+    return f"""
+    <div class="epm-mobile-feed" data-stories-news="{_story_attr(stories)}">
+        <div class="epm-story-strip">{bubbles}</div>
+        <div class="epm-pc-section-title"><span class="epm-ribbon-bullet">●</span> Breaking Wire <span class="epm-live-pill">LIVE</span></div>
+        <div class="epm-pc-list">{''.join(rows)}</div>
+    </div>"""
+
+
+def render_calendar_timeline_html(events: List[Dict]) -> str:
+    """Mobile-only chronological timeline (white theme) with tap-to-expand event cards and a NOW marker."""
+    if not events:
+        return '<div class="epm-empty-state"><div class="epm-empty-title">No scheduled catalysts for this filter</div></div>'
+    now = now_ist()
+    now_key = now.strftime("%Y-%m-%d %H:%M")
+    evs = sorted(events, key=lambda e: (str(e.get("date", "")), str(e.get("time", "") or "99:99")))[:150]
+    stories = build_story_items("calendar", 8)
+    parts, cur_date, now_inserted = [], None, False
+    for ev in evs:
+        d = str(ev.get("date", ""))
+        t_full = calendar_pdf_engine._format_event_time(ev)
+        t_short = t_full[:5] if t_full else "—"
+        if d != cur_date:
+            cur_date = d
+            try:
+                lbl = datetime.strptime(d, "%Y-%m-%d").strftime("%a, %d %b %Y")
+            except Exception:
+                lbl = d
+            parts.append(f'<div class="epm-tl-date">{html.escape(lbl)}</div>')
+        ev_key = f"{d} {t_short if t_full else '23:59'}"
+        if not now_inserted and ev_key > now_key:
+            parts.append(f'<div class="epm-tl-now"><span>LIVE · {now.strftime("%H:%M")} IST</span></div>')
+            now_inserted = True
+        country, reg = calendar_pdf_engine._infer_country_and_regulator(ev)
+        sent_text, _ = calendar_pdf_engine._format_sentiment(ev)
+        sk = _sent_key(sent_text)
+        stars = calendar_pdf_engine._infer_impact_stars(ev).count("*") or 3
+        pips = "".join(f'<span class="pip {"on" if i < stars else ""}"></span>' for i in range(5))
+        name = clean_table_text(ev.get("event", "Scheduled Release"))
+        prev = clean_table_text(str(ev.get("previous", "—")) or "—")
+        fore = clean_table_text(str(ev.get("forecast", "—")) or "—")
+        act = clean_table_text(str(ev.get("actual", "")) or "")
+        if not act or act in ("—", "None"):
+            act = "⏳ Pending"
+        reason = clean_table_text(calendar_pdf_engine._build_ai_reasoning(ev))
+        flag = COUNTRY_FLAGS.get(country.upper(), "🌐")
+        past = "is-past" if ev_key <= now_key else ""
+        parts.append(f"""
+        <div class="epm-tl-row {past}">
+            <div class="epm-tl-time">{html.escape(t_short)}</div>
+            <div class="epm-tl-rail"><span class="epm-tl-dot sent-{sk}"></span></div>
+            <div class="epm-tl-card sent-{sk}" onclick="window.epmToggleProgressive(this)">
+                <div class="epm-tl-card-top">
+                    <span class="epm-tl-country">{flag} {html.escape(country.title())}</span>
+                    <span class="epm-tl-reg">{html.escape(reg)}</span>
+                </div>
+                <div class="epm-tl-name">{html.escape(name)}</div>
+                <div class="epm-tl-badges">
+                    <span class="epm-tl-sent sent-{sk}">● {html.escape(sent_text.title())}</span>
+                    <span class="epm-signal-pips tier-{stars}">{pips}</span>
+                </div>
+                <div class="epm-pc-body">
+                    <div class="epm-pc-metrics">
+                        <div><span>Prev</span><b>{html.escape(prev[:16])}</b></div>
+                        <div><span>Fcst</span><b>{html.escape(fore[:16])}</b></div>
+                        <div><span>Result</span><b>{html.escape(act[:22])}</b></div>
+                    </div>
+                    <div class="epm-pc-reason">• {html.escape(reason)}</div>
+                </div>
+            </div>
+        </div>""")
+    if not now_inserted:
+        parts.append(f'<div class="epm-tl-now"><span>LIVE · {now.strftime("%H:%M")} IST</span></div>')
+    return f"""
+    <div class="epm-mobile-timeline" data-stories-calendar="{_story_attr(stories)}">
+        <div class="epm-tl-header">
+            <span class="epm-pc-section-title"><span class="epm-ribbon-bullet">●</span> Chronological Timeline</span>
+            <button type="button" class="epm-pc-story-btn" onclick="window.epmOpenStory('calendar',0)">▶ Stories</button>
         </div>
-        <div class="epm-stream-mode-toggles">
-            <button type="button" class="epm-mode-btn active" id="btn-mode-cards" onclick="window.epmSwitchMobileStreamMode('cards')">📱 List Feed</button>
-            <button type="button" class="epm-mode-btn" id="btn-mode-table" onclick="window.epmSwitchMobileStreamMode('table')">📊 Grid Table</button>
-        </div>
-    </div>
-    """
-    return f'{stream_selector}<div class="epm-stream-container">{"".join(cards_html)}</div>'
+        {''.join(parts)}
+    </div>"""
 
 
 def render_circulars_feed_html(circulars: List[Dict]) -> str:
@@ -1020,7 +1236,8 @@ def render_calendar_dossier_html(events: List[Dict]) -> str:
         """
 
     return f"""
-    <div class="epm-dossier-container">
+    <div class="epm-mobile-only">{render_calendar_timeline_html(events)}</div>
+    <div class="epm-dossier-container epm-desktop-only">
         <div class="epm-dossier-table-wrap">
             <table class="epm-dossier-table">
                 <thead>
@@ -1265,12 +1482,14 @@ def get_dashboard_tables():
             f"⏱️ **IST Clock:** `{now_ist().strftime('%H:%M:%S IST')}`"
         )
         news_visual_html = render_news_feed_html(items)
-        return status_str, news_visual_html, top_rows, bottom_rows
+        mobile_html = render_mobile_news_feed_html(all_pool)
+        return status_str, news_visual_html, top_rows, bottom_rows, mobile_html
     except Exception as e:
         status_err = f"🟢 **System Engine:** `ONLINE` | Refreshed: `{now_ist().strftime('%H:%M:%S IST')}`"
         empty_top = [["-", "-", "-", f"Feeds syncing: {str(e)}", "-", "-", "-", "-", "-"]]
         empty_bottom = [["-", "-", "-", "-", "-", "-"]]
-        return status_err, f'<div class="epm-empty-state"><div class="epm-empty-icon">📡</div><div class="epm-empty-title">Connecting to Global Wire...</div><div class="epm-empty-sub">{str(e)}</div></div>', empty_top, empty_bottom
+        err_html = f'<div class="epm-empty-state"><div class="epm-empty-icon">📡</div><div class="epm-empty-title">Connecting to Global Wire...</div><div class="epm-empty-sub">{html.escape(str(e))}</div></div>'
+        return status_err, err_html, empty_top, empty_bottom, err_html
 
 
 def get_calendar_tables(range_filter: str = "all", market_filter: str = "ALL"):
@@ -1645,6 +1864,39 @@ def save_social_media_settings(
         f"• **Visual Format:** `{mode}`\n"
         f"• **Public Image Server URL:** `{social_publisher.get_public_url()}`"
     )
+
+
+def _render_story_frames(kind: str, count: int):
+    items = build_story_items(kind, int(count))
+    return [story_card_generator.render_story(it, i, len(items)) for i, it in enumerate(items)], items
+
+
+def preview_instagram_story_frames(kind: str = "news", count: int = 5):
+    try:
+        frames, items = _render_story_frames(kind, count)
+        paths = []
+        for i, fb in enumerate(frames):
+            fp = os.path.join(MEDIA_DIR, f"story_preview_{kind}_{i}.png")
+            with open(fp, "wb") as f:
+                f.write(fb)
+            paths.append((fp, items[i]["title"][:60]))
+        return paths, f"✅ Rendered **{len(frames)}** story frames ({kind})."
+    except Exception as e:
+        return [], f"❌ Preview failed: `{e}`"
+
+
+def publish_instagram_story_sequence(kind: str = "news", count: int = 5):
+    if not (social_publisher.instagram_account_id and social_publisher.instagram_access_token):
+        return ("⚠️ **Instagram is not connected.** Enter your Instagram Business Account ID and a long-lived "
+                "Access Token (scopes: `instagram_basic`, `instagram_content_publish`) above, save, then retry.")
+    try:
+        frames, items = _render_story_frames(kind, count)
+        results = social_publisher.post_story_sequence_to_instagram(frames)
+        ok_n = sum(1 for ok, _ in results if ok)
+        lines = [f"- Frame {i + 1} ({items[i]['title'][:40]}…): {'✅' if ok else '❌'} {msg}" for i, (ok, msg) in enumerate(results)]
+        return f"**Instagram Stories:** {ok_n}/{len(results)} frames published.\n" + "\n".join(lines)
+    except Exception as e:
+        return f"❌ Story publish failed: `{e}`"
 
 
 def trigger_test_social(platform: str):
@@ -3324,115 +3576,16 @@ tbody tr:hover td {
         gap: 4px !important;
     }
 
-    /* Mobile Stream Selector */
-    .epm-mobile-stream-selector {
-        display: flex !important;
-        align-items: center !important;
-        justify-content: space-between !important;
-        padding: 6px 10px !important;
-        background: #FFFFFF !important;
-        border: 1px solid #E2E8F0 !important;
-        border-radius: 6px !important;
-        margin-bottom: 8px !important;
-    }
-    .epm-stream-title {
-        display: flex !important;
-        align-items: center !important;
-        gap: 6px !important;
-        font-size: 11px !important;
-        font-weight: 700 !important;
-        color: #0F172A !important;
-    }
-    .epm-live-pill {
-        font-size: 9px !important;
-        font-weight: 700 !important;
-        padding: 1px 5px !important;
-        border-radius: 3px !important;
-        background: #ECFDF5 !important;
-        color: #059669 !important;
-        border: 1px solid #A7F3D0 !important;
-    }
-    .epm-stream-mode-toggles {
-        display: flex !important;
-        align-items: center !important;
-        gap: 4px !important;
-        background: #F1F5F9 !important;
-        padding: 2px !important;
-        border-radius: 5px !important;
-    }
-    .epm-mode-btn {
-        border: none !important;
-        background: transparent !important;
-        font-size: 10px !important;
-        font-weight: 600 !important;
-        color: #64748B !important;
-        padding: 3px 7px !important;
-        border-radius: 4px !important;
-        cursor: pointer !important;
-        transition: all 0.15s ease !important;
-    }
-    .epm-mode-btn.active {
-        background: #FFFFFF !important;
-        color: #0052FF !important;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
-    }
-
-    /* By default on mobile, show the clean readable list cards */
-    #sec_breaking_wire {
+    /* Mobile: single clean feed per page — hide desktop grids & secondary panels */
+    .epm-desktop-only,
+    #sec_breaking_wire, #sec_secondary_wire, #sec_visual_news,
+    #cal_table_header_strip .epm-tbl-hdr-actions,
+    #cal_table_header_strip .epm-tbl-hdr-badge,
+    #cal_table_header_strip .epm-tbl-hdr-badge-sub {
         display: none !important;
     }
-    #sec_secondary_wire {
-        display: none !important;
-    }
-    #sec_visual_news {
-        display: block !important;
-        margin-top: 0 !important;
-        border: none !important;
-        background: transparent !important;
-    }
-    #sec_visual_news > .label-wrap {
-        display: none !important;
-    }
-    #sec_visual_news > div > .open,
-    #sec_visual_news .wrap.default,
-    #sec_visual_news [data-testid="accordion"] > div:last-child {
-        display: block !important;
-        padding: 0 !important;
-        border: none !important;
-        background: transparent !important;
-    }
-    #news_visual_feed {
-        display: block !important;
-    }
-    .epm-news-card {
-        background: #FFFFFF !important;
-        border: 1px solid #E2E8F0 !important;
-        border-radius: 8px !important;
-        padding: 11px 13px !important;
-        margin-bottom: 8px !important;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
-    }
-    .epm-news-title {
-        font-size: 13px !important;
-        line-height: 1.4 !important;
-        font-weight: 600 !important;
-        color: #0F172A !important;
-        display: -webkit-box !important;
-        -webkit-line-clamp: 3 !important;
-        -webkit-box-orient: vertical !important;
-        overflow: hidden !important;
-        margin: 6px 0 !important;
-    }
-    .epm-news-reasoning {
-        font-size: 11px !important;
-        color: #475569 !important;
-        line-height: 1.35 !important;
-        display: -webkit-box !important;
-        -webkit-line-clamp: 2 !important;
-        -webkit-box-orient: vertical !important;
-        overflow: hidden !important;
-        margin-bottom: 6px !important;
-    }
+    .epm-mobile-only { display: block !important; }
+    #mobile_news_feed { padding: 0 !important; border: none !important; background: transparent !important; }
 
     /* Mobile News Streams: High-Density Responsive Table with Horizontal & Vertical Touch Scroll */
     #top_news_table, #bottom_news_table {
@@ -3496,7 +3649,121 @@ tbody tr:hover td {
     .epm-mobile-menu-trigger {
         display: none !important;
     }
+    .epm-mobile-only, #mobile_news_feed { display: none !important; }
 }
+
+/* ═══ Mobile Progressive Cards, Timeline & Story Viewer (white theme) ═══ */
+.epm-mobile-feed, .epm-mobile-timeline { font-family: var(--font-sans, Inter, system-ui, sans-serif) !important; color: #0F172A; }
+.epm-pc-section-title { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #0F172A; margin: 4px 2px 8px; }
+.epm-live-pill { font-size: 9px; font-weight: 800; padding: 1px 6px; border-radius: 999px; background: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; }
+
+/* Stories strip */
+.epm-story-strip { display: flex; gap: 12px; overflow-x: auto; padding: 4px 2px 12px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.epm-story-strip::-webkit-scrollbar { display: none; }
+.epm-story-bubble { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 4px; background: none; border: none; padding: 0; cursor: pointer; width: 64px; }
+.epm-story-ring { width: 58px; height: 58px; border-radius: 50%; padding: 2.5px; background: conic-gradient(#0052FF, #10B981, #F43F5E, #0052FF); display: flex; }
+.epm-story-bubble.sent-bullish .epm-story-ring { background: conic-gradient(#10B981, #34D399, #059669, #10B981); }
+.epm-story-bubble.sent-bearish .epm-story-ring { background: conic-gradient(#F43F5E, #FB7185, #BE123C, #F43F5E); }
+.epm-story-inner { flex: 1; border-radius: 50%; background: #FFFFFF; border: 2px solid #FFFFFF; display: flex; align-items: center; justify-content: center; font: 700 11px var(--font-mono, monospace); color: #0F172A; }
+.epm-story-label { font-size: 10px; color: #475569; max-width: 64px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Progressive (tap-to-expand) cards */
+.epm-pc-list { display: flex; flex-direction: column; gap: 8px; }
+.epm-pc-card, .epm-tl-card { background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; box-shadow: 0 1px 2px rgba(15,23,42,.04); cursor: pointer; transition: box-shadow .2s ease, border-color .2s ease; -webkit-tap-highlight-color: transparent; }
+.epm-pc-card { padding: 11px 12px; }
+.epm-pc-head { display: flex; align-items: flex-start; gap: 10px; }
+.epm-pc-head-text { flex: 1; min-width: 0; }
+.epm-pc-title { font-size: 13.5px; font-weight: 700; line-height: 1.35; color: #0F172A; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.epm-pc-meta { margin-top: 4px; font: 500 10.5px var(--font-mono, monospace); color: #64748B; display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.epm-pc-dot { width: 7px; height: 7px; border-radius: 50%; background: #94A3B8; flex: 0 0 auto; }
+.sent-bullish .epm-pc-dot { background: #10B981; }
+.sent-bearish .epm-pc-dot { background: #F43F5E; }
+.epm-pc-chev { color: #94A3B8; font-size: 16px; line-height: 1; transition: transform .2s ease; }
+.epm-pc-body { display: block; max-height: 0; overflow: hidden; opacity: 0; transition: max-height .28s ease, opacity .2s ease, margin .2s ease; }
+.is-open > .epm-pc-body, .is-open .epm-pc-body { max-height: 520px; opacity: 1; margin-top: 10px; }
+.epm-pc-card.is-open .epm-pc-chev { transform: rotate(180deg); }
+.epm-pc-card.is-open.sent-bullish, .epm-tl-card.is-open.sent-bullish { background: linear-gradient(160deg, #ECFDF5 0%, #FFFFFF 60%); border-color: #A7F3D0; }
+.epm-pc-card.is-open.sent-bearish, .epm-tl-card.is-open.sent-bearish { background: linear-gradient(160deg, #FFF1F2 0%, #FFFFFF 60%); border-color: #FECDD3; }
+.epm-pc-card.is-open.sent-neutral, .epm-tl-card.is-open.sent-neutral { background: linear-gradient(160deg, #F1F5F9 0%, #FFFFFF 60%); }
+.epm-pc-metrics { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid #E2E8F0; border-bottom: 1px solid #E2E8F0; }
+.epm-pc-metrics > div { padding: 8px 4px; display: flex; flex-direction: column; gap: 2px; }
+.epm-pc-metrics > div + div { border-left: 1px solid #E2E8F0; padding-left: 10px; }
+.epm-pc-metrics span { font-size: 9.5px; text-transform: uppercase; letter-spacing: .05em; color: #64748B; font-weight: 700; }
+.epm-pc-metrics b { font: 700 14px var(--font-mono, monospace); color: #0F172A; font-feature-settings: 'tnum'; word-break: break-word; }
+.epm-pc-reason { font-size: 12px; line-height: 1.45; color: #334155; margin-top: 8px; }
+.epm-pc-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.epm-pc-tag { font-size: 9.5px; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: #F1F5F9; color: #475569; }
+.epm-pc-actions { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.epm-pc-sent { font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 999px; background: #F1F5F9; color: #334155; }
+.sent-bullish .epm-pc-sent { background: rgba(16,185,129,.12); color: #047857; }
+.sent-bearish .epm-pc-sent { background: rgba(244,63,94,.12); color: #BE123C; }
+.epm-pc-story-btn { margin-left: auto; font-size: 11px; font-weight: 700; padding: 5px 10px; border-radius: 999px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #0F172A; cursor: pointer; }
+.epm-pc-link { font-size: 11px; font-weight: 700; color: #0052FF !important; text-decoration: none !important; }
+
+/* Chronological timeline */
+.epm-tl-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.epm-tl-header .epm-pc-story-btn { margin-left: 0; }
+.epm-tl-date { position: sticky; top: 0; z-index: 2; background: rgba(248,250,252,.95); backdrop-filter: blur(4px); font-size: 11px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: #475569; padding: 8px 2px 6px; }
+.epm-tl-row { display: grid; grid-template-columns: 50px 18px 1fr; align-items: start; min-height: 64px; }
+.epm-tl-time { margin-top: 10px; font: 700 11px var(--font-mono, monospace); color: #0F172A; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 7px; padding: 4px 0; text-align: center; font-feature-settings: 'tnum'; }
+.epm-tl-rail { position: relative; align-self: stretch; }
+.epm-tl-rail::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; transform: translateX(-50%); background: #E2E8F0; }
+.epm-tl-dot { position: absolute; left: 50%; top: 16px; width: 11px; height: 11px; border-radius: 50%; transform: translateX(-50%); background: #94A3B8; box-shadow: 0 0 0 3px #FFFFFF; }
+.epm-tl-dot.sent-bullish { background: #10B981; }
+.epm-tl-dot.sent-bearish { background: #F43F5E; }
+.epm-tl-card { margin: 4px 0 8px 4px; padding: 10px 11px; }
+.epm-tl-row.is-past .epm-tl-card { opacity: .78; }
+.epm-tl-row.is-past .epm-tl-time { color: #64748B; background: #F8FAFC; }
+.epm-tl-card-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.epm-tl-country { font-size: 11px; font-weight: 600; color: #334155; }
+.epm-tl-reg { font-size: 9.5px; font-weight: 800; color: #0052FF; background: #EFF6FF; border: 1px solid #BFDBFE; padding: 1px 6px; border-radius: 4px; white-space: nowrap; }
+.epm-tl-name { font-size: 13px; font-weight: 700; line-height: 1.35; margin: 5px 0 7px; color: #0F172A; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.epm-tl-card.is-open .epm-tl-name { -webkit-line-clamp: unset; }
+.epm-tl-badges { display: flex; align-items: center; justify-content: space-between; }
+.epm-tl-sent { font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 999px; background: #F1F5F9; color: #334155; }
+.epm-tl-sent.sent-bullish { background: rgba(16,185,129,.12); color: #047857; }
+.epm-tl-sent.sent-bearish { background: rgba(244,63,94,.12); color: #BE123C; }
+.epm-tl-now { display: grid; grid-template-columns: 50px 1fr; align-items: center; margin: 6px 0; }
+.epm-tl-now span { grid-column: 2; display: flex; align-items: center; gap: 8px; font: 800 10px var(--font-mono, monospace); color: #F43F5E; letter-spacing: .05em; }
+.epm-tl-now span::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: #F43F5E; box-shadow: 0 0 0 4px rgba(244,63,94,.18); animation: epmPulse 1.6s infinite; }
+.epm-tl-now span::after { content: ""; flex: 1; height: 2px; background: linear-gradient(90deg, #F43F5E, rgba(244,63,94,0)); }
+@keyframes epmPulse { 0%,100% { box-shadow: 0 0 0 3px rgba(244,63,94,.25); } 50% { box-shadow: 0 0 0 7px rgba(244,63,94,0); } }
+
+/* Full-screen swipeable story viewer */
+.epm-story-viewer { position: fixed; inset: 0; z-index: 200000; background: rgba(15,23,42,.55); display: none; align-items: center; justify-content: center; }
+.epm-story-viewer.is-open { display: flex; }
+.epm-sv-frame { position: relative; width: min(100vw, 430px); height: min(100dvh, 860px); background: #FFFFFF; overflow: hidden; display: flex; flex-direction: column; touch-action: pan-y; user-select: none; }
+@media (min-width: 480px) { .epm-sv-frame { border-radius: 18px; box-shadow: 0 30px 80px rgba(15,23,42,.35); } }
+.epm-sv-frame.sent-bullish { background: linear-gradient(180deg, #D1FAE5 0%, #FFFFFF 58%); }
+.epm-sv-frame.sent-bearish { background: linear-gradient(180deg, #FFE4E6 0%, #FFFFFF 58%); }
+.epm-sv-frame.sent-neutral { background: linear-gradient(180deg, #E2E8F0 0%, #FFFFFF 58%); }
+.epm-sv-progress { display: flex; gap: 4px; padding: 12px 12px 0; }
+.epm-sv-seg { flex: 1; height: 3px; border-radius: 3px; background: rgba(15,23,42,.15); overflow: hidden; }
+.epm-sv-seg i { display: block; height: 100%; width: 0; background: #0F172A; }
+.epm-sv-seg.done i { width: 100%; }
+.epm-sv-seg.active i { animation: epmSvFill linear forwards; }
+@keyframes epmSvFill { from { width: 0; } to { width: 100%; } }
+.epm-sv-top { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; }
+.epm-sv-brand { font-weight: 800; font-size: 15px; color: #0F172A; } .epm-sv-brand b { color: #0052FF; }
+.epm-sv-close { background: none; border: none; font-size: 22px; color: #0F172A; cursor: pointer; padding: 4px 8px; }
+.epm-sv-content { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 0 26px 20px; text-align: center; }
+.epm-sv-pill { align-self: center; font-size: 13px; font-weight: 800; padding: 5px 14px; border-radius: 999px; background: #F1F5F9; color: #334155; }
+.sent-bullish .epm-sv-pill { background: #DCFCE7; color: #047857; }
+.sent-bearish .epm-sv-pill { background: #FFE4E6; color: #BE123C; }
+.epm-sv-tag { margin-top: 12px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #64748B; }
+.epm-sv-title { margin: 8px 0 18px; font-size: 26px; line-height: 1.2; font-weight: 800; color: #0F172A; }
+.epm-sv-metrics { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #E2E8F0; border-bottom: 1px solid #E2E8F0; padding: 16px 0; }
+.epm-sv-metrics > div + div { border-left: 1px solid #E2E8F0; }
+.epm-sv-metrics b { display: block; font: 800 30px var(--font-mono, monospace); color: #0F172A; font-feature-settings: 'tnum'; word-break: break-word; }
+.sent-bullish .epm-sv-metrics > div + div b { color: #059669; }
+.sent-bearish .epm-sv-metrics > div + div b { color: #E11D48; }
+.epm-sv-metrics span { font-size: 11px; color: #64748B; }
+.epm-sv-bullets { text-align: left; margin-top: 16px; font-size: 14px; line-height: 1.5; color: #334155; }
+.epm-sv-bullets li { margin-bottom: 6px; }
+.epm-sv-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px 18px; font-size: 11px; color: #94A3B8; }
+.epm-sv-foot a { font-weight: 700; font-size: 12px; color: #0052FF; text-decoration: none; padding: 7px 12px; border: 1px solid #BFDBFE; border-radius: 999px; background: #FFFFFF; }
+.epm-sv-tap { position: absolute; top: 70px; bottom: 70px; width: 35%; z-index: 1; }
+.epm-sv-tap.left { left: 0; } .epm-sv-tap.right { right: 0; }
 """
 
 
@@ -4363,33 +4630,105 @@ TERMINAL_CLIENT_JS = r"""
     window.epmOpenMobileMenu = window.epmOpenSideMenu;
     window.epmCloseMobileMenu = window.epmCloseSideMenu;
 
-    window.epmSwitchMobileStreamMode = function(mode) {
-        const secBreaking = document.getElementById('sec_breaking_wire');
-        const secSecondary = document.getElementById('sec_secondary_wire');
-        const secVisual = document.getElementById('sec_visual_news');
-        const btnCards = document.getElementById('btn-mode-cards');
-        const btnTable = document.getElementById('btn-mode-table');
+    // 13b. Progressive (tap-to-expand) cards — one open at a time per list
+    window.epmToggleProgressive = function(el) {
+        if (!el) return;
+        const wasOpen = el.classList.contains('is-open');
+        const scope = el.closest('.epm-pc-list, .epm-mobile-timeline');
+        if (scope) scope.querySelectorAll('.is-open').forEach(n => n.classList.remove('is-open'));
+        if (!wasOpen) el.classList.add('is-open');
+    };
 
-        if (mode === 'table') {
-            if (secBreaking) secBreaking.style.setProperty('display', 'block', 'important');
-            if (secSecondary) secSecondary.style.setProperty('display', 'block', 'important');
-            if (secVisual) {
-                const container = secVisual.querySelector('.epm-stream-container');
-                if (container) container.style.setProperty('display', 'none', 'important');
-            }
-            if (btnTable) btnTable.classList.add('active');
-            if (btnCards) btnCards.classList.remove('active');
-        } else {
-            if (secBreaking) secBreaking.style.setProperty('display', 'none', 'important');
-            if (secSecondary) secSecondary.style.setProperty('display', 'none', 'important');
-            if (secVisual) {
-                secVisual.style.setProperty('display', 'block', 'important');
-                const container = secVisual.querySelector('.epm-stream-container');
-                if (container) container.style.setProperty('display', 'block', 'important');
-            }
-            if (btnCards) btnCards.classList.add('active');
-            if (btnTable) btnTable.classList.remove('active');
-        }
+    // 13c. Swipeable full-screen story viewer (in-app preview of the Instagram story sequence)
+    const EPM_STORY_MS = 6000;
+    let epmStory = { items: [], idx: 0, timer: null, kind: 'news' };
+
+    function epmEnsureStoryViewer() {
+        let v = document.getElementById('epm-story-viewer');
+        if (v) return v;
+        v = document.createElement('div');
+        v.id = 'epm-story-viewer';
+        v.className = 'epm-story-viewer';
+        v.innerHTML = `
+          <div class="epm-sv-frame" id="epm-sv-frame">
+            <div class="epm-sv-progress" id="epm-sv-progress"></div>
+            <div class="epm-sv-top"><span class="epm-sv-brand">EPM<b>PRO</b></span>
+              <button type="button" class="epm-sv-close" aria-label="Close story">✕</button></div>
+            <div class="epm-sv-tap left"></div><div class="epm-sv-tap right"></div>
+            <div class="epm-sv-content" id="epm-sv-content"></div>
+            <div class="epm-sv-foot"><span id="epm-sv-src"></span>
+              <a id="epm-sv-dl" href="#" target="_blank" rel="noopener">⬇ Story PNG</a></div>
+          </div>`;
+        document.body.appendChild(v);
+        v.querySelector('.epm-sv-close').addEventListener('click', window.epmCloseStory);
+        v.addEventListener('click', e => { if (e.target === v) window.epmCloseStory(); });
+        v.querySelector('.epm-sv-tap.left').addEventListener('click', () => epmStoryGo(epmStory.idx - 1));
+        v.querySelector('.epm-sv-tap.right').addEventListener('click', () => epmStoryGo(epmStory.idx + 1));
+        const frame = v.querySelector('#epm-sv-frame');
+        let sx = 0, sy = 0;
+        frame.addEventListener('touchstart', e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, { passive: true });
+        frame.addEventListener('touchend', e => {
+            const dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy;
+            if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) epmStoryGo(epmStory.idx + (dx < 0 ? 1 : -1));
+            else if (dy > 90) window.epmCloseStory();
+        }, { passive: true });
+        document.addEventListener('keydown', e => {
+            if (!v.classList.contains('is-open')) return;
+            if (e.key === 'Escape') window.epmCloseStory();
+            if (e.key === 'ArrowRight') epmStoryGo(epmStory.idx + 1);
+            if (e.key === 'ArrowLeft') epmStoryGo(epmStory.idx - 1);
+        });
+        return v;
+    }
+
+    function epmEsc(t) { const d = document.createElement('div'); d.textContent = t == null ? '' : String(t); return d.innerHTML; }
+
+    function epmStoryGo(i) {
+        const n = epmStory.items.length;
+        if (i < 0) i = 0;
+        if (i >= n) { window.epmCloseStory(); return; }
+        epmStory.idx = i;
+        const it = epmStory.items[i];
+        const s = String(it.sentiment || '').toUpperCase();
+        const sk = s.includes('BULL') ? 'bullish' : (s.includes('BEAR') ? 'bearish' : 'neutral');
+        const frame = document.getElementById('epm-sv-frame');
+        frame.className = 'epm-sv-frame sent-' + sk;
+        document.getElementById('epm-sv-progress').innerHTML = epmStory.items.map((_, k) =>
+            `<span class="epm-sv-seg ${k < i ? 'done' : (k === i ? 'active' : '')}"><i style="animation-duration:${EPM_STORY_MS}ms"></i></span>`).join('');
+        const bullets = (it.bullets || []).filter(Boolean).map(b => `<li>${epmEsc(b)}</li>`).join('');
+        document.getElementById('epm-sv-content').innerHTML = `
+            <span class="epm-sv-pill">● ${epmEsc(sk.charAt(0).toUpperCase() + sk.slice(1))}</span>
+            <div class="epm-sv-tag">${epmEsc(it.tag || '')}</div>
+            <div class="epm-sv-title">${epmEsc(it.title)}</div>
+            <div class="epm-sv-metrics">
+              <div><b>${epmEsc(it.metric1)}</b><span>${epmEsc(it.metric1_label)}</span></div>
+              <div><b>${epmEsc(it.metric2)}</b><span>${epmEsc(it.metric2_label)}</span></div>
+            </div>
+            <ul class="epm-sv-bullets"><li><b>Impact: ${epmEsc(it.impact)}</b></li>${bullets}</ul>`;
+        document.getElementById('epm-sv-src').textContent = [it.source, it.time].filter(Boolean).join(' · ');
+        document.getElementById('epm-sv-dl').href = `/api/story/${epmStory.kind}/${i}.png`;
+        clearTimeout(epmStory.timer);
+        epmStory.timer = setTimeout(() => epmStoryGo(epmStory.idx + 1), EPM_STORY_MS);
+    }
+
+    window.epmOpenStory = function(kind, startIdx) {
+        const src = document.querySelector(kind === 'calendar' ? '[data-stories-calendar]' : '[data-stories-news]');
+        if (!src) return;
+        let items = [];
+        try { items = JSON.parse(src.getAttribute(kind === 'calendar' ? 'data-stories-calendar' : 'data-stories-news')) || []; } catch (e) { items = []; }
+        if (!items.length) return;
+        epmStory.items = items; epmStory.kind = kind;
+        const v = epmEnsureStoryViewer();
+        v.classList.add('is-open');
+        document.body.classList.add('epm-drawer-locked');
+        epmStoryGo(Math.min(startIdx || 0, items.length - 1));
+    };
+
+    window.epmCloseStory = function() {
+        clearTimeout(epmStory.timer);
+        const v = document.getElementById('epm-story-viewer');
+        if (v) v.classList.remove('is-open');
+        document.body.classList.remove('epm-drawer-locked');
     };
 
     // 14. Inshorts-Style Mobile Page View Drawer (Bottom Sheet) Controller
@@ -4754,7 +5093,7 @@ TERMINAL_CLIENT_JS = r"""
 # ─── Build Gradio Blocks UI ──────────────────────────────────────────────────
 
 # Pre-computed initial states for instantaneous zero-error load across all tabs
-init_status_str, init_news_html, init_top_rows, init_bottom_rows = get_dashboard_tables()
+init_status_str, init_news_html, init_top_rows, init_bottom_rows, init_mobile_news_html = get_dashboard_tables()
 init_cal_summary, init_cal_html, init_cal_rows, init_hol_rows = get_calendar_tables()
 init_circ_summary, init_circ_html, init_circ_rows = get_circulars_view()
 
@@ -4776,6 +5115,7 @@ with gr.Blocks(
         # TAB 1: Live Financial Wire & Breaking Catalysts
         # ═══════════════════════════════════════════════════════════
         with gr.TabItem("📰 Live Financial Wire & Breaking Catalysts"):
+            mobile_news_feed = gr.HTML(value=init_mobile_news_html, elem_id="mobile_news_feed", elem_classes=["epm-mobile-only"])
             with gr.Column(elem_id="sec_breaking_wire", elem_classes=["epm-modular-section"]):
                 with gr.Row(elem_id="tab1_header_strip"):
                     gr.HTML(render_table_ribbon("top_news_table", "Institutional Breaking Wire", subtitle="AI Scored ≥ 7", count_badge="Primary Catalysts", section_id="sec_breaking_wire", show_refresh=True))
@@ -5320,6 +5660,28 @@ with gr.Blocks(
             test_discord_btn.click(lambda: trigger_test_social("discord"), outputs=[social_admin_status])
 
             with gr.Column(elem_classes=["epm-bento-card"]):
+                gr.Markdown(
+                    "### 📸 Instagram Swipeable Stories\n"
+                    "Publishes a sequence of 1080×1920 story flashcards (one catalyst per frame) to the connected "
+                    "Instagram Business/Creator account. Followers swipe through them as one story. "
+                    "Preview frames: `/api/story/news/0.png`, `/api/story/calendar/0.png`."
+                )
+                with gr.Row():
+                    ig_story_kind = gr.Radio(
+                        choices=[("📰 Top Breaking News", "news"), ("📅 Today's Calendar Catalysts", "calendar")],
+                        value="news", label="Story Source"
+                    )
+                    ig_story_count = gr.Slider(minimum=1, maximum=8, step=1, value=5, label="Frames in Sequence")
+                with gr.Row():
+                    ig_story_preview_btn = gr.Button("👁️ Preview Story Frames")
+                    ig_story_publish_btn = gr.Button("🚀 Publish Story Sequence to Instagram", variant="primary")
+                ig_story_gallery = gr.Gallery(label="Story Frames", columns=4, height=420, object_fit="contain")
+                ig_story_status = gr.Markdown()
+
+            ig_story_preview_btn.click(preview_instagram_story_frames, inputs=[ig_story_kind, ig_story_count], outputs=[ig_story_gallery, ig_story_status])
+            ig_story_publish_btn.click(publish_instagram_story_sequence, inputs=[ig_story_kind, ig_story_count], outputs=[ig_story_status])
+
+            with gr.Column(elem_classes=["epm-bento-card"]):
                 gr.Markdown("### 📡 Connected News Sources & Selective Forwarding Rules")
             sources_table = gr.Dataframe(
                 headers=["Source Name", "Category", "Ingestion Type", "Telegram Alerts", "WhatsApp Alerts", "Feed / Scrape URL"],
@@ -5517,13 +5879,13 @@ with gr.Blocks(
                 </div>
             </div>""")
 
-    refresh_btn.click(manual_refresh, outputs=[status_box, top_news_visual, top_table, bottom_table]).then(None, js="() => window.epmPlayChime(false)")
-    demo.load(get_dashboard_tables, outputs=[status_box, top_news_visual, top_table, bottom_table])
+    refresh_btn.click(manual_refresh, outputs=[status_box, top_news_visual, top_table, bottom_table, mobile_news_feed]).then(None, js="() => window.epmPlayChime(false)")
+    demo.load(get_dashboard_tables, outputs=[status_box, top_news_visual, top_table, bottom_table, mobile_news_feed])
     demo.load(get_calendar_tables, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_visual_feed, calendar_table, holidays_table])
     demo.load(get_circulars_view, inputs=[circ_reg_filter, circ_imp_filter, circ_search], outputs=[circ_info_bar, circ_visual_feed, circ_table])
 
     wire_timer = gr.Timer(10)
-    wire_timer.tick(get_dashboard_tables, outputs=[status_box, top_news_visual, top_table, bottom_table])
+    wire_timer.tick(get_dashboard_tables, outputs=[status_box, top_news_visual, top_table, bottom_table, mobile_news_feed])
 
 demo.queue(default_concurrency_limit=20)
 

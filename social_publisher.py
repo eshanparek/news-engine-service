@@ -240,6 +240,61 @@ class SocialPublisher:
             logger.error(f"Instagram dispatch exception: {e}")
             return False, f"Exception: {str(e)}"
 
+    def post_story_to_instagram(self, image_bytes: bytes) -> Tuple[bool, str]:
+        """
+        Publishes a single 9:16 image as an Instagram STORY via the Meta Graph API
+        (media_type=STORIES). Requires an Instagram Business/Creator account linked to
+        a Facebook Page and a token with instagram_basic + instagram_content_publish.
+        """
+        if not self.instagram_account_id or not self.instagram_access_token:
+            return False, "Instagram Account ID or Access Token is missing."
+        try:
+            image_url = self.cache_image_locally(image_bytes)
+            base = f"https://graph.facebook.com/v21.0/{self.instagram_account_id}"
+            r1 = requests.post(f"{base}/media", data={
+                "image_url": image_url,
+                "media_type": "STORIES",
+                "access_token": self.instagram_access_token,
+            }, timeout=25)
+            j1 = r1.json()
+            if r1.status_code != 200 or "id" not in j1:
+                return False, f"Story Container Error: {j1.get('error', {}).get('message', r1.text[:200])}"
+            creation_id = j1["id"]
+
+            # Poll container status until FINISHED (max ~20s)
+            for _ in range(10):
+                time.sleep(2)
+                try:
+                    st = requests.get(f"https://graph.facebook.com/v21.0/{creation_id}", params={
+                        "fields": "status_code", "access_token": self.instagram_access_token
+                    }, timeout=15).json()
+                    if st.get("status_code") in ("FINISHED", "PUBLISHED"):
+                        break
+                    if st.get("status_code") == "ERROR":
+                        return False, "Story container processing failed on Meta side."
+                except Exception:
+                    pass
+
+            r2 = requests.post(f"{base}/media_publish", data={
+                "creation_id": creation_id,
+                "access_token": self.instagram_access_token,
+            }, timeout=25)
+            j2 = r2.json()
+            if r2.status_code == 200 and "id" in j2:
+                return True, f"Story published (ID: {j2['id']})"
+            return False, f"Story Publish Error: {j2.get('error', {}).get('message', r2.text[:200])}"
+        except Exception as e:
+            logger.error(f"Instagram story exception: {e}")
+            return False, f"Exception: {e}"
+
+    def post_story_sequence_to_instagram(self, frames: List[bytes]) -> List[Tuple[bool, str]]:
+        """Publishes frames in order so followers swipe through them as one story sequence."""
+        results = []
+        for fb in frames:
+            results.append(self.post_story_to_instagram(fb))
+            time.sleep(1.5)
+        return results
+
     # ═══════════════════════════════════════════════════════════════════════════
     # 2. X / Twitter API v2 (Direct Integration)
     # ═══════════════════════════════════════════════════════════════════════════
