@@ -476,8 +476,8 @@ class TelegramNotifier:
 
     def send_story_alert(self, item: Dict, kind: str = "news") -> tuple[bool, str]:
         """Dispatches an infographic story flashcard (1080x1920) directly to Telegram in story format."""
-        token = self.bot_token or self.cal_bot_token
-        chat_id = self.chat_id or self.cal_chat_id
+        token = self.bot_token or self.calendar_bot_token
+        chat_id = self.chat_id or self.calendar_chat_id
         if not token or not chat_id:
             logger.warning("[Telegram] Story alert skipped: bot token or chat ID missing.")
             return False, "Telegram credentials not configured"
