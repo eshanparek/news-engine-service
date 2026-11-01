@@ -3713,7 +3713,7 @@ tbody tr:hover td {
 .epm-pc-metrics > div { padding: 8px 4px; display: flex; flex-direction: column; gap: 2px; }
 .epm-pc-metrics > div + div { border-left: 1px solid #E2E8F0; padding-left: 10px; }
 .epm-pc-metrics span { font-size: 9.5px; text-transform: uppercase; letter-spacing: .05em; color: #64748B; font-weight: 700; }
-.epm-pc-metrics b { font: 700 14px var(--font-mono, monospace); color: #0F172A; font-feature-settings: 'tnum'; word-break: break-word; }
+.epm-pc-metrics b { font: 700 13px var(--font-mono, monospace); color: #0F172A; font-feature-settings: 'tnum'; word-break: normal !important; overflow-wrap: break-word; hyphens: none; line-height: 1.3; }
 .epm-pc-reason { font-size: 12px; line-height: 1.45; color: #334155; margin-top: 8px; }
 .epm-pc-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
 .epm-pc-tag { font-size: 9.5px; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: #F1F5F9; color: #475569; }

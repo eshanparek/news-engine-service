@@ -69,7 +69,7 @@ async def run_verification():
         mobile_page = await context_mobile.new_page()
         print(f"[Mobile] Navigating to {TARGET_URL}...")
         await mobile_page.goto(TARGET_URL, wait_until="domcontentloaded", timeout=60000)
-        await mobile_page.wait_for_selector("#top_news_table", timeout=45000)
+        await mobile_page.wait_for_selector("#top_news_table", state="attached", timeout=45000)
         await mobile_page.add_script_tag(content=TERMINAL_CLIENT_JS)
         await mobile_page.wait_for_timeout(4000)
         
