@@ -125,9 +125,16 @@ class StoryCardGenerator:
             d.rounded_rectangle([x0, 60, x0 + seg_w, 68], radius=4, fill=col)
 
         # Brand header
-        d.text((pad, 110), "EPM", font=self._font(48), fill=INK)
-        d.text((pad + d.textlength("EPM", font=self._font(48)), 110), "PRO", font=self._font(48), fill=BRAND_BLUE)
-        kind_label = "MARKET CALENDAR" if item.get("kind") == "calendar" else "BREAKING WIRE"
+        d.text((pad, 110), "GNC", font=self._font(48), fill=INK)
+        k = item.get("kind")
+        if k == "calendar":
+            kind_label = "MARKET CALENDAR"
+        elif k == "circulars":
+            kind_label = "OFFICIAL CIRCULAR"
+        elif k == "holidays":
+            kind_label = "TRADING HOLIDAY"
+        else:
+            kind_label = "BREAKING WIRE"
         kf = self._font(26)
         kw = d.textlength(kind_label, font=kf)
         d.rounded_rectangle([W - pad - kw - 36, 112, W - pad, 160], radius=24, outline=(203, 213, 225), width=2, fill=(255, 255, 255))
@@ -220,7 +227,7 @@ class StoryCardGenerator:
             else:
                 d.ellipse([cx + 8, dot_y, cx + 20, dot_y + 12], fill=(203, 213, 225))
         cf = self._font(26, bold=False)
-        cta = "Live multi-market intelligence  |  EPMPRO"
+        cta = "Live multi-market intelligence  |  GNC"
         cw = d.textlength(cta, font=cf)
         d.text(((W - cw) / 2, H - 110), cta, font=cf, fill=FAINT)
 

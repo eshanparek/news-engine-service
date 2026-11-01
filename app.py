@@ -61,6 +61,15 @@ async def serve_media(filename: str):
     return PlainTextResponse("Media card not found", status_code=404)
 
 
+@app.get("/api/logo")
+async def serve_logo():
+    """Serves the official GNC brand broadcast emblem."""
+    logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "global_news_feed_room_logo.png")
+    if os.path.exists(logo_path):
+        return FileResponse(logo_path, media_type="image/png")
+    return PlainTextResponse("Logo not found", status_code=404)
+
+
 @app.get("/api/story/{kind}/{idx}.png")
 async def serve_story_frame(kind: str, idx: int):
     """Renders a 1080x1920 Instagram Story flashcard (read-only preview / download)."""
@@ -623,7 +632,7 @@ def get_merged_news_pool() -> List[Dict]:
     return pool
 
 
-def build_story_items(kind: str = "news", limit: int = 6) -> List[Dict]:
+def build_story_items(kind: str = "news", limit: int = 100) -> List[Dict]:
     """Normalised one-catalyst-per-frame story payloads (used by in-app viewer and Instagram PNGs)."""
     out: List[Dict] = []
     if kind == "calendar":
@@ -656,6 +665,62 @@ def build_story_items(kind: str = "news", limit: int = 6) -> List[Dict]:
                 "time": f"{ev.get('date', '')} {calendar_pdf_engine._format_event_time(ev)} IST".strip(),
                 "link": ev.get("linked_news_url") or "",
             })
+    elif kind == "circulars":
+        try:
+            circ_items = circular_engine.get_circulars(regulator_filter="ALL", impact_filter="ALL")
+        except Exception:
+            circ_items = []
+        for c in circ_items[:limit]:
+            reg = c.get("regulator", "NSE")
+            category = clean_table_text(str(c.get("category", "Directive")))
+            title = clean_table_text(str(c.get("title", "")))
+            circ_no = clean_table_text(str(c.get("circular_no", "")))
+            date_str = clean_table_text(str(c.get("date", "")))
+            doc_url = str(c.get("pdf_url") or c.get("web_url") or "").strip()
+            impact = str(c.get("impact", "MEDIUM")).upper()
+            action = clean_table_text(str(c.get("action_takeaway", "")))
+            bullets = [clean_table_text(str(b)) for b in c.get("bullets", [])] if c.get("bullets") else [action or title]
+            out.append({
+                "kind": "circulars",
+                "title": title,
+                "tag": f"{reg} · {category}",
+                "sentiment": "NEUTRAL",
+                "metric1": circ_no[:12] if circ_no else reg,
+                "metric1_label": "Directive Ref",
+                "metric2": date_str[:12],
+                "metric2_label": "Date",
+                "impact": "Critical" if impact == "HIGH" else "Directive",
+                "bullets": bullets[:2],
+                "source": reg,
+                "time": date_str,
+                "link": doc_url
+            })
+    elif kind == "holidays":
+        try:
+            snap = calendar_engine.get_holiday_snapshot().get("comparison", [])
+        except Exception:
+            snap = []
+        for h in snap[:limit]:
+            d = h.get("date", "")
+            day = h.get("day", "")
+            desc = h.get("description", "")
+            nse = h.get("nse_status", "")
+            nyse = h.get("nyse_status", "")
+            out.append({
+                "kind": "holidays",
+                "title": desc,
+                "tag": f"{day} · 2026",
+                "sentiment": "NEUTRAL",
+                "metric1": d,
+                "metric1_label": "Date",
+                "metric2": "Closed" if "Closed" in nse or "Closed" in nyse else "Open",
+                "metric2_label": "Trading Status",
+                "impact": "Market Holiday",
+                "bullets": [f"NSE: {nse}", f"NYSE: {nyse}"],
+                "source": "Holiday Calendar",
+                "time": d,
+                "link": ""
+            })
     else:
         for it in get_merged_news_pool()[:limit]:
             sectors = it.get("ai_sectors") or []
@@ -685,9 +750,9 @@ def _story_attr(items: List[Dict]) -> str:
 
 def render_mobile_news_feed_html(pool: List[Dict]) -> str:
     """Mobile-only progressive (tap-to-expand) news cards with an Instagram-style stories strip."""
-    stories = build_story_items("news", 8)
+    stories = build_story_items("news", limit=len(pool))
     rows = []
-    for i, it in enumerate(pool[:30]):
+    for i, it in enumerate(pool[:40]):
         sk = _sent_key(it.get("ai_sentiment"))
         title = html.escape(clean_table_text(it.get("title", "")))
         src = html.escape(clean_table_text(it.get("source", "Wire")))
@@ -744,15 +809,15 @@ def render_mobile_news_feed_html(pool: List[Dict]) -> str:
 
 
 def render_calendar_timeline_html(events: List[Dict]) -> str:
-    """Mobile-only chronological timeline (white theme) with tap-to-expand event cards and a NOW marker."""
+    """Mobile-only chronological timeline (white theme) with tap-to-expand event cards, story bubbles, and a NOW marker."""
     if not events:
         return '<div class="epm-empty-state"><div class="epm-empty-title">No scheduled catalysts for this filter</div></div>'
     now = now_ist()
     now_key = now.strftime("%Y-%m-%d %H:%M")
     evs = sorted(events, key=lambda e: (str(e.get("date", "")), calendar_pdf_engine._format_event_time(e) or "99:99"))[:150]
-    stories = build_story_items("calendar", 8)
+    stories = build_story_items("calendar", limit=len(evs))
     parts, cur_date, now_inserted = [], None, False
-    for ev in evs:
+    for i, ev in enumerate(evs):
         d = str(ev.get("date", ""))
         t_full = calendar_pdf_engine._format_event_time(ev)
         t_short = t_full[:5] if t_full else "—"
@@ -771,7 +836,7 @@ def render_calendar_timeline_html(events: List[Dict]) -> str:
         sent_text, _ = calendar_pdf_engine._format_sentiment(ev)
         sk = _sent_key(sent_text)
         stars = calendar_pdf_engine._infer_impact_stars(ev).count("*") or 3
-        pips = "".join(f'<span class="pip {"on" if i < stars else ""}"></span>' for i in range(5))
+        pips = "".join(f'<span class="pip {"on" if idx < stars else ""}"></span>' for idx in range(5))
         name = clean_table_text(ev.get("event", "Scheduled Release"))
         prev = clean_table_text(str(ev.get("previous", "—")) or "—")
         fore = clean_table_text(str(ev.get("forecast", "—")) or "—")
@@ -781,6 +846,8 @@ def render_calendar_timeline_html(events: List[Dict]) -> str:
         reason = clean_table_text(calendar_pdf_engine._build_ai_reasoning(ev))
         flag = COUNTRY_FLAGS.get(country.upper(), "🌐")
         past = "is-past" if ev_key <= now_key else ""
+        story_btn = f'<button type="button" class="epm-pc-story-btn" onclick="event.stopPropagation();window.epmOpenStory(\'calendar\',{i})">▶ Story</button>' if i < len(stories) else ""
+
         parts.append(f"""
         <div class="epm-tl-row {past}">
             <div class="epm-tl-time">{html.escape(t_short)}</div>
@@ -802,16 +869,182 @@ def render_calendar_timeline_html(events: List[Dict]) -> str:
                         <div><span>Result</span><b>{html.escape(act[:22])}</b></div>
                     </div>
                     <div class="epm-pc-reason">• {html.escape(reason)}</div>
+                    <div class="epm-pc-actions" style="margin-top:8px;">
+                        {story_btn}
+                    </div>
                 </div>
             </div>
         </div>""")
     if not now_inserted:
         parts.append(f'<div class="epm-tl-now"><span>LIVE · {now.strftime("%H:%M")} IST</span></div>')
+
+    bubbles = "".join(
+        f'<button type="button" class="epm-story-bubble tone-{_sent_key(s["sentiment"])}" onclick="window.epmOpenStory(\'calendar\',{i})">'
+        f'<span class="epm-story-ring"><span class="epm-story-inner">{html.escape(str(s["metric1"])[:8])}</span></span>'
+        f'<span class="epm-story-label">{html.escape(s["title"][:14])}</span></button>'
+        for i, s in enumerate(stories)
+    )
     return f"""
     <div class="epm-mobile-timeline" data-stories-calendar="{_story_attr(stories)}">
+        <div class="epm-story-strip">{bubbles}</div>
         <div class="epm-tl-header">
-            <span class="epm-pc-section-title"><span class="epm-ribbon-bullet">●</span> Chronological Timeline</span>
-            <button type="button" class="epm-pc-story-btn" onclick="window.epmOpenStory('calendar',0)">▶ Stories</button>
+            <span class="epm-pc-section-title"><span class="epm-ribbon-bullet">●</span> Chronological Timeline <span class="epm-live-pill">LIVE</span></span>
+        </div>
+        {''.join(parts)}
+    </div>"""
+
+
+def render_mobile_circulars_feed_html(items: List[Dict]) -> str:
+    """Mobile-only progressive cards feed for Regulatory Circulars with circular story bubbles and direct PDF download."""
+    if not items:
+        return (
+            '<div class="epm-empty-state">'
+            '  <div class="epm-empty-icon">📜</div>'
+            '  <div class="epm-empty-title">No Official Circulars Available</div>'
+            '  <div class="epm-empty-sub">Connecting to regulator repositories...</div>'
+            '</div>'
+        )
+    stories = build_story_items("circulars", limit=len(items))
+    bubbles = "".join(
+        f'<button type="button" class="epm-story-bubble tone-{_sent_key(s["sentiment"])}" onclick="window.epmOpenStory(\'circulars\',{i})">'
+        f'<span class="epm-story-ring"><span class="epm-story-inner">{html.escape(str(s["metric1"])[:8])}</span></span>'
+        f'<span class="epm-story-label">{html.escape(s["source"])}</span></button>'
+        for i, s in enumerate(stories)
+    )
+
+    chips = ["ALL", "NSE", "BSE", "MCX", "RBI", "FINMIN", "FOMC", "NYSE"]
+    chip_html = "".join(
+        f'<button type="button" class="epm-circ-chip {"active" if c == "ALL" else ""}" onclick="window.epmFilterCircCards(\'{c}\', this)">{c}</button>'
+        for c in chips
+    )
+
+    cards = []
+    for i, it in enumerate(items):
+        reg = it.get("regulator", "NSE")
+        meta = REGULATOR_META.get(reg, {"badge": reg, "color": "#2563eb", "type": "Regulator"})
+        title = html.escape(clean_table_text(str(it.get("title", "Official Directive"))))
+        circ_no = html.escape(clean_table_text(str(it.get("circular_no", "—"))))
+        date_str = html.escape(clean_table_text(str(it.get("date", "—"))))
+        category = html.escape(clean_table_text(str(it.get("category", "Directive"))))
+        impact = str(it.get("impact", "MEDIUM")).upper()
+        doc_url = html.escape(str(it.get("pdf_url") or it.get("web_url") or "#").strip(), quote=True)
+
+        bullets = it.get("bullets", []) or []
+        cleaned_bullets = [clean_table_text(b) for b in bullets if b]
+        if cleaned_bullets:
+            reasoning_html = "".join(f'<div style="margin-bottom:4px;">• {html.escape(b)}</div>' for b in cleaned_bullets)
+        else:
+            reasoning_html = f'<div>• {html.escape(clean_table_text(it.get("action_takeaway") or it.get("title", "")))}</div>'
+
+        story_btn = f'<button type="button" class="epm-pc-story-btn" onclick="event.stopPropagation();window.epmOpenStory(\'circulars\',{i})">▶ Story</button>' if i < len(stories) else ""
+
+        cards.append(f"""
+        <div class="epm-pc-card tone-neutral" data-circ-reg="{reg}" onclick="window.epmToggleProgressive(this)">
+            <div class="epm-pc-head">
+                <div class="epm-pc-head-text">
+                    <div class="epm-pc-title">{title}</div>
+                    <div class="epm-pc-meta">
+                        <span class="epm-reg-badge" style="background:{meta['color']}18; color:{meta['color']}; border:1px solid {meta['color']}40; padding:1px 6px; border-radius:4px; font-weight:700; font-size:10px;">{reg}</span>
+                        <span> · {circ_no} · {date_str}</span>
+                    </div>
+                </div>
+                <span class="epm-pc-chev">⌄</span>
+            </div>
+            <div class="epm-pc-body">
+                <div class="epm-pc-metrics">
+                    <div><span>Authority</span><b>{reg}</b></div>
+                    <div><span>Classification</span><b>{category[:12]}</b></div>
+                    <div><span>Impact</span><b style="color:{'#E11D48' if impact == 'HIGH' else '#2563EB'}">{impact}</b></div>
+                </div>
+                <div class="epm-pc-reason">
+                    <div style="font-weight:700; margin-bottom:6px; color:#0F172A;">💡 AI Directive Breakdown & Takeaway:</div>
+                    {reasoning_html}
+                </div>
+                <div class="epm-pc-actions" style="margin-top:10px; display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                    {story_btn}
+                    <a class="epm-pc-link epm-btn-download" href="{doc_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="font-weight:700; background:#0052FF; color:#FFFFFF; padding:6px 12px; border-radius:6px; text-decoration:none; font-size:11.5px; display:inline-flex; align-items:center; gap:4px;">
+                        📥 Download Official PDF ↗
+                    </a>
+                </div>
+            </div>
+        </div>""")
+
+    return f"""
+    <div class="epm-mobile-feed" data-stories-circulars="{_story_attr(stories)}">
+        <div class="epm-story-strip">{bubbles}</div>
+        <div class="epm-circ-chips-strip">{chip_html}</div>
+        <div class="epm-pc-section-title"><span class="epm-ribbon-bullet">●</span> Official Regulatory Directives</div>
+        <div class="epm-pc-list" id="epm-circ-mobile-list">{''.join(cards)}</div>
+    </div>"""
+
+
+def render_mobile_holidays_timeline_html(holidays: List[Dict]) -> str:
+    """Mobile-only chronological timeline for 2026 Authoritative Trading Holidays with circular story bubbles."""
+    if not holidays:
+        return (
+            '<div class="epm-empty-state">'
+            '  <div class="epm-empty-icon">🏖️</div>'
+            '  <div class="epm-empty-title">No Holidays Found</div>'
+            '  <div class="epm-empty-sub">No trading holidays recorded for this country filter.</div>'
+            '</div>'
+        )
+    stories = build_story_items("holidays", limit=len(holidays))
+    bubbles = "".join(
+        f'<button type="button" class="epm-story-bubble tone-neutral" onclick="window.epmOpenStory(\'holidays\',{i})">'
+        f'<span class="epm-story-ring"><span class="epm-story-inner">{html.escape(str(s["metric1"])[5:10])}</span></span>'
+        f'<span class="epm-story-label">{html.escape(s["title"][:14])}</span></button>'
+        for i, s in enumerate(stories)
+    )
+
+    parts = []
+    for i, h in enumerate(holidays):
+        d = clean_table_text(h.get("date", ""))
+        day = clean_table_text(h.get("day", ""))
+        desc = clean_table_text(h.get("description", "Market Holiday"))
+        nse = clean_table_text(h.get("nse_status", "Open"))
+        bse = clean_table_text(h.get("bse_status", "Open"))
+        mcx = clean_table_text(h.get("mcx_status", "Open"))
+        nyse = clean_table_text(h.get("nyse_status", "Open"))
+        crypto = clean_table_text(h.get("crypto_status", "Open 24/7"))
+
+        try:
+            lbl = datetime.strptime(d, "%Y-%m-%d").strftime("%a, %d %b %Y")
+        except Exception:
+            lbl = f"{day}, {d}"
+
+        story_btn = f'<button type="button" class="epm-pc-story-btn" onclick="event.stopPropagation();window.epmOpenStory(\'holidays\',{i})">▶ Story</button>' if i < len(stories) else ""
+
+        parts.append(f"""
+        <div class="epm-tl-row">
+            <div class="epm-tl-time" style="font-size:11px; font-weight:700; color:#475569;">{html.escape(d[5:])}</div>
+            <div class="epm-tl-rail"><span class="epm-tl-dot tone-neutral"></span></div>
+            <div class="epm-tl-card tone-neutral" onclick="window.epmToggleProgressive(this)">
+                <div class="epm-tl-card-top">
+                    <span class="epm-tl-country">🏖️ {html.escape(lbl)}</span>
+                    <span class="epm-tl-reg">2026</span>
+                </div>
+                <div class="epm-tl-name">{html.escape(desc)}</div>
+                <div class="epm-pc-body">
+                    <div class="epm-pc-metrics" style="grid-template-columns:1fr 1fr; margin-bottom:8px;">
+                        <div><span>🇮🇳 NSE / BSE</span><b>{html.escape(nse)}</b></div>
+                        <div><span>🇺🇸 US NYSE</span><b>{html.escape(nyse)}</b></div>
+                    </div>
+                    <div class="epm-pc-reason">
+                        <div>• <b>MCX:</b> {html.escape(mcx)}</div>
+                        <div>• <b>Crypto:</b> {html.escape(crypto)}</div>
+                    </div>
+                    <div class="epm-pc-actions" style="margin-top:8px;">
+                        {story_btn}
+                    </div>
+                </div>
+            </div>
+        </div>""")
+
+    return f"""
+    <div class="epm-mobile-timeline" data-stories-holidays="{_story_attr(stories)}">
+        <div class="epm-story-strip">{bubbles}</div>
+        <div class="epm-tl-header" style="padding-top:8px;">
+            <span class="epm-pc-section-title"><span class="epm-ribbon-bullet">●</span> 2026 Authoritative Holidays Timeline</span>
         </div>
         {''.join(parts)}
     </div>"""
@@ -940,10 +1173,12 @@ def get_circulars_view(regulator_filter: str = "ALL", impact_filter: str = "ALL"
             f"📜 **Official Documents Indexed:** `{len(items)}` &nbsp;|&nbsp; "
             f"🔒 **Storage:** Verified PDF Repository"
         )
-        return summary_text, visual_html, table_rows
+        mobile_circ_html = render_mobile_circulars_feed_html(items)
+        return summary_text, visual_html, table_rows, mobile_circ_html
     except Exception as e:
         empty_rows = [["-", "-", "-", "-", f"Failed to load circulars: {str(e)}", "-", "-", "-"]]
-        return f"⚠️ **Error loading circulars:** {str(e)}", f'<div class="epm-empty-state"><div class="epm-empty-icon">⚠️</div><div class="epm-empty-title">Error Loading Circulars</div><div class="epm-empty-sub">{str(e)}</div></div>', empty_rows
+        err_box = f'<div class="epm-empty-state"><div class="epm-empty-icon">⚠️</div><div class="epm-empty-title">Error Loading Circulars</div><div class="epm-empty-sub">{str(e)}</div></div>'
+        return f"⚠️ **Error loading circulars:** {str(e)}", err_box, empty_rows, err_box
 
 
 def refresh_circulars_data(regulator_filter: str = "ALL", impact_filter: str = "ALL", search_query: str = ""):
@@ -1392,11 +1627,8 @@ def get_dashboard_tables():
                 all_pool.append(base_it)
                 seen_titles.add(clean_table_text(base_it["title"]))
 
-        # Institutional Breaking Wire gets the top 7-8 highest-priority catalysts
-        primary_pool = all_pool[:8]
-        secondary_pool = all_pool[8:]
-
-        for it in primary_pool:
+        # Institutional Breaking Wire gets all primary and broad catalysts merged into one unified table
+        for it in all_pool:
             score = it.get("ai_score", 5)
             sentiment = str(it.get("ai_sentiment", "NEUTRAL")).upper()
             impact = str(it.get("ai_impact", "MEDIUM")).upper()
@@ -1441,37 +1673,7 @@ def get_dashboard_tables():
                 time_str
             ])
 
-        for it in secondary_pool:
-            score = it.get("ai_score", 5)
-            sentiment = str(it.get("ai_sentiment", "NEUTRAL")).upper()
-            relevance = it.get("relevance", 0)
-            time_str = clean_table_text(str(it.get("timestamp", ""))[:19])
-            source = clean_table_text(it.get("source", ""))
-            title = clean_table_text(it.get("title", ""))
-            link = it.get("link", "#")
-
-            if "BULL" in sentiment:
-                sent_badge = "🟢 BULLISH"
-            elif "BEAR" in sentiment:
-                sent_badge = "🔴 BEARISH"
-            else:
-                sent_badge = "⚪ NEUTRAL"
-
-            safe_title = title.replace("[", "(").replace("]", ")")
-            title_link = f"[{safe_title}]({link})" if link and link != "#" else safe_title
-            bottom_link = f"[🔗 Open Wire ↗]({link})" if link and link != "#" else "—"
-
-            bottom_rows.append([
-                time_str,
-                source,
-                title_link,
-                f"{relevance}%",
-                sent_badge,
-                bottom_link
-            ])
-
-        if not bottom_rows:
-            bottom_rows.append(["-", "-", "No general news items in cache", "-", "-", "-"])
+        bottom_rows = []
 
         cal_status = "🟢 Connected" if telegram_notifier.is_calendar_configured() else "⚪ Standalone"
         status_str = (
@@ -1574,12 +1776,11 @@ def get_calendar_tables(range_filter: str = "all", market_filter: str = "ALL"):
             f"⏱️ **IST Clock:** `{now_ist().strftime('%H:%M:%S IST')}` &nbsp;|&nbsp; "
             f"📅 **iCal Feed:** `/api/calendar/ics`"
         )
-        return cal_summary, calendar_visual_html, cal_rows, hol_rows
+        return cal_summary, calendar_visual_html, cal_rows
     except Exception as e:
         err_sum = f"📅 **Market Calendar Status:** Active | `{now_ist().strftime('%Y-%m-%d %H:%M:%S IST')}`"
         empty_cal = [["-", "-", "-", "-", "-", "-", "-", f"Calendar Notice: {str(e)}", "-", "-", "-", "-", "-", "-", "-"]]
-        empty_hol = [["-", "-", "-", "-", "-", "-", "-", "-"]]
-        return err_sum, f'<div class="epm-empty-state"><div class="epm-empty-icon">📅</div><div class="epm-empty-title">Calendar Initializing</div><div class="epm-empty-sub">{str(e)}</div></div>', empty_cal, empty_hol
+        return err_sum, f'<div class="epm-empty-state"><div class="epm-empty-icon">📅</div><div class="epm-empty-title">Calendar Initializing</div><div class="epm-empty-sub">{str(e)}</div></div>', empty_cal
 
 
 def sync_and_refresh_calendar(range_filter: str = "all", market_filter: str = "ALL"):
@@ -1625,6 +1826,48 @@ def push_holiday_check_alert():
     return f"ℹ️ **Holiday Check:** {msg}"
 
 
+def get_holidays_view(country_filter: str = "ALL"):
+    """Returns authoritative 2026 market holidays filtered by country ('ALL', 'INDIA', 'USA') for table & mobile timeline."""
+    try:
+        snap = calendar_engine.get_holiday_snapshot().get("comparison", [])
+        cf = (country_filter or "ALL").upper()
+        filtered = []
+        for h in snap:
+            nse = str(h.get("nse_status", ""))
+            bse = str(h.get("bse_status", ""))
+            mcx = str(h.get("mcx_status", ""))
+            nyse = str(h.get("nyse_status", ""))
+            if cf == "INDIA":
+                if "Closed" in nse or "Closed" in bse or "Closed" in mcx:
+                    filtered.append(h)
+            elif cf == "USA":
+                if "Closed" in nyse:
+                    filtered.append(h)
+            else:
+                filtered.append(h)
+
+        hol_rows = []
+        for h in filtered:
+            hol_rows.append([
+                clean_table_text(h.get("date", "")),
+                clean_table_text(h.get("day", "")),
+                clean_table_text(h.get("description", "")),
+                clean_table_text(h.get("nse_status", "")),
+                clean_table_text(h.get("bse_status", "")),
+                clean_table_text(h.get("mcx_status", "")),
+                clean_table_text(h.get("nyse_status", "")),
+                clean_table_text(h.get("crypto_status", ""))
+            ])
+        if not hol_rows:
+            hol_rows.append(["-", "-", f"No trading holidays recorded for {cf}", "-", "-", "-", "-", "-"])
+
+        mobile_html = render_mobile_holidays_timeline_html(filtered)
+        return mobile_html, hol_rows
+    except Exception as e:
+        empty = [["-", "-", f"Error: {e}", "-", "-", "-", "-", "-"]]
+        return f'<div class="epm-empty-state"><div class="epm-empty-title">{e}</div></div>', empty
+
+
 def handle_manual_event_save(
     evt_id: str,
     mkt_s: str,
@@ -1655,7 +1898,7 @@ def handle_manual_event_save(
         market=mkt_s,
         forward_now=forward_tg
     )
-    cal_summary, cal_visual_html, cal_rows, _ = get_calendar_tables(current_range, current_market)
+    cal_summary, cal_visual_html, cal_rows = get_calendar_tables(current_range, current_market)
     status_msg = f"✅ **Saved [{ev['market']}] Event `{ev['id']}` ({ev['event']}) — Outcome: `{ev['actual']}`.**"
     if forward_tg:
         status_msg += f" Dispatched individual `{ev['market']}` update to Calendar Telegram Channel!"
@@ -2275,8 +2518,8 @@ div[role="tablist"],
 .epm-ribbon-controls, .epm-tbl-hdr-actions {
     display: flex !important;
     align-items: center !important;
-    gap: 6px !important;
-    flex-wrap: nowrap !important;
+    gap: 4px !important;
+    flex-wrap: wrap !important;
     flex-shrink: 0 !important;
 }
 
@@ -2284,11 +2527,11 @@ div[role="tablist"],
 .epm-ribbon-btn, 
 button.epm-hdr-action-btn, 
 .epm-section-ctrl-btn {
-    height: 32px !important;
-    min-height: 32px !important;
-    line-height: 20px !important;
-    padding: 6px 12px !important;
-    font-size: 11.5px !important;
+    height: 26px !important;
+    min-height: 26px !important;
+    line-height: 1 !important;
+    padding: 2px 8px !important;
+    font-size: 11px !important;
     font-weight: 600 !important;
     background: #FFFFFF !important;
     border: 1px solid #CBD5E1 !important;
@@ -2298,7 +2541,7 @@ button.epm-hdr-action-btn,
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    gap: 5px !important;
+    gap: 4px !important;
     margin: 0 !important;
     flex-shrink: 0 !important;
     transition: all 0.15s ease !important;
@@ -3544,6 +3787,48 @@ tbody tr:hover td {
     font-weight: 600 !important;
 }
 
+.epm-nav-logo {
+    height: 28px !important;
+    width: auto !important;
+    max-height: 28px !important;
+    object-fit: contain !important;
+    vertical-align: middle !important;
+    display: inline-block !important;
+    margin-right: 6px !important;
+}
+.epm-nav-title {
+    font-size: 20px !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.02em !important;
+    color: #0F172A !important;
+}
+#sec_secondary_wire {
+    display: none !important;
+}
+.epm-circ-chips-strip {
+    display: flex !important;
+    gap: 6px !important;
+    overflow-x: auto !important;
+    padding: 6px 0 10px !important;
+    -webkit-overflow-scrolling: touch !important;
+}
+.epm-circ-chip {
+    padding: 4px 10px !important;
+    border-radius: 999px !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    background: #FFFFFF !important;
+    border: 1px solid #CBD5E1 !important;
+    color: #475569 !important;
+    cursor: pointer !important;
+    white-space: nowrap !important;
+}
+.epm-circ-chip.active {
+    background: #0052FF !important;
+    color: #FFFFFF !important;
+    border-color: #0052FF !important;
+}
+
 /* 12. Mobile Responsive Architecture (< 768px Viewports) */
 @media (max-width: 767px) {
     body {
@@ -3579,13 +3864,42 @@ tbody tr:hover td {
     /* Mobile: single clean feed per page — hide desktop grids & secondary panels */
     .epm-desktop-only,
     #sec_breaking_wire, #sec_secondary_wire, #sec_visual_news,
+    #sec_circ_directory, #sec_circ_visual, #circ_filters_row, #circ_action_toolbar,
+    #sec_holidays_page,
     #cal_table_header_strip .epm-tbl-hdr-actions,
     #cal_table_header_strip .epm-tbl-hdr-badge,
     #cal_table_header_strip .epm-tbl-hdr-badge-sub {
         display: none !important;
     }
     .epm-mobile-only { display: block !important; }
-    #mobile_news_feed { padding: 0 !important; border: none !important; background: transparent !important; }
+    #mobile_news_feed, #mobile_circ_feed, #mobile_holidays_feed { padding: 0 !important; border: none !important; background: transparent !important; }
+
+    /* Calendar Dropdowns Side-by-Side (50% each) on Mobile */
+    #cal_table_header_strip .epm-tbl-hdr-filters {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 6px !important;
+        width: 100% !important;
+        margin: 6px 0 !important;
+    }
+    #cal_table_header_strip .epm-tbl-hdr-filters > div,
+    #cal_table_header_strip .epm-tbl-hdr-filters .epm-filter-dropdown,
+    #cal_date_filter_dd,
+    #cal_reg_filter_dd {
+        flex: 1 1 50% !important;
+        max-width: 50% !important;
+        width: 50% !important;
+        min-width: 0 !important;
+    }
+    #cal_date_filter_dd .wrap, #cal_reg_filter_dd .wrap,
+    #cal_date_filter_dd select, #cal_reg_filter_dd select,
+    #cal_date_filter_dd input, #cal_reg_filter_dd input {
+        width: 100% !important;
+        font-size: 11px !important;
+        padding: 4px 6px !important;
+        height: 32px !important;
+    }
 
     /* Mobile News Streams: High-Density Responsive Table with Horizontal & Vertical Touch Scroll */
     #top_news_table, #bottom_news_table {
@@ -3794,18 +4108,14 @@ tbody tr:hover td {
 TOP_NAVBAR_HTML = """
 <div id="epm-top-navbar" class="epm-top-navbar">
     <div class="epm-nav-single-row">
-        <!-- Left: Brand Identity, Live Dot, IST Telemetry -->
-        <div class="epm-nav-brand-cluster">
-            <span class="epm-nav-bolt">⚡</span>
-            <span class="epm-nav-title">EPM<span class="epm-title-highlight">PRO</span></span>
-            <div class="epm-nav-status-badge">
-                <span class="epm-live-dot"></span>
-                <span>ONLINE</span>
-            </div>
+        <!-- Left: Brand Identity Logo + GNC -->
+        <a href="javascript:void(0)" class="epm-nav-brand-cluster" onclick="window.epmSwitchTab(0)" style="text-decoration:none;">
+            <img src="/api/logo" class="epm-nav-logo" alt="GNC" />
+            <span class="epm-nav-title">GNC</span>
             <div class="epm-nav-telemetry">
                 <span class="epm-telem-pill epm-telem-time" title="Current Time (IST)"><b id="epm-hdr-ist">12:50:00 IST</b></span>
             </div>
-        </div>
+        </a>
 
         <!-- Center: Continuous Sliding Ticker Ribbon -->
         <div class="epm-ticker-container" id="epm-telemetry-ticker">
@@ -3898,16 +4208,9 @@ TOP_NAVBAR_HTML = """
             </div>
         </div>
 
-        <!-- Right: Audio Toggle & Hamburger Menu -->
+        <!-- Right: Prominent High-Visibility Menu Button (Sidebar Drawer) -->
         <div class="epm-nav-controls">
-            <!-- Audio Alert Toggle -->
-            <button type="button" id="epm-audio-toggle-btn" class="epm-top-btn epm-btn-active" onclick="window.epmToggleAudio()" title="Toggle Web Audio Flash Chime">
-                <span class="epm-btn-icon">⚡</span>
-                <span id="epm-audio-status-lbl">Audio ON</span>
-            </button>
-
-            <!-- Prominent High-Visibility Menu Button (Sidebar Drawer) -->
-            <button type="button" id="epm-desktop-menu-btn" class="epm-top-btn epm-menu-btn epm-nav-menu-main" onclick="window.epmToggleSideMenu()" title="Open Workspaces & Actions Menu">
+            <button type="button" id="epm-desktop-menu-btn" class="epm-top-btn epm-menu-btn epm-nav-menu-main" onclick="window.epmToggleSideMenu()" title="Open Menu">
                 <span class="epm-menu-icon">☰</span>
                 <span class="epm-menu-btn-text">Menu ▾</span>
             </button>
@@ -3920,13 +4223,25 @@ TOP_NAVBAR_HTML = """
 <div id="epm-side-menu-drawer" class="epm-side-drawer epm-mobile-drawer">
     <div class="epm-side-drawer-header">
         <div class="epm-side-drawer-brand">
-            <span class="epm-nav-bolt">⚡</span>
-            <span class="epm-side-drawer-title">EPM<span class="epm-title-highlight">PRO</span></span>
+            <img src="/api/logo" class="epm-nav-logo" alt="GNC" style="height:26px;width:auto;margin-right:6px;" />
+            <span class="epm-side-drawer-title">GNC</span>
         </div>
         <button type="button" class="epm-side-drawer-close" onclick="window.epmCloseSideMenu()" title="Close Menu">✕</button>
     </div>
 
     <div class="epm-side-drawer-body">
+        <div class="epm-side-section-label">SYSTEM & AUDIO CONTROLS</div>
+        <div class="epm-side-audio-card" onclick="window.epmToggleAudio()" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;margin-bottom:12px;cursor:pointer;">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <span style="font-size:18px;">🔔</span>
+                <div>
+                    <div style="font-weight:700;font-size:12.5px;color:#0F172A;">Audio Alert Chime</div>
+                    <div style="font-size:10.5px;color:#64748B;">Audible sound on breaking catalysts</div>
+                </div>
+            </div>
+            <span id="epm-side-audio-status" class="epm-side-audio-badge" style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;background:#DCFCE7;color:#166534;border:1px solid #86EFAC;">Audio ON</span>
+        </div>
+
         <div class="epm-side-section-label">WORKSPACES & SCREENS</div>
         <div class="epm-side-nav-list">
             <button type="button" class="epm-side-nav-item active" data-tab="0" onclick="window.epmSwitchTab(0);window.epmCloseSideMenu()">
@@ -3954,20 +4269,28 @@ TOP_NAVBAR_HTML = """
                 <span class="epm-side-item-tag">Tab 3</span>
             </button>
             <button type="button" class="epm-side-nav-item" data-tab="3" onclick="window.epmSwitchTab(3);window.epmCloseSideMenu()">
+                <span class="epm-side-item-icon">🏖️</span>
+                <div class="epm-side-item-info">
+                    <span class="epm-side-item-name">Trading Holidays & Closures</span>
+                    <span class="epm-side-item-desc">Authoritative 2026 market holidays</span>
+                </div>
+                <span class="epm-side-item-tag">Tab 4</span>
+            </button>
+            <button type="button" class="epm-side-nav-item epm-desktop-only" data-tab="4" onclick="window.epmSwitchTab(4);window.epmCloseSideMenu()">
                 <span class="epm-side-item-icon">⚙️</span>
                 <div class="epm-side-item-info">
                     <span class="epm-side-item-name">Settings & Dispatches Hub</span>
                     <span class="epm-side-item-desc">Telegram bots & calendar configuration</span>
                 </div>
-                <span class="epm-side-item-tag">Tab 4</span>
+                <span class="epm-side-item-tag">Tab 5</span>
             </button>
-            <button type="button" class="epm-side-nav-item" data-tab="4" onclick="window.epmSwitchTab(4);window.epmCloseSideMenu()">
+            <button type="button" class="epm-side-nav-item" data-tab="5" onclick="window.epmSwitchTab(5);window.epmCloseSideMenu()">
                 <span class="epm-side-item-icon">📖</span>
                 <div class="epm-side-item-info">
                     <span class="epm-side-item-name">Developer Docs & User Guide</span>
                     <span class="epm-side-item-desc">Interactive API endpoints & cron schedule</span>
                 </div>
-                <span class="epm-side-item-tag">Tab 5</span>
+                <span class="epm-side-item-tag">Tab 6</span>
             </button>
         </div>
 
@@ -4173,6 +4496,13 @@ TERMINAL_CLIENT_JS = r"""
                 drawerAudioState.classList.add("emerald");
             }
         }
+        const sideAudioBadge = document.getElementById("epm-side-audio-status");
+        if (sideAudioBadge) {
+            sideAudioBadge.textContent = audioMuted ? "Audio OFF" : "Audio ON";
+            sideAudioBadge.style.background = audioMuted ? "#F1F5F9" : "#DCFCE7";
+            sideAudioBadge.style.color = audioMuted ? "#64748B" : "#166534";
+            sideAudioBadge.style.borderColor = audioMuted ? "#CBD5E1" : "#86EFAC";
+        }
     }
 
     // 2. Tab Navigation Sync & Active Tab Indicator
@@ -4180,6 +4510,7 @@ TERMINAL_CLIENT_JS = r"""
         "📰 LIVE FINANCIAL WIRE",
         "📅 MARKET CALENDAR & OUTCOMES",
         "📜 REGULATORY CIRCULARS & PDFS",
+        "🏖️ TRADING HOLIDAYS & CLOSURES",
         "⚙️ PORTAL SETTINGS & INTEGRATIONS",
         "❓ USER GUIDE & MANUAL"
     ];
@@ -4736,16 +5067,32 @@ TERMINAL_CLIENT_JS = r"""
     }
 
     window.epmOpenStory = function(kind, startIdx) {
-        const src = document.querySelector(kind === 'calendar' ? '[data-stories-calendar]' : '[data-stories-news]');
+        const attrName = 'data-stories-' + kind;
+        const src = document.querySelector('[' + attrName + ']');
         if (!src) return;
         let items = [];
-        try { items = JSON.parse(src.getAttribute(kind === 'calendar' ? 'data-stories-calendar' : 'data-stories-news')) || []; } catch (e) { items = []; }
+        try { items = JSON.parse(src.getAttribute(attrName)) || []; } catch (e) { items = []; }
         if (!items.length) return;
         epmStory.items = items; epmStory.kind = kind;
         const v = epmEnsureStoryViewer();
         v.classList.add('is-open');
         document.body.classList.add('epm-drawer-locked');
         epmStoryGo(Math.min(startIdx || 0, items.length - 1));
+    };
+
+    window.epmFilterCircCards = function(reg, btn) {
+        const chipBtns = document.querySelectorAll('.epm-circ-chip');
+        chipBtns.forEach(b => b.classList.remove('active'));
+        if (btn) btn.classList.add('active');
+        const cards = document.querySelectorAll('#epm-circ-mobile-list .epm-pc-card');
+        cards.forEach(card => {
+            const cardReg = card.getAttribute('data-circ-reg');
+            if (reg === 'ALL' || cardReg === reg) {
+                card.style.display = '';
+            } else {
+                card.style.display = 'none';
+            }
+        });
     };
 
     window.epmCloseStory = function() {
@@ -5118,11 +5465,12 @@ TERMINAL_CLIENT_JS = r"""
 
 # Pre-computed initial states for instantaneous zero-error load across all tabs
 init_status_str, init_news_html, init_top_rows, init_bottom_rows, init_mobile_news_html = get_dashboard_tables()
-init_cal_summary, init_cal_html, init_cal_rows, init_hol_rows = get_calendar_tables()
-init_circ_summary, init_circ_html, init_circ_rows = get_circulars_view()
+init_cal_summary, init_cal_html, init_cal_rows = get_calendar_tables()
+init_circ_summary, init_circ_html, init_circ_rows, init_mobile_circ_html = get_circulars_view()
+init_hol_mobile_html, init_hol_rows = get_holidays_view("ALL")
 
 with gr.Blocks(
-    title="EPM Pro Global Financial News & Multi-Market Intelligence Terminal",
+    title="GNC | Global News Feed Room & Financial Terminal",
     fill_width=True,
     head=(
         '<link rel="preconnect" href="https://fonts.googleapis.com">'
@@ -5142,7 +5490,7 @@ with gr.Blocks(
             mobile_news_feed = gr.HTML(value=init_mobile_news_html, elem_id="mobile_news_feed", elem_classes=["epm-mobile-only"])
             with gr.Column(elem_id="sec_breaking_wire", elem_classes=["epm-modular-section"]):
                 with gr.Row(elem_id="tab1_header_strip"):
-                    gr.HTML(render_table_ribbon("top_news_table", "Institutional Breaking Wire", subtitle="AI Scored ≥ 7", count_badge="Primary Catalysts", section_id="sec_breaking_wire", show_refresh=True))
+                    gr.HTML(render_table_ribbon("top_news_table", "Institutional Breaking Wire & Multi-Market Stream", subtitle="All Catalysts · AI Scored", count_badge="Primary Catalysts", section_id="sec_breaking_wire", show_refresh=True))
                     refresh_btn = gr.Button("🔄 Force Refresh Feeds", variant="primary", elem_id="tab1_refresh_btn", scale=0)
 
                 top_table = gr.Dataframe(
@@ -5236,7 +5584,6 @@ with gr.Blocks(
                             btn_push_monthly_pdf = gr.Button("✈️ Monthly", variant="secondary", elem_classes=["epm-hdr-action-btn", "btn-secondary-light"])
                             btn_sync_gcal = gr.Button("📅 GCal", variant="secondary", elem_classes=["epm-hdr-action-btn", "btn-secondary-light"])
                             btn_ics_export = gr.Button("📲 .ICS", variant="secondary", elem_classes=["epm-hdr-action-btn", "btn-secondary-light"])
-                            btn_push_holiday = gr.Button("🏖️ Holidays", variant="secondary", elem_classes=["epm-hdr-action-btn", "btn-secondary-light"])
                             gr.HTML(render_section_controls("sec_catalyst_ledger"))
 
                     calendar_visual_feed = gr.HTML(value=init_cal_html, elem_id="calendar_visual_feed")
@@ -5271,26 +5618,6 @@ with gr.Blocks(
                 elem_id="calendar_table"
             )
 
-            with gr.Column(elem_id="sec_holidays_ledger", elem_classes=["epm-modular-section"]):
-                gr.HTML(render_table_ribbon("holidays_table", "2026 Authoritative Trading Holidays", subtitle="NSE · BSE · MCX · NYSE · CRYPTO", count_badge="All Sessions", section_id="sec_holidays_ledger"))
-                holidays_table = gr.Dataframe(
-                    headers=[
-                        "Date",
-                        "Day",
-                        "Holiday / Occasion",
-                        "🇮🇳 NSE Status",
-                        "🇮🇳 BSE Status",
-                        "⛽ MCX Status (Morning / Evening)",
-                        "🇺🇸 NYSE Status (EST / IST)",
-                        "₿ Crypto Status"
-                    ],
-                    datatype=["str", "str", "str", "str", "str", "str", "str", "str"],
-                    value=init_hol_rows,
-                    interactive=False,
-                    wrap=True,
-                    elem_id="holidays_table"
-                )
-
             with gr.Accordion("✏️ Record Event Outcome Manually or Add Custom Event", open=False):
                 gr.Markdown("Enter an existing **Event ID** to update its outcome (e.g. `nse_reliance_res`), or leave blank to log a new scheduled release:")
                 with gr.Row():
@@ -5315,10 +5642,9 @@ with gr.Blocks(
                     in_ev_push = gr.Checkbox(value=True, label="Immediately forward this Individual Event & Outcome to the Calendar Telegram Channel")
                     save_ev_btn = gr.Button("💾 Save Event / Outcome & Dispatch Market Update", variant="primary")
 
-            cal_filter.change(get_calendar_tables, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_visual_feed, calendar_table, holidays_table])
-            cal_market_filter.change(get_calendar_tables, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_visual_feed, calendar_table, holidays_table])
+            cal_filter.change(get_calendar_tables, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_visual_feed, calendar_table])
+            cal_market_filter.change(get_calendar_tables, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_visual_feed, calendar_table])
             btn_sync_gcal.click(trigger_sync_google_cal, outputs=[cal_action_msg])
-            btn_push_holiday.click(push_holiday_check_alert, outputs=[cal_action_msg])
             btn_download_daily_outcomes.click(handle_download_daily_outcomes_pdf, outputs=[cal_action_msg, cal_pdf_file])
             btn_push_daily_outcomes.click(handle_dispatch_daily_outcomes_pdf_telegram, outputs=[cal_action_msg, cal_pdf_file])
             btn_download_weekly.click(handle_download_weekly_pdf, outputs=[cal_action_msg, cal_pdf_file])
@@ -5337,8 +5663,9 @@ with gr.Blocks(
         # ═══════════════════════════════════════════════════════════
         with gr.TabItem("📜 Regulatory Circulars & Official PDFs"):
             circ_info_bar = gr.Markdown(value=init_circ_summary, elem_id="circ_info_bar", visible=False)
+            mobile_circ_feed = gr.HTML(value=init_mobile_circ_html, elem_id="mobile_circ_feed", elem_classes=["epm-mobile-only"])
 
-            with gr.Row(elem_id="circ_filters_row"):
+            with gr.Row(elem_id="circ_filters_row", elem_classes=["epm-desktop-only"]):
                 circ_reg_filter = gr.Radio(
                     choices=[
                         ("🌐 ALL", "ALL"),
@@ -5372,14 +5699,14 @@ with gr.Blocks(
                     scale=3
                 )
 
-            with gr.Column(elem_id="sec_circ_directory", elem_classes=["epm-modular-section"]):
+            with gr.Column(elem_id="sec_circ_directory", elem_classes=["epm-modular-section", "epm-desktop-only"]):
                 with gr.Row(elem_id="circ_action_toolbar", elem_classes=["epm-toolbar-card"]):
                     circ_refresh_btn = gr.Button("🔄 Check & Poll Official Circulars (NSE, BSE, MCX, RBI, FINMIN, FOMC)", variant="primary", scale=3)
                     circ_dispatch_btn = gr.Button("📲 Forward Latest Circular to Telegram", variant="secondary", scale=2)
 
                 circ_action_msg = gr.Markdown(elem_id="circ_action_msg")
 
-                gr.HTML(render_table_ribbon("circ_table", "Official Regulatory Documents Directory", subtitle="Verified PDFs", count_badge="Directives", section_id="sec_circ_directory"))
+                gr.HTML(render_table_ribbon("circ_table", "Official Regulatory Documents Directory", subtitle="Verified PDFs & Directives", count_badge="Directives", section_id="sec_circ_directory"))
                 circ_table = gr.Dataframe(
                     headers=[
                         "Regulator",
@@ -5398,35 +5725,84 @@ with gr.Blocks(
                     elem_id="circ_table"
                 )
 
-            with gr.Column(elem_id="sec_circ_visual", elem_classes=["epm-modular-section"]):
-                with gr.Accordion("🎴 Visual Regulatory Stream & AI Breakdown Cards", open=False):
-                    circ_visual_feed = gr.HTML(value=init_circ_html, elem_id="circ_visual_feed")
+            circ_visual_feed = gr.HTML(value="", elem_id="circ_visual_feed", visible=False)
 
             circ_reg_filter.change(
                 get_circulars_view,
                 inputs=[circ_reg_filter, circ_imp_filter, circ_search],
-                outputs=[circ_info_bar, circ_visual_feed, circ_table]
+                outputs=[circ_info_bar, circ_visual_feed, circ_table, mobile_circ_feed]
             )
             circ_imp_filter.change(
                 get_circulars_view,
                 inputs=[circ_reg_filter, circ_imp_filter, circ_search],
-                outputs=[circ_info_bar, circ_visual_feed, circ_table]
+                outputs=[circ_info_bar, circ_visual_feed, circ_table, mobile_circ_feed]
             )
             circ_search.submit(
                 get_circulars_view,
                 inputs=[circ_reg_filter, circ_imp_filter, circ_search],
-                outputs=[circ_info_bar, circ_visual_feed, circ_table]
+                outputs=[circ_info_bar, circ_visual_feed, circ_table, mobile_circ_feed]
             )
             circ_refresh_btn.click(
                 refresh_circulars_data,
                 inputs=[circ_reg_filter, circ_imp_filter, circ_search],
-                outputs=[circ_info_bar, circ_visual_feed, circ_table]
+                outputs=[circ_info_bar, circ_visual_feed, circ_table, mobile_circ_feed]
             )
             circ_dispatch_btn.click(
                 dispatch_circular_to_telegram,
                 inputs=[circ_reg_filter],
                 outputs=[circ_action_msg]
             )
+
+        # ═══════════════════════════════════════════════════════════
+        # TAB 4: Dedicated 2026 Authoritative Trading Holidays & Market Closures
+        # ═══════════════════════════════════════════════════════════
+        with gr.TabItem("🏖️ Trading Holidays & Market Closures"):
+            mobile_holidays_feed = gr.HTML(value=init_hol_mobile_html, elem_id="mobile_holidays_feed", elem_classes=["epm-mobile-only"])
+            with gr.Column(elem_id="sec_holidays_page", elem_classes=["epm-modular-section"]):
+                with gr.Row(elem_id="holidays_header_strip", elem_classes=["epm-table-header-integrated"]):
+                    with gr.Row(elem_classes=["epm-tbl-hdr-left"]):
+                        gr.HTML("""
+                        <div class="epm-tbl-hdr-title-group">
+                            <span class="epm-ribbon-bullet">●</span>
+                            <span class="epm-tbl-hdr-title">2026 AUTHORITATIVE TRADING HOLIDAYS & CLOSURES</span>
+                            <span class="epm-tbl-hdr-badge">MULTI-MARKET</span>
+                        </div>
+                        """)
+                    with gr.Row(elem_classes=["epm-tbl-hdr-filters"]):
+                        hol_country_filter = gr.Radio(
+                            choices=[
+                                ("🌐 All Markets", "ALL"),
+                                ("🇮🇳 Indian Markets (NSE, BSE, MCX)", "INDIA"),
+                                ("🇺🇸 US Markets (NYSE)", "USA")
+                            ],
+                            value="ALL",
+                            label="",
+                            show_label=False,
+                            elem_id="hol_country_filter_radio"
+                        )
+                    with gr.Row(elem_classes=["epm-tbl-hdr-actions"]):
+                        btn_push_holiday_page = gr.Button("🔔 Dispatch Holiday Alert", variant="secondary", elem_classes=["epm-hdr-action-btn", "btn-secondary-light"])
+
+                holidays_table = gr.Dataframe(
+                    headers=[
+                        "Date",
+                        "Day",
+                        "Holiday / Occasion",
+                        "🇮🇳 NSE Status",
+                        "🇮🇳 BSE Status",
+                        "⛽ MCX Status (Morning / Evening)",
+                        "🇺🇸 NYSE Status (EST / IST)",
+                        "₿ Crypto Status"
+                    ],
+                    datatype=["str", "str", "str", "str", "str", "str", "str", "str"],
+                    value=init_hol_rows,
+                    interactive=False,
+                    wrap=True,
+                    elem_id="holidays_table"
+                )
+
+            hol_country_filter.change(get_holidays_view, inputs=[hol_country_filter], outputs=[mobile_holidays_feed, holidays_table])
+            btn_push_holiday_page.click(push_holiday_check_alert, outputs=[cal_action_msg])
 
         # ═══════════════════════════════════════════════════════════
         # TAB 4: Portal Settings Page (Alert Channels, Google Cal & Sources)
@@ -5905,8 +6281,9 @@ with gr.Blocks(
 
     refresh_btn.click(manual_refresh, outputs=[status_box, top_news_visual, top_table, bottom_table, mobile_news_feed]).then(None, js="() => window.epmPlayChime(false)")
     demo.load(get_dashboard_tables, outputs=[status_box, top_news_visual, top_table, bottom_table, mobile_news_feed])
-    demo.load(get_calendar_tables, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_visual_feed, calendar_table, holidays_table])
-    demo.load(get_circulars_view, inputs=[circ_reg_filter, circ_imp_filter, circ_search], outputs=[circ_info_bar, circ_visual_feed, circ_table])
+    demo.load(get_calendar_tables, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_visual_feed, calendar_table])
+    demo.load(get_circulars_view, inputs=[circ_reg_filter, circ_imp_filter, circ_search], outputs=[circ_info_bar, circ_visual_feed, circ_table, mobile_circ_feed])
+    demo.load(get_holidays_view, inputs=[hol_country_filter], outputs=[mobile_holidays_feed, holidays_table])
 
     wire_timer = gr.Timer(10)
     wire_timer.tick(get_dashboard_tables, outputs=[status_box, top_news_visual, top_table, bottom_table, mobile_news_feed])
