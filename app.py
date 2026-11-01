@@ -1217,7 +1217,21 @@ def render_calendar_timeline_html(events: List[Dict]) -> str:
         return '<div class="epm-empty-state"><div class="epm-empty-title">No scheduled catalysts for this filter</div></div>'
     now = now_ist()
     now_key = now.strftime("%Y-%m-%d %H:%M")
-    evs = sorted(events, key=lambda e: (str(e.get("date", "")), calendar_pdf_engine._format_event_time(e) or "99:99"))[:150]
+    all_sorted = sorted(events, key=lambda e: (str(e.get("date", "")), calendar_pdf_engine._format_event_time(e) or "99:99"))
+    
+    # Filter for upcoming events unfolding from the time the user is on the site (no past events)
+    future_evs = []
+    for ev in all_sorted:
+        d = str(ev.get("date", ""))
+        t_full = calendar_pdf_engine._format_event_time(ev)
+        t_short = t_full[:5] if t_full else "23:59"
+        ev_key = f"{d} {t_short}"
+        if ev_key >= now_key:
+            future_evs.append(ev)
+    if not future_evs:
+        future_evs = [ev for ev in all_sorted if str(ev.get("date", "")) >= now.strftime("%Y-%m-%d")]
+    
+    evs = (future_evs if future_evs else all_sorted)[:150]
     stories = build_story_items("calendar", limit=len(evs))
     parts, cur_date, now_inserted = [], None, False
     for i, ev in enumerate(evs):
