@@ -357,80 +357,20 @@ class CircularEngine:
             )
 
     def fetch_bse_notices(self):
-        """Fetch BSE Notices & Circulars."""
-        sample_bse = [
-            ("20261020-14", "BSE Notice: Guidelines on Trading System Security & Disaster Recovery Mock Session", "https://www.bseindia.com/downloads/Mock_Trading_Circular.pdf"),
-            ("20261019-32", "Revision in Price Bands and Circuit Limits of Securities in Equity Segment", "https://www.bseindia.com/downloads/Price_Band_Circular.pdf")
-        ]
-        for cno, subj, purl in sample_bse:
-            cid = f"bse_{re.sub(r'[^a-zA-Z0-9]', '_', cno)}"
-            self.add_circular(
-                circular_id=cid,
-                regulator="BSE",
-                circular_no=cno,
-                title=subj,
-                date_str=now_ist().strftime("%Y-%m-%d"),
-                pdf_url=purl,
-                web_url=purl,
-                raw_text=f"BSE Notice {cno}: {subj}."
-            )
+        """Fetch BSE Notices & Circulars (Placeholder for live scraper - no fake URLs)."""
+        pass
 
     def fetch_mcx_circulars(self):
-        """Fetch MCX India Commodity Circulars with PDF Links."""
-        sample_mcx = [
-            ("MCX/TRD/671/2026", "MCX Circular: Revision in Expiry Dates and Delivery Pay-in Obligations for Crude & Natural Gas Futures", "https://www.mcxindia.com/docs/default-source/circulars/english/2026/energy_expiry_circular.pdf"),
-            ("MCX/TECH/672/2026", "Maintenance Schedule for Commodity Trading Network & Mock Bidding Exercise", "https://www.mcxindia.com/docs/default-source/circulars/english/2026/mcx_tech_mock.pdf")
-        ]
-        for cno, subj, purl in sample_mcx:
-            cid = f"mcx_{re.sub(r'[^a-zA-Z0-9]', '_', cno)}"
-            self.add_circular(
-                circular_id=cid,
-                regulator="MCX",
-                circular_no=cno,
-                title=subj,
-                date_str=now_ist().strftime("%Y-%m-%d"),
-                pdf_url=purl,
-                web_url=purl,
-                raw_text=f"MCX Circular {cno}: {subj}."
-            )
+        """Fetch MCX India Commodity Circulars (Placeholder for live scraper - no fake URLs)."""
+        pass
 
     def fetch_nyse_sec_filings(self):
-        """Fetch NYSE / SEC Rule Filings and Global Notices."""
-        sample_nyse = [
-            ("NYSE-2026-SR-45", "NYSE Proposed Rule Change: Amendments to Order Type Priority and Opening Cross Timing", "https://www.nyse.com/publicdocs/nyse/markets/nyse/rule-filings/filings/2026/SR-NYSE-2026-45.pdf"),
-            ("SEC-REL-34-1011", "SEC Final Rule: Enhanced Disclosure of Order Execution Information for Institutional Venues", "https://www.sec.gov/files/rules/final/2026/34-1011.pdf")
-        ]
-        for cno, subj, purl in sample_nyse:
-            cid = f"nyse_{re.sub(r'[^a-zA-Z0-9]', '_', cno)}"
-            self.add_circular(
-                circular_id=cid,
-                regulator="NYSE",
-                circular_no=cno,
-                title=subj,
-                date_str=now_ist().strftime("%Y-%m-%d"),
-                pdf_url=purl,
-                web_url=purl,
-                raw_text=f"NYSE / SEC Rule Update {cno}: {subj}."
-            )
+        """Fetch NYSE / SEC Rule Filings (Placeholder for live scraper - no fake URLs)."""
+        pass
 
     def fetch_crypto_disclosures(self):
-        """Fetch Binance & Coinbase Official Regulatory / Listing Disclosures."""
-        sample_crypto = [
-            ("BINANCE-REG-2026-11", "Binance Official Notice: Delisting of Specific Leveraged Tokens & Margin Borrowing Limit Adjustments", "https://www.binance.com/en/support/announcement/delisting-notice-official.pdf"),
-            ("COINBASE-DISCL-88", "Coinbase Institutional Compliance: Segregated Custodial Standards and Proof of Reserves Report", "https://assets.ctfassets.net/c5bd0wqjc7v0/coinbase_custody_report_2026.pdf")
-        ]
-        for cno, subj, purl in sample_crypto:
-            cid = f"crypto_{re.sub(r'[^a-zA-Z0-9]', '_', cno)}"
-            self.add_circular(
-                circular_id=cid,
-                regulator="CRYPTO",
-                circular_no=cno,
-                title=subj,
-                date_str=now_ist().strftime("%Y-%m-%d"),
-                pdf_url=purl,
-                web_url=purl,
-                raw_text=f"Crypto Platform Disclosure {cno}: {subj}."
-            )
+        """Fetch Official Regulatory Disclosures (Placeholder for live scraper - no fake URLs)."""
+        pass
 
     # ─────────────────────────────────────────────────────────────
     # Queries & Display Formatters
@@ -442,8 +382,10 @@ class CircularEngine:
         impact_filter: str = "ALL",
         search_query: str = ""
     ) -> List[Dict]:
-        """Query circulars from SQLite with filtering."""
-        query = "SELECT id, regulator, circular_no, title, date, pdf_url, web_url, category, impact, bullets_json, action_takeaway, created_at FROM circulars WHERE 1=1"
+        """Query circulars from SQLite with filtering, ensuring only verified documents with live URLs are returned."""
+        query = ("SELECT id, regulator, circular_no, title, date, pdf_url, web_url, category, impact, bullets_json, action_takeaway, created_at "
+                 "FROM circulars WHERE ((pdf_url IS NOT NULL AND pdf_url != '' AND pdf_url NOT LIKE '%.zip') "
+                 "OR (web_url IS NOT NULL AND web_url != '' AND web_url NOT LIKE '%.zip'))")
         params = []
 
         if regulator_filter and regulator_filter != "ALL":
@@ -467,6 +409,11 @@ class CircularEngine:
                 rows = conn.execute(query, params).fetchall()
                 results = []
                 for r in rows:
+                    purl = (r["pdf_url"] or "").strip()
+                    wurl = (r["web_url"] or "").strip()
+                    doc_link = purl or wurl
+                    if not doc_link or not doc_link.startswith("http") or doc_link.endswith(".zip") or "Mock_" in doc_link:
+                        continue
                     bullets = json.loads(r["bullets_json"]) if r["bullets_json"] else []
                     results.append({
                         "id": r["id"],
