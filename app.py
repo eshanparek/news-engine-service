@@ -837,6 +837,68 @@ def clean_table_text(text: any) -> str:
     return clean.strip()
 
 
+def extract_clean_time_str(raw_ts: str, fallback_dt: Optional[datetime] = None) -> str:
+    """
+    Extracts strictly the time (e.g. '12:50 PM', '16:30 IST', '04:30:15 PM')
+    stripping any day or date component (e.g. 'Sun, 01 Nov 2026') to prevent left rail overlap.
+    Guarantees max length <= 12 chars.
+    """
+    ts = str(raw_ts or "").strip()
+    if not ts:
+        if fallback_dt is None:
+            fallback_dt = now_ist()
+        return fallback_dt.strftime("%I:%M %p")
+
+    # 1. ISO format with T
+    if "T" in ts:
+        try:
+            dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            return dt.astimezone(ist).strftime("%I:%M %p")
+        except Exception:
+            pass
+
+    # 2. Check for 12-hour format with AM/PM (e.g. "12:50:30 PM", "04:30 PM")
+    m_ampm = re.search(r'(\d{1,2}:\d{2}(?::\d{2})?\s*[AP]M)', ts, re.IGNORECASE)
+    if m_ampm:
+        return m_ampm.group(1).upper()
+
+    # 3. Check for 24-hour format with IST (e.g. "16:30 IST")
+    m_ist = re.search(r'(\d{1,2}:\d{2}(?::\d{2})?)\s*IST', ts, re.IGNORECASE)
+    if m_ist:
+        return f"{m_ist.group(1)} IST"
+
+    # 4. Standard YYYY-MM-DD HH:MM(:SS)
+    m_dt = re.search(r'\d{4}-\d{2}-\d{2}\s+(\d{1,2}:\d{2}(?::\d{2})?)', ts)
+    if m_dt:
+        t_part = m_dt.group(1)
+        try:
+            p = t_part.split(":")
+            h, m = int(p[0]), int(p[1])
+            suffix = "AM" if h < 12 else "PM"
+            h_12 = h if 1 <= h <= 12 else (h - 12 if h > 12 else 12)
+            if len(p) == 3:
+                return f"{h_12:02d}:{m:02d}:{p[2]} {suffix}"
+            return f"{h_12:02d}:{m:02d} {suffix}"
+        except Exception:
+            return f"{t_part} IST"
+
+    # 5. Check if there's any HH:MM(:SS) anywhere in the string
+    m_time = re.search(r'\b([01]?\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?\b', ts)
+    if m_time:
+        h = int(m_time.group(1))
+        m = int(m_time.group(2))
+        s = m_time.group(3)
+        suffix = "AM" if h < 12 else "PM"
+        h_12 = h if 1 <= h <= 12 else (h - 12 if h > 12 else 12)
+        if s:
+            return f"{h_12:02d}:{m:02d}:{s} {suffix}"
+        return f"{h_12:02d}:{m:02d} {suffix}"
+
+    if fallback_dt is None:
+        fallback_dt = now_ist()
+    return fallback_dt.strftime("%I:%M %p")
+
+
 def render_news_feed_html(items: List[Dict]) -> str:
     """Renders the Desktop Chronological Timeline Feed with left time rail & institutional highlights (Screenshot 5)."""
     if not items:
@@ -870,25 +932,9 @@ def render_news_feed_html(items: List[Dict]) -> str:
         source = clean_table_text(str(it.get("source", "Reuters")))
         link = it.get("link", "#")
 
-        # Time format 12:50:30 PM
+        # Time format strictly time-only (e.g. 12:50:30 PM or 16:30 IST)
         ts = str(it.get("timestamp", "")).strip()
-        try:
-            if " " in ts and ":" in ts and ("AM" in ts or "PM" in ts):
-                time_str = ts.replace("Today ", "").strip()
-            elif "T" in ts:
-                dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-                time_str = dt.astimezone(ist).strftime("%I:%M:%S %p")
-            elif len(ts) >= 19 and "-" in ts[:10] and ":" in ts[11:]:
-                dt = datetime.strptime(ts[:19], "%Y-%m-%d %H:%M:%S")
-                time_str = dt.strftime("%I:%M:%S %p")
-            elif ":" in ts and len(ts.split(":")) >= 2:
-                time_str = ts.replace("Today ", "").strip()
-                if not time_str.endswith("AM") and not time_str.endswith("PM"):
-                    time_str = f"{time_str} IST"
-            else:
-                time_str = now.strftime("%I:%M:%S %p")
-        except Exception:
-            time_str = now.strftime("%I:%M:%S %p")
+        time_str = extract_clean_time_str(ts, fallback_dt=now)
 
         # Bullets & Reasoning
         raw_reasoning = str(it.get("ai_reasoning", "")).strip()
@@ -944,7 +990,9 @@ def render_news_feed_html(items: List[Dict]) -> str:
     desktop_stories_strip = render_story_strip_html(stories, "news", is_desktop=True)
 
     # Render Chronological News Rows with Left Rail
-    rows_html = []
+    rows_html = [
+        f'<div class="epm-chron-day-divider"><span>📅 {today_banner_str}</span></div>'
+    ]
     seen_broad_divider = False
 
     for it in processed:
@@ -1282,17 +1330,36 @@ def render_site_disclaimer_html(is_mobile: bool = False) -> str:
 
 
 def render_story_strip_html(stories: List[Dict], kind: str, is_desktop: bool = False) -> str:
-    """Renders sleek rectangular story preview thumbnails with authority tags, live scores, and headlines."""
+    """Renders sleek rectangular story preview thumbnails with mid-gray canvas and green, red, or yellow ribbons."""
     cls = "epm-story-strip desktop-strip" if is_desktop else "epm-story-strip"
     thumbs = []
+    INSTITUTIONAL_TAGS = {
+        "SEBI", "RBI", "FOMC", "FED", "MCX", "NSE", "BSE", "FINMIN",
+        "IFSCA", "IRDAI", "PFRDA", "SEC", "CFTC", "TREASURY", "DGFT", "MOPNG",
+        "GOVT", "MINISTRY", "CATALYST"
+    }
     for i, s in enumerate(stories[:30]):
         sk = _sent_key(s.get("sentiment", "NEUTRAL")).lower()
         title = html.escape(clean_table_text(s.get("title", "Market Story")))
-        emblem = html.escape(str(s.get("emblem") or s.get("source") or "GNC").upper()[:8])
+        raw_auth = str(s.get("emblem") or s.get("source") or "GNC").strip()
+        emblem = html.escape(raw_auth.upper()[:10])
         score = html.escape(str(s.get("metric1", "8.5/10")).split("/")[0])
         sent_label = html.escape(str(s.get("sentiment", "NEUTRAL")).upper())
+
+        is_inst = s.get("is_institutional", False) or any(k in (raw_auth + " " + s.get("title", "")).upper() for k in INSTITUTIONAL_TAGS)
+
+        # Yellow ribbon for institutional news; green for bullish; red for bearish; neutral for others
+        if kind == "news" and is_inst:
+            ribbon_cls = "ribbon-yellow is-inst-thumb"
+        elif sk == "bullish":
+            ribbon_cls = "tone-bullish"
+        elif sk == "bearish":
+            ribbon_cls = "tone-bearish"
+        else:
+            ribbon_cls = "tone-neutral"
+
         thumbs.append(
-            f'<div class="epm-story-thumbnail tone-{sk}" onclick="window.epmOpenStory(\'{kind}\',{i})">'
+            f'<div class="epm-story-thumbnail {ribbon_cls}" onclick="window.epmOpenStory(\'{kind}\',{i})">'
             f'  <div class="epm-thumb-inner">'
             f'    <div class="epm-thumb-top">'
             f'      <span class="epm-thumb-auth">{emblem}</span>'
@@ -1316,9 +1383,14 @@ def _story_attr(items: List[Dict]) -> str:
 
 
 def render_mobile_news_feed_html(pool: List[Dict]) -> str:
-    """Mobile-only progressive (tap-to-expand) news cards with an Instagram-style stories strip."""
+    """Mobile-only progressive (tap-to-expand) news cards with an Instagram-style stories strip and institutional highlights."""
     stories = build_story_items("news", limit=len(pool))
     rows = []
+    INSTITUTIONAL_KEYWORDS = {
+        "SEBI", "RBI", "FOMC", "FED", "MCX", "NSE", "BSE", "FINMIN",
+        "IFSCA", "IRDAI", "PFRDA", "SEC", "CFTC", "TREASURY", "DGFT", "MOPNG",
+        "GOVT", "MINISTRY", "CATALYST", "REGULATORY"
+    }
     for i, it in enumerate(pool[:40]):
         sk = _sent_key(it.get("ai_sentiment"))
         title = html.escape(clean_table_text(it.get("title", "")))
@@ -1334,12 +1406,18 @@ def render_mobile_news_feed_html(pool: List[Dict]) -> str:
         sec_html = "".join(f'<span class="epm-pc-tag">{html.escape(str(s))}</span>' for s in sectors[:3])
         link = html.escape(it.get("link", "#") or "#", quote=True)
         story_btn = f'<button type="button" class="epm-pc-story-btn" onclick="event.stopPropagation();window.epmOpenStory(\'news\',{i})">▶ Story</button>' if i < len(stories) else ""
+
+        combined_text = (src + " " + title).upper()
+        is_inst = any(k in combined_text for k in INSTITUTIONAL_KEYWORDS)
+        inst_cls = "is-institutional" if is_inst else ""
+        inst_badge = f'<span class="epm-inst-chip">🏛️ {src[:12]}</span>' if is_inst else ""
+
         rows.append(f"""
-        <div class="epm-pc-card tone-{sk}" onclick="window.epmToggleProgressive(this)">
+        <div class="epm-pc-card tone-{sk} {inst_cls}" onclick="window.epmToggleProgressive(this)">
             <div class="epm-pc-head">
                 <div class="epm-pc-head-text">
                     <div class="epm-pc-title">{title}</div>
-                    <div class="epm-pc-meta"><span class="epm-pc-dot"></span>{src} · {ts}</div>
+                    <div class="epm-pc-meta">{inst_badge}<span class="epm-pc-dot"></span>{src} · {ts}</div>
                 </div>
                 <span class="epm-pc-chev">⌄</span>
             </div>
@@ -2057,14 +2135,16 @@ def render_calendar_dossier_html(events: List[Dict]) -> str:
             rendered_total += 1
 
 def render_desktop_calendar_html(events: List[Dict]) -> str:
-    """Renders desktop institutional Market Calendar with 2-row header & left chronological rail (Screenshots 4 & 5)."""
+    """Renders desktop institutional Market Calendar with 1-row header & left chronological rail."""
     if not events:
         return '<div class="epm-empty-state"><div class="epm-empty-title">No upcoming catalysts</div></div>'
     
     curr = now_ist()
     today_banner_str = curr.strftime("%A, %d %B %Y")
     
-    rows_html = []
+    rows_html = [
+        f'<div class="epm-chron-day-divider"><span>📅 UPCOMING CATALYSTS • {today_banner_str}</span></div>'
+    ]
     processed = []
     cal_stories = build_story_items("calendar", limit=len(events))
     desktop_stories_strip = render_story_strip_html(cal_stories, "calendar", is_desktop=True)
@@ -2072,10 +2152,7 @@ def render_desktop_calendar_html(events: List[Dict]) -> str:
     for idx, ev in enumerate(events[:50]):
         eid = ev.get("id", f"ev_{idx}")
         time_str = ev.get("time", "10:00")
-        if len(time_str) == 5:
-            time_display = f"{time_str}:00 AM" if int(time_str[:2]) < 12 else f"{time_str}:00 PM"
-        else:
-            time_display = f"{time_str} IST"
+        time_display = extract_clean_time_str(time_str, fallback_dt=curr)
             
         mkt = ev.get("market", "NSE")
         cat_raw = str(ev.get("category", "Corp. Board Meet"))
@@ -2163,64 +2240,51 @@ def render_desktop_calendar_html(events: List[Dict]) -> str:
             <!-- Desktop Story Circles Strip (Instagram Web Style) -->
             {desktop_stories_strip}
 
-            <!-- Strictly 2-Row Header (Screenshot 4) -->
-            <div class="epm-cal-2row-hdr">
-                <!-- Row 1: Brand / Title on Left + Category Pills on Right -->
-                <div class="epm-cal-2row-r1">
-                    <div class="epm-cal-logo-title" style="display:flex; align-items:center; gap:8px;">
-                        <span class="epm-cal-logo-badge" style="background:#0052FF; color:#fff; font-weight:800; font-size:11px; padding:3px 8px; border-radius:4px;">GNC</span>
-                        <span class="epm-cal-logo-sub" style="font-size:12px; font-weight:600; color:#64748B;">Global News Feed Room</span>
-                        <span style="font-size:14px; font-weight:800; color:#0F172A; margin-left:6px;">MARKET CALENDAR</span>
-                    </div>
-                    <div class="epm-cal-cat-pills" style="display:flex; gap:6px;">
-                        <button type="button" class="epm-cal-cat-btn active" onclick="window.epmFilterCalCat('all', this)">All</button>
-                        <button type="button" class="epm-cal-cat-btn" onclick="window.epmFilterCalCat('equities', this)">Equities</button>
-                        <button type="button" class="epm-cal-cat-btn" onclick="window.epmFilterCalCat('fno', this)">Futures & Options</button>
-                        <button type="button" class="epm-cal-cat-btn" onclick="window.epmFilterCalCat('ipos', this)">IPOs</button>
-                        <button type="button" class="epm-cal-cat-btn" onclick="window.epmFilterCalCat('macro', this)">Macro Events</button>
-                    </div>
+            <!-- Strictly 1-Row Header: Title on far left, selects, category pills, action buttons all in 1 single row -->
+            <div class="epm-cal-1row-hdr">
+                <div class="epm-cal-1row-left">
+                    <span class="epm-cal-title-badge">MARKET CALENDAR</span>
+                    <select class="epm-cal-select-filter" id="epm-cal-period-select" onchange="window.epmChangeCalPeriod(this.value)">
+                        <option value="all">📅 Select Period ▾</option>
+                        <option value="today">📅 Today (7 AM)</option>
+                        <option value="tomorrow">📅 Tomorrow (7 AM)</option>
+                        <option value="week">📅 Next 7 Days</option>
+                        <option value="upcoming">📅 Active Timers</option>
+                    </select>
+                    <select class="epm-cal-select-filter" id="epm-cal-market-select" onchange="window.epmChangeCalMarket(this.value)">
+                        <option value="ALL">🏛️ Select Regulators ▾</option>
+                        <option value="NSE">🇮🇳 NSE</option>
+                        <option value="BSE">🇮🇳 BSE</option>
+                        <option value="MCX">⛽ MCX</option>
+                        <option value="CRYPTO">₿ CRYPTO</option>
+                        <option value="NYSE">🇺🇸 SEC / NYSE</option>
+                    </select>
                 </div>
-
-                <!-- Row 2: Select Period & Select Regulators on Left + Actions on Right -->
-                <div class="epm-cal-2row-r2">
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <select class="epm-cal-select-filter" id="epm-cal-period-select" onchange="window.epmChangeCalPeriod(this.value)">
-                            <option value="all">📅 Select Period ▾</option>
-                            <option value="today">📅 Today (7 AM)</option>
-                            <option value="tomorrow">📅 Tomorrow (7 AM)</option>
-                            <option value="week">📅 Next 7 Days</option>
-                            <option value="upcoming">📅 Active Timers</option>
-                        </select>
-                        <select class="epm-cal-select-filter" id="epm-cal-market-select" onchange="window.epmChangeCalMarket(this.value)">
-                            <option value="ALL">🏛️ Select Regulators ▾</option>
-                            <option value="NSE">🇮🇳 NSE</option>
-                            <option value="BSE">🇮🇳 BSE</option>
-                            <option value="MCX">⛽ MCX</option>
-                            <option value="CRYPTO">₿ CRYPTO</option>
-                            <option value="NYSE">🇺🇸 SEC / NYSE</option>
-                        </select>
-                    </div>
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <div class="epm-dropdown-wrap">
-                            <button type="button" class="epm-cal-hdr-btn epm-dropdown-btn" onclick="window.epmToggleExportMenu(this)">
-                                📥 Export Dossier PDF ▾
-                            </button>
-                            <div class="epm-dropdown-menu" id="epm-export-dropdown">
-                                <a href="/api/calendar/pdf/weekly" download target="_blank" class="epm-dropdown-item">📄 Weekly Snapshot PDF (Next Week)</a>
-                                <a href="/api/calendar/pdf/daily-outcomes" download target="_blank" class="epm-dropdown-item">📄 5 PM Daily Outcomes PDF (Today)</a>
-                                <a href="/api/calendar/pdf/monthly" download target="_blank" class="epm-dropdown-item">📄 Monthly Outlook PDF (Upcoming Month)</a>
-                                <a href="/api/calendar/ics" download class="epm-dropdown-item">📲 Apple & Google Calendar (.ICS)</a>
-                            </div>
-                        </div>
-                        <button type="button" class="epm-cal-hdr-btn" onclick="window.epmPushDeskTelegram('weekly')">
-                            Forward to Telegram ✈️
+                <div class="epm-cal-cat-pills">
+                    <button type="button" class="epm-cal-cat-btn active" onclick="window.epmFilterCalCat('all', this)">All</button>
+                    <button type="button" class="epm-cal-cat-btn" onclick="window.epmFilterCalCat('equities', this)">Equities</button>
+                    <button type="button" class="epm-cal-cat-btn" onclick="window.epmFilterCalCat('fno', this)">Futures & Options</button>
+                    <button type="button" class="epm-cal-cat-btn" onclick="window.epmFilterCalCat('ipos', this)">IPOs</button>
+                    <button type="button" class="epm-cal-cat-btn" onclick="window.epmFilterCalCat('macro', this)">Macro Events</button>
+                </div>
+                <div class="epm-cal-1row-actions">
+                    <div class="epm-dropdown-wrap">
+                        <button type="button" class="epm-cal-hdr-btn epm-dropdown-btn" onclick="window.epmToggleExportMenu(this)">
+                            📥 Export Dossier PDF ▾
                         </button>
-                        <button type="button" class="epm-cal-hdr-icon-btn" onclick="window.epmToggleCalFilters()" title="Filters">⚙️</button>
+                        <div class="epm-dropdown-menu" id="epm-export-dropdown">
+                            <a href="/api/calendar/pdf/weekly" download target="_blank" class="epm-dropdown-item">📄 Weekly Snapshot PDF (Next Week)</a>
+                            <a href="/api/calendar/pdf/daily-outcomes" download target="_blank" class="epm-dropdown-item">📄 5 PM Daily Outcomes PDF (Today)</a>
+                            <a href="/api/calendar/pdf/monthly" download target="_blank" class="epm-dropdown-item">📄 Monthly Outlook PDF (Upcoming Month)</a>
+                            <a href="/api/calendar/ics" download class="epm-dropdown-item">📲 Apple & Google Calendar (.ICS)</a>
+                        </div>
                     </div>
+                    <button type="button" class="epm-cal-hdr-btn" onclick="window.epmPushDeskTelegram('weekly')">
+                        Forward to Telegram ✈️
+                    </button>
+                    <button type="button" class="epm-cal-hdr-icon-btn" onclick="window.epmToggleCalFilters()" title="Filters">⚙️</button>
                 </div>
             </div>
-
-            <div class="epm-cal-sub-date" style="font-size:11.5px; font-weight:600; color:#64748B; margin: 4px 0 10px 4px;">UPCOMING EVENTS • {today_banner_str}</div>
 
             <!-- Continuous Left-Rail Timeline Feed for Calendar -->
             <div class="epm-chron-feed" id="epm-cal-cards-list">
@@ -2276,7 +2340,9 @@ def render_desktop_circulars_html(circulars: List[Dict]) -> str:
     curr = now_ist()
     today_banner_str = curr.strftime("%A, %d %B %Y")
     
-    rows_html = []
+    rows_html = [
+        f'<div class="epm-chron-day-divider"><span>📅 REGULATORY DIRECTIVES • {today_banner_str}</span></div>'
+    ]
     processed = []
     circ_stories = build_story_items("circulars", limit=len(circulars))
     desktop_stories_strip = render_story_strip_html(circ_stories, "circulars", is_desktop=True)
@@ -2286,7 +2352,8 @@ def render_desktop_circulars_html(circulars: List[Dict]) -> str:
         reg = c.get("regulator", "NSE")
         meta = REGULATOR_META.get(reg, {"badge": f"🇮🇳 {reg}", "color": "#2563EB"})
         cno = c.get("circular_no") or f"{reg}/NOTIFICATION"
-        time_str = c.get("date", curr.strftime("%Y-%m-%d"))
+        raw_ts = c.get("timestamp") or c.get("created_at") or c.get("date") or "11:00 IST"
+        time_display = extract_clean_time_str(str(raw_ts), fallback_dt=curr)
         title = c.get("title", "Official Regulatory Directive")
         impact = str(c.get("impact", "MEDIUM")).upper()
         score = "8.5/10" if impact == "HIGH" else "6.4/10"
@@ -2324,7 +2391,7 @@ def render_desktop_circulars_html(circulars: List[Dict]) -> str:
         rows_html.append(f'''
         <div class="epm-chron-row is-institutional" data-idx="{idx}" data-reg="{reg.lower()}" onclick="window.epmOpenDeskCircAi({idx})">
             <div class="epm-chron-left-rail">
-                <span class="epm-chron-time">{html.escape(time_str[:10])}</span>
+                <span class="epm-chron-time">{time_display}</span>
                 <span class="epm-chron-dot {dot_class}"></span>
                 <div class="epm-chron-source-box">
                     <span class="epm-chron-source-name">{html.escape(reg)} ↗</span>
@@ -6984,12 +7051,13 @@ tbody tr:hover td {
     border-radius: 12px;
     margin-bottom: 12px;
 }
+/* Story Thumbnails - Mid-gray canvas, distinct green, red, yellow ribbons */
 .epm-story-thumbnail {
     flex: 0 0 84px !important;
     height: 114px !important;
     border-radius: 10px !important;
     padding: 2.5px !important;
-    background: linear-gradient(135deg, #0052FF, #4F46E5) !important;
+    background: #CBD5E1 !important;
     cursor: pointer !important;
     box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08) !important;
     transition: transform 0.18s ease, box-shadow 0.18s ease !important;
@@ -7006,17 +7074,21 @@ tbody tr:hover td {
     background: linear-gradient(135deg, #10B981, #059669) !important;
 }
 .epm-story-thumbnail.tone-bearish {
-    background: linear-gradient(135deg, #F43F5E, #BE123C) !important;
+    background: linear-gradient(135deg, #EF4444, #DC2626) !important;
+}
+.epm-story-thumbnail.ribbon-yellow, .epm-story-thumbnail.is-inst-thumb {
+    background: linear-gradient(135deg, #F59E0B, #D97706) !important;
 }
 .epm-story-thumbnail.tone-neutral {
-    background: linear-gradient(135deg, #64748B, #334155) !important;
+    background: linear-gradient(135deg, #94A3B8, #64748B) !important;
 }
 
 .epm-thumb-inner {
     width: 100% !important;
     height: 100% !important;
     border-radius: 8px !important;
-    background: linear-gradient(180deg, #1E293B 0%, #0F172A 100%) !important;
+    background: #E2E8F0 !important;
+    border: 1px solid #CBD5E1 !important;
     display: flex !important;
     flex-direction: column !important;
     justify-content: space-between !important;
@@ -7035,17 +7107,21 @@ tbody tr:hover td {
     font-size: 8px !important;
     font-weight: 800 !important;
     letter-spacing: 0.04em !important;
-    color: #93C5FD !important;
+    color: #1E293B !important;
     text-transform: uppercase !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     max-width: 48px !important;
 }
+.ribbon-yellow .epm-thumb-auth, .is-inst-thumb .epm-thumb-auth {
+    color: #92400E !important;
+    font-weight: 900 !important;
+}
 .epm-thumb-score {
     font: 800 8.5px var(--font-mono, monospace) !important;
-    color: #F8FAFC !important;
-    background: rgba(255, 255, 255, 0.15) !important;
+    color: #0F172A !important;
+    background: rgba(0, 0, 0, 0.08) !important;
     padding: 1px 4px !important;
     border-radius: 4px !important;
 }
@@ -7059,7 +7135,7 @@ tbody tr:hover td {
     font-size: 9px !important;
     font-weight: 700 !important;
     line-height: 1.25 !important;
-    color: #FFFFFF !important;
+    color: #0F172A !important;
     display: -webkit-box !important;
     -webkit-line-clamp: 3 !important;
     -webkit-box-orient: vertical !important;
@@ -7078,9 +7154,10 @@ tbody tr:hover td {
     border-radius: 3px !important;
     text-transform: uppercase !important;
 }
-.tone-bullish .epm-thumb-pill { background: rgba(16, 185, 129, 0.25) !important; color: #34D399 !important; }
-.tone-bearish .epm-thumb-pill { background: rgba(244, 63, 94, 0.25) !important; color: #FDA4AF !important; }
-.tone-neutral .epm-thumb-pill { background: rgba(148, 163, 184, 0.25) !important; color: #E2E8F0 !important; }
+.tone-bullish .epm-thumb-pill { background: #DCFCE7 !important; color: #166534 !important; border: 1px solid #86EFAC !important; font-weight: 800 !important; }
+.tone-bearish .epm-thumb-pill { background: #FEE2E2 !important; color: #991B1B !important; border: 1px solid #FCA5A5 !important; font-weight: 800 !important; }
+.tone-neutral .epm-thumb-pill { background: #F1F5F9 !important; color: #475569 !important; border: 1px solid #CBD5E1 !important; font-weight: 700 !important; }
+.ribbon-yellow .epm-thumb-pill, .is-inst-thumb .epm-thumb-pill { background: #FEF3C7 !important; color: #92400E !important; border: 1px solid #FCD34D !important; font-weight: 800 !important; }
 
 @media (max-width: 640px) {
     .epm-story-thumbnail {
@@ -7097,6 +7174,27 @@ tbody tr:hover td {
 .epm-pc-list { display: flex; flex-direction: column; gap: 8px; }
 .epm-pc-card, .epm-tl-card { background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; box-shadow: 0 1px 2px rgba(15,23,42,.04); cursor: pointer; transition: box-shadow .2s ease, border-color .2s ease; -webkit-tap-highlight-color: transparent; }
 .epm-pc-card { padding: 11px 12px; }
+.epm-pc-card.is-institutional {
+    background: #F8FAFC !important;
+    border-left: 4px solid #F59E0B !important;
+    border-color: #CBD5E1 !important;
+    box-shadow: 0 2px 6px rgba(245, 158, 11, 0.08) !important;
+}
+.epm-inst-chip {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 3px !important;
+    font-size: 8.5px !important;
+    font-weight: 800 !important;
+    color: #92400E !important;
+    background: #FEF3C7 !important;
+    border: 1px solid #FCD34D !important;
+    padding: 1px 5px !important;
+    border-radius: 4px !important;
+    margin-right: 4px !important;
+    letter-spacing: 0.03em !important;
+    flex-shrink: 0 !important;
+}
 .epm-pc-head { display: flex; align-items: flex-start; gap: 10px; }
 .epm-pc-head-text { flex: 1; min-width: 0; }
 .epm-pc-title { font-size: 13.5px; font-weight: 700; line-height: 1.35; color: #0F172A; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -7424,17 +7522,38 @@ tbody tr:hover td {
 /* Continuous Timeline Feed */
 .epm-chron-feed {
     position: relative;
-    padding-left: 200px;
+    padding-left: 215px;
 }
 .epm-chron-feed::before {
     content: '';
     position: absolute;
     top: 15px;
     bottom: 15px;
-    left: 88px;
+    left: 95px;
     width: 2px;
     background: #CBD5E1;
     z-index: 1;
+}
+
+.epm-chron-day-divider {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    margin: 4px 0 14px -205px;
+    padding: 6px 12px;
+    background: #F1F5F9;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #334155;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+.epm-chron-day-divider span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .epm-chron-row {
@@ -7463,10 +7582,10 @@ tbody tr:hover td {
 
 .epm-chron-left-rail {
     position: absolute;
-    left: -200px;
+    left: -215px;
     top: 0;
     bottom: 0;
-    width: 190px;
+    width: 205px;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -7476,9 +7595,13 @@ tbody tr:hover td {
     font-size: 11px;
     font-weight: 600;
     color: #64748B;
-    width: 78px;
+    width: 82px;
     text-align: right;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
 }
 .epm-chron-dot {
     position: relative;
@@ -7571,28 +7694,45 @@ tbody tr:hover td {
 .epm-chron-sent.sent-bearish { background: #FEE2E2; color: #DC2626; }
 .epm-chron-sent.sent-neutral { background: #F1F5F9; color: #64748B; }
 
-/* Calendar Strictly 2-Row Header (Screenshot 4) */
-.epm-cal-2row-hdr {
+/* Calendar Strictly 1-Row Header (Title on Left, Selects, Category Pills & Actions in 1 Row) */
+.epm-cal-1row-hdr {
     display: flex;
-    flex-direction: column;
-    gap: 10px;
-    padding: 12px 16px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 14px;
     background: #FFFFFF;
     border: 1px solid #E2E8F0;
-    border-radius: 12px;
+    border-radius: 10px;
     margin-bottom: 12px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
 }
-.epm-cal-2row-r1 {
+.epm-cal-1row-left {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+    gap: 8px;
+    flex-shrink: 0;
 }
-.epm-cal-2row-r2 {
+.epm-cal-title-badge {
+    font-size: 13.5px;
+    font-weight: 900;
+    color: #0F172A;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+    margin-right: 4px;
+}
+.epm-cal-cat-pills {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+    gap: 5px;
+    flex-shrink: 0;
+}
+.epm-cal-1row-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
 }
 .epm-cal-select-filter {
     padding: 6px 12px;
@@ -7607,6 +7747,53 @@ tbody tr:hover td {
 }
 .epm-cal-select-filter:focus {
     border-color: #0052FF;
+}
+
+/* Institutional Settings Page Bento Containers */
+.epm-settings-card {
+    background: #FFFFFF !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 12px !important;
+    padding: 20px !important;
+    margin-bottom: 20px !important;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05) !important;
+}
+.epm-settings-card .epm-card-hdr {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 12px;
+    margin-bottom: 14px;
+    border-bottom: 1px solid #F1F5F9;
+}
+.epm-settings-card .epm-card-hdr-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.epm-settings-card .epm-card-hdr-icon {
+    font-size: 16px;
+}
+.epm-settings-card .epm-card-hdr-title {
+    font-size: 13.5px;
+    font-weight: 800;
+    color: #0F172A;
+    letter-spacing: 0.02em;
+}
+.epm-settings-card .epm-card-hdr-tag {
+    font-size: 10px;
+    font-weight: 700;
+    color: #475569;
+    background: #F1F5F9;
+    border: 1px solid #E2E8F0;
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+.epm-settings-accordion {
+    background: #FFFFFF !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 12px !important;
+    margin-bottom: 16px !important;
 }
 
 @media (max-width: 768px) {
@@ -9139,7 +9326,7 @@ TERMINAL_CLIENT_JS = r"""
             feedCol.style.setProperty('flex', '1 1 63%', 'important');
         }
 
-        document.querySelectorAll('#epm-cal-terminal-layout .epm-cal-card').forEach((c) => {
+        document.querySelectorAll('#epm-cal-terminal-layout .epm-chron-row, #epm-cal-terminal-layout .epm-cal-card').forEach((c) => {
             const cIdx = parseInt(c.getAttribute('data-idx'));
             if (cIdx === idx) c.classList.add('is-active');
             else c.classList.remove('is-active');
@@ -9185,13 +9372,13 @@ TERMINAL_CLIENT_JS = r"""
             feedCol.style.setProperty('max-width', '100%', 'important');
             feedCol.style.setProperty('flex', '1 1 100%', 'important');
         }
-        document.querySelectorAll('#epm-cal-terminal-layout .epm-cal-card').forEach(c => c.classList.remove('is-active'));
+        document.querySelectorAll('#epm-cal-terminal-layout .epm-chron-row, #epm-cal-terminal-layout .epm-cal-card').forEach(c => c.classList.remove('is-active'));
     };
 
     window.epmFilterCalCat = function(cat, btn) {
         document.querySelectorAll('.epm-cal-cat-btn').forEach(b => b.classList.remove('active'));
         if (btn) btn.classList.add('active');
-        document.querySelectorAll('#epm-cal-cards-list .epm-cal-card').forEach(c => {
+        document.querySelectorAll('#epm-cal-cards-list .epm-chron-row, #epm-cal-cards-list .epm-cal-card').forEach(c => {
             const cCat = c.getAttribute('data-cat') || 'equities';
             if (cat === 'all' || cCat === cat) {
                 c.style.display = '';
@@ -9842,9 +10029,241 @@ with gr.Blocks(
         with gr.TabItem("⚙️ Portal Settings & Integrations"):
             gr.HTML(render_settings_hub_html())
 
-            with gr.Accordion("🔧 Advanced API & Direct Cloud Sync (Google Calendar & Social Integrations)", open=False):
-                with gr.Column(elem_classes=["epm-bento-card"]):
-                    gr.Markdown("### 📡 Legacy Telegram & Direct Parameter Overrides")
+            # Section 1: Connected News Sources & Selective Forwarding Rules
+            with gr.Column(elem_classes=["epm-bento-card", "epm-settings-card"]):
+                gr.HTML("""
+                <div class="epm-card-hdr">
+                    <div class="epm-card-hdr-left">
+                        <span class="epm-card-hdr-icon">📡</span>
+                        <span class="epm-card-hdr-title">CONNECTED NEWS SOURCES & SELECTIVE FORWARDING RULES</span>
+                    </div>
+                    <span class="epm-card-hdr-tag">Real-Time Ingestion Control</span>
+                </div>
+                <div style="font-size:12px; color:#64748B; margin-bottom:12px;">
+                    Configure multi-market news wires, institutional regulators, and selective dispatch routing across Telegram and WhatsApp channels.
+                </div>
+                """)
+                sources_table = gr.Dataframe(
+                    headers=["Source Name", "Category", "Ingestion Type", "Telegram Alerts", "WhatsApp Alerts", "Feed / Scrape URL"],
+                    datatype=["str", "str", "str", "str", "str", "str"],
+                    value=get_sources_table(),
+                    interactive=False,
+                    wrap=True,
+                    elem_id="sources_table"
+                )
+
+                min_score_slider = gr.Slider(
+                    minimum=0, maximum=10, value=news_worker.min_forward_score, step=1,
+                    label="Minimum AI Score Threshold for News (0 = Forward All News, 7 = High Impact Only)"
+                )
+
+                with gr.Row():
+                    with gr.Column():
+                        tg_checkboxes = gr.CheckboxGroup(choices=all_source_names, value=default_tg_selected, label="✈️ Select News Channels for Telegram")
+                    with gr.Column():
+                        wa_checkboxes = gr.CheckboxGroup(choices=all_source_names, value=default_wa_selected, label="💬 Select News Channels for WhatsApp")
+
+                save_rules_btn = gr.Button("💾 Save Source Forwarding Rules", variant="primary")
+                rules_status = gr.Markdown()
+
+                save_rules_btn.click(
+                    save_forwarding_rules,
+                    inputs=[tg_checkboxes, wa_checkboxes, min_score_slider],
+                    outputs=[rules_status, sources_table]
+                )
+
+            # Section 2: Google Calendar Direct API Integration
+            with gr.Column(elem_classes=["epm-bento-card", "epm-settings-card"]):
+                gr.HTML("""
+                <div class="epm-card-hdr">
+                    <div class="epm-card-hdr-left">
+                        <span class="epm-card-hdr-icon">📅</span>
+                        <span class="epm-card-hdr-title">GOOGLE CALENDAR DIRECT API INTEGRATION</span>
+                    </div>
+                    <span class="epm-card-hdr-tag">Automated 1-Hour Reminder Alarms</span>
+                </div>
+                <div style="font-size:12px; color:#64748B; margin-bottom:12px;">
+                    Directly synchronizes events from the calendar into your personal or team Google Calendar with <b>60-minute email and popup reminders</b>. Authenticate using a Google Cloud Service Account JSON key or JSON string.
+                </div>
+                """)
+                with gr.Row():
+                    with gr.Column():
+                        adm_gcal_id = gr.Textbox(
+                            label="Google Calendar ID",
+                            value=google_calendar_manager.calendar_id,
+                            placeholder="e.g. primary or your-calendar-id@group.calendar.google.com"
+                        )
+                        adm_gcal_enabled = gr.Checkbox(
+                            label="Enable Direct Google Calendar Sync",
+                            value=google_calendar_manager.enabled
+                        )
+                    with gr.Column():
+                        adm_gcal_sa_file = gr.Textbox(
+                            label="Service Account JSON File Path",
+                            value=google_calendar_manager.service_account_file,
+                            placeholder="e.g. service_account.json"
+                        )
+                        adm_gcal_sa_json = gr.Textbox(
+                            label="Service Account JSON String (Optional, for Cloud / Docker)",
+                            value=google_calendar_manager.service_account_json_str,
+                            type="password",
+                            placeholder='Paste full {"type": "service_account", ...} JSON'
+                        )
+
+                with gr.Row():
+                    save_gcal_btn = gr.Button("💾 Save Google Calendar Settings", variant="primary")
+                    sync_gcal_admin_btn = gr.Button("🔄 Sync All Active Events Now to Google Calendar (1h Alert)")
+
+                gcal_admin_status = gr.Markdown()
+                save_gcal_btn.click(
+                    save_google_calendar_settings,
+                    inputs=[adm_gcal_id, adm_gcal_sa_json, adm_gcal_sa_file, adm_gcal_enabled],
+                    outputs=[gcal_admin_status]
+                )
+                sync_gcal_admin_btn.click(trigger_sync_google_cal, outputs=[gcal_admin_status])
+
+            # Section 3: Omnichannel Social Media Hub
+            with gr.Column(elem_classes=["epm-bento-card", "epm-settings-card"]):
+                gr.HTML("""
+                <div class="epm-card-hdr">
+                    <div class="epm-card-hdr-left">
+                        <span class="epm-card-hdr-icon">📸</span>
+                        <span class="epm-card-hdr-title">OMNICHANNEL SOCIAL MEDIA AUTO-BROADCASTING HUB</span>
+                    </div>
+                    <span class="epm-card-hdr-tag">Instagram, X / Twitter & Discord APIs</span>
+                </div>
+                <div style="font-size:12px; color:#64748B; margin-bottom:12px;">
+                    Publishes publication-grade <b>1080×1350 financial infographic cards</b> and morning multi-market calendar snapshots to <b>Instagram, X / Twitter, and Discord</b>.
+                </div>
+                """)
+                with gr.Row():
+                    with gr.Column():
+                        gr.Markdown("#### 📸 Instagram Integration (Meta Graph API)")
+                        adm_ig_enabled = gr.Checkbox(
+                            label="Enable Instagram Auto-Posting (Visual Cards & Captions)",
+                            value=social_publisher.instagram_enabled
+                        )
+                        adm_ig_account_id = gr.Textbox(
+                            label="Instagram Business / Creator Account ID",
+                            value=social_publisher.instagram_account_id,
+                            placeholder="e.g. 17841400000000000"
+                        )
+                        adm_ig_token = gr.Textbox(
+                            label="Meta Graph API Access Token",
+                            value=social_publisher.instagram_access_token,
+                            type="password",
+                            placeholder="Paste long-lived Meta Page/IG Token..."
+                        )
+                        test_ig_btn = gr.Button("📸 Send Test 1080×1350 Card to Instagram")
+
+                        gr.Markdown("#### 🎮 Discord Webhook Integration")
+                        adm_discord_enabled = gr.Checkbox(
+                            label="Enable Discord Channel Alerts",
+                            value=social_publisher.discord_enabled
+                        )
+                        adm_discord_webhook = gr.Textbox(
+                            label="Discord Webhook URL",
+                            value=social_publisher.discord_webhook_url,
+                            placeholder="https://discord.com/api/webhooks/..."
+                        )
+                        test_discord_btn = gr.Button("🎮 Send Test Rich Embed to Discord")
+
+                    with gr.Column():
+                        gr.Markdown("#### 🐦 X / Twitter API v2 (Direct Integration)")
+                        adm_twitter_enabled = gr.Checkbox(
+                            label="Enable X / Twitter Auto-Tweeting (Card + $Cashtags)",
+                            value=social_publisher.twitter_enabled
+                        )
+                        adm_tw_api_key = gr.Textbox(
+                            label="API Key (Consumer Key)",
+                            value=social_publisher.twitter_api_key,
+                            placeholder="Twitter App API Key..."
+                        )
+                        adm_tw_api_secret = gr.Textbox(
+                            label="API Key Secret",
+                            value=social_publisher.twitter_api_secret,
+                            type="password",
+                            placeholder="Twitter App API Key Secret..."
+                        )
+                        adm_tw_token = gr.Textbox(
+                            label="Access Token",
+                            value=social_publisher.twitter_access_token,
+                            placeholder="OAuth Access Token..."
+                        )
+                        adm_tw_secret = gr.Textbox(
+                            label="Access Token Secret",
+                            value=social_publisher.twitter_access_secret,
+                            type="password",
+                            placeholder="OAuth Access Token Secret..."
+                        )
+                        adm_tw_min_score = gr.Slider(
+                            minimum=5, maximum=10, step=1,
+                            label="Minimum AI Score to Tweet (Recommended: 8)",
+                            value=social_publisher.twitter_min_score
+                        )
+                        test_tw_btn = gr.Button("🐦 Send Test Tweet with Image Card")
+
+                        gr.Markdown("#### 🖼️ Image-Only Visual Dispatch Mode")
+                        adm_news_photos = gr.Checkbox(
+                            label="Deliver News as Graphic Infographic Cards instead of plain text across Telegram & all channels",
+                            value=social_publisher.send_news_as_photos
+                        )
+                        adm_social_pub_url = gr.Textbox(
+                            label="Public Image Server URL (For Meta/Instagram to fetch card images)",
+                            value=social_publisher.get_public_url(),
+                            placeholder="https://p01--news-engine-service--dkhqtlpvx6bh.code.run"
+                        )
+
+                save_social_btn = gr.Button("💾 Save Omnichannel Social Media Settings", variant="primary")
+                social_admin_status = gr.Markdown()
+
+                save_social_btn.click(
+                    save_social_media_settings,
+                    inputs=[
+                        adm_ig_enabled, adm_ig_account_id, adm_ig_token,
+                        adm_twitter_enabled, adm_tw_api_key, adm_tw_api_secret, adm_tw_token, adm_tw_secret, adm_tw_min_score,
+                        adm_discord_enabled, adm_discord_webhook,
+                        adm_news_photos, adm_social_pub_url
+                    ],
+                    outputs=[social_admin_status]
+                )
+                test_ig_btn.click(lambda: trigger_test_social("instagram"), outputs=[social_admin_status])
+                test_tw_btn.click(lambda: trigger_test_social("twitter"), outputs=[social_admin_status])
+                test_discord_btn.click(lambda: trigger_test_social("discord"), outputs=[social_admin_status])
+
+            # Section 4: Instagram Swipeable Stories Flashcards
+            with gr.Column(elem_classes=["epm-bento-card", "epm-settings-card"]):
+                gr.HTML("""
+                <div class="epm-card-hdr">
+                    <div class="epm-card-hdr-left">
+                        <span class="epm-card-hdr-icon">📸</span>
+                        <span class="epm-card-hdr-title">INSTAGRAM SWIPEABLE STORIES FLASHCARD PUBLISHER</span>
+                    </div>
+                    <span class="epm-card-hdr-tag">1080×1920 Story Frames</span>
+                </div>
+                <div style="font-size:12px; color:#64748B; margin-bottom:12px;">
+                    Publishes a sequence of 1080×1920 story flashcards (one catalyst per frame) to the connected Instagram Business/Creator account. Followers swipe through them as one continuous story.
+                </div>
+                """)
+                with gr.Row():
+                    ig_story_kind = gr.Radio(
+                        choices=[("📰 Top Breaking News", "news"), ("📅 Today's Calendar Catalysts", "calendar")],
+                        value="news", label="Story Source"
+                    )
+                    ig_story_count = gr.Slider(minimum=1, maximum=8, step=1, value=5, label="Frames in Sequence")
+                with gr.Row():
+                    ig_story_preview_btn = gr.Button("👁️ Preview Story Frames")
+                    ig_story_publish_btn = gr.Button("🚀 Publish Story Sequence to Instagram", variant="primary")
+                ig_story_gallery = gr.Gallery(label="Story Frames", columns=4, height=420, object_fit="contain")
+                ig_story_status = gr.Markdown()
+
+                ig_story_preview_btn.click(preview_instagram_story_frames, inputs=[ig_story_kind, ig_story_count], outputs=[ig_story_gallery, ig_story_status])
+                ig_story_publish_btn.click(publish_instagram_story_sequence, inputs=[ig_story_kind, ig_story_count], outputs=[ig_story_status])
+
+            # Section 5: Advanced Telegram Parameter Overrides
+            with gr.Accordion("🔧 Advanced API & Direct Parameter Overrides (Telegram Channels)", open=False, elem_classes=["epm-settings-accordion"]):
+                with gr.Column(elem_classes=["epm-bento-card", "epm-settings-card"]):
+                    gr.Markdown("### 📡 Telegram Bot Credentials & Schedule Overrides")
                     with gr.Row():
                         with gr.Column():
                             gr.Markdown("#### 📰 Channel 1: Live Breaking News Telegram")
@@ -9896,7 +10315,7 @@ with gr.Blocks(
                                 value=telegram_notifier.auto_holiday_7am
                             )
                             adm_auto_circulars = gr.Checkbox(
-                                label="📜 Auto-Forward Critical Regulatory Circulars (NSE, BSE, MCX, RBI, FinMin, FOMC, NYSE, Crypto) with 3-5 Bullets & PDF Link",
+                                label="📜 Auto-Forward Critical Regulatory Circulars (Disabled per policy)",
                                 value=getattr(telegram_notifier, "auto_circulars_tg", False)
                             )
                             with gr.Accordion("⚙️ Legacy Dispatches (Optional)", open=False):
@@ -9913,13 +10332,13 @@ with gr.Blocks(
                                     value=getattr(telegram_notifier, "auto_weekly_fri_7am", False)
                                 )
                             adm_send_as_photos = gr.Checkbox(
-                                label="📸 Deliver Morning Calendar Snapshots as Infographic Photo Cards (Details rendered directly in image)",
+                                label="📸 Deliver Morning Calendar Snapshots as Infographic Photo Cards",
                                 value=getattr(telegram_notifier, "send_as_photos", True)
                             )
                             adm_public_app_url = gr.Textbox(
-                                label="Public Web Portal / API URL (Used for Apple & Google Calendar 1-Click Sync Links)",
+                                label="Public Web Portal / API URL (Used for Calendar Sync Links)",
                                 value=telegram_notifier.public_app_url,
-                                placeholder="e.g. https://news-engine-service.onrender.com or your custom domain"
+                                placeholder="e.g. https://p01--news-engine-service--dkhqtlpvx6bh.code.run"
                             )
                             gr.Markdown("**⚡ Real-Time Individual Event Triggers:**")
                             with gr.Row():
@@ -9949,201 +10368,6 @@ with gr.Blocks(
                     test_news_tg_btn.click(lambda: trigger_test_telegram("news"), outputs=[adm_tg_status])
                     test_cal_tg_btn.click(lambda: trigger_test_telegram("calendar"), outputs=[adm_tg_status])
                     resend_weekly_btn.click(push_weekly_calendar_dispatch, outputs=[adm_tg_status])
-
-            with gr.Column(elem_classes=["epm-bento-card"]):
-                gr.Markdown("### 📅 Google Calendar Direct API Integration (Automated 1-Hour Reminder Alarms)")
-            gr.Markdown(
-                "Directly synchronizes events from the EPM Pro calendar into your personal or team Google Calendar with **60-minute email and popup reminders**. "
-                "You can authenticate using a Google Cloud Service Account JSON key or JSON string."
-            )
-            with gr.Row():
-                with gr.Column():
-                    adm_gcal_id = gr.Textbox(
-                        label="Google Calendar ID",
-                        value=google_calendar_manager.calendar_id,
-                        placeholder="e.g. primary or your-calendar-id@group.calendar.google.com"
-                    )
-                    adm_gcal_enabled = gr.Checkbox(
-                        label="Enable Direct Google Calendar Sync",
-                        value=google_calendar_manager.enabled
-                    )
-                with gr.Column():
-                    adm_gcal_sa_file = gr.Textbox(
-                        label="Service Account JSON File Path",
-                        value=google_calendar_manager.service_account_file,
-                        placeholder="e.g. service_account.json"
-                    )
-                    adm_gcal_sa_json = gr.Textbox(
-                        label="Service Account JSON String (Optional, for Cloud / Docker)",
-                        value=google_calendar_manager.service_account_json_str,
-                        type="password",
-                        placeholder='Paste full {"type": "service_account", ...} JSON'
-                    )
-
-            with gr.Row():
-                save_gcal_btn = gr.Button("💾 Save Google Calendar Settings", variant="primary")
-                sync_gcal_admin_btn = gr.Button("🔄 Sync All Active Events Now to Google Calendar (1h Alert)")
-
-            gcal_admin_status = gr.Markdown()
-            save_gcal_btn.click(
-                save_google_calendar_settings,
-                inputs=[adm_gcal_id, adm_gcal_sa_json, adm_gcal_sa_file, adm_gcal_enabled],
-                outputs=[gcal_admin_status]
-            )
-            sync_gcal_admin_btn.click(trigger_sync_google_cal, outputs=[gcal_admin_status])
-
-            with gr.Column(elem_classes=["epm-bento-card"]):
-                gr.Markdown("### 📸 Omnichannel Social Media Auto-Broadcasting Hub (Instagram, X / Twitter & Discord)")
-            gr.Markdown(
-                "Directly publishes publication-grade **1080×1350 financial infographic cards** (Finshots/Bloomberg style) and morning multi-market calendar snapshots to **Instagram, X / Twitter, and Discord** via official APIs."
-            )
-            with gr.Row():
-                with gr.Column():
-                    gr.Markdown("#### 📸 Instagram Integration (Meta Graph API)")
-                    adm_ig_enabled = gr.Checkbox(
-                        label="Enable Instagram Auto-Posting (Visual Cards & Captions)",
-                        value=social_publisher.instagram_enabled
-                    )
-                    adm_ig_account_id = gr.Textbox(
-                        label="Instagram Business / Creator Account ID",
-                        value=social_publisher.instagram_account_id,
-                        placeholder="e.g. 17841400000000000"
-                    )
-                    adm_ig_token = gr.Textbox(
-                        label="Meta Graph API Access Token",
-                        value=social_publisher.instagram_access_token,
-                        type="password",
-                        placeholder="Paste long-lived Meta Page/IG Token..."
-                    )
-                    test_ig_btn = gr.Button("📸 Send Test 1080×1350 Card to Instagram")
-
-                    gr.Markdown("#### 🎮 Discord Webhook Integration")
-                    adm_discord_enabled = gr.Checkbox(
-                        label="Enable Discord Channel Alerts",
-                        value=social_publisher.discord_enabled
-                    )
-                    adm_discord_webhook = gr.Textbox(
-                        label="Discord Webhook URL",
-                        value=social_publisher.discord_webhook_url,
-                        placeholder="https://discord.com/api/webhooks/..."
-                    )
-                    test_discord_btn = gr.Button("🎮 Send Test Rich Embed to Discord")
-
-                with gr.Column():
-                    gr.Markdown("#### 🐦 X / Twitter API v2 (Direct Integration)")
-                    adm_twitter_enabled = gr.Checkbox(
-                        label="Enable X / Twitter Auto-Tweeting (Card + $Cashtags)",
-                        value=social_publisher.twitter_enabled
-                    )
-                    adm_tw_api_key = gr.Textbox(
-                        label="API Key (Consumer Key)",
-                        value=social_publisher.twitter_api_key,
-                        placeholder="Twitter App API Key..."
-                    )
-                    adm_tw_api_secret = gr.Textbox(
-                        label="API Key Secret",
-                        value=social_publisher.twitter_api_secret,
-                        type="password",
-                        placeholder="Twitter App API Key Secret..."
-                    )
-                    adm_tw_token = gr.Textbox(
-                        label="Access Token",
-                        value=social_publisher.twitter_access_token,
-                        placeholder="OAuth Access Token..."
-                    )
-                    adm_tw_secret = gr.Textbox(
-                        label="Access Token Secret",
-                        value=social_publisher.twitter_access_secret,
-                        type="password",
-                        placeholder="OAuth Access Token Secret..."
-                    )
-                    adm_tw_min_score = gr.Slider(
-                        minimum=5, maximum=10, step=1,
-                        label="Minimum AI Score to Tweet (Recommended: 8 - Stays within 1,500/mo Free Tier)",
-                        value=social_publisher.twitter_min_score
-                    )
-                    test_tw_btn = gr.Button("🐦 Send Test Tweet with Image Card")
-
-                    gr.Markdown("#### 🖼️ Image-Only Visual Dispatch Mode")
-                    adm_news_photos = gr.Checkbox(
-                        label="Deliver News as Graphic Infographic Cards instead of plain text across Telegram & all channels",
-                        value=social_publisher.send_news_as_photos
-                    )
-                    adm_social_pub_url = gr.Textbox(
-                        label="Public Image Server URL (For Meta/Instagram to fetch card images)",
-                        value=social_publisher.get_public_url(),
-                        placeholder="https://p01--news-engine-service--dkhqtlpvx6bh.code.run"
-                    )
-
-            save_social_btn = gr.Button("💾 Save Omnichannel Social Media Settings", variant="primary")
-            social_admin_status = gr.Markdown()
-
-            save_social_btn.click(
-                save_social_media_settings,
-                inputs=[
-                    adm_ig_enabled, adm_ig_account_id, adm_ig_token,
-                    adm_twitter_enabled, adm_tw_api_key, adm_tw_api_secret, adm_tw_token, adm_tw_secret, adm_tw_min_score,
-                    adm_discord_enabled, adm_discord_webhook,
-                    adm_news_photos, adm_social_pub_url
-                ],
-                outputs=[social_admin_status]
-            )
-            test_ig_btn.click(lambda: trigger_test_social("instagram"), outputs=[social_admin_status])
-            test_tw_btn.click(lambda: trigger_test_social("twitter"), outputs=[social_admin_status])
-            test_discord_btn.click(lambda: trigger_test_social("discord"), outputs=[social_admin_status])
-
-            with gr.Column(elem_classes=["epm-bento-card"]):
-                gr.Markdown(
-                    "### 📸 Instagram Swipeable Stories\n"
-                    "Publishes a sequence of 1080×1920 story flashcards (one catalyst per frame) to the connected "
-                    "Instagram Business/Creator account. Followers swipe through them as one story. "
-                    "Preview frames: `/api/story/news/0.png`, `/api/story/calendar/0.png`."
-                )
-                with gr.Row():
-                    ig_story_kind = gr.Radio(
-                        choices=[("📰 Top Breaking News", "news"), ("📅 Today's Calendar Catalysts", "calendar")],
-                        value="news", label="Story Source"
-                    )
-                    ig_story_count = gr.Slider(minimum=1, maximum=8, step=1, value=5, label="Frames in Sequence")
-                with gr.Row():
-                    ig_story_preview_btn = gr.Button("👁️ Preview Story Frames")
-                    ig_story_publish_btn = gr.Button("🚀 Publish Story Sequence to Instagram", variant="primary")
-                ig_story_gallery = gr.Gallery(label="Story Frames", columns=4, height=420, object_fit="contain")
-                ig_story_status = gr.Markdown()
-
-            ig_story_preview_btn.click(preview_instagram_story_frames, inputs=[ig_story_kind, ig_story_count], outputs=[ig_story_gallery, ig_story_status])
-            ig_story_publish_btn.click(publish_instagram_story_sequence, inputs=[ig_story_kind, ig_story_count], outputs=[ig_story_status])
-
-            with gr.Column(elem_classes=["epm-bento-card"]):
-                gr.Markdown("### 📡 Connected News Sources & Selective Forwarding Rules")
-            sources_table = gr.Dataframe(
-                headers=["Source Name", "Category", "Ingestion Type", "Telegram Alerts", "WhatsApp Alerts", "Feed / Scrape URL"],
-                datatype=["str", "str", "str", "str", "str", "str"],
-                value=get_sources_table(),
-                interactive=False,
-                wrap=True,
-                elem_id="sources_table"
-            )
-
-            min_score_slider = gr.Slider(
-                minimum=0, maximum=10, value=news_worker.min_forward_score, step=1,
-                label="Minimum AI Score Threshold for News (0 = Forward All News, 7 = High Impact Only)"
-            )
-
-            with gr.Row():
-                with gr.Column():
-                    tg_checkboxes = gr.CheckboxGroup(choices=all_source_names, value=default_tg_selected, label="✈️ Select News Channels for Telegram")
-                with gr.Column():
-                    wa_checkboxes = gr.CheckboxGroup(choices=all_source_names, value=default_wa_selected, label="💬 Select News Channels for WhatsApp")
-
-            save_rules_btn = gr.Button("💾 Save Source Forwarding Rules", variant="primary")
-            rules_status = gr.Markdown()
-
-            save_rules_btn.click(
-                save_forwarding_rules,
-                inputs=[tg_checkboxes, wa_checkboxes, min_score_slider],
-                outputs=[rules_status, sources_table]
-            )
 
 
 
