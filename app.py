@@ -473,27 +473,33 @@ def download_daily_outcomes_pdf_endpoint():
 
 
 @app.get("/api/circular/doc/{circular_id}")
-def serve_circular_document(circular_id: str):
+def serve_circular_document(circular_id: str, url: Optional[str] = Query(None)):
     """
     Directly streams or redirects to the official circular document.
     For NSE / BSE documents, attaches proper headers (Referer, User-Agent) so downloads never fail with 503 or 403.
     """
-    with sqlite3.connect("circulars.db") as conn:
-        conn.row_factory = sqlite3.Row
-        row = conn.execute("SELECT id, regulator, circular_no, pdf_url, web_url FROM circulars WHERE id = ?", (circular_id,)).fetchone()
+    target_url = None
+    regulator = "CIRCULAR"
+    cno_clean = circular_id
+    try:
+        with sqlite3.connect("circulars.db") as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute("SELECT id, regulator, circular_no, pdf_url, web_url FROM circulars WHERE id = ?", (circular_id,)).fetchone()
+            if row:
+                target_url = (row["pdf_url"] or "").strip() or (row["web_url"] or "").strip()
+                regulator = row["regulator"]
+                cno_clean = re.sub(r'[^a-zA-Z0-9_-]', '_', row['circular_no'] or circular_id)
+    except Exception as e:
+        logger.warning(f"Error querying circulars.db for {circular_id}: {e}")
 
-    if not row:
+    if not target_url and url and url.startswith("http"):
+        target_url = url.strip()
+
+    if not target_url:
         raise HTTPException(status_code=404, detail="Circular not found")
 
-    purl = (row["pdf_url"] or "").strip()
-    wurl = (row["web_url"] or "").strip()
-    target_url = purl or wurl
-
-    if not target_url or not target_url.startswith("http"):
-        raise HTTPException(status_code=404, detail="No official document URL available")
-
     # If it's an NSE archive PDF, proxy it with NSE headers so Akamai doesn't block with 503
-    if "nsearchives.nseindia.com" in target_url:
+    if "nsearchives.nseindia.com" in target_url or "archives.nseindia.com" in target_url:
         try:
             req_headers = {
                 "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -503,8 +509,7 @@ def serve_circular_document(circular_id: str):
             resp = requests.get(target_url, headers=req_headers, timeout=12, stream=True)
             if resp.status_code == 200:
                 ctype = resp.headers.get("content-type", "application/pdf")
-                cno_clean = re.sub(r'[^a-zA-Z0-9_-]', '_', row['circular_no'] or circular_id)
-                fn = f"{row['regulator']}_{cno_clean}.pdf"
+                fn = f"{regulator}_{cno_clean}.pdf"
                 return StreamingResponse(
                     resp.iter_content(chunk_size=16384),
                     media_type=ctype,
@@ -515,10 +520,8 @@ def serve_circular_document(circular_id: str):
                 )
         except Exception as e:
             logger.warning(f"Error proxying NSE circular {circular_id}: {e}")
-            if wurl and wurl.startswith("http"):
-                return RedirectResponse(wurl)
 
-    # For HTML press releases or direct public PDFs
+    # Fallback redirect to document or web URL
     return RedirectResponse(target_url)
 
 
