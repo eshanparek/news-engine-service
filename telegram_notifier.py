@@ -474,6 +474,40 @@ class TelegramNotifier:
             return True, f"Delivered {sent_count}/{len(photo_items)} market infographic photo cards"
         return False, last_err or "No photo cards delivered"
 
+    def send_story_alert(self, item: Dict, kind: str = "news") -> tuple[bool, str]:
+        """Dispatches an infographic story flashcard (1080x1920) directly to Telegram in story format."""
+        token = self.bot_token or self.cal_bot_token
+        chat_id = self.chat_id or self.cal_chat_id
+        if not token or not chat_id:
+            logger.warning("[Telegram] Story alert skipped: bot token or chat ID missing.")
+            return False, "Telegram credentials not configured"
+
+        try:
+            from story_card_generator import story_card_generator
+            photo_bytes = story_card_generator.render_story(item, 0, 1)
+
+            title = item.get("title", "Market Story")
+            sent = str(item.get("sentiment") or item.get("ai_sentiment") or "NEUTRAL").upper()
+            score = item.get("score") or item.get("ai_score") or 7.5
+            bullets = item.get("bullets") or []
+            bullets_txt = "\n".join(f"• {b}" for b in bullets[:3]) if bullets else ""
+            link = item.get("link") or item.get("doc_url") or "https://p01--news-engine-service--dkhqtlpvx6bh.code.run/"
+
+            sent_emoji = "🟢" if "BULL" in sent else ("🔴" if "BEAR" in sent else "⚪")
+            caption = (
+                f"⚡ <b>GNC MARKET STORY</b> · {sent_emoji} <b>{sent}</b>\n\n"
+                f"<b>{html.escape(title)}</b>\n\n"
+                f"📊 <b>Impact Score:</b> <code>{score}/10</code>\n"
+            )
+            if bullets_txt:
+                caption += f"\n💡 <b>Key Directives & Takeaways:</b>\n<i>{html.escape(bullets_txt)}</i>\n"
+            caption += f"\n🔗 <a href=\"{html.escape(link)}\">Read Full Telemetry & Analysis ↗</a>\n<i>Archived by Global News Feed Room (GNC)</i>"
+
+            return self.send_photo(token, chat_id, photo_bytes, caption=caption)
+        except Exception as e:
+            logger.error(f"Error dispatching story to Telegram: {e}", exc_info=True)
+            return False, str(e)
+
     def send_news_alert(self, news: Dict) -> bool:
         if not self.enabled or not self.is_configured():
             logger.warning(f"[Telegram] News alert skipped: enabled={self.enabled}, bot_token={'SET' if self.bot_token else 'EMPTY'}, chat_id={'SET' if self.chat_id else 'EMPTY'}")

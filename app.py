@@ -624,6 +624,17 @@ def api_dispatch_news_item(payload: Dict = Body(...)):
         return {"status": "error", "detail": str(e)}
 
 
+@app.post("/api/telegram/dispatch-story")
+def api_dispatch_story_to_telegram(payload: Dict = Body(...)):
+    """Dispatches a story flashcard (1080x1920) directly to the Telegram channel in story format."""
+    try:
+        ok, detail = telegram_notifier.send_story_alert(payload, kind=payload.get("kind", "news"))
+        return {"status": "success" if ok else "failed", "detail": detail}
+    except Exception as e:
+        logger.error(f"Error in api_dispatch_story_to_telegram: {e}", exc_info=True)
+        return {"status": "error", "detail": str(e)}
+
+
 @app.post("/api/settings/dispatch")
 def api_save_dispatch_settings(payload: Dict = Body(...)):
     """Saves dispatch settings and refreshes TelegramNotifier configuration."""
@@ -827,7 +838,7 @@ def clean_table_text(text: any) -> str:
 
 
 def render_news_feed_html(items: List[Dict]) -> str:
-    """Renders the Desktop 3-Column Institutional Terminal Layout (Screenshot 3) on pure white canvas."""
+    """Renders the Desktop Chronological Timeline Feed with left time rail & institutional highlights (Screenshot 5)."""
     if not items:
         return (
             '<div class="epm-empty-state">'
@@ -839,19 +850,9 @@ def render_news_feed_html(items: List[Dict]) -> str:
 
     # Process items into structured clean format
     processed = []
-    source_icons = {
-        "Reuters": "🟠",
-        "Bloomberg": "🟣",
-        "Livemint": "🟠",
-        "Economic Times": "🔴",
-        "CNBC": "🔵",
-        "Moneycontrol": "🟢",
-        "NDTV Profit": "🟡",
-        "Financial Express": "🔵"
-    }
-
     now = now_ist()
     today_banner_str = now.strftime("TODAY • %A, %d %B %Y")
+    now_time_str = now.strftime("%H:%M")
 
     for i, it in enumerate(items[:60]):
         title = clean_table_text(str(it.get("title", "")))
@@ -865,7 +866,6 @@ def render_news_feed_html(items: List[Dict]) -> str:
 
         sent_raw = str(it.get("ai_sentiment", "NEUTRAL")).upper()
         sentiment = "BULLISH" if "BULL" in sent_raw else ("BEARISH" if "BEAR" in sent_raw else "NEUTRAL")
-        impact_raw = str(it.get("ai_impact", "HIGH" if score_num >= 7.5 else "MEDIUM")).upper()
         impact = "HIGH" if score_num >= 7.5 else ("LOW" if score_num <= 4.0 else "MEDIUM")
         source = clean_table_text(str(it.get("source", "Reuters")))
         link = it.get("link", "#")
@@ -876,6 +876,10 @@ def render_news_feed_html(items: List[Dict]) -> str:
             if "T" in ts:
                 dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
                 time_str = dt.astimezone(ist).strftime("%I:%M:%S %p")
+            elif ":" in ts:
+                time_str = ts.replace("Today ", "").strip()
+                if not time_str.endswith("AM") and not time_str.endswith("PM"):
+                    time_str = now.strftime("%I:%M:%S %p")
             else:
                 time_str = now.strftime("%I:%M:%S %p")
         except Exception:
@@ -885,7 +889,6 @@ def render_news_feed_html(items: List[Dict]) -> str:
         raw_reasoning = str(it.get("ai_reasoning", "")).strip()
         bullets = []
         if raw_reasoning:
-            # Split by period or semicolon into clean distinct analytical sentences
             sentences = [s.strip() for s in re.split(r'(?<=[.?!])\s+', raw_reasoning) if len(s.strip()) > 15]
             bullets = sentences[:4]
         if not bullets:
@@ -895,15 +898,13 @@ def render_news_feed_html(items: List[Dict]) -> str:
                 "Liquidity and open interest flows confirm elevated directional sensitivity."
             ]
 
-        # Topic summary (first 5-7 words)
         words = title.split()
         topic = " ".join(words[:6]) if len(words) > 6 else title
         horizon = "Medium-Term" if sentiment == "BEARISH" else "Short-Term"
-        src_icon = source_icons.get(source, "⚡")
 
-        # Region tagging
-        is_in = any(k in (title + " " + source).lower() for k in ["nifty", "sensex", "rbi", "sebi", "india", "rupee", "inr", "mcx", "bse", "nse", "livemint", "moneycontrol"])
-        region = "IN" if is_in else "GLOBAL"
+        is_inst = any(k in (source + " " + title).upper() for k in ["SEBI", "RBI", "MCX", "NSE", "BSE", "IFSCA", "FINMIN", "FOMC", "SEC", "CATALYST"])
+        scope = "institutional" if is_inst else "broad"
+        source_type = "Regulatory Document" if "SEBI" in (source + " " + title).upper() else ("Market Authority" if any(m in (source + " " + title).upper() for m in ["MCX", "NSE", "BSE"]) else "Outbound Link")
 
         processed.append({
             "idx": i,
@@ -914,11 +915,12 @@ def render_news_feed_html(items: List[Dict]) -> str:
             "impact": impact,
             "horizon": horizon,
             "source": source,
-            "source_icon": src_icon,
+            "source_type": source_type,
             "time_str": time_str,
             "link": link,
             "bullets": bullets,
-            "region": region,
+            "scope": scope,
+            "is_inst": is_inst,
             "reasoning": " ".join(bullets)
         })
 
@@ -932,57 +934,90 @@ def render_news_feed_html(items: List[Dict]) -> str:
     verdict_badge0 = f"{'🔴' if is_bear0 else ('🟢' if is_bull0 else '⚪')} {it0['sentiment']} ({it0['horizon']})"
     bullets_html0 = "".join(f"<li>{html.escape(b)}</li>" for b in it0["bullets"])
 
-    # Render Left Column News Cards
-    cards_html = []
+    # Build Stories for Desktop Story Strip
+    stories = build_story_items("news", limit=len(processed))
+    desktop_stories_strip = render_story_strip_html(stories, "news", is_desktop=True)
+
+    # Render Chronological News Rows with Left Rail
+    rows_html = []
+    seen_broad_divider = False
+
     for it in processed:
         i = it["idx"]
         s_class = "bullish" if it["sentiment"] == "BULLISH" else ("bearish" if it["sentiment"] == "BEARISH" else "neutral")
-        card = f'''
-        <div class="epm-dn-card" data-idx="{i}" data-region="{it['region']}" onclick="window.epmOpenDeskNewsAi({i})">
-            <div class="epm-dn-row1">
-                <div class="epm-dn-row1-left">
-                    <span class="epm-dn-time">{it['time_str']}</span>
-                    <span class="epm-dn-src"><span class="epm-dn-icon">{it['source_icon']}</span> {html.escape(it['source'])}</span>
-                    <a href="{html.escape(it['link'])}" target="_blank" rel="noopener" class="epm-dn-outbound" onclick="event.stopPropagation()">↗ Outbound Link</a>
-                </div>
-                <div class="epm-dn-row1-right">
-                    <span class="epm-dn-sent sent-{s_class}">{it['sentiment']}</span>
-                    <button type="button" class="epm-dn-analyze-btn" onclick="event.stopPropagation();window.epmOpenDeskNewsAi({i})">
-                        Analyze Impact ✦
-                    </button>
+        is_inst = it["is_inst"]
+        dot_class = "dot-inst" if is_inst else ("dot-secondary" if seen_broad_divider else "dot-live")
+
+        if not is_inst and not seen_broad_divider:
+            seen_broad_divider = True
+            rows_html.append(
+                '<div class="epm-stream-divider broad-stream">'
+                '  <span class="line"></span> BROAD MARKET SECONDARY STREAM 📰 <span class="line"></span>'
+                '</div>'
+            )
+
+        row = f'''
+        <div class="epm-chron-row {'is-institutional' if is_inst else ''}" data-idx="{i}" data-scope="{it['scope']}" onclick="window.epmOpenDeskNewsAi({i})">
+            <div class="epm-chron-left-rail">
+                <span class="epm-chron-time">{it['time_str']}</span>
+                <span class="epm-chron-dot {dot_class}"></span>
+                <div class="epm-chron-source-box">
+                    <a href="{html.escape(it['link'])}" target="_blank" rel="noopener" class="epm-chron-source-name" onclick="event.stopPropagation()">
+                        {html.escape(it['source'])} ↗
+                    </a>
+                    <span class="epm-chron-source-type">{html.escape(it['source_type'])}</span>
                 </div>
             </div>
-            <div class="epm-dn-row2">
-                <div class="epm-dn-headline">{html.escape(it['title'])}</div>
+            <div class="epm-chron-content">
+                <div class="epm-chron-headline">{html.escape(it['title'])}</div>
+            </div>
+            <div class="epm-chron-actions">
+                <button type="button" class="epm-chron-analyze-btn" onclick="event.stopPropagation();window.epmOpenDeskNewsAi({i})">
+                    Analyze Impact ✧
+                </button>
+                <span class="epm-chron-sent sent-{s_class}">{it['sentiment']}</span>
             </div>
         </div>
         '''
-        cards_html.append(card)
+        rows_html.append(row)
 
-    cards_joined = "".join(cards_html)
+    feed_joined = "".join(rows_html)
     json_attr = html.escape(json.dumps(processed), quote=True)
+    story_attr_data = _story_attr(stories)
 
     return f'''
-    <div class="epm-desk-layout" id="epm-desk-terminal-layout" data-desktop-news="{json_attr}">
-        <!-- Column 1: Live Breaking News Feed -->
+    <div class="epm-desk-layout epm-chron-timeline-wrap" id="epm-desk-terminal-layout" data-desktop-news="{json_attr}" data-stories-news="{story_attr_data}">
+        <!-- Column 1: Live Chronological Breaking News Feed -->
         <div class="epm-desk-news-col">
-            <div class="epm-dn-head">
-                <div class="epm-dn-title">LIVE BREAKING NEWS Feed</div>
-                <div class="epm-dn-filters">
-                    <div class="epm-dn-search">
+            <!-- Desktop Story Strip (Instagram Web Style) -->
+            {desktop_stories_strip}
+
+            <!-- Chronological Timeline Header Bar (Screenshot 5) -->
+            <div class="epm-chron-header-bar">
+                <div class="epm-chron-title">CHRONOLOGICAL NEWS TIMELINE • LIVE</div>
+                <div class="epm-chron-controls">
+                    <span class="epm-chron-date-banner">{today_banner_str}</span>
+                    <div class="epm-chron-search">
                         <span>🔍</span>
-                        <input type="text" placeholder="Search..." oninput="window.epmFilterDeskNews(this.value)" />
+                        <input type="text" placeholder="Search..." oninput="window.epmFilterChronNews(this.value)" />
                     </div>
-                    <div class="epm-dn-pills">
-                        <button type="button" class="epm-dn-pill active" onclick="window.epmSetDeskRegion('ALL', this)">ALL</button>
-                        <button type="button" class="epm-dn-pill" onclick="window.epmSetDeskRegion('IN', this)">IN</button>
-                        <button type="button" class="epm-dn-pill-icon" onclick="window.epmToggleDeskSort()" title="Filter Settings">⚙️</button>
+                    <div class="epm-chron-pills">
+                        <button type="button" class="epm-chron-pill active" onclick="window.epmFilterNewsScope('all', this)">ALL NEWS</button>
+                        <button type="button" class="epm-chron-pill" onclick="window.epmFilterNewsScope('institutional', this)">INSTITUTIONAL</button>
+                        <button type="button" class="epm-chron-pill" onclick="window.epmFilterNewsScope('broad', this)">BROAD MARKET</button>
                     </div>
                 </div>
             </div>
-            <div class="epm-dn-date">{today_banner_str}</div>
-            <div class="epm-dn-cards" id="epm-dn-cards">
-                {cards_joined}
+
+            <!-- Institutional Wire Live Sub-Header Line -->
+            <div class="epm-stream-divider inst-stream">
+                <span class="epm-live-dot" style="color:#EF4444;">●</span> LIVE • {now_time_str} IST
+                <span class="line"></span> INSTITUTIONAL BREAKING WIRE & MULTI-MARKET STREAM ⚡ <span class="line"></span>
+            </div>
+
+            <!-- Continuous Left-Rail Timeline Feed -->
+            <div class="epm-chron-feed" id="epm-chron-feed">
+                {feed_joined}
             </div>
         </div>
 
@@ -1051,8 +1086,11 @@ def get_merged_news_pool() -> List[Dict]:
 
 
 def build_story_items(kind: str = "news", limit: int = 100) -> List[Dict]:
-    """Normalised one-catalyst-per-frame story payloads (used by in-app viewer and Instagram PNGs)."""
+    """Normalised one-catalyst-per-frame story payloads with rich institutional data (in-app viewer, web stories, and Telegram 9:16 PNGs)."""
     out: List[Dict] = []
+    now = now_ist()
+    now_str = now.strftime("%I:%M:%S %p IST")
+
     if kind == "calendar":
         try:
             events = calendar_engine.get_enriched_events(filter_range="today", market_filter="ALL") or \
@@ -1060,8 +1098,6 @@ def build_story_items(kind: str = "news", limit: int = 100) -> List[Dict]:
         except Exception:
             events = []
         
-        # Only show calendar stories that will unfold from the time the user is on the site
-        now = now_ist()
         now_key = now.strftime("%Y-%m-%d %H:%M")
         upcoming_events = []
         for ev in events:
@@ -1084,20 +1120,33 @@ def build_story_items(kind: str = "news", limit: int = 100) -> List[Dict]:
             actual = clean_table_text(str(ev.get("actual", "")) or "")
             if not actual or actual in ("—", "None") or actual.startswith("⏳"):
                 actual = "Pending"
+            
+            bullets = [
+                f"High-impact macroeconomic release scheduled under {reg} surveillance framework.",
+                f"Anticipated volatility driver across {country} benchmark yields and currency pairs.",
+                "Liquidity and positioning metrics indicate elevated multi-desk sensitivity."
+            ]
+            if ev.get("details"):
+                bullets.insert(0, clean_table_text(ev.get("details")))
+            elif ev.get("ai_reasoning"):
+                bullets.insert(0, clean_table_text(ev.get("ai_reasoning")))
+
             out.append({
                 "kind": "calendar",
                 "title": clean_table_text(ev.get("event", "Scheduled Release")),
                 "tag": f"{reg} · {country}",
                 "sentiment": sent_text.upper(),
+                "score": 8.5 if stars >= 4 else 6.5,
                 "metric1": clean_table_text(str(ev.get("previous", "—")) or "—")[:14],
                 "metric1_label": "Previous",
                 "metric2": actual[:14],
-                "metric2_label": "Result",
-                "impact": {5: "Critical", 4: "High", 3: "Medium", 2: "Low", 1: "Minor"}.get(stars, "Medium"),
-                "bullets": [clean_table_text(calendar_pdf_engine._build_ai_reasoning(ev))],
+                "metric2_label": "Forecast / Result",
+                "impact": {5: "Critical", 4: "High Impact", 3: "Medium", 2: "Low", 1: "Minor"}.get(stars, "High Impact"),
+                "bullets": bullets[:4],
+                "takeaway": f"Watch immediate spread repricing and open interest adjustments in {reg} benchmark contracts upon release.",
                 "source": reg,
                 "time": f"{ev.get('date', '')} {calendar_pdf_engine._format_event_time(ev)} IST".strip(),
-                "link": ev.get("linked_news_url") or "",
+                "link": ev.get("linked_news_url") or "/api/calendar/pdf/weekly",
             })
     elif kind == "circulars":
         try:
@@ -1110,23 +1159,35 @@ def build_story_items(kind: str = "news", limit: int = 100) -> List[Dict]:
             title = clean_table_text(str(c.get("title", "")))
             circ_no = clean_table_text(str(c.get("circular_no", "")))
             date_str = clean_table_text(str(c.get("date", "")))
-            doc_url = str(c.get("pdf_url") or c.get("web_url") or "").strip()
+            cid = c.get("id") or f"{reg.lower()}_{circ_no.replace('/', '_')}"
+            doc_url = f"/api/circular/doc/{cid}"
             impact = str(c.get("impact", "MEDIUM")).upper()
             action = clean_table_text(str(c.get("action_takeaway", "")))
-            bullets = [clean_table_text(str(b)) for b in c.get("bullets", [])] if c.get("bullets") else [action or title]
+            bullets = [clean_table_text(str(b)) for b in c.get("bullets", []) if b]
+            if not bullets:
+                bullets = [
+                    f"Official regulatory mandate issued by {reg} establishing compliance parameters.",
+                    f"Binding across all registered trading members, depository participants, and listed issuers.",
+                    "Strengthens market integrity, surveillance norms, and investor protection standards."
+                ]
+            if action and action not in bullets:
+                bullets.insert(0, action)
+
             out.append({
                 "kind": "circulars",
                 "title": title,
                 "tag": f"{reg} · {category}",
                 "sentiment": "NEUTRAL",
+                "score": 9.0 if impact == "HIGH" else 7.0,
                 "metric1": circ_no[:12] if circ_no else reg,
                 "metric1_label": "Directive Ref",
                 "metric2": date_str[:12],
-                "metric2_label": "Date",
-                "impact": "Critical" if impact == "HIGH" else "Directive",
-                "bullets": bullets[:2],
+                "metric2_label": "Effective Date",
+                "impact": "Regulatory Directive" if impact != "HIGH" else "Critical Mandate",
+                "bullets": bullets[:4],
+                "takeaway": action or f"Mandatory compliance directive enforced by {reg}. Verified document archived in official repository.",
                 "source": reg,
-                "time": date_str,
+                "time": date_str or now_str,
                 "link": doc_url
             })
     elif kind == "holidays":
@@ -1145,12 +1206,14 @@ def build_story_items(kind: str = "news", limit: int = 100) -> List[Dict]:
                 "title": desc,
                 "tag": f"{day} · 2026",
                 "sentiment": "NEUTRAL",
+                "score": 5.0,
                 "metric1": d,
                 "metric1_label": "Date",
                 "metric2": "Closed" if "Closed" in nse or "Closed" in nyse else "Open",
                 "metric2_label": "Trading Status",
                 "impact": "Market Holiday",
-                "bullets": [f"NSE: {nse}", f"NYSE: {nyse}"],
+                "bullets": [f"National Stock Exchange (NSE): {nse}", f"New York Stock Exchange (NYSE): {nyse}"],
+                "takeaway": f"Settlement cycles and trading sessions deferred across affected exchange venues.",
                 "source": "Holiday Calendar",
                 "time": d,
                 "link": ""
@@ -1160,26 +1223,63 @@ def build_story_items(kind: str = "news", limit: int = 100) -> List[Dict]:
             sectors = it.get("ai_sectors") or []
             if isinstance(sectors, str):
                 sectors = [sectors]
+            raw_score = it.get("ai_score", 7.5)
+            try:
+                score_num = round(float(raw_score), 1)
+            except Exception:
+                score_num = 7.5
+
+            sent_str = str(it.get("ai_sentiment", "NEUTRAL")).upper()
+            reasoning = clean_table_text(str(it.get("ai_reasoning", "")))
+            bullets = [s.strip() for s in re.split(r'(?<=[.?!])\s+', reasoning) if len(s.strip()) > 15]
+            if not bullets:
+                bullets = [
+                    f"Direct valuation and capital allocation spillover into {', '.join(sectors[:2]) if sectors else 'broad equities'}.",
+                    f"Institutional order flow reflects directional sentiment alignment across prime desks.",
+                    "Elevated liquidity velocity and heightened derivatives volume expected across correlated contracts."
+                ]
+
             out.append({
                 "kind": "news",
                 "title": clean_table_text(it.get("title", "")),
-                "tag": ", ".join(str(s) for s in sectors[:2]) or clean_table_text(it.get("source", "")),
-                "sentiment": str(it.get("ai_sentiment", "NEUTRAL")).upper(),
-                "metric1": f"{it.get('ai_score', 5)}/10",
-                "metric1_label": "AI Score",
-                "metric2": f"{it.get('relevance', 0)}%",
-                "metric2_label": "Relevance",
-                "impact": str(it.get("ai_impact", "MEDIUM")).title(),
-                "bullets": [clean_table_text(it.get("ai_reasoning", ""))],
-                "source": clean_table_text(it.get("source", "")),
-                "time": clean_table_text(str(it.get("timestamp", ""))[:16]),
+                "tag": ", ".join(str(s) for s in sectors[:2]) or clean_table_text(it.get("source", "Wire")),
+                "sentiment": sent_str,
+                "score": score_num,
+                "metric1": f"{score_num}/10",
+                "metric1_label": "Impact Score",
+                "metric2": f"{it.get('relevance', 88)}%",
+                "metric2_label": "Conviction",
+                "impact": str(it.get("ai_impact", "HIGH" if score_num >= 7.5 else "MEDIUM")).title() + " Impact",
+                "bullets": bullets[:4],
+                "takeaway": reasoning[:180] if reasoning else "Institutional desks tracking secondary order flow and options pricing adjustments.",
+                "source": clean_table_text(it.get("source", "Wire")),
+                "time": clean_table_text(str(it.get("timestamp", ""))[:16]) or now_str,
                 "link": it.get("link", ""),
             })
     return out
 
 
+def render_story_strip_html(stories: List[Dict], kind: str, is_desktop: bool = False) -> str:
+    """Renders Instagram-style circular story bubbles for both mobile and desktop views."""
+    cls = "epm-story-strip desktop-strip" if is_desktop else "epm-story-strip"
+    bubbles = []
+    for i, s in enumerate(stories):
+        sk = _sent_key(s.get("sentiment", "NEUTRAL")).lower()
+        title = s.get("title", "Market Story")
+        short_title = title[:15] + "…" if len(title) > 15 else title
+        badge_text = str(s.get("metric1", "AI"))[:7]
+        bubbles.append(
+            f'<button type="button" class="epm-story-bubble tone-{sk}" onclick="window.epmOpenStory(\'{kind}\',{i})">'
+            f'<span class="epm-story-ring"><span class="epm-story-inner">{html.escape(badge_text)}</span></span>'
+            f'<span class="epm-story-label">{html.escape(short_title)}</span>'
+            f'</button>'
+        )
+    return f'<div class="{cls}">{ "".join(bubbles) }</div>'
+
+
 def _story_attr(items: List[Dict]) -> str:
     return html.escape(json.dumps(items, ensure_ascii=False), quote=True)
+
 
 
 def render_mobile_news_feed_html(pool: List[Dict]) -> str:
@@ -1908,16 +2008,19 @@ def render_calendar_dossier_html(events: List[Dict]) -> str:
             rendered_total += 1
 
 def render_desktop_calendar_html(events: List[Dict]) -> str:
-    """Renders desktop institutional 2-panel Market Calendar matching Screenshot 7."""
+    """Renders desktop institutional Market Calendar with 2-row header & left chronological rail (Screenshots 4 & 5)."""
     if not events:
         return '<div class="epm-empty-state"><div class="epm-empty-title">No upcoming catalysts</div></div>'
     
     curr = now_ist()
     today_banner_str = curr.strftime("%A, %d %B %Y")
     
-    cards_html = []
+    rows_html = []
     processed = []
-    for idx, ev in enumerate(events[:40]):
+    cal_stories = build_story_items("calendar", limit=len(events))
+    desktop_stories_strip = render_story_strip_html(cal_stories, "calendar", is_desktop=True)
+
+    for idx, ev in enumerate(events[:50]):
         eid = ev.get("id", f"ev_{idx}")
         time_str = ev.get("time", "10:00")
         if len(time_str) == 5:
@@ -1944,13 +2047,12 @@ def render_desktop_calendar_html(events: List[Dict]) -> str:
             cat_tab = "equities"
             cat_chip = "Corp. Board Meet"
             
-        flag = "🇮🇳" if mkt in ["NSE", "BSE", "MCX"] else ("🇺🇸" if mkt == "NYSE" else "🌐")
+        flag = "🇮🇳" if mkt in ["NSE", "BSE", "MCX"] else ("🇺🇸" if mkt in ["NYSE", "SEC", "FOMC"] else "🌐")
         prev = ev.get("previous", "—")
         fcast = ev.get("forecast", "—")
         sent = "BULLISH" if "BULL" in str(ev.get("outcome_sentiment", "")).upper() else ("BEARISH" if "BEAR" in str(ev.get("outcome_sentiment", "")).upper() else "NEUTRAL")
         title = ev.get("event") or ev.get("symbol") or "Market Catalyst"
         
-        # Reasoning bullets
         bullets = [
             f"Scheduled {ev.get('impact', 'HIGH').lower()}-impact market catalyst monitored by multi-market instl. desks.",
             f"Supportive of short-term {mkt} market liquidity and sentiment.",
@@ -1969,73 +2071,111 @@ def render_desktop_calendar_html(events: List[Dict]) -> str:
             "sentiment": sent,
             "bullets": bullets[:3],
             "horizon": "Short-Term",
-            "cat_tab": cat_tab
+            "cat_tab": cat_tab,
+            "market": mkt
         }
         processed.append(item_obj)
         
-        cards_html.append(f'''
-        <div class="epm-cal-card" data-idx="{idx}" data-cat="{cat_tab}" onclick="window.epmOpenDeskCalAi({idx})">
-            <div class="epm-cal-main-col">
-                <div class="epm-cal-card-head">
-                    <span class="epm-cal-time">{time_display}</span>
-                    <span class="epm-cal-chip">{cat_chip}</span>
-                    <span class="epm-cal-flag">{flag}</span>
+        is_inst = mkt in ["RBI", "SEBI", "FOMC", "SEC"] or "Macro" in cat_chip
+        dot_class = "dot-inst" if is_inst else "dot-live"
+        s_class = sent.lower()
+
+        rows_html.append(f'''
+        <div class="epm-chron-row {'is-institutional' if is_inst else ''}" data-idx="{idx}" data-cat="{cat_tab}" data-mkt="{mkt}" onclick="window.epmOpenDeskCalAi({idx})">
+            <div class="epm-chron-left-rail">
+                <span class="epm-chron-time">{time_display}</span>
+                <span class="epm-chron-dot {dot_class}"></span>
+                <div class="epm-chron-source-box">
+                    <span class="epm-chron-source-name">{flag} {mkt}</span>
+                    <span class="epm-chron-source-type">{html.escape(cat_chip[:16])}</span>
                 </div>
-                <div class="epm-cal-title">{html.escape(title)}</div>
             </div>
-            <div class="epm-cal-side-col">
-                <div class="epm-cal-side-top">
-                    <span class="epm-cal-prev-fcast">Prev: {html.escape(str(prev)[:12])} • Fcast: {html.escape(str(fcast)[:12])}</span>
-                    <span class="epm-dn-sent sent-{sent.lower()}">{sent}</span>
+            <div class="epm-chron-content">
+                <div class="epm-chron-headline">
+                    <b>{html.escape(title)}</b>
+                    <span style="display:inline-block; margin-left:8px; font-size:11px; color:#64748B; font-weight:normal;">(Prev: {html.escape(str(prev)[:10])} • Fcast: {html.escape(str(fcast)[:10])})</span>
                 </div>
-                <button type="button" class="epm-dn-analyze-btn" onclick="event.stopPropagation();window.epmOpenDeskCalAi({idx})">
-                    Analyze Impact ✦
+            </div>
+            <div class="epm-chron-actions">
+                <button type="button" class="epm-chron-analyze-btn" onclick="event.stopPropagation();window.epmOpenDeskCalAi({idx})">
+                    Analyze Impact ✧
                 </button>
+                <span class="epm-chron-sent sent-{s_class}">{sent}</span>
             </div>
         </div>
         ''')
         
     json_attr = html.escape(json.dumps(processed), quote=True)
+    story_attr_data = _story_attr(cal_stories)
     
     return f'''
-    <div class="epm-desk-layout" id="epm-cal-terminal-layout" data-desktop-cal="{json_attr}">
+    <div class="epm-desk-layout epm-chron-timeline-wrap" id="epm-cal-terminal-layout" data-desktop-cal="{json_attr}" data-stories-calendar="{story_attr_data}">
         <div class="epm-desk-feed-col">
-            <div class="epm-cal-top-strip">
-                <div class="epm-cal-logo-title">
-                    <span class="epm-cal-logo-badge">GNC</span>
-                    <span class="epm-cal-logo-sub">Global News Feed Room</span>
-                </div>
-                <div class="epm-cal-cat-pills">
-                    <button type="button" class="epm-cal-cat-btn active" onclick="window.epmFilterCalCat('all', this)">All</button>
-                    <button type="button" class="epm-cal-cat-btn" onclick="window.epmFilterCalCat('equities', this)">Equities</button>
-                    <button type="button" class="epm-cal-cat-btn" onclick="window.epmFilterCalCat('fno', this)">Futures & Options</button>
-                    <button type="button" class="epm-cal-cat-btn" onclick="window.epmFilterCalCat('ipos', this)">IPOs</button>
-                    <button type="button" class="epm-cal-cat-btn" onclick="window.epmFilterCalCat('macro', this)">Macro Events</button>
-                </div>
-            </div>
-            <div class="epm-cal-main-head">
-                <div class="epm-cal-title-text">MARKET CALENDAR</div>
-                <div class="epm-cal-action-btns">
-                    <div class="epm-dropdown-wrap">
-                        <button type="button" class="epm-cal-hdr-btn epm-dropdown-btn" onclick="window.epmToggleExportMenu(this)">
-                            📥 Export Dossier PDF ▾
-                        </button>
-                        <div class="epm-dropdown-menu" id="epm-export-dropdown">
-                            <a href="/api/calendar/pdf/weekly" download target="_blank" class="epm-dropdown-item">📄 Weekly Snapshot PDF (Next Week)</a>
-                            <a href="/api/calendar/pdf/daily-outcomes" download target="_blank" class="epm-dropdown-item">📄 5 PM Daily Outcomes PDF (Today)</a>
-                            <a href="/api/calendar/pdf/monthly" download target="_blank" class="epm-dropdown-item">📄 Monthly Outlook PDF (Upcoming Month)</a>
-                            <a href="/api/calendar/ics" download class="epm-dropdown-item">📲 Apple & Google Calendar (.ICS)</a>
-                        </div>
+            <!-- Desktop Story Circles Strip (Instagram Web Style) -->
+            {desktop_stories_strip}
+
+            <!-- Strictly 2-Row Header (Screenshot 4) -->
+            <div class="epm-cal-2row-hdr">
+                <!-- Row 1: Brand / Title on Left + Category Pills on Right -->
+                <div class="epm-cal-2row-r1">
+                    <div class="epm-cal-logo-title" style="display:flex; align-items:center; gap:8px;">
+                        <span class="epm-cal-logo-badge" style="background:#0052FF; color:#fff; font-weight:800; font-size:11px; padding:3px 8px; border-radius:4px;">GNC</span>
+                        <span class="epm-cal-logo-sub" style="font-size:12px; font-weight:600; color:#64748B;">Global News Feed Room</span>
+                        <span style="font-size:14px; font-weight:800; color:#0F172A; margin-left:6px;">MARKET CALENDAR</span>
                     </div>
-                    <button type="button" class="epm-cal-hdr-btn" onclick="window.epmPushDeskTelegram('weekly')">
-                        Forward to Telegram ✈️
-                    </button>
-                    <button type="button" class="epm-cal-hdr-icon-btn" onclick="window.epmToggleCalFilters()" title="Filters">⚙️</button>
+                    <div class="epm-cal-cat-pills" style="display:flex; gap:6px;">
+                        <button type="button" class="epm-cal-cat-btn active" onclick="window.epmFilterCalCat('all', this)">All</button>
+                        <button type="button" class="epm-cal-cat-btn" onclick="window.epmFilterCalCat('equities', this)">Equities</button>
+                        <button type="button" class="epm-cal-cat-btn" onclick="window.epmFilterCalCat('fno', this)">Futures & Options</button>
+                        <button type="button" class="epm-cal-cat-btn" onclick="window.epmFilterCalCat('ipos', this)">IPOs</button>
+                        <button type="button" class="epm-cal-cat-btn" onclick="window.epmFilterCalCat('macro', this)">Macro Events</button>
+                    </div>
+                </div>
+
+                <!-- Row 2: Select Period & Select Regulators on Left + Actions on Right -->
+                <div class="epm-cal-2row-r2">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <select class="epm-cal-select-filter" id="epm-cal-period-select" onchange="window.epmChangeCalPeriod(this.value)">
+                            <option value="all">📅 Select Period ▾</option>
+                            <option value="today">📅 Today (7 AM)</option>
+                            <option value="tomorrow">📅 Tomorrow (7 AM)</option>
+                            <option value="week">📅 Next 7 Days</option>
+                            <option value="upcoming">📅 Active Timers</option>
+                        </select>
+                        <select class="epm-cal-select-filter" id="epm-cal-market-select" onchange="window.epmChangeCalMarket(this.value)">
+                            <option value="ALL">🏛️ Select Regulators ▾</option>
+                            <option value="NSE">🇮🇳 NSE</option>
+                            <option value="BSE">🇮🇳 BSE</option>
+                            <option value="MCX">⛽ MCX</option>
+                            <option value="CRYPTO">₿ CRYPTO</option>
+                            <option value="NYSE">🇺🇸 SEC / NYSE</option>
+                        </select>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <div class="epm-dropdown-wrap">
+                            <button type="button" class="epm-cal-hdr-btn epm-dropdown-btn" onclick="window.epmToggleExportMenu(this)">
+                                📥 Export Dossier PDF ▾
+                            </button>
+                            <div class="epm-dropdown-menu" id="epm-export-dropdown">
+                                <a href="/api/calendar/pdf/weekly" download target="_blank" class="epm-dropdown-item">📄 Weekly Snapshot PDF (Next Week)</a>
+                                <a href="/api/calendar/pdf/daily-outcomes" download target="_blank" class="epm-dropdown-item">📄 5 PM Daily Outcomes PDF (Today)</a>
+                                <a href="/api/calendar/pdf/monthly" download target="_blank" class="epm-dropdown-item">📄 Monthly Outlook PDF (Upcoming Month)</a>
+                                <a href="/api/calendar/ics" download class="epm-dropdown-item">📲 Apple & Google Calendar (.ICS)</a>
+                            </div>
+                        </div>
+                        <button type="button" class="epm-cal-hdr-btn" onclick="window.epmPushDeskTelegram('weekly')">
+                            Forward to Telegram ✈️
+                        </button>
+                        <button type="button" class="epm-cal-hdr-icon-btn" onclick="window.epmToggleCalFilters()" title="Filters">⚙️</button>
+                    </div>
                 </div>
             </div>
-            <div class="epm-cal-sub-date">UPCOMING EVENTS • {today_banner_str}</div>
-            <div class="epm-cal-cards-list" id="epm-cal-cards-list">
-                {''.join(cards_html)}
+
+            <div class="epm-cal-sub-date" style="font-size:11.5px; font-weight:600; color:#64748B; margin: 4px 0 10px 4px;">UPCOMING EVENTS • {today_banner_str}</div>
+
+            <!-- Continuous Left-Rail Timeline Feed for Calendar -->
+            <div class="epm-chron-feed" id="epm-cal-cards-list">
+                {''.join(rows_html)}
             </div>
         </div>
         
@@ -2048,14 +2188,14 @@ def render_desktop_calendar_html(events: List[Dict]) -> str:
                 </div>
                 <div class="epm-ai-sub" id="epm-cal-ai-sub-text">AI Analysis: Selected Market Event</div>
                 
-                <div class="epm-ai-score-box tone-bearish" id="epm-cal-ai-score-box">
+                <div class="epm-ai-score-box tone-bullish" id="epm-cal-ai-score-box">
                     <div class="epm-ai-score-val" id="epm-cal-ai-score-val">IMPACT SCORE: 4.8/5</div>
                     <div class="epm-ai-score-lbl" id="epm-cal-ai-score-lbl">HIGH IMPACT</div>
                 </div>
                 
                 <div class="epm-ai-verdict-box">
                     <span class="epm-ai-verdict-pill sent-bullish" id="epm-cal-ai-verdict-pill">
-                        🟢 BULLISH
+                        🟢 BULLISH (Short-Term)
                     </span>
                 </div>
                 
@@ -2079,16 +2219,19 @@ def render_desktop_calendar_html(events: List[Dict]) -> str:
 
 
 def render_desktop_circulars_html(circulars: List[Dict]) -> str:
-    """Renders desktop institutional 2-panel Regulatory Circulars matching Screenshot 8."""
+    """Renders desktop institutional Regulatory Circulars with left chronological rail (Screenshot 8 & 5)."""
     if not circulars:
         return '<div class="epm-empty-state"><div class="epm-empty-title">No official circulars found</div></div>'
     
     curr = now_ist()
     today_banner_str = curr.strftime("%A, %d %B %Y")
     
-    cards_html = []
+    rows_html = []
     processed = []
-    for idx, c in enumerate(circulars[:40]):
+    circ_stories = build_story_items("circulars", limit=len(circulars))
+    desktop_stories_strip = render_story_strip_html(circ_stories, "circulars", is_desktop=True)
+
+    for idx, c in enumerate(circulars[:50]):
         cid = c.get("id", f"circ_{idx}")
         reg = c.get("regulator", "NSE")
         meta = REGULATOR_META.get(reg, {"badge": f"🇮🇳 {reg}", "color": "#2563EB"})
@@ -2124,37 +2267,52 @@ def render_desktop_circulars_html(circulars: List[Dict]) -> str:
         }
         processed.append(item_obj)
         
-        cards_html.append(f'''
-        <div class="epm-circ-desk-card" data-idx="{idx}" data-reg="{reg.lower()}" onclick="window.epmOpenDeskCircAi({idx})">
-            <div class="epm-circ-main-col">
-                <div class="epm-circ-desk-head">
-                    <span class="epm-circ-time">12:58:18 IST</span>
-                    <span class="epm-circ-reg-badge">{meta.get('badge', reg)}</span>
-                    <span class="epm-circ-ref-badge">{html.escape(cno[:22])}</span>
-                    <a href="{doc_url}" target="_blank" download class="epm-circ-download-link" onclick="event.stopPropagation()">📥 Download Official PDF ↗</a>
+        is_inst = True
+        dot_class = "dot-inst"
+        s_class = sent.lower()
+
+        rows_html.append(f'''
+        <div class="epm-chron-row is-institutional" data-idx="{idx}" data-reg="{reg.lower()}" onclick="window.epmOpenDeskCircAi({idx})">
+            <div class="epm-chron-left-rail">
+                <span class="epm-chron-time">{html.escape(time_str[:10])}</span>
+                <span class="epm-chron-dot {dot_class}"></span>
+                <div class="epm-chron-source-box">
+                    <span class="epm-chron-source-name">{html.escape(reg)} ↗</span>
+                    <span class="epm-chron-source-type">Regulatory Directive</span>
                 </div>
-                <div class="epm-circ-desk-title">{html.escape(title)}</div>
             </div>
-            <div class="epm-circ-side-col">
-                <div class="epm-circ-side-top">
-                    <span class="epm-circ-imp-score">{impact} | {score}</span>
-                    <span class="epm-dn-sent sent-{sent.lower()}">{sent}</span>
+            <div class="epm-chron-content">
+                <div class="epm-chron-headline">
+                    <span style="font-weight:700; color:#0052FF; margin-right:6px;">[{html.escape(cno[:20])}]</span>
+                    <b>{html.escape(title)}</b>
+                    <div style="margin-top:4px;">
+                        <a href="{doc_url}" target="_blank" download class="epm-circ-download-link" onclick="event.stopPropagation()" style="font-size:11px; font-weight:700; color:#0052FF; text-decoration:none; display:inline-flex; align-items:center; gap:3px;">
+                            📥 Download Official PDF ↗
+                        </a>
+                    </div>
                 </div>
-                <button type="button" class="epm-dn-analyze-btn" onclick="event.stopPropagation();window.epmOpenDeskCircAi({idx})">
-                    Analyze Impact ✦
+            </div>
+            <div class="epm-chron-actions">
+                <button type="button" class="epm-chron-analyze-btn" onclick="event.stopPropagation();window.epmOpenDeskCircAi({idx})">
+                    Analyze Impact ✧
                 </button>
+                <span class="epm-chron-sent sent-{s_class}">{sent}</span>
             </div>
         </div>
         ''')
         
     json_attr = html.escape(json.dumps(processed), quote=True)
+    story_attr_data = _story_attr(circ_stories)
     
     return f'''
-    <div class="epm-desk-layout" id="epm-circ-terminal-layout" data-desktop-circ="{json_attr}">
+    <div class="epm-desk-layout epm-chron-timeline-wrap" id="epm-circ-terminal-layout" data-desktop-circ="{json_attr}" data-stories-circulars="{story_attr_data}">
         <div class="epm-desk-feed-col">
-            <div class="epm-circ-top-strip">
-                <div class="epm-circ-title-text">OFFICIAL REGULATORY CIRCULARS DIRECTORY</div>
-                <div class="epm-circ-reg-pills">
+            <!-- Desktop Story Circles Strip (Instagram Web Style) -->
+            {desktop_stories_strip}
+
+            <div class="epm-circ-top-strip" style="display:flex; align-items:center; justify-content:space-between; padding:12px 16px; background:#fff; border:1px solid #E2E8F0; border-radius:12px; margin-bottom:10px; flex-wrap:wrap; gap:10px;">
+                <div class="epm-circ-title-text" style="font-size:14px; font-weight:800; color:#0F172A;">OFFICIAL REGULATORY DIRECTIVES & CIRCULARS</div>
+                <div class="epm-circ-reg-pills" style="display:flex; gap:6px;">
                     <button type="button" class="epm-circ-reg-btn active" onclick="window.epmFilterCircReg('all', this)">ALL</button>
                     <button type="button" class="epm-circ-reg-btn" onclick="window.epmFilterCircReg('rbi', this)">RBI</button>
                     <button type="button" class="epm-circ-reg-btn" onclick="window.epmFilterCircReg('sebi', this)">SEBI</button>
@@ -2163,8 +2321,8 @@ def render_desktop_circulars_html(circulars: List[Dict]) -> str:
                     <button type="button" class="epm-circ-reg-btn" onclick="window.epmFilterCircReg('mcx', this)">MCX</button>
                     <button type="button" class="epm-circ-reg-btn" onclick="window.epmFilterCircReg('fomc', this)">FOMC</button>
                 </div>
-                <div class="epm-circ-action-btns">
-                    <a href="/api/calendar/pdf/monthly" download target="_blank" class="epm-cal-hdr-btn">
+                <div class="epm-circ-action-btns" style="display:flex; gap:8px;">
+                    <a href="/api/calendar/pdf/monthly" download target="_blank" class="epm-cal-hdr-btn" style="text-decoration:none;">
                         Export PDF Directory 📥
                     </a>
                     <button type="button" class="epm-cal-hdr-btn" onclick="window.epmPushDeskTelegram('circular')">
@@ -2173,9 +2331,11 @@ def render_desktop_circulars_html(circulars: List[Dict]) -> str:
                     <button type="button" class="epm-cal-hdr-icon-btn" onclick="window.epmToggleCircFilters()" title="Filters">⚙️</button>
                 </div>
             </div>
-            <div class="epm-circ-sub-date">RECENT OFFICIAL RELEASES • {today_banner_str}</div>
-            <div class="epm-circ-cards-list" id="epm-circ-cards-list">
-                {''.join(cards_html)}
+            <div class="epm-circ-sub-date" style="font-size:11.5px; font-weight:600; color:#64748B; margin: 4px 0 10px 4px;">RECENT OFFICIAL RELEASES • {today_banner_str}</div>
+
+            <!-- Continuous Left-Rail Timeline Feed for Circulars -->
+            <div class="epm-chron-feed" id="epm-circ-cards-list">
+                {''.join(rows_html)}
             </div>
         </div>
         
@@ -2188,29 +2348,28 @@ def render_desktop_circulars_html(circulars: List[Dict]) -> str:
                 </div>
                 <div class="epm-ai-sub" id="epm-circ-ai-sub-text">Analysis: Official Regulatory Directive</div>
                 
-                <div class="epm-ai-score-box tone-bearish" id="epm-circ-ai-score-box">
-                    <div class="epm-ai-score-val" id="epm-circ-ai-score-val">AI IMPACT SCORE: 8.5/10</div>
+                <div class="epm-ai-score-box tone-bullish" id="epm-circ-ai-score-box">
+                    <div class="epm-ai-score-val" id="epm-circ-ai-score-val">IMPACT SCORE: 8.5/10</div>
                     <div class="epm-ai-score-lbl" id="epm-circ-ai-score-lbl">HIGH IMPACT</div>
                 </div>
                 
                 <div class="epm-ai-verdict-box">
-                    <span class="epm-ai-verdict-pill sent-bearish" id="epm-circ-ai-verdict-pill">
-                        🔴 BEARISH (Short-Term)
+                    <span class="epm-ai-verdict-pill sent-bullish" id="epm-circ-ai-verdict-pill">
+                        🟢 BULLISH (Short-Term)
                     </span>
                 </div>
                 
                 <div class="epm-ai-reasoning-wrap">
-                    <div class="epm-ai-reasoning-title">AI Executive Summary</div>
+                    <div class="epm-ai-reasoning-title">AI Directive Breakdown & Takeaway</div>
                     <ul class="epm-ai-bullets" id="epm-circ-ai-bullets">
-                        <li>Official regulatory communication released by authoritative body.</li>
+                        <li>Official regulatory communication released by authority.</li>
                         <li>Streamlines administrative processes while imposing stricter oversight on participants.</li>
-                        <li>Medium-term impact on operational timelines and regulatory filings.</li>
                     </ul>
                 </div>
                 
                 <div class="epm-ai-share-wrap">
                     <button type="button" class="epm-ai-share-btn" onclick="window.epmShareDeskCircToTelegram()">
-                        Forward Latest Circular to Telegram
+                        Share Directive Analysis to Telegram
                     </button>
                 </div>
             </div>
@@ -2571,52 +2730,112 @@ def render_settings_hub_html() -> str:
 
 BASELINE_BREAKING_CATALYSTS = [
     {
+        "title": "Fed Holds Rates Steady Despite Lack of Progress on Inflation, stubborn price pressures persist",
+        "link": "https://www.federalreserve.gov",
+        "source": "Reuters",
+        "ai_score": 8.5,
+        "ai_sentiment": "BEARISH",
+        "ai_impact": "HIGH",
+        "relevance": 92,
+        "ai_sectors": ["GLOBAL MACRO", "CENTRAL BANKS", "BONDS"],
+        "ai_reasoning": "FOMC holds target fed funds rate unchanged; inflation persistence delays rate reduction path, keeping dollar yields firm.",
+        "timestamp": "Today 12:50:30 PM"
+    },
+    {
+        "title": "🚨 SEBI Catalyst: Regulator mandates enhanced disclosure rules for foreign portfolio investors (FPIs)",
+        "link": "/api/circular/doc/sebi_fpi_disclosure_2026",
+        "source": "SEBI",
+        "ai_score": 9.0,
+        "ai_sentiment": "BULLISH",
+        "ai_impact": "HIGH",
+        "relevance": 96,
+        "ai_sectors": ["CAPITAL MARKETS", "FPI INFLOWS", "SURVEILLANCE"],
+        "ai_reasoning": "SEBI enforces stringent granular beneficial ownership transparency; institutional desks welcome long-term governance enhancement.",
+        "timestamp": "Today 12:44:15 PM"
+    },
+    {
+        "title": "Relief for IT as hiring surges 15% across tech giants, TCS and Infosys lead Q3 recruitment push",
+        "link": "https://www.bloomberg.com",
+        "source": "Bloomberg",
+        "ai_score": 7.5,
+        "ai_sentiment": "NEUTRAL",
+        "ai_impact": "MEDIUM",
+        "relevance": 84,
+        "ai_sectors": ["IT / TECH", "TCS", "INFOSYS"],
+        "ai_reasoning": "Headcount recovery signals bottoming of tech discretionary budget cycle and stabilizing deal pipelines across BFSI verticals.",
+        "timestamp": "Today 12:35:00 PM"
+    },
+    {
+        "title": "🚨 MCX Catalyst: Crude oil and base metals margin requirements revised following global volatility",
+        "link": "/api/circular/doc/mcx_margin_crude_bullion_2026",
+        "source": "MCX",
+        "ai_score": 8.8,
+        "ai_sentiment": "BULLISH",
+        "ai_impact": "HIGH",
+        "relevance": 89,
+        "ai_sectors": ["COMMODITIES", "ENERGY", "BASE METALS"],
+        "ai_reasoning": "MCX recalibrates minimum initial and special margin thresholds to mitigate speculative leverage ahead of inventory data.",
+        "timestamp": "Today 12:28:00 PM"
+    },
+    {
+        "title": "Jio Platforms and Bharti Airtel see steady volume in retail market ahead of major telecom service announcements",
+        "link": "https://www.moneycontrol.com",
+        "source": "Moneycontrol",
+        "ai_score": 7.0,
+        "ai_sentiment": "BEARISH",
+        "ai_impact": "MEDIUM",
+        "relevance": 81,
+        "ai_sectors": ["TELECOM", "RELIANCE", "BHARTI AIRTEL"],
+        "ai_reasoning": "High-volume churn observed in telecom heavyweights amidst market chatter surrounding new ARPU tariff timelines.",
+        "timestamp": "Today 12:15:20 PM"
+    },
+    {
         "title": "RBI MPC Keeps Repo Rate Unchanged at 6.50% with Stance Focused on Withdrawal of Accommodation",
         "link": "https://www.rbi.org.in",
-        "source": "Reserve Bank of India",
+        "source": "RBI",
         "ai_score": 10,
         "ai_sentiment": "BULLISH",
         "ai_impact": "HIGH",
         "relevance": 95,
         "ai_sectors": ["BANKING", "FINANCE", "REALTY"],
         "ai_reasoning": "MPC maintains benchmark policy repo rate at 6.50%; durable domestic liquidity surplus supports banking margins.",
-        "timestamp": "Today 08:30 IST"
+        "timestamp": "Today 08:30:00 AM"
     },
     {
         "title": "US Federal Reserve Holds Fed Funds Target at 5.25%-5.50% Amid Resilient Core CPI & Payroll Strength",
         "link": "https://www.federalreserve.gov",
-        "source": "Federal Reserve Wire",
+        "source": "FOMC",
         "ai_score": 9,
         "ai_sentiment": "NEUTRAL",
         "ai_impact": "HIGH",
         "relevance": 90,
         "ai_sectors": ["GLOBAL MACRO", "BONDS", "USD/INR"],
         "ai_reasoning": "FOMC policy rate held steady; higher-for-longer trajectory anchors 10Y US Treasury yields near 4.25%.",
-        "timestamp": "Today 09:15 IST"
+        "timestamp": "Today 09:15:00 AM"
     },
     {
         "title": "Reliance Industries & Jio Platforms Report 28% Profit Surge on Accelerated 5G Monetization & Retail Scale",
         "link": "https://www.bseindia.com",
-        "source": "BSE / NSE Corporate",
+        "source": "BSE",
         "ai_score": 9,
         "ai_sentiment": "BULLISH",
         "ai_impact": "HIGH",
         "relevance": 88,
         "ai_sectors": ["ENERGY / OIL", "TELECOM", "RETAIL"],
         "ai_reasoning": "Strong EBITDA expansion in digital services and retail cushions refining margins; positive index heavyweight impact.",
-        "timestamp": "Today 10:00 IST"
+        "timestamp": "Today 10:00:00 AM"
     },
     {
         "title": "NTPC & NTPC Green Energy Finalize Rs 10,000 Cr Renewable Capex Plan with Ultra-Mega Solar Grid Commissioning",
         "link": "https://www.nseindia.com",
-        "source": "NSE Corporate",
+        "source": "NSE",
         "ai_score": 8,
         "ai_sentiment": "BULLISH",
         "ai_impact": "HIGH",
         "relevance": 85,
         "ai_sectors": ["POWER", "GREEN ENERGY", "UTILITIES"],
         "ai_reasoning": "Major capacity addition milestone enhances earnings visibility and green energy asset valuation ahead of IPO listing.",
-        "timestamp": "Today 10:45 IST"
+        "timestamp": "Today 10:45:00 AM"
     },
     {
         "title": "HDFC Bank & ICICI Bank Post Broad-Based Loan Growth of 16.8% with Gross NPAs Declining to Historic Low of 1.18%",
@@ -2628,43 +2847,43 @@ BASELINE_BREAKING_CATALYSTS = [
         "relevance": 82,
         "ai_sectors": ["BANKING", "FINANCIAL SERVICES"],
         "ai_reasoning": "Robust credit growth across retail and commercial segments; pristine asset quality reduces provisioning drag.",
-        "timestamp": "Today 11:20 IST"
+        "timestamp": "Today 11:20:00 AM"
     },
     {
         "title": "Brent Crude Stabilizes at $74.20/bbl as OPEC+ Reaffirms Voluntary Output Discipline into Q1 2027",
         "link": "https://www.reuters.com",
-        "source": "Reuters Energy",
+        "source": "Reuters",
         "ai_score": 8,
         "ai_sentiment": "NEUTRAL",
         "ai_impact": "HIGH",
         "relevance": 80,
         "ai_sectors": ["COMMODITIES", "OIL & GAS", "AVIATION"],
         "ai_reasoning": "Crude stability removes immediate inflationary headwind for import-dependent Asian economies and downstream refiners.",
-        "timestamp": "Today 12:10 IST"
+        "timestamp": "Today 12:10:00 PM"
     },
     {
         "title": "SEBI Releases Framework for Instant Settlement T+0 and Direct Market Access Architecture for FPI Inflows",
         "link": "https://www.sebi.gov.in",
-        "source": "SEBI Directives",
+        "source": "SEBI",
         "ai_score": 8,
         "ai_sentiment": "BULLISH",
         "ai_impact": "HIGH",
         "relevance": 78,
         "ai_sectors": ["CAPITAL MARKETS", "EXCHANGES", "BROKING"],
         "ai_reasoning": "Streamlined clearing cycle lowers counterparty risk and enhances liquidity velocity across Indian secondary markets.",
-        "timestamp": "Today 13:00 IST"
+        "timestamp": "Today 01:00:00 PM"
     },
     {
         "title": "India Forex Reserves Touch Record $704.8 Billion; Import Cover Expands to Over 12.5 Months",
         "link": "https://www.rbi.org.in",
-        "source": "RBI Bulletin",
+        "source": "RBI",
         "ai_score": 7,
         "ai_sentiment": "BULLISH",
         "ai_impact": "MEDIUM",
         "relevance": 75,
         "ai_sectors": ["ECONOMY", "CURRENCY", "MACRO"],
         "ai_reasoning": "Substantial foreign exchange buffer fortifies Rupee against external volatility and capital flow rebalancing.",
-        "timestamp": "Today 13:45 IST"
+        "timestamp": "Today 01:45:00 PM"
     }
 ]
 
@@ -2743,7 +2962,7 @@ def get_dashboard_tables():
             f"📡 **Telegram Broadcast:** `{cal_status}` &nbsp;|&nbsp; "
             f"⏱️ **IST Clock:** `{now_ist().strftime('%H:%M:%S IST')}`"
         )
-        news_visual_html = render_news_feed_html(items)
+        news_visual_html = render_news_feed_html(all_pool)
         mobile_html = render_mobile_news_feed_html(all_pool)
         return status_str, news_visual_html, top_rows, bottom_rows, mobile_html
     except Exception as e:
@@ -6398,41 +6617,447 @@ tbody tr:hover td {
 .epm-tl-now span::after { content: ""; flex: 1; height: 2px; background: linear-gradient(90deg, #F43F5E, rgba(244,63,94,0)); }
 @keyframes epmPulse { 0%,100% { box-shadow: 0 0 0 3px rgba(244,63,94,.25); } 50% { box-shadow: 0 0 0 7px rgba(244,63,94,0); } }
 
-/* Full-screen swipeable story viewer */
-.epm-story-viewer { position: fixed; inset: 0; z-index: 200000; background: rgba(15,23,42,.55); display: none; align-items: center; justify-content: center; }
-.epm-story-viewer.is-open { display: flex; }
-.epm-sv-frame { position: relative; width: min(100vw, 430px); height: min(100dvh, 860px); background: #FFFFFF; overflow: hidden; display: flex; flex-direction: column; touch-action: pan-y; user-select: none; }
-@media (min-width: 480px) { .epm-sv-frame { border-radius: 18px; box-shadow: 0 30px 80px rgba(15,23,42,.35); } }
-.epm-sv-frame.tone-bullish { background: linear-gradient(180deg, #D1FAE5 0%, #FFFFFF 58%); }
-.epm-sv-frame.tone-bearish { background: linear-gradient(180deg, #FFE4E6 0%, #FFFFFF 58%); }
-.epm-sv-frame.tone-neutral { background: linear-gradient(180deg, #E2E8F0 0%, #FFFFFF 58%); }
-.epm-sv-progress { display: flex; gap: 4px; padding: 12px 12px 0; }
-.epm-sv-seg { flex: 1; height: 3px; border-radius: 3px; background: rgba(15,23,42,.15); overflow: hidden; }
+/* Full-screen swipeable & desktop modal story viewer (Instagram Web Style) */
+.epm-story-viewer {
+    position: fixed;
+    inset: 0;
+    z-index: 200000;
+    background: rgba(15, 23, 42, 0.82);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+.epm-story-viewer.is-open { display: flex !important; }
+.epm-sv-frame {
+    position: relative;
+    width: min(100vw, 440px);
+    height: min(100dvh, 880px);
+    background: #FFFFFF;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    touch-action: pan-y;
+    user-select: none;
+    border-radius: 18px;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.5);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.epm-sv-frame.tone-bullish { background: linear-gradient(180deg, #ECFDF5 0%, #FFFFFF 45%, #F8FAFC 100%); }
+.epm-sv-frame.tone-bearish { background: linear-gradient(180deg, #FFF1F2 0%, #FFFFFF 45%, #F8FAFC 100%); }
+.epm-sv-frame.tone-neutral { background: linear-gradient(180deg, #F1F5F9 0%, #FFFFFF 45%, #F8FAFC 100%); }
+
+.epm-sv-progress { display: flex; gap: 4px; padding: 12px 14px 0; }
+.epm-sv-seg { flex: 1; height: 3.5px; border-radius: 3px; background: rgba(15,23,42,.15); overflow: hidden; }
 .epm-sv-seg i { display: block; height: 100%; width: 0; background: #0F172A; }
 .epm-sv-seg.done i { width: 100%; }
 .epm-sv-seg.active i { animation: epmSvFill linear forwards; }
 @keyframes epmSvFill { from { width: 0; } to { width: 100%; } }
-.epm-sv-top { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; }
-.epm-sv-brand { font-weight: 800; font-size: 15px; color: #0F172A; } .epm-sv-brand b { color: #0052FF; }
-.epm-sv-close { background: none; border: none; font-size: 22px; color: #0F172A; cursor: pointer; padding: 4px 8px; }
-.epm-sv-content { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 0 26px 20px; text-align: center; }
-.epm-sv-pill { align-self: center; font-size: 13px; font-weight: 800; padding: 5px 14px; border-radius: 999px; background: #F1F5F9; color: #334155; }
+
+.epm-sv-top { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid rgba(0,0,0,0.05); }
+.epm-sv-author-meta { display: flex; align-items: center; gap: 8px; }
+.epm-sv-avatar { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; }
+.epm-sv-brand { font-weight: 800; font-size: 14px; color: #0F172A; letter-spacing: 0.5px; }
+.epm-sv-time { font-size: 11px; color: #64748B; font-weight: 600; margin-left: 6px; }
+.epm-sv-close { background: none; border: none; font-size: 20px; color: #475569; cursor: pointer; padding: 4px 8px; line-height: 1; border-radius: 6px; }
+.epm-sv-close:hover { background: #E2E8F0; color: #0F172A; }
+
+.epm-sv-content { flex: 1; display: flex; flex-direction: column; justify-content: flex-start; padding: 16px 22px 10px; overflow-y: auto; text-align: left; }
+.epm-sv-badges-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.epm-sv-pill { font-size: 11px; font-weight: 800; padding: 4px 12px; border-radius: 999px; background: #F1F5F9; color: #334155; }
 .tone-bullish .epm-sv-pill { background: #DCFCE7; color: #047857; }
 .tone-bearish .epm-sv-pill { background: #FFE4E6; color: #BE123C; }
-.epm-sv-tag { margin-top: 12px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #64748B; }
-.epm-sv-title { margin: 8px 0 18px; font-size: 26px; line-height: 1.2; font-weight: 800; color: #0F172A; }
-.epm-sv-metrics { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #E2E8F0; border-bottom: 1px solid #E2E8F0; padding: 16px 0; }
-.epm-sv-metrics > div + div { border-left: 1px solid #E2E8F0; }
-.epm-sv-metrics b { display: block; font: 800 30px var(--font-mono, monospace); color: #0F172A; font-feature-settings: 'tnum'; word-break: break-word; }
-.tone-bullish .epm-sv-metrics > div + div b { color: #059669; }
-.tone-bearish .epm-sv-metrics > div + div b { color: #E11D48; }
-.epm-sv-metrics span { font-size: 11px; color: #64748B; }
-.epm-sv-bullets { text-align: left; margin-top: 16px; font-size: 14px; line-height: 1.5; color: #334155; }
+.epm-sv-tag { font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #64748B; background: #F1F5F9; padding: 3px 8px; border-radius: 4px; }
+
+.epm-sv-title { margin: 8px 0 12px; font-size: 19px; line-height: 1.35; font-weight: 800; color: #0F172A; }
+.epm-sv-score-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 800; background: #EEF2FF; color: #4F46E5; border: 1px solid #C7D2FE; padding: 4px 10px; border-radius: 6px; margin-bottom: 12px; align-self: flex-start; }
+
+.epm-sv-metrics { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #E2E8F0; border-bottom: 1px solid #E2E8F0; padding: 10px 0; margin-bottom: 12px; }
+.epm-sv-metrics > div + div { border-left: 1px solid #E2E8F0; padding-left: 14px; }
+.epm-sv-metrics b { display: block; font: 800 22px var(--font-mono, monospace); color: #0F172A; font-feature-settings: 'tnum'; }
+.tone-bullish .epm-sv-metrics > div b { color: #059669; }
+.tone-bearish .epm-sv-metrics > div b { color: #E11D48; }
+.epm-sv-metrics span { font-size: 10.5px; color: #64748B; font-weight: 600; text-transform: uppercase; }
+
+.epm-sv-bullets { margin: 0 0 12px; padding-left: 18px; font-size: 12.5px; line-height: 1.5; color: #334155; }
 .epm-sv-bullets li { margin-bottom: 6px; }
-.epm-sv-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px 18px; font-size: 11px; color: #94A3B8; }
-.epm-sv-foot a { font-weight: 700; font-size: 12px; color: #0052FF; text-decoration: none; padding: 7px 12px; border: 1px solid #BFDBFE; border-radius: 999px; background: #FFFFFF; }
-.epm-sv-tap { position: absolute; top: 70px; bottom: 70px; width: 35%; z-index: 1; }
-.epm-sv-tap.left { left: 0; } .epm-sv-tap.right { right: 0; }
+
+.epm-sv-takeaway-box { background: #F8FAFC; border: 1px solid #E2E8F0; border-left: 3px solid #0052FF; border-radius: 6px; padding: 8px 12px; font-size: 11.5px; line-height: 1.4; color: #1E293B; margin-top: auto; }
+
+.epm-sv-foot { display: flex; flex-direction: column; gap: 8px; padding: 12px 18px 16px; border-top: 1px solid #E2E8F0; background: #FFFFFF; }
+.epm-sv-actions-row { display: flex; align-items: center; gap: 8px; width: 100%; }
+.epm-sv-btn { flex: 1; font-weight: 700; font-size: 11.5px; text-decoration: none; padding: 8px 10px; border-radius: 8px; text-align: center; border: 1px solid #CBD5E1; cursor: pointer; transition: all 0.15s ease; white-space: nowrap; }
+.epm-sv-btn-doc { background: #FFFFFF; color: #0052FF; border-color: #BFDBFE; }
+.epm-sv-btn-tg { background: #0088cc; color: #FFFFFF; border-color: #0088cc; }
+.epm-sv-btn-png { background: #0F172A; color: #FFFFFF; border-color: #0F172A; }
+
+/* Floating navigation arrow buttons for desktop stories (Instagram web style) */
+.epm-sv-arrow-nav {
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    color: #FFFFFF;
+    font-size: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 200005;
+    transition: all 0.2s ease;
+    user-select: none;
+    line-height: 1;
+    padding-bottom: 4px;
+}
+.epm-sv-arrow-nav:hover {
+    background: rgba(255, 255, 255, 0.45);
+    transform: translateY(-50%) scale(1.08);
+}
+.epm-sv-arrow-nav.prev {
+    left: max(16px, calc(50vw - 280px));
+}
+.epm-sv-arrow-nav.next {
+    right: max(16px, calc(50vw - 280px));
+}
+@media (max-width: 640px) {
+    .epm-sv-arrow-nav { display: none !important; }
+}
+
+/* Desktop Story Circles Strip */
+.epm-story-strip.desktop-strip {
+    display: flex;
+    gap: 14px;
+    overflow-x: auto;
+    padding: 10px 14px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    margin-bottom: 12px;
+}
+.epm-story-strip.desktop-strip::-webkit-scrollbar { height: 4px; }
+.epm-story-strip.desktop-strip::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+
+/* Chronological Timeline CSS (Screenshot 5 & Institutional Requirements) */
+.epm-chron-timeline-wrap {
+    position: relative;
+    width: 100%;
+}
+.epm-chron-header-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+    margin-bottom: 8px;
+    gap: 12px;
+}
+.epm-chron-title {
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    color: #0F172A;
+    white-space: nowrap;
+}
+.epm-chron-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+.epm-chron-date-banner {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #64748B;
+    white-space: nowrap;
+}
+.epm-chron-search {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #F8FAFC;
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
+    padding: 4px 8px;
+}
+.epm-chron-search input {
+    border: none;
+    background: transparent;
+    outline: none;
+    font-size: 11.5px;
+    color: #0F172A;
+    width: 100px;
+}
+.epm-chron-pills {
+    display: flex;
+    gap: 4px;
+}
+.epm-chron-pill {
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 10.5px;
+    font-weight: 700;
+    border: 1px solid #CBD5E1;
+    background: #FFFFFF;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.epm-chron-pill.active {
+    background: #0F172A;
+    color: #FFFFFF;
+    border-color: #0F172A;
+}
+
+.epm-stream-divider {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: 0.6px;
+    margin: 10px 0 8px 0;
+    padding: 2px 4px;
+}
+.epm-stream-divider.inst-stream {
+    color: #991B1B;
+}
+.epm-stream-divider.inst-stream .line {
+    flex: 1;
+    height: 1.5px;
+    background: #EF4444;
+}
+.epm-stream-divider.broad-stream {
+    color: #64748B;
+    justify-content: center;
+}
+.epm-stream-divider.broad-stream .line {
+    flex: 1;
+    height: 1px;
+    background: #CBD5E1;
+}
+
+/* Continuous Timeline Feed */
+.epm-chron-feed {
+    position: relative;
+    padding-left: 200px;
+}
+.epm-chron-feed::before {
+    content: '';
+    position: absolute;
+    top: 15px;
+    bottom: 15px;
+    left: 88px;
+    width: 2px;
+    background: #CBD5E1;
+    z-index: 1;
+}
+
+.epm-chron-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 10px 14px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    margin-bottom: 7px;
+    transition: all 0.15s ease;
+    cursor: pointer;
+}
+.epm-chron-row:hover {
+    box-shadow: 0 3px 10px rgba(0,0,0,0.04);
+    border-color: #CBD5E1;
+}
+.epm-chron-row.is-institutional {
+    background: #EEF2FF !important;
+    border-left: 4px solid #4F46E5 !important;
+    border-color: #C7D2FE;
+}
+
+.epm-chron-left-rail {
+    position: absolute;
+    left: -200px;
+    top: 0;
+    bottom: 0;
+    width: 190px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.epm-chron-time {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: #64748B;
+    width: 78px;
+    text-align: right;
+    white-space: nowrap;
+}
+.epm-chron-dot {
+    position: relative;
+    z-index: 2;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #F43F5E;
+    border: 2px solid #FFFFFF;
+    box-shadow: 0 0 0 1px #CBD5E1;
+    flex-shrink: 0;
+}
+.epm-chron-dot.dot-inst {
+    background: #4F46E5;
+    box-shadow: 0 0 0 2px #C7D2FE;
+}
+.epm-chron-dot.dot-secondary {
+    background: #94A3B8;
+}
+.epm-chron-source-box {
+    display: flex;
+    flex-direction: column;
+    background: #F1F5F9;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    padding: 3px 6px;
+    min-width: 82px;
+}
+.epm-chron-source-name {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #0F172A;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+.epm-chron-source-type {
+    font-size: 9px;
+    color: #64748B;
+    white-space: nowrap;
+}
+
+.epm-chron-content {
+    flex: 1;
+    min-width: 0;
+}
+.epm-chron-headline {
+    font-size: 13px;
+    font-weight: 600;
+    color: #0F172A;
+    line-height: 1.4;
+    word-break: break-word;
+}
+.epm-chron-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+.epm-chron-analyze-btn {
+    padding: 5px 10px;
+    background: #FFFFFF;
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #334155;
+    cursor: pointer;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.15s ease;
+}
+.epm-chron-analyze-btn:hover {
+    background: #F8FAFC;
+    border-color: #94A3B8;
+}
+.epm-chron-sent {
+    font-size: 9.5px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    padding: 4px 7px;
+    border-radius: 4px;
+    text-align: center;
+    min-width: 60px;
+}
+.epm-chron-sent.sent-bullish { background: #DCFCE7; color: #16A34A; }
+.epm-chron-sent.sent-bearish { background: #FEE2E2; color: #DC2626; }
+.epm-chron-sent.sent-neutral { background: #F1F5F9; color: #64748B; }
+
+/* Calendar Strictly 2-Row Header (Screenshot 4) */
+.epm-cal-2row-hdr {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 16px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    margin-bottom: 12px;
+}
+.epm-cal-2row-r1 {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+.epm-cal-2row-r2 {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+.epm-cal-select-filter {
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid #CBD5E1;
+    background: #FFFFFF;
+    font-size: 12px;
+    font-weight: 700;
+    color: #0F172A;
+    outline: none;
+    cursor: pointer;
+}
+.epm-cal-select-filter:focus {
+    border-color: #0052FF;
+}
+
+@media (max-width: 768px) {
+    .epm-chron-feed { padding-left: 0 !important; }
+    .epm-chron-feed::before { display: none !important; }
+    .epm-chron-left-rail {
+        position: static !important;
+        width: 100% !important;
+        margin-bottom: 6px !important;
+        justify-content: flex-start !important;
+    }
+    .epm-chron-row {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 6px !important;
+    }
+    .epm-chron-actions {
+        width: 100% !important;
+        justify-content: space-between !important;
+    }
+    .epm-cal-2row-r1, .epm-cal-2row-r2 {
+        flex-direction: column !important;
+        align-items: stretch !important;
+    }
+}
+
 """
 
 
@@ -7230,7 +7855,7 @@ TERMINAL_CLIENT_JS = r"""
         if (!wasOpen) el.classList.add('is-open');
     };
 
-    // 13c. Swipeable full-screen story viewer (in-app preview of the Instagram story sequence)
+    // 13c. Swipeable full-screen & desktop modal story viewer (Instagram web style)
     const EPM_STORY_MS = 6000;
     let epmStory = { items: [], idx: 0, timer: null, kind: 'news' };
 
@@ -7241,21 +7866,44 @@ TERMINAL_CLIENT_JS = r"""
         v.id = 'epm-story-viewer';
         v.className = 'epm-story-viewer';
         v.innerHTML = `
+          <button type="button" class="epm-sv-arrow-nav prev" id="epm-sv-prev-btn" title="Previous Story (Left Arrow)">‹</button>
           <div class="epm-sv-frame" id="epm-sv-frame">
             <div class="epm-sv-progress" id="epm-sv-progress"></div>
-            <div class="epm-sv-top"><span class="epm-sv-brand">EPM<b>PRO</b></span>
-              <button type="button" class="epm-sv-close" aria-label="Close story">✕</button></div>
+            <div class="epm-sv-top">
+              <div class="epm-sv-author-meta">
+                <img src="/api/logo" class="epm-sv-avatar" alt="GNC" />
+                <span class="epm-sv-brand">GNC</span>
+                <span class="epm-sv-time" id="epm-sv-top-time">Live Feed</span>
+              </div>
+              <button type="button" class="epm-sv-close" aria-label="Close story">✕</button>
+            </div>
             <div class="epm-sv-tap left"></div><div class="epm-sv-tap right"></div>
             <div class="epm-sv-content" id="epm-sv-content"></div>
-            <div class="epm-sv-foot"><span id="epm-sv-src"></span>
-              <a id="epm-sv-dl" href="#" target="_blank" rel="noopener">⬇ Story PNG</a></div>
-          </div>`;
+            <div class="epm-sv-foot">
+              <div class="epm-sv-actions-row">
+                <a id="epm-sv-doc-link" href="#" target="_blank" rel="noopener" class="epm-sv-btn epm-sv-btn-doc">📥 View Document ↗</a>
+                <button type="button" id="epm-sv-tg-btn" class="epm-sv-btn epm-sv-btn-tg" onclick="window.epmDispatchCurrentStoryToTelegram()">✈️ Forward Story to Telegram</button>
+                <a id="epm-sv-dl" href="#" target="_blank" rel="noopener" class="epm-sv-btn epm-sv-btn-png">⬇ Save PNG</a>
+              </div>
+            </div>
+          </div>
+          <button type="button" class="epm-sv-arrow-nav next" id="epm-sv-next-btn" title="Next Story (Right Arrow)">›</button>`;
         document.body.appendChild(v);
         v.querySelector('.epm-sv-close').addEventListener('click', window.epmCloseStory);
         v.addEventListener('click', e => { if (e.target === v) window.epmCloseStory(); });
+        v.querySelector('#epm-sv-prev-btn').addEventListener('click', e => { e.stopPropagation(); epmStoryGo(epmStory.idx - 1); });
+        v.querySelector('#epm-sv-next-btn').addEventListener('click', e => { e.stopPropagation(); epmStoryGo(epmStory.idx + 1); });
         v.querySelector('.epm-sv-tap.left').addEventListener('click', () => epmStoryGo(epmStory.idx - 1));
         v.querySelector('.epm-sv-tap.right').addEventListener('click', () => epmStoryGo(epmStory.idx + 1));
+        
         const frame = v.querySelector('#epm-sv-frame');
+        // Pause timer on mouse hover for desktop reading (Instagram web behavior)
+        frame.addEventListener('mouseenter', () => clearTimeout(epmStory.timer));
+        frame.addEventListener('mouseleave', () => {
+            clearTimeout(epmStory.timer);
+            epmStory.timer = setTimeout(() => epmStoryGo(epmStory.idx + 1), EPM_STORY_MS);
+        });
+
         let sx = 0, sy = 0;
         frame.addEventListener('touchstart', e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, { passive: true });
         frame.addEventListener('touchend', e => {
@@ -7286,17 +7934,37 @@ TERMINAL_CLIENT_JS = r"""
         frame.className = 'epm-sv-frame tone-' + sk;
         document.getElementById('epm-sv-progress').innerHTML = epmStory.items.map((_, k) =>
             `<span class="epm-sv-seg ${k < i ? 'done' : (k === i ? 'active' : '')}"><i style="animation-duration:${EPM_STORY_MS}ms"></i></span>`).join('');
-        const bullets = (it.bullets || []).filter(Boolean).map(b => `<li>${epmEsc(b)}</li>`).join('');
+        
+        const bullets = (it.bullets || []).filter(Boolean).slice(0, 4).map(b => `<li>${epmEsc(b)}</li>`).join('');
+        const takeawayHtml = it.takeaway ? `<div class="epm-sv-takeaway-box">💡 <b>Executive Takeaway:</b> ${epmEsc(it.takeaway)}</div>` : '';
+        const m1 = it.metric1 || (it.score ? it.score + '/10' : '8.5/10');
+        const m1_lbl = it.metric1_label || 'Impact Score';
+        const m2 = it.metric2 || '92%';
+        const m2_lbl = it.metric2_label || 'Conviction';
+
         document.getElementById('epm-sv-content').innerHTML = `
-            <span class="epm-sv-pill">● ${epmEsc(sk.charAt(0).toUpperCase() + sk.slice(1))}</span>
-            <div class="epm-sv-tag">${epmEsc(it.tag || '')}</div>
-            <div class="epm-sv-title">${epmEsc(it.title)}</div>
-            <div class="epm-sv-metrics">
-              <div><b>${epmEsc(it.metric1)}</b><span>${epmEsc(it.metric1_label)}</span></div>
-              <div><b>${epmEsc(it.metric2)}</b><span>${epmEsc(it.metric2_label)}</span></div>
+            <div class="epm-sv-badges-row">
+              <span class="epm-sv-pill">● ${epmEsc(sk.charAt(0).toUpperCase() + sk.slice(1))}</span>
+              <span class="epm-sv-tag">${epmEsc(it.tag || it.source || 'WIRE')}</span>
             </div>
-            <ul class="epm-sv-bullets"><li><b>Impact: ${epmEsc(it.impact)}</b></li>${bullets}</ul>`;
-        document.getElementById('epm-sv-src').textContent = [it.source, it.time].filter(Boolean).join(' · ');
+            <div class="epm-sv-title">${epmEsc(it.title)}</div>
+            <div class="epm-sv-score-pill">📊 Impact Rating: ${epmEsc(m1)} · ${epmEsc(it.impact || 'High')}</div>
+            <div class="epm-sv-metrics">
+              <div><b>${epmEsc(m1)}</b><span>${epmEsc(m1_lbl)}</span></div>
+              <div><b>${epmEsc(m2)}</b><span>${epmEsc(m2_lbl)}</span></div>
+            </div>
+            <ul class="epm-sv-bullets">${bullets}</ul>
+            ${takeawayHtml}`;
+        
+        const topTime = document.getElementById('epm-sv-top-time');
+        if (topTime) topTime.textContent = it.time ? `· ${it.time}` : '· Live Wire';
+
+        const docLink = document.getElementById('epm-sv-doc-link');
+        if (docLink) {
+            docLink.href = it.link || '#';
+            docLink.style.display = it.link ? 'inline-block' : 'none';
+        }
+
         document.getElementById('epm-sv-dl').href = `/api/story/${epmStory.kind}/${i}.png`;
         clearTimeout(epmStory.timer);
         epmStory.timer = setTimeout(() => epmStoryGo(epmStory.idx + 1), EPM_STORY_MS);
@@ -7314,6 +7982,37 @@ TERMINAL_CLIENT_JS = r"""
         v.classList.add('is-open');
         document.body.classList.add('epm-drawer-locked');
         epmStoryGo(Math.min(startIdx || 0, items.length - 1));
+    };
+
+    window.epmDispatchCurrentStoryToTelegram = function() {
+        if (!epmStory.items || !epmStory.items.length) return;
+        const it = epmStory.items[epmStory.idx];
+        const btn = document.getElementById('epm-sv-tg-btn');
+        if (btn) {
+            btn.textContent = '⏳ Dispatching...';
+            btn.disabled = true;
+        }
+        fetch('/api/telegram/dispatch-story', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(it)
+        }).then(r => r.json()).then(data => {
+            if (btn) {
+                btn.textContent = data.status === 'success' ? '✅ Dispatched to Telegram!' : '❌ Dispatch Failed';
+                setTimeout(() => {
+                    btn.textContent = '✈️ Forward Story to Telegram';
+                    btn.disabled = false;
+                }, 3000);
+            }
+        }).catch(err => {
+            if (btn) {
+                btn.textContent = '❌ Network Error';
+                setTimeout(() => {
+                    btn.textContent = '✈️ Forward Story to Telegram';
+                    btn.disabled = false;
+                }, 3000);
+            }
+        });
     };
 
     window.epmFilterCircCards = function(reg, btn) {
@@ -7337,6 +8036,7 @@ TERMINAL_CLIENT_JS = r"""
         if (v) v.classList.remove('is-open');
         document.body.classList.remove('epm-drawer-locked');
     };
+
 
     // 14. Inshorts-Style Mobile Page View Drawer (Bottom Sheet) Controller
     window.epmOpenInshortsDrawer = function(data) {
@@ -7690,7 +8390,7 @@ TERMINAL_CLIENT_JS = r"""
             newsCol.style.setProperty('flex', '1 1 63%', 'important');
         }
 
-        document.querySelectorAll('#epm-desk-terminal-layout .epm-dn-card').forEach((c) => {
+        document.querySelectorAll('#epm-desk-terminal-layout .epm-chron-row, #epm-desk-terminal-layout .epm-dn-card').forEach((c) => {
             const cIdx = parseInt(c.getAttribute('data-idx'));
             if (cIdx === idx) c.classList.add('is-active');
             else c.classList.remove('is-active');
@@ -7744,10 +8444,62 @@ TERMINAL_CLIENT_JS = r"""
             newsCol.style.setProperty('max-width', '100%', 'important');
             newsCol.style.setProperty('flex', '1 1 100%', 'important');
         }
-        document.querySelectorAll('#epm-desk-terminal-layout .epm-dn-card').forEach(c => c.classList.remove('is-active'));
+        document.querySelectorAll('#epm-desk-terminal-layout .epm-chron-row, #epm-desk-terminal-layout .epm-dn-card').forEach(c => c.classList.remove('is-active'));
     };
     window.epmSelectDeskAi = window.epmOpenDeskNewsAi;
     window.epmResetDeskAi = window.epmCloseDeskNewsAi;
+
+    window.epmFilterChronNews = function(term) {
+        const q = (term || '').toLowerCase().trim();
+        document.querySelectorAll('#epm-chron-feed .epm-chron-row').forEach(row => {
+            const txt = row.textContent.toLowerCase();
+            row.style.display = (!q || txt.includes(q)) ? '' : 'none';
+        });
+    };
+
+    window.epmFilterNewsScope = function(scope, btn) {
+        document.querySelectorAll('.epm-chron-pill').forEach(b => b.classList.remove('active'));
+        if (btn) btn.classList.add('active');
+        document.querySelectorAll('#epm-chron-feed .epm-chron-row').forEach(row => {
+            const rowScope = row.getAttribute('data-scope') || 'broad';
+            if (scope === 'all') {
+                row.style.display = '';
+            } else if (scope === 'institutional') {
+                row.style.display = (rowScope === 'institutional' || row.classList.contains('is-institutional')) ? '' : 'none';
+            } else if (scope === 'broad') {
+                row.style.display = (rowScope === 'broad' && !row.classList.contains('is-institutional')) ? '' : 'none';
+            }
+        });
+    };
+
+    window.epmChangeCalPeriod = function(period) {
+        const rows = document.querySelectorAll('#epm-cal-cards-list .epm-chron-row');
+        rows.forEach(r => {
+            r.style.display = '';
+        });
+        const dd = document.querySelector('#cal_date_filter_dd select, #cal_date_filter_dd input');
+        if (dd) {
+            dd.value = period;
+            dd.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    };
+
+    window.epmChangeCalMarket = function(mkt) {
+        const rows = document.querySelectorAll('#epm-cal-cards-list .epm-chron-row');
+        rows.forEach(r => {
+            const rowMkt = (r.getAttribute('data-mkt') || '').toUpperCase();
+            if (mkt === 'ALL' || rowMkt === mkt.toUpperCase() || (mkt === 'NYSE' && (rowMkt === 'SEC' || rowMkt === 'FOMC'))) {
+                r.style.display = '';
+            } else {
+                r.style.display = 'none';
+            }
+        });
+        const dd = document.querySelector('#cal_reg_filter_dd select, #cal_reg_filter_dd input');
+        if (dd) {
+            dd.value = mkt;
+            dd.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    };
 
     window.epmFilterDeskNews = function(term) {
         const q = (term || '').toLowerCase().trim();
@@ -7755,6 +8507,7 @@ TERMINAL_CLIENT_JS = r"""
             const txt = c.textContent.toLowerCase();
             c.style.display = (!q || txt.includes(q)) ? '' : 'none';
         });
+    };
     };
 
     window.epmSetDeskRegion = function(region, btn) {
@@ -8214,7 +8967,7 @@ with gr.Blocks(
 
             with gr.Column(elem_id="sec_catalyst_ledger", elem_classes=["epm-modular-section"]):
                 with gr.Column(elem_id="calendar_dossier_wrap"):
-                    with gr.Row(elem_id="cal_table_header_strip", elem_classes=["epm-table-header-integrated", "epm-mobile-only"]):
+                    with gr.Row(elem_id="cal_table_header_strip", elem_classes=["epm-table-header-integrated", "epm-mobile-only"], visible=False):
                         with gr.Row(elem_classes=["epm-tbl-hdr-left"]):
                             gr.HTML("""
                             <div class="epm-tbl-hdr-title-group">
