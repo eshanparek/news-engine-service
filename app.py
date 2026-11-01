@@ -4,6 +4,9 @@ import html
 import re
 import sqlite3
 import json
+import threading
+import glob
+import logging
 from typing import Optional, List, Dict
 from datetime import datetime
 from fastapi import FastAPI, Query, BackgroundTasks, HTTPException, Body
@@ -13,6 +16,8 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 import asyncio
 import gradio as gr
+
+logger = logging.getLogger("news_terminal")
 
 load_dotenv()
 
@@ -812,16 +817,10 @@ def render_news_feed_html(items: List[Dict]) -> str:
         cards_html.append(card)
 
     cards_joined = "".join(cards_html)
-    json_safe = json.dumps(processed).replace("</script>", "<\\/script>")
+    json_attr = html.escape(json.dumps(processed), quote=True)
 
     return f'''
-    <div class="epm-desk-layout">
-        <!-- Script embedding for instant instantaneous interaction -->
-        <script>
-            window.epmDesktopNews = {json_safe};
-            window.epmActiveDeskIdx = 0;
-        </script>
-
+    <div class="epm-desk-layout" id="epm-desk-terminal-layout" data-desktop-news="{json_attr}">
         <!-- Column 1: Live Breaking News Feed -->
         <div class="epm-desk-news-col">
             <div class="epm-dn-head">
@@ -6197,6 +6196,14 @@ TERMINAL_CLIENT_JS = r"""
 
     // 14. Desktop 3-Column Institutional Terminal Controllers (Screenshot 3 Theme)
     window.epmSelectDeskAi = function(idx) {
+        if (!window.epmDesktopNews || !window.epmDesktopNews[idx]) {
+            const layoutEl = document.getElementById('epm-desk-terminal-layout');
+            if (layoutEl && layoutEl.getAttribute('data-desktop-news')) {
+                try {
+                    window.epmDesktopNews = JSON.parse(layoutEl.getAttribute('data-desktop-news'));
+                } catch(e) {}
+            }
+        }
         if (!window.epmDesktopNews || !window.epmDesktopNews[idx]) return;
         window.epmActiveDeskIdx = idx;
         const it = window.epmDesktopNews[idx];
