@@ -703,7 +703,7 @@ def render_mobile_news_feed_html(pool: List[Dict]) -> str:
         link = html.escape(it.get("link", "#") or "#", quote=True)
         story_btn = f'<button type="button" class="epm-pc-story-btn" onclick="event.stopPropagation();window.epmOpenStory(\'news\',{i})">▶ Story</button>' if i < len(stories) else ""
         rows.append(f"""
-        <div class="epm-pc-card sent-{sk}" onclick="window.epmToggleProgressive(this)">
+        <div class="epm-pc-card tone-{sk}" onclick="window.epmToggleProgressive(this)">
             <div class="epm-pc-head">
                 <div class="epm-pc-head-text">
                     <div class="epm-pc-title">{title}</div>
@@ -730,7 +730,7 @@ def render_mobile_news_feed_html(pool: List[Dict]) -> str:
         rows.append('<div class="epm-empty-state"><div class="epm-empty-title">Connecting to live wire…</div></div>')
 
     bubbles = "".join(
-        f'<button type="button" class="epm-story-bubble sent-{_sent_key(s["sentiment"])}" onclick="window.epmOpenStory(\'news\',{i})">'
+        f'<button type="button" class="epm-story-bubble tone-{_sent_key(s["sentiment"])}" onclick="window.epmOpenStory(\'news\',{i})">'
         f'<span class="epm-story-ring"><span class="epm-story-inner">{html.escape(str(s["metric1"]))}</span></span>'
         f'<span class="epm-story-label">{html.escape(s["title"][:14])}</span></button>'
         for i, s in enumerate(stories)
@@ -749,7 +749,7 @@ def render_calendar_timeline_html(events: List[Dict]) -> str:
         return '<div class="epm-empty-state"><div class="epm-empty-title">No scheduled catalysts for this filter</div></div>'
     now = now_ist()
     now_key = now.strftime("%Y-%m-%d %H:%M")
-    evs = sorted(events, key=lambda e: (str(e.get("date", "")), str(e.get("time", "") or "99:99")))[:150]
+    evs = sorted(events, key=lambda e: (str(e.get("date", "")), calendar_pdf_engine._format_event_time(e) or "99:99"))[:150]
     stories = build_story_items("calendar", 8)
     parts, cur_date, now_inserted = [], None, False
     for ev in evs:
@@ -784,15 +784,15 @@ def render_calendar_timeline_html(events: List[Dict]) -> str:
         parts.append(f"""
         <div class="epm-tl-row {past}">
             <div class="epm-tl-time">{html.escape(t_short)}</div>
-            <div class="epm-tl-rail"><span class="epm-tl-dot sent-{sk}"></span></div>
-            <div class="epm-tl-card sent-{sk}" onclick="window.epmToggleProgressive(this)">
+            <div class="epm-tl-rail"><span class="epm-tl-dot tone-{sk}"></span></div>
+            <div class="epm-tl-card tone-{sk}" onclick="window.epmToggleProgressive(this)">
                 <div class="epm-tl-card-top">
                     <span class="epm-tl-country">{flag} {html.escape(country.title())}</span>
                     <span class="epm-tl-reg">{html.escape(reg)}</span>
                 </div>
                 <div class="epm-tl-name">{html.escape(name)}</div>
                 <div class="epm-tl-badges">
-                    <span class="epm-tl-sent sent-{sk}">● {html.escape(sent_text.title())}</span>
+                    <span class="epm-tl-sent tone-{sk}">● {html.escape(sent_text.title())}</span>
                     <span class="epm-signal-pips tier-{stars}">{pips}</span>
                 </div>
                 <div class="epm-pc-body">
@@ -3653,6 +3653,30 @@ tbody tr:hover td {
 }
 
 /* ═══ Mobile Progressive Cards, Timeline & Story Viewer (white theme) ═══ */
+/* Never cover live-refreshing HTML feeds with Gradio's loading overlay */
+#mobile_news_feed > .wrap, #mobile_news_feed [data-testid="status-tracker"],
+#calendar_visual_feed > .wrap, #calendar_visual_feed [data-testid="status-tracker"],
+#news_visual_feed > .wrap, #news_visual_feed [data-testid="status-tracker"] { display: none !important; }
+#mobile_news_feed.pending, #calendar_visual_feed.pending, #news_visual_feed.pending,
+#mobile_news_feed .pending, #calendar_visual_feed .pending { opacity: 1 !important; }
+
+/* Layout hardening against global Gradio/prose rules */
+.epm-mobile-timeline, .epm-mobile-feed { display: block !important; width: 100% !important; max-width: 100% !important; overflow-x: hidden !important; box-sizing: border-box !important; }
+.epm-tl-row { display: grid !important; grid-template-columns: 50px 18px minmax(0, 1fr) !important; width: 100% !important; }
+.epm-tl-card { display: block !important; min-width: 0 !important; box-sizing: border-box !important; }
+.epm-tl-card-top, .epm-tl-badges, .epm-tl-header, .epm-pc-head, .epm-pc-actions { display: flex !important; flex-direction: row !important; }
+.epm-tl-name, .epm-pc-title { display: -webkit-box !important; }
+.epm-tl-date { display: block !important; }
+.epm-tl-now { display: grid !important; }
+.epm-pc-card { display: block !important; box-sizing: border-box !important; }
+.epm-pc-list { display: flex !important; flex-direction: column !important; }
+.epm-pc-metrics { display: grid !important; }
+.epm-story-bubble { display: flex !important; flex-direction: column !important; background: transparent !important; border: none !important; box-shadow: none !important; min-width: 64px !important; }
+.epm-story-ring { display: flex !important; width: 58px !important; height: 58px !important; border-radius: 50% !important; padding: 2.5px !important; box-sizing: border-box !important; }
+.epm-story-inner { display: flex !important; border-radius: 50% !important; background: #FFFFFF !important; }
+.epm-sv-progress { display: flex !important; }
+.epm-sv-top { display: flex !important; justify-content: space-between !important; }
+
 .epm-mobile-feed, .epm-mobile-timeline { font-family: var(--font-sans, Inter, system-ui, sans-serif) !important; color: #0F172A; }
 .epm-pc-section-title { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #0F172A; margin: 4px 2px 8px; }
 .epm-live-pill { font-size: 9px; font-weight: 800; padding: 1px 6px; border-radius: 999px; background: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; }
@@ -3662,8 +3686,8 @@ tbody tr:hover td {
 .epm-story-strip::-webkit-scrollbar { display: none; }
 .epm-story-bubble { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 4px; background: none; border: none; padding: 0; cursor: pointer; width: 64px; }
 .epm-story-ring { width: 58px; height: 58px; border-radius: 50%; padding: 2.5px; background: conic-gradient(#0052FF, #10B981, #F43F5E, #0052FF); display: flex; }
-.epm-story-bubble.sent-bullish .epm-story-ring { background: conic-gradient(#10B981, #34D399, #059669, #10B981); }
-.epm-story-bubble.sent-bearish .epm-story-ring { background: conic-gradient(#F43F5E, #FB7185, #BE123C, #F43F5E); }
+.epm-story-bubble.tone-bullish .epm-story-ring { background: conic-gradient(#10B981, #34D399, #059669, #10B981); }
+.epm-story-bubble.tone-bearish .epm-story-ring { background: conic-gradient(#F43F5E, #FB7185, #BE123C, #F43F5E); }
 .epm-story-inner { flex: 1; border-radius: 50%; background: #FFFFFF; border: 2px solid #FFFFFF; display: flex; align-items: center; justify-content: center; font: 700 11px var(--font-mono, monospace); color: #0F172A; }
 .epm-story-label { font-size: 10px; color: #475569; max-width: 64px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
@@ -3676,15 +3700,15 @@ tbody tr:hover td {
 .epm-pc-title { font-size: 13.5px; font-weight: 700; line-height: 1.35; color: #0F172A; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .epm-pc-meta { margin-top: 4px; font: 500 10.5px var(--font-mono, monospace); color: #64748B; display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .epm-pc-dot { width: 7px; height: 7px; border-radius: 50%; background: #94A3B8; flex: 0 0 auto; }
-.sent-bullish .epm-pc-dot { background: #10B981; }
-.sent-bearish .epm-pc-dot { background: #F43F5E; }
+.tone-bullish .epm-pc-dot { background: #10B981; }
+.tone-bearish .epm-pc-dot { background: #F43F5E; }
 .epm-pc-chev { color: #94A3B8; font-size: 16px; line-height: 1; transition: transform .2s ease; }
 .epm-pc-body { display: block; max-height: 0; overflow: hidden; opacity: 0; transition: max-height .28s ease, opacity .2s ease, margin .2s ease; }
 .is-open > .epm-pc-body, .is-open .epm-pc-body { max-height: 520px; opacity: 1; margin-top: 10px; }
 .epm-pc-card.is-open .epm-pc-chev { transform: rotate(180deg); }
-.epm-pc-card.is-open.sent-bullish, .epm-tl-card.is-open.sent-bullish { background: linear-gradient(160deg, #ECFDF5 0%, #FFFFFF 60%); border-color: #A7F3D0; }
-.epm-pc-card.is-open.sent-bearish, .epm-tl-card.is-open.sent-bearish { background: linear-gradient(160deg, #FFF1F2 0%, #FFFFFF 60%); border-color: #FECDD3; }
-.epm-pc-card.is-open.sent-neutral, .epm-tl-card.is-open.sent-neutral { background: linear-gradient(160deg, #F1F5F9 0%, #FFFFFF 60%); }
+.epm-pc-card.is-open.tone-bullish, .epm-tl-card.is-open.tone-bullish { background: linear-gradient(160deg, #ECFDF5 0%, #FFFFFF 60%); border-color: #A7F3D0; }
+.epm-pc-card.is-open.tone-bearish, .epm-tl-card.is-open.tone-bearish { background: linear-gradient(160deg, #FFF1F2 0%, #FFFFFF 60%); border-color: #FECDD3; }
+.epm-pc-card.is-open.tone-neutral, .epm-tl-card.is-open.tone-neutral { background: linear-gradient(160deg, #F1F5F9 0%, #FFFFFF 60%); }
 .epm-pc-metrics { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid #E2E8F0; border-bottom: 1px solid #E2E8F0; }
 .epm-pc-metrics > div { padding: 8px 4px; display: flex; flex-direction: column; gap: 2px; }
 .epm-pc-metrics > div + div { border-left: 1px solid #E2E8F0; padding-left: 10px; }
@@ -3695,8 +3719,8 @@ tbody tr:hover td {
 .epm-pc-tag { font-size: 9.5px; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: #F1F5F9; color: #475569; }
 .epm-pc-actions { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
 .epm-pc-sent { font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 999px; background: #F1F5F9; color: #334155; }
-.sent-bullish .epm-pc-sent { background: rgba(16,185,129,.12); color: #047857; }
-.sent-bearish .epm-pc-sent { background: rgba(244,63,94,.12); color: #BE123C; }
+.tone-bullish .epm-pc-sent { background: rgba(16,185,129,.12); color: #047857; }
+.tone-bearish .epm-pc-sent { background: rgba(244,63,94,.12); color: #BE123C; }
 .epm-pc-story-btn { margin-left: auto; font-size: 11px; font-weight: 700; padding: 5px 10px; border-radius: 999px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #0F172A; cursor: pointer; }
 .epm-pc-link { font-size: 11px; font-weight: 700; color: #0052FF !important; text-decoration: none !important; }
 
@@ -3709,8 +3733,8 @@ tbody tr:hover td {
 .epm-tl-rail { position: relative; align-self: stretch; }
 .epm-tl-rail::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; transform: translateX(-50%); background: #E2E8F0; }
 .epm-tl-dot { position: absolute; left: 50%; top: 16px; width: 11px; height: 11px; border-radius: 50%; transform: translateX(-50%); background: #94A3B8; box-shadow: 0 0 0 3px #FFFFFF; }
-.epm-tl-dot.sent-bullish { background: #10B981; }
-.epm-tl-dot.sent-bearish { background: #F43F5E; }
+.epm-tl-dot.tone-bullish { background: #10B981; }
+.epm-tl-dot.tone-bearish { background: #F43F5E; }
 .epm-tl-card { margin: 4px 0 8px 4px; padding: 10px 11px; }
 .epm-tl-row.is-past .epm-tl-card { opacity: .78; }
 .epm-tl-row.is-past .epm-tl-time { color: #64748B; background: #F8FAFC; }
@@ -3721,8 +3745,8 @@ tbody tr:hover td {
 .epm-tl-card.is-open .epm-tl-name { -webkit-line-clamp: unset; }
 .epm-tl-badges { display: flex; align-items: center; justify-content: space-between; }
 .epm-tl-sent { font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 999px; background: #F1F5F9; color: #334155; }
-.epm-tl-sent.sent-bullish { background: rgba(16,185,129,.12); color: #047857; }
-.epm-tl-sent.sent-bearish { background: rgba(244,63,94,.12); color: #BE123C; }
+.epm-tl-sent.tone-bullish { background: rgba(16,185,129,.12); color: #047857; }
+.epm-tl-sent.tone-bearish { background: rgba(244,63,94,.12); color: #BE123C; }
 .epm-tl-now { display: grid; grid-template-columns: 50px 1fr; align-items: center; margin: 6px 0; }
 .epm-tl-now span { grid-column: 2; display: flex; align-items: center; gap: 8px; font: 800 10px var(--font-mono, monospace); color: #F43F5E; letter-spacing: .05em; }
 .epm-tl-now span::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: #F43F5E; box-shadow: 0 0 0 4px rgba(244,63,94,.18); animation: epmPulse 1.6s infinite; }
@@ -3734,9 +3758,9 @@ tbody tr:hover td {
 .epm-story-viewer.is-open { display: flex; }
 .epm-sv-frame { position: relative; width: min(100vw, 430px); height: min(100dvh, 860px); background: #FFFFFF; overflow: hidden; display: flex; flex-direction: column; touch-action: pan-y; user-select: none; }
 @media (min-width: 480px) { .epm-sv-frame { border-radius: 18px; box-shadow: 0 30px 80px rgba(15,23,42,.35); } }
-.epm-sv-frame.sent-bullish { background: linear-gradient(180deg, #D1FAE5 0%, #FFFFFF 58%); }
-.epm-sv-frame.sent-bearish { background: linear-gradient(180deg, #FFE4E6 0%, #FFFFFF 58%); }
-.epm-sv-frame.sent-neutral { background: linear-gradient(180deg, #E2E8F0 0%, #FFFFFF 58%); }
+.epm-sv-frame.tone-bullish { background: linear-gradient(180deg, #D1FAE5 0%, #FFFFFF 58%); }
+.epm-sv-frame.tone-bearish { background: linear-gradient(180deg, #FFE4E6 0%, #FFFFFF 58%); }
+.epm-sv-frame.tone-neutral { background: linear-gradient(180deg, #E2E8F0 0%, #FFFFFF 58%); }
 .epm-sv-progress { display: flex; gap: 4px; padding: 12px 12px 0; }
 .epm-sv-seg { flex: 1; height: 3px; border-radius: 3px; background: rgba(15,23,42,.15); overflow: hidden; }
 .epm-sv-seg i { display: block; height: 100%; width: 0; background: #0F172A; }
@@ -3748,15 +3772,15 @@ tbody tr:hover td {
 .epm-sv-close { background: none; border: none; font-size: 22px; color: #0F172A; cursor: pointer; padding: 4px 8px; }
 .epm-sv-content { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 0 26px 20px; text-align: center; }
 .epm-sv-pill { align-self: center; font-size: 13px; font-weight: 800; padding: 5px 14px; border-radius: 999px; background: #F1F5F9; color: #334155; }
-.sent-bullish .epm-sv-pill { background: #DCFCE7; color: #047857; }
-.sent-bearish .epm-sv-pill { background: #FFE4E6; color: #BE123C; }
+.tone-bullish .epm-sv-pill { background: #DCFCE7; color: #047857; }
+.tone-bearish .epm-sv-pill { background: #FFE4E6; color: #BE123C; }
 .epm-sv-tag { margin-top: 12px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #64748B; }
 .epm-sv-title { margin: 8px 0 18px; font-size: 26px; line-height: 1.2; font-weight: 800; color: #0F172A; }
 .epm-sv-metrics { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #E2E8F0; border-bottom: 1px solid #E2E8F0; padding: 16px 0; }
 .epm-sv-metrics > div + div { border-left: 1px solid #E2E8F0; }
 .epm-sv-metrics b { display: block; font: 800 30px var(--font-mono, monospace); color: #0F172A; font-feature-settings: 'tnum'; word-break: break-word; }
-.sent-bullish .epm-sv-metrics > div + div b { color: #059669; }
-.sent-bearish .epm-sv-metrics > div + div b { color: #E11D48; }
+.tone-bullish .epm-sv-metrics > div + div b { color: #059669; }
+.tone-bearish .epm-sv-metrics > div + div b { color: #E11D48; }
 .epm-sv-metrics span { font-size: 11px; color: #64748B; }
 .epm-sv-bullets { text-align: left; margin-top: 16px; font-size: 14px; line-height: 1.5; color: #334155; }
 .epm-sv-bullets li { margin-bottom: 6px; }
@@ -4692,7 +4716,7 @@ TERMINAL_CLIENT_JS = r"""
         const s = String(it.sentiment || '').toUpperCase();
         const sk = s.includes('BULL') ? 'bullish' : (s.includes('BEAR') ? 'bearish' : 'neutral');
         const frame = document.getElementById('epm-sv-frame');
-        frame.className = 'epm-sv-frame sent-' + sk;
+        frame.className = 'epm-sv-frame tone-' + sk;
         document.getElementById('epm-sv-progress').innerHTML = epmStory.items.map((_, k) =>
             `<span class="epm-sv-seg ${k < i ? 'done' : (k === i ? 'active' : '')}"><i style="animation-duration:${EPM_STORY_MS}ms"></i></span>`).join('');
         const bullets = (it.bullets || []).filter(Boolean).map(b => `<li>${epmEsc(b)}</li>`).join('');
