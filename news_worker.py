@@ -343,14 +343,91 @@ DEFAULT_SOURCES = [
         "enabled": True,
         "forward_telegram": True,
         "forward_whatsapp": True
+    },
+
+    # Authoritative Institutional & Regulatory Trackers
+    {
+        "id": "sebi_regulatory_wire",
+        "name": "SEBI Regulatory Wire",
+        "category": "Indian Regulatory",
+        "type": "RSS / Scrape",
+        "url": "https://www.sebi.gov.in/sebirss.xml",
+        "fallback_scrape_url": "https://www.sebi.gov.in/sebiweb/home/HomeAction.do?doListing=yes&sid=1&smid=0&ssid=0",
+        "enabled": True,
+        "forward_telegram": True,
+        "forward_whatsapp": True
+    },
+    {
+        "id": "rbi_monetary_wire",
+        "name": "RBI Monetary Policy & Press Wire",
+        "category": "Indian Central Bank",
+        "type": "RSS",
+        "url": "https://rbi.org.in/pressreleases_rss.xml",
+        "enabled": True,
+        "forward_telegram": True,
+        "forward_whatsapp": True
+    },
+    {
+        "id": "finmin_pib_wire",
+        "name": "Ministry of Finance & DEA (PIB)",
+        "category": "Indian Ministry",
+        "type": "RSS",
+        "url": "https://pib.gov.in/RssMain.aspx?ModId=6&Lang=1&Regid=3",
+        "enabled": True,
+        "forward_telegram": True,
+        "forward_whatsapp": True
+    },
+    {
+        "id": "sec_press_wire",
+        "name": "US SEC Regulatory & Enforcement Wire",
+        "category": "US Regulatory",
+        "type": "RSS",
+        "url": "https://www.sec.gov/news/pressreleases.rss",
+        "enabled": True,
+        "forward_telegram": True,
+        "forward_whatsapp": True
+    },
+    {
+        "id": "fed_fomc_wire",
+        "name": "Federal Reserve FOMC & Monetary Policy",
+        "category": "US Central Bank",
+        "type": "RSS",
+        "url": "https://www.federalreserve.gov/feeds/press_monetary.xml",
+        "enabled": True,
+        "forward_telegram": True,
+        "forward_whatsapp": True
+    },
+    {
+        "id": "cftc_surveillance_wire",
+        "name": "CFTC Commitments of Traders & Enforcement",
+        "category": "US Derivatives & Commodities",
+        "type": "RSS",
+        "url": "https://www.cftc.gov/PressRoom/PressReleases/rss.xml",
+        "enabled": True,
+        "forward_telegram": True,
+        "forward_whatsapp": True
+    },
+    {
+        "id": "eia_petroleum_wire",
+        "name": "US EIA Petroleum & Natural Gas Reports",
+        "category": "Commodities & Energy",
+        "type": "RSS",
+        "url": "https://www.eia.gov/rss/petroleum.xml",
+        "enabled": True,
+        "forward_telegram": True,
+        "forward_whatsapp": True
     }
 ]
 
 CORE_KEYWORDS = [
-    "NIFTY", "SENSEX", "BANKNIFTY", "RBI", "FED", "RATE HIKE", "RATE CUT",
-    "INFLATION", "CPI", "GDP", "CRUDE", "BRENT", "OPEC", "EARNINGS", "QUARTER",
+    "NIFTY", "SENSEX", "BANKNIFTY", "RBI", "FED", "FOMC", "RATE HIKE", "RATE CUT",
+    "INFLATION", "CPI", "PPI", "PCE", "GDP", "CRUDE", "BRENT", "WTI", "OPEC", "OPEC+",
+    "JMMC", "NATURAL GAS", "GOLD", "SILVER", "BULLION", "EARNINGS", "QUARTER",
     "Q1", "Q2", "Q3", "Q4", "PROFIT", "REVENUE", "ACQUISITION", "MERGER",
-    "IPO", "DIVIDEND", "BONUS", "BUYBACK", "SEBI", "US TREASURY", "YIELD",
+    "IPO", "DIVIDEND", "BONUS", "BUYBACK", "SEBI", "US TREASURY", "YIELD", "QRA",
+    "CFTC", "COT", "EIA", "NFP", "NON-FARM PAYROLLS", "DGFT", "MoPNG", "APM",
+    "ETHANOL", "MCA", "CME", "CBOE", "VIX", "0DTE", "DTCC", "IFSCA", "GIFT CITY",
+    "NDF", "ASM", "ESM", "PEAK MARGIN", "LOT SIZE", "WEEKLY EXPIRY", "BASEL",
     "RELIANCE", "TCS", "HDFC", "INFOSYS", "ICICI", "TATA", "ADANI", "SBI", "L&T"
 ]
 

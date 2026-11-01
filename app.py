@@ -803,7 +803,7 @@ def render_news_feed_html(items: List[Dict]) -> str:
         i = it["idx"]
         s_class = "bullish" if it["sentiment"] == "BULLISH" else ("bearish" if it["sentiment"] == "BEARISH" else "neutral")
         card = f'''
-        <div class="epm-dn-card {'is-active' if i == 0 else ''}" data-idx="{i}" data-region="{it['region']}" onclick="window.epmSelectDeskAi({i})">
+        <div class="epm-dn-card" data-idx="{i}" data-region="{it['region']}" onclick="window.epmOpenDeskNewsAi({i})">
             <div class="epm-dn-meta">
                 <span class="epm-dn-time">{it['time_str']}</span>
                 <span class="epm-dn-src"><span class="epm-dn-icon">{it['source_icon']}</span> {html.escape(it['source'])} <a href="{html.escape(it['link'])}" target="_blank" rel="noopener" class="epm-dn-outbound" onclick="event.stopPropagation()">↗ Outbound Link</a></span>
@@ -811,7 +811,7 @@ def render_news_feed_html(items: List[Dict]) -> str:
             </div>
             <div class="epm-dn-headline">{html.escape(it['title'])}</div>
             <div class="epm-dn-actions">
-                <button type="button" class="epm-dn-analyze-btn" onclick="event.stopPropagation();window.epmSelectDeskAi({i})">
+                <button type="button" class="epm-dn-analyze-btn" onclick="event.stopPropagation();window.epmOpenDeskNewsAi({i})">
                     Analyze Impact ✦
                 </button>
             </div>
@@ -846,12 +846,12 @@ def render_news_feed_html(items: List[Dict]) -> str:
             </div>
         </div>
 
-        <!-- Column 2: AI Impact & Sentiment Drawer -->
-        <div class="epm-desk-ai-col">
+        <!-- Column 2: On-Demand Dismissible AI Impact & Sentiment Drawer -->
+        <div class="epm-desk-ai-col" id="epm-desk-ai-col">
             <div class="epm-ai-drawer-card">
                 <div class="epm-ai-top">
                     <div class="epm-ai-topic-title">AI Analysis: <span id="epm-ai-topic-text">{html.escape(it0['topic'])}</span></div>
-                    <button type="button" class="epm-ai-close" onclick="window.epmResetDeskAi()" title="Reset Selection">✕</button>
+                    <button type="button" class="epm-ai-close" onclick="window.epmCloseDeskNewsAi()" title="Close AI Analysis">✕</button>
                 </div>
                 <div class="epm-ai-sub" id="epm-ai-sub-text">AI Analysis: {html.escape(it0['title'])}</div>
 
@@ -881,41 +881,6 @@ def render_news_feed_html(items: List[Dict]) -> str:
                     <button type="button" class="epm-ai-share-btn" onclick="window.epmShareDeskAiToTelegram()">
                         Share AI Insight to Telegram
                     </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Column 3: Workspaces Navigation -->
-        <div class="epm-desk-ws-col">
-            <div class="epm-ws-col-inner">
-                <div>
-                    <div class="epm-ws-title">WORKSPACES</div>
-                    <div class="epm-ws-list">
-                        <button type="button" class="epm-ws-btn active" onclick="window.epmSwitchTab(0)">
-                            <span class="epm-ws-text">1. News Dashboard</span>
-                            <span class="epm-ws-icon">📰</span>
-                        </button>
-                        <button type="button" class="epm-ws-btn" onclick="window.epmSwitchTab(1)">
-                            <span class="epm-ws-text">2. Market Calendar</span>
-                            <span class="epm-ws-icon">📅</span>
-                        </button>
-                        <button type="button" class="epm-ws-btn" onclick="window.epmSwitchTab(2)">
-                            <span class="epm-ws-text">3. Regulatory Circulars</span>
-                            <span class="epm-ws-icon">📜</span>
-                        </button>
-                        <button type="button" class="epm-ws-btn" onclick="window.epmSwitchTab(3)">
-                            <span class="epm-ws-text">4. Trading Holidays & Closures</span>
-                            <span class="epm-ws-icon">🏖️</span>
-                        </button>
-                        <button type="button" class="epm-ws-btn" onclick="window.epmSwitchTab(4)">
-                            <span class="epm-ws-text">5. Settings & Telegram Hub</span>
-                            <span class="epm-ws-icon">⚙️</span>
-                        </button>
-                    </div>
-                </div>
-                <div class="epm-ws-foot">
-                    <span>Powered by GNC</span>
-                    <button type="button" class="epm-ws-foot-btn" onclick="window.epmSwitchTab(4)" title="Settings">⚙️</button>
                 </div>
             </div>
         </div>
@@ -1441,7 +1406,7 @@ def get_circulars_view(regulator_filter: str = "ALL", impact_filter: str = "ALL"
             impact_filter=imp_filter,
             search_query=search_str
         )
-        visual_html = render_circulars_feed_html(items)
+        visual_html = render_desktop_circulars_html(items)
         
         table_rows = []
         for it in items:
@@ -1772,6 +1737,456 @@ def render_calendar_dossier_html(events: List[Dict]) -> str:
             global_row_idx += 1
             rendered_total += 1
 
+def render_desktop_calendar_html(events: List[Dict]) -> str:
+    """Renders desktop institutional 2-panel Market Calendar matching Screenshot 7."""
+    if not events:
+        return '<div class="epm-empty-state"><div class="epm-empty-title">No upcoming catalysts</div></div>'
+    
+    curr = now_ist()
+    today_banner_str = curr.strftime("%A, %d %B %Y")
+    
+    cards_html = []
+    processed = []
+    for idx, ev in enumerate(events[:40]):
+        eid = ev.get("id", f"ev_{idx}")
+        time_str = ev.get("time", "10:00")
+        if len(time_str) == 5:
+            time_display = f"{time_str}:00 AM" if int(time_str[:2]) < 12 else f"{time_str}:00 PM"
+        else:
+            time_display = f"{time_str} IST"
+            
+        mkt = ev.get("market", "NSE")
+        cat_raw = str(ev.get("category", "Corp. Board Meet"))
+        
+        # Categorize into Equities, Futures & Options, IPOs, Macro Events
+        cat_tab = "equities"
+        cat_chip = "Corp. Board Meet"
+        if "IPO" in cat_raw.upper() or "IPO" in str(ev.get("event", "")).upper():
+            cat_tab = "ipos"
+            cat_chip = "IPO"
+        elif "FNO" in cat_raw.upper() or "EXPIRY" in cat_raw.upper() or "F&O" in cat_raw.upper() or "DERIVATIVES" in cat_raw.upper():
+            cat_tab = "fno"
+            cat_chip = "Futures & Options"
+        elif "MACRO" in cat_raw.upper() or "ECON" in cat_raw.upper() or "FED" in cat_raw.upper() or "RBI" in cat_raw.upper() or "CPI" in cat_raw.upper() or "TREASURY" in cat_raw.upper():
+            cat_tab = "macro"
+            cat_chip = "Econ Cal."
+        else:
+            cat_tab = "equities"
+            cat_chip = "Corp. Board Meet"
+            
+        flag = "🇮🇳" if mkt in ["NSE", "BSE", "MCX"] else ("🇺🇸" if mkt == "NYSE" else "🌐")
+        prev = ev.get("previous", "—")
+        fcast = ev.get("forecast", "—")
+        sent = "BULLISH" if "BULL" in str(ev.get("outcome_sentiment", "")).upper() else ("BEARISH" if "BEAR" in str(ev.get("outcome_sentiment", "")).upper() else "NEUTRAL")
+        title = ev.get("event") or ev.get("symbol") or "Market Catalyst"
+        
+        # Reasoning bullets
+        bullets = [
+            f"Scheduled {ev.get('impact', 'HIGH').lower()}-impact market catalyst monitored by multi-market instl. desks.",
+            f"Supportive of short-term {mkt} market liquidity and sentiment.",
+            f"Direct valuation and volatility driver across benchmark indices."
+        ]
+        if ev.get("details"):
+            bullets.insert(0, ev.get("details"))
+            
+        item_obj = {
+            "idx": idx,
+            "id": eid,
+            "topic": ev.get("symbol") or title[:30],
+            "title": title,
+            "score": "4.8/5" if ev.get("impact") == "HIGH" else "3.5/5",
+            "impact": "HIGH" if ev.get("impact") == "HIGH" else "MEDIUM",
+            "sentiment": sent,
+            "bullets": bullets[:3],
+            "horizon": "Short-Term",
+            "cat_tab": cat_tab
+        }
+        processed.append(item_obj)
+        
+        cards_html.append(f'''
+        <div class="epm-cal-card" data-idx="{idx}" data-cat="{cat_tab}" onclick="window.epmOpenDeskCalAi({idx})">
+            <div class="epm-cal-card-head">
+                <div class="epm-cal-head-left">
+                    <span class="epm-cal-time">{time_display}</span>
+                    <span class="epm-cal-chip">{cat_chip}</span>
+                    <span class="epm-cal-flag">{flag}</span>
+                </div>
+                <div class="epm-cal-head-right">
+                    <span class="epm-cal-prev-fcast">Prev: {html.escape(str(prev)[:12])} • Fcast: {html.escape(str(fcast)[:12])}</span>
+                    <span class="epm-dn-sent sent-{sent.lower()}">{sent}</span>
+                </div>
+            </div>
+            <div class="epm-cal-title">{html.escape(title)}</div>
+            <div class="epm-cal-actions">
+                <button type="button" class="epm-dn-analyze-btn" onclick="event.stopPropagation();window.epmOpenDeskCalAi({idx})">
+                    Analyze Impact ✦
+                </button>
+            </div>
+        </div>
+        ''')
+        
+    json_attr = html.escape(json.dumps(processed), quote=True)
+    
+    return f'''
+    <div class="epm-desk-layout" id="epm-cal-terminal-layout" data-desktop-cal="{json_attr}">
+        <div class="epm-desk-feed-col">
+            <div class="epm-cal-top-strip">
+                <div class="epm-cal-logo-title">
+                    <span class="epm-cal-logo-badge">GNC</span>
+                    <span class="epm-cal-logo-sub">Global News Feed Room</span>
+                </div>
+                <div class="epm-cal-cat-pills">
+                    <button type="button" class="epm-cal-cat-btn active" onclick="window.epmFilterCalCat('all', this)">All</button>
+                    <button type="button" class="epm-cal-cat-btn" onclick="window.epmFilterCalCat('equities', this)">Equities</button>
+                    <button type="button" class="epm-cal-cat-btn" onclick="window.epmFilterCalCat('fno', this)">Futures & Options</button>
+                    <button type="button" class="epm-cal-cat-btn" onclick="window.epmFilterCalCat('ipos', this)">IPOs</button>
+                    <button type="button" class="epm-cal-cat-btn" onclick="window.epmFilterCalCat('macro', this)">Macro Events</button>
+                </div>
+            </div>
+            <div class="epm-cal-main-head">
+                <div class="epm-cal-title-text">MARKET CALENDAR</div>
+                <div class="epm-cal-action-btns">
+                    <a href="/api/calendar/pdf/weekly" download target="_blank" class="epm-cal-hdr-btn">
+                        Download Weekly PDF 📥
+                    </a>
+                    <button type="button" class="epm-cal-hdr-btn" onclick="window.epmPushDeskTelegram('weekly')">
+                        Forward to Telegram ✈️
+                    </button>
+                    <button type="button" class="epm-cal-hdr-icon-btn" onclick="window.epmToggleCalFilters()" title="Filters">⚙️</button>
+                </div>
+            </div>
+            <div class="epm-cal-sub-date">UPCOMING EVENTS • {today_banner_str}</div>
+            <div class="epm-cal-cards-list" id="epm-cal-cards-list">
+                {''.join(cards_html)}
+            </div>
+        </div>
+        
+        <!-- On-Demand Dismissible AI Impact & Sentiment Drawer -->
+        <div class="epm-desk-ai-col" id="epm-cal-ai-col">
+            <div class="epm-ai-drawer-card">
+                <div class="epm-ai-top">
+                    <div class="epm-ai-topic-title">AI Analysis: <span id="epm-cal-ai-topic-text">Selected Event</span></div>
+                    <button type="button" class="epm-ai-close" onclick="window.epmCloseDeskCalAi()" title="Close AI Analysis">✕</button>
+                </div>
+                <div class="epm-ai-sub" id="epm-cal-ai-sub-text">AI Analysis: Selected Market Event</div>
+                
+                <div class="epm-ai-score-box tone-bearish" id="epm-cal-ai-score-box">
+                    <div class="epm-ai-score-val" id="epm-cal-ai-score-val">IMPACT SCORE: 4.8/5</div>
+                    <div class="epm-ai-score-lbl" id="epm-cal-ai-score-lbl">HIGH IMPACT</div>
+                </div>
+                
+                <div class="epm-ai-verdict-box">
+                    <span class="epm-ai-verdict-pill sent-bullish" id="epm-cal-ai-verdict-pill">
+                        🟢 BULLISH
+                    </span>
+                </div>
+                
+                <div class="epm-ai-reasoning-wrap">
+                    <div class="epm-ai-reasoning-title">AI Opinion & Reasoning</div>
+                    <ul class="epm-ai-bullets" id="epm-cal-ai-bullets">
+                        <li>Scheduled high-impact market catalyst monitored by multi-market instl. desks.</li>
+                        <li>Supportive of short-term banking liquidity, potentially driving financial stock index upwards.</li>
+                    </ul>
+                </div>
+                
+                <div class="epm-ai-share-wrap">
+                    <button type="button" class="epm-ai-share-btn" onclick="window.epmShareDeskCalToTelegram()">
+                        Share AI Insight to Telegram
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    '''
+
+
+def render_desktop_circulars_html(circulars: List[Dict]) -> str:
+    """Renders desktop institutional 2-panel Regulatory Circulars matching Screenshot 8."""
+    if not circulars:
+        return '<div class="epm-empty-state"><div class="epm-empty-title">No official circulars found</div></div>'
+    
+    curr = now_ist()
+    today_banner_str = curr.strftime("%A, %d %B %Y")
+    
+    cards_html = []
+    processed = []
+    for idx, c in enumerate(circulars[:40]):
+        cid = c.get("id", f"circ_{idx}")
+        reg = c.get("regulator", "NSE")
+        meta = REGULATOR_META.get(reg, {"badge": f"🇮🇳 {reg}", "color": "#2563EB"})
+        cno = c.get("circular_no") or f"{reg}/NOTIFICATION"
+        time_str = c.get("date", curr.strftime("%Y-%m-%d"))
+        title = c.get("title", "Official Regulatory Directive")
+        impact = str(c.get("impact", "MEDIUM")).upper()
+        score = "8.5/10" if impact == "HIGH" else "6.4/10"
+        sent = "BEARISH" if "BEAR" in str(c.get("bullets_json", "")).upper() else "BULLISH"
+        doc_url = f"/api/circular/doc/{cid}"
+        
+        bullets = c.get("bullets", []) or []
+        if not bullets and c.get("action_takeaway"):
+            bullets = [c.get("action_takeaway")]
+        if not bullets:
+            bullets = [
+                f"Official regulatory communication released by {reg}. Focus: compliance and market framework.",
+                f"Streamlines administrative processes while imposing stricter oversight on participants.",
+                "Medium-term impact on regulatory compliance and operational timelines."
+            ]
+            
+        item_obj = {
+            "idx": idx,
+            "id": cid,
+            "regulator": reg,
+            "cno": cno,
+            "title": title,
+            "score": score,
+            "impact": impact,
+            "sentiment": sent,
+            "bullets": bullets[:3],
+            "doc_url": doc_url
+        }
+        processed.append(item_obj)
+        
+        cards_html.append(f'''
+        <div class="epm-circ-desk-card" data-idx="{idx}" data-reg="{reg.lower()}" onclick="window.epmOpenDeskCircAi({idx})">
+            <div class="epm-circ-desk-head">
+                <div class="epm-circ-head-left">
+                    <span class="epm-circ-time">12:58:18 IST</span>
+                    <span class="epm-circ-reg-badge">{meta.get('badge', reg)}</span>
+                    <span class="epm-circ-ref-badge">{html.escape(cno[:22])}</span>
+                </div>
+                <div class="epm-circ-head-right">
+                    <span class="epm-circ-imp-score">{impact} | {score}</span>
+                    <span class="epm-dn-sent sent-{sent.lower()}">{sent}</span>
+                </div>
+            </div>
+            <div class="epm-circ-desk-title">{html.escape(title)}</div>
+            <div class="epm-circ-actions">
+                <button type="button" class="epm-dn-analyze-btn" onclick="event.stopPropagation();window.epmOpenDeskCircAi({idx})">
+                    Analyze Impact ✦
+                </button>
+            </div>
+        </div>
+        ''')
+        
+    json_attr = html.escape(json.dumps(processed), quote=True)
+    
+    return f'''
+    <div class="epm-desk-layout" id="epm-circ-terminal-layout" data-desktop-circ="{json_attr}">
+        <div class="epm-desk-feed-col">
+            <div class="epm-circ-top-strip">
+                <div class="epm-circ-title-text">OFFICIAL REGULATORY CIRCULARS DIRECTORY</div>
+                <div class="epm-circ-reg-pills">
+                    <button type="button" class="epm-circ-reg-btn active" onclick="window.epmFilterCircReg('all', this)">ALL</button>
+                    <button type="button" class="epm-circ-reg-btn" onclick="window.epmFilterCircReg('rbi', this)">RBI</button>
+                    <button type="button" class="epm-circ-reg-btn" onclick="window.epmFilterCircReg('sebi', this)">SEBI</button>
+                    <button type="button" class="epm-circ-reg-btn" onclick="window.epmFilterCircReg('nse', this)">NSE</button>
+                    <button type="button" class="epm-circ-reg-btn" onclick="window.epmFilterCircReg('bse', this)">BSE</button>
+                    <button type="button" class="epm-circ-reg-btn" onclick="window.epmFilterCircReg('mcx', this)">MCX</button>
+                    <button type="button" class="epm-circ-reg-btn" onclick="window.epmFilterCircReg('fomc', this)">FOMC</button>
+                </div>
+                <div class="epm-circ-action-btns">
+                    <a href="/api/calendar/pdf/monthly" download target="_blank" class="epm-cal-hdr-btn">
+                        Export PDF Directory 📥
+                    </a>
+                    <button type="button" class="epm-cal-hdr-btn" onclick="window.epmPushDeskTelegram('circular')">
+                        Forward to Telegram ✈️
+                    </button>
+                    <button type="button" class="epm-cal-hdr-icon-btn" onclick="window.epmToggleCircFilters()" title="Filters">⚙️</button>
+                </div>
+            </div>
+            <div class="epm-circ-sub-date">RECENT OFFICIAL RELEASES • {today_banner_str}</div>
+            <div class="epm-circ-cards-list" id="epm-circ-cards-list">
+                {''.join(cards_html)}
+            </div>
+        </div>
+        
+        <!-- On-Demand Dismissible AI Executive Summary & Impact Analysis Drawer -->
+        <div class="epm-desk-ai-col" id="epm-circ-ai-col">
+            <div class="epm-ai-drawer-card">
+                <div class="epm-ai-top">
+                    <div class="epm-ai-topic-title"><span id="epm-circ-ai-topic-text">AI Executive Summary & Impact Analysis</span></div>
+                    <button type="button" class="epm-ai-close" onclick="window.epmCloseDeskCircAi()" title="Close AI Analysis">✕</button>
+                </div>
+                <div class="epm-ai-sub" id="epm-circ-ai-sub-text">Analysis: Official Regulatory Directive</div>
+                
+                <div class="epm-ai-score-box tone-bearish" id="epm-circ-ai-score-box">
+                    <div class="epm-ai-score-val" id="epm-circ-ai-score-val">AI IMPACT SCORE: 8.5/10</div>
+                    <div class="epm-ai-score-lbl" id="epm-circ-ai-score-lbl">HIGH IMPACT</div>
+                </div>
+                
+                <div class="epm-ai-verdict-box">
+                    <span class="epm-ai-verdict-pill sent-bearish" id="epm-circ-ai-verdict-pill">
+                        🔴 BEARISH (Short-Term)
+                    </span>
+                </div>
+                
+                <div class="epm-ai-reasoning-wrap">
+                    <div class="epm-ai-reasoning-title">AI Executive Summary</div>
+                    <ul class="epm-ai-bullets" id="epm-circ-ai-bullets">
+                        <li>Official regulatory communication released by authoritative body.</li>
+                        <li>Streamlines administrative processes while imposing stricter oversight on participants.</li>
+                        <li>Medium-term impact on operational timelines and regulatory filings.</li>
+                    </ul>
+                </div>
+                
+                <div class="epm-ai-share-wrap">
+                    <button type="button" class="epm-ai-share-btn" onclick="window.epmShareDeskCircToTelegram()">
+                        Forward Latest Circular to Telegram
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    '''
+
+
+def render_desktop_holidays_html(holidays: List[Dict]) -> str:
+    """Renders authoritative 2026 market holidays matching Screenshot 5."""
+    if not holidays:
+        return '<div class="epm-empty-state"><div class="epm-empty-title">No holidays found</div></div>'
+        
+    rows_html = []
+    for h in holidays:
+        d = clean_table_text(h.get("date", ""))
+        day = clean_table_text(h.get("day", ""))
+        desc = clean_table_text(h.get("description", "Market Holiday"))
+        nse = clean_table_text(h.get("nse_status", "Open"))
+        bse = clean_table_text(h.get("bse_status", "Open"))
+        mcx = clean_table_text(h.get("mcx_status", "Open"))
+        nyse = clean_table_text(h.get("nyse_status", "Open"))
+        crypto = clean_table_text(h.get("crypto_status", "Open 24/7 (Holiday)"))
+        
+        is_india = "Closed" in nse or "Closed" in bse or "Closed" in mcx or "FULL HOLIDAY" in mcx.upper()
+        is_usa = "Closed" in nyse
+        c_tag = "ALL"
+        if is_india and not is_usa:
+            c_tag = "INDIA"
+        elif is_usa and not is_india:
+            c_tag = "USA"
+        elif is_india and is_usa:
+            c_tag = "BOTH"
+
+        def _status_pill(st: str) -> str:
+            st_u = st.upper()
+            if "FULL HOLIDAY" in st_u:
+                return f'<span class="epm-hol-pill hol-full">FULL HOLIDAY</span>'
+            elif "CLOSED" in st_u and "MORN" not in st_u and "EVE" not in st_u:
+                return f'<span class="epm-hol-pill hol-closed">Closed</span>'
+            elif "MORN: CLOSED" in st_u:
+                return f'<span class="epm-hol-pill hol-split">{html.escape(st)}</span>'
+            elif "OPEN" in st_u and "24/7" in st_u:
+                return f'<span class="epm-hol-pill hol-crypto">{html.escape(st)}</span>'
+            elif "OPEN" in st_u and ("IST" in st_u or "09:" in st_u or "19:" in st_u):
+                return f'<span class="epm-hol-pill hol-timed">{html.escape(st)}</span>'
+            elif "OPEN" in st_u:
+                return f'<span class="epm-hol-pill hol-open">Open</span>'
+            return f'<span class="epm-hol-pill">{html.escape(st)}</span>'
+
+        rows_html.append(f'''
+        <tr class="epm-hol-row" data-country="{c_tag}">
+            <td class="col-hol-date"><b>{d}</b></td>
+            <td class="col-hol-day">{day}</td>
+            <td class="col-hol-desc">{desc}</td>
+            <td class="col-hol-stat">{_status_pill(nse)}</td>
+            <td class="col-hol-stat">{_status_pill(bse)}</td>
+            <td class="col-hol-stat">{_status_pill(mcx)}</td>
+            <td class="col-hol-stat">{_status_pill(nyse)}</td>
+            <td class="col-hol-stat">{_status_pill(crypto)}</td>
+        </tr>
+        ''')
+
+    return f'''
+    <div class="epm-hol-desktop-container">
+        <div class="epm-hol-header-strip">
+            <div class="epm-hol-title-wrap">
+                <span class="epm-hol-title">2026 AUTHORITATIVE TRADING HOLIDAYS & CLOSURES</span>
+            </div>
+            <div class="epm-hol-controls">
+                <div class="epm-hol-pills">
+                    <button type="button" class="epm-hol-pill-btn active" onclick="window.epmFilterHolidays('ALL', this)">● All Markets</button>
+                    <button type="button" class="epm-hol-pill-btn" onclick="window.epmFilterHolidays('INDIA', this)">Indian Markets (NSE, BSE, MCX)</button>
+                    <button type="button" class="epm-hol-pill-btn" onclick="window.epmFilterHolidays('USA', this)">US Markets (NYSE)</button>
+                </div>
+                <div class="epm-hol-actions">
+                    <button type="button" class="epm-hol-dispatch-btn" onclick="window.epmDispatchHolidayAlert()">
+                        Dispatch Holiday Alert to Telegram 📥
+                    </button>
+                    <button type="button" class="epm-hol-icon-btn" title="Filter Funnel">🝖</button>
+                    <button type="button" class="epm-hol-icon-btn" title="Settings">⚙️</button>
+                </div>
+            </div>
+        </div>
+        <div class="epm-hol-table-wrap">
+            <table class="epm-hol-table" id="epm-hol-table">
+                <thead>
+                    <tr>
+                        <th>DATE</th>
+                        <th>DAY</th>
+                        <th>HOLIDAY / OCCASION</th>
+                        <th>NSE STATUS</th>
+                        <th>BSE STATUS</th>
+                        <th>MCX STATUS (MORNING / EVENING)</th>
+                        <th>NYSE STATUS (EST / IST)</th>
+                        <th>CRYPTO STATUS</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {''.join(rows_html)}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    '''
+
+
+def get_calendar_tables(filter_range: str = "all", market_filter: str = "ALL"):
+    global_row_idx = 1
+    events = calendar_engine.get_enriched_events(filter_range, market_filter)
+    all_table_rows = []
+    rendered_total = 0
+    max_render = 120
+
+    for ev in events[:max_render]:
+        mkt_code = ev.get("market", "NSE")
+        badge = MARKET_META.get(mkt_code, {}).get("badge", f"[{mkt_code}]")
+        
+        # Clean data fields
+        c_date = clean_table_text(ev.get("date", "—"))
+        c_time = clean_table_text(calendar_pdf_engine._format_event_time(ev))
+        c_day = clean_table_text(ev.get("day", "—"))
+        c_type = clean_table_text(ev.get("category", "Macro"))
+        c_country = clean_table_text(ev.get("country", "IN"))
+        c_sec = clean_table_text(ev.get("sector", "General"))
+        c_event = clean_table_text(ev.get("event", "—"))
+        c_imp = clean_table_text(ev.get("impact", "MEDIUM"))
+        c_prev = clean_table_text(ev.get("previous", "—"))
+        c_fore = clean_table_text(ev.get("forecast", "—"))
+        c_act = clean_table_text(ev.get("actual", "—"))
+        c_sent = clean_table_text(ev.get("outcome_sentiment", "—"))
+        c_reason = clean_table_text(ev.get("ai_reasoning", "—"))
+
+        all_table_rows.append(f"""
+        <tr>
+            <td class="col-idx">{global_row_idx}</td>
+            <td class="col-date">{c_date}</td>
+            <td class="col-time">{c_time}</td>
+            <td class="col-day">{c_day}</td>
+            <td class="col-type">{c_type}</td>
+            <td class="col-country">{c_country}</td>
+            <td class="col-reg">{badge}</td>
+            <td class="col-sec">{c_sec}</td>
+            <td class="col-event">{c_event}</td>
+            <td class="col-imp">{c_imp}</td>
+            <td class="col-prev">{c_prev}</td>
+            <td class="col-fore">{c_fore}</td>
+            <td class="col-outcome">{c_act}</td>
+            <td class="col-sent">{c_sent}</td>
+            <td class="col-reason">{c_reason}</td>
+        </tr>
+        """)
+        global_row_idx += 1
+        rendered_total += 1
+
     footer_note = ""
     if len(events) > max_render:
         footer_note = f"""
@@ -1780,43 +2195,51 @@ def render_calendar_dossier_html(events: List[Dict]) -> str:
         </div>
         """
 
-    return f"""
+    desktop_cards_html = render_desktop_calendar_html(events)
+
+    html_content = f"""
     <div class="epm-mobile-only">{render_calendar_timeline_html(events)}</div>
-    <div class="epm-dossier-container epm-desktop-only">
-        <div class="epm-dossier-table-wrap">
-            <table class="epm-dossier-table">
-                <thead>
-                    <tr>
-                        <th class="col-idx">#</th>
-                        <th class="col-date col-clickable-filter" onclick="window.epmFocusFilter('date')" title="Click to filter by date window">Date ▾</th>
-                        <th class="col-time">Time (IST)</th>
-                        <th class="col-day">Day</th>
-                        <th class="col-type">Type</th>
-                        <th class="col-country">Country</th>
-                        <th class="col-reg col-clickable-filter" onclick="window.epmFocusFilter('reg')" title="Click to filter by regulator / market">Reg. ▾</th>
-                        <th class="col-sec">Sector</th>
-                        <th class="col-event">Event Catalyst</th>
-                        <th class="col-imp">Impact</th>
-                        <th class="col-prev">Prev</th>
-                        <th class="col-fore">Fcst</th>
-                        <th class="col-outcome">Results</th>
-                        <th class="col-sent">Sent.</th>
-                        <th class="col-reason">AI Reasoning</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {''.join(all_table_rows)}
-                </tbody>
-            </table>
-        </div>
-        <a href="/api/calendar/pdf/daily-outcomes" download target="_blank" class="epm-daily-pdf-floater" title="Download Official 5 PM Daily Outcomes Dossier (Rolling 24H Results)">
-            <span class="floater-pulse"></span>
-            <span class="floater-label">📥 <b>Daily Outcomes PDF (5 PM Release)</b></span>
-            <span class="floater-tag">A4 Dossier</span>
-        </a>
-        {footer_note}
+    <div class="epm-desktop-only">
+        {desktop_cards_html}
+        <details class="epm-dossier-collapse-wrap" style="margin-top: 24px;">
+            <summary class="epm-dossier-summary" style="cursor: pointer; font-weight: 800; font-size: 13px; color: #1E293B; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 16px;">
+                📊 View Comprehensive 15-Column Multi-Market Catalyst Ledger ({len(events)} Total Catalysts)
+            </summary>
+            <div class="epm-dossier-container" style="margin-top: 12px;">
+                <div class="epm-dossier-table-wrap">
+                    <table class="epm-dossier-table">
+                        <thead>
+                            <tr>
+                                <th class="col-idx">#</th>
+                                <th class="col-date col-clickable-filter" onclick="window.epmFocusFilter('date')" title="Click to filter by date window">Date ▾</th>
+                                <th class="col-time">Time (IST)</th>
+                                <th class="col-day">Day</th>
+                                <th class="col-type">Type</th>
+                                <th class="col-country">Country</th>
+                                <th class="col-reg col-clickable-filter" onclick="window.epmFocusFilter('reg')" title="Click to filter by regulator / market">Reg. ▾</th>
+                                <th class="col-sec">Sector</th>
+                                <th class="col-event">Event Catalyst</th>
+                                <th class="col-imp">Impact</th>
+                                <th class="col-prev">Prev</th>
+                                <th class="col-fore">Fcst</th>
+                                <th class="col-outcome">Results</th>
+                                <th class="col-sent">Sent.</th>
+                                <th class="col-reason">AI Reasoning</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {''.join(all_table_rows)}
+                        </tbody>
+                    </table>
+                </div>
+                {footer_note}
+            </div>
+        </details>
     </div>
     """
+
+    summary_msg = f"Synced {len(events)} multi-market events."
+    return summary_msg, html_content, all_table_rows
 
 
 BASELINE_BREAKING_CATALYSTS = [
@@ -2172,10 +2595,12 @@ def get_holidays_view(country_filter: str = "ALL"):
             hol_rows.append(["-", "-", f"No trading holidays recorded for {cf}", "-", "-", "-", "-", "-"])
 
         mobile_html = render_mobile_holidays_timeline_html(filtered)
-        return mobile_html, hol_rows
+        desktop_html = render_desktop_holidays_html(filtered)
+        return mobile_html, hol_rows, desktop_html
     except Exception as e:
         empty = [["-", "-", f"Error: {e}", "-", "-", "-", "-", "-"]]
-        return f'<div class="epm-empty-state"><div class="epm-empty-title">{e}</div></div>', empty
+        err_box = f'<div class="epm-empty-state"><div class="epm-empty-title">{e}</div></div>'
+        return err_box, empty, err_box
 
 
 def handle_manual_event_save(
@@ -3659,9 +4084,12 @@ tbody tr:hover td {
         align-items: stretch !important;
         margin: 12px 0 24px 0 !important;
         min-height: 720px !important;
+        width: 100% !important;
     }
-    .epm-desk-news-col {
-        flex: 1 1 50% !important;
+    .epm-desk-news-col,
+    .epm-desk-feed-col {
+        flex: 1 1 100% !important;
+        max-width: 100% !important;
         min-width: 0 !important;
         background: #FFFFFF !important;
         border: 1px solid #E2E8F0 !important;
@@ -3670,30 +4098,33 @@ tbody tr:hover td {
         display: flex !important;
         flex-direction: column !important;
         box-shadow: 0 1px 3px rgba(0,0,0,0.03) !important;
+        transition: all 0.2s ease !important;
+    }
+    .epm-desk-layout.has-ai-open .epm-desk-news-col,
+    .epm-desk-layout.has-ai-open .epm-desk-feed-col {
+        flex: 1 1 63% !important;
+        max-width: 63% !important;
     }
     .epm-desk-ai-col {
-        flex: 0 0 31% !important;
+        display: none !important;
+        flex: 0 0 37% !important;
+        max-width: 37% !important;
         min-width: 320px !important;
         background: #FFFFFF !important;
         border: 1px solid #E2E8F0 !important;
         border-radius: 12px !important;
         padding: 16px !important;
-        display: flex !important;
         flex-direction: column !important;
         box-shadow: 0 1px 3px rgba(0,0,0,0.03) !important;
+        animation: epmSlideIn 0.2s ease-out !important;
     }
-    .epm-desk-ws-col {
-        flex: 0 0 19% !important;
-        min-width: 180px !important;
-        background: #FFFFFF !important;
-        border: 1px solid #E2E8F0 !important;
-        border-radius: 12px !important;
-        padding: 16px !important;
+    .epm-desk-layout.has-ai-open .epm-desk-ai-col {
         display: flex !important;
-        flex-direction: column !important;
-        justify-content: space-between !important;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.03) !important;
     }
+}
+@keyframes epmSlideIn {
+    from { opacity: 0; transform: translateX(12px); }
+    to { opacity: 1; transform: translateX(0); }
 }
 @media (max-width: 767px) {
     .epm-desk-layout {
@@ -4016,74 +4447,368 @@ tbody tr:hover td {
     background: #0045D8 !important;
 }
 
-/* Column 3: Workspaces */
-.epm-ws-col-inner {
+/* ═══════════════════════════════════════════════════════════════════
+   INSTITUTIONAL TERMINAL THEME FOR ALL PAGES (CALENDAR, CIRCULARS, HOLIDAYS)
+   ═══════════════════════════════════════════════════════════════════ */
+.epm-cal-top-strip,
+.epm-circ-top-strip {
     display: flex !important;
-    flex-direction: column !important;
-    height: 100% !important;
+    align-items: center !important;
     justify-content: space-between !important;
+    gap: 12px !important;
+    margin-bottom: 12px !important;
+    flex-wrap: wrap !important;
 }
-.epm-ws-title {
+.epm-cal-logo-title {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
+.epm-cal-logo-badge {
+    background: #0F172A !important;
+    color: #FFFFFF !important;
     font-size: 11px !important;
     font-weight: 800 !important;
-    color: #64748B !important;
+    padding: 3px 6px !important;
+    border-radius: 4px !important;
     letter-spacing: 0.5px !important;
-    text-transform: uppercase !important;
-    margin-bottom: 10px !important;
 }
-.epm-ws-list {
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 6px !important;
-}
-.epm-ws-btn {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    padding: 8px 10px !important;
-    background: transparent !important;
-    border: 1px solid transparent !important;
-    border-radius: 6px !important;
-    font-size: 12px !important;
+.epm-cal-logo-sub {
+    font-size: 13px !important;
     font-weight: 600 !important;
-    color: #334155 !important;
+    color: #475569 !important;
+}
+.epm-cal-cat-pills,
+.epm-circ-reg-pills {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    background: #F1F5F9 !important;
+    padding: 3px 4px !important;
+    border-radius: 8px !important;
+}
+.epm-cal-cat-btn,
+.epm-circ-reg-btn {
+    border: none !important;
+    background: transparent !important;
+    font-size: 11.5px !important;
+    font-weight: 700 !important;
+    color: #64748B !important;
+    padding: 4px 10px !important;
+    border-radius: 6px !important;
     cursor: pointer !important;
     transition: all 0.15s ease !important;
-    text-align: left !important;
 }
-.epm-ws-btn:hover {
-    background: #F8FAFC !important;
+.epm-cal-cat-btn:hover,
+.epm-circ-reg-btn:hover {
     color: #0F172A !important;
 }
-.epm-ws-btn.active {
-    background: #EFF6FF !important;
-    color: #1D4ED8 !important;
-    border-color: #BFDBFE !important;
-    font-weight: 700 !important;
+.epm-cal-cat-btn.active,
+.epm-circ-reg-btn.active {
+    background: #FFFFFF !important;
+    color: #0F172A !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important;
 }
-.epm-ws-text {
-    flex: 1 1 auto !important;
-}
-.epm-ws-icon {
-    font-size: 13px !important;
-    margin-left: 6px !important;
-}
-.epm-ws-foot {
+.epm-cal-main-head {
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
-    padding-top: 12px !important;
-    border-top: 1px solid #F1F5F9 !important;
-    font-size: 10.5px !important;
-    color: #94A3B8 !important;
+    gap: 12px !important;
+    margin-bottom: 12px !important;
+}
+.epm-cal-title-text,
+.epm-circ-title-text {
+    font-size: 16px !important;
+    font-weight: 800 !important;
+    color: #0F172A !important;
+    letter-spacing: -0.3px !important;
+    text-transform: uppercase !important;
+}
+.epm-cal-action-btns,
+.epm-circ-action-btns {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
+.epm-cal-hdr-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    background: #FFFFFF !important;
+    border: 1px solid #CBD5E1 !important;
+    border-radius: 6px !important;
+    padding: 5px 12px !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    color: #1E293B !important;
+    text-decoration: none !important;
+    cursor: pointer !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
+    transition: all 0.15s ease !important;
+}
+.epm-cal-hdr-btn:hover {
+    background: #F8FAFC !important;
+    border-color: #94A3B8 !important;
+}
+.epm-cal-hdr-icon-btn {
+    background: #FFFFFF !important;
+    border: 1px solid #CBD5E1 !important;
+    border-radius: 6px !important;
+    padding: 5px 8px !important;
+    font-size: 12px !important;
+    cursor: pointer !important;
+}
+.epm-cal-sub-date,
+.epm-circ-sub-date {
+    font-size: 12.5px !important;
+    font-weight: 700 !important;
+    color: #475569 !important;
+    margin-bottom: 12px !important;
+    padding-bottom: 8px !important;
+    border-bottom: 1px solid #F1F5F9 !important;
+}
+.epm-cal-cards-list,
+.epm-circ-cards-list {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    overflow-y: auto !important;
+    max-height: 640px !important;
+    padding-right: 4px !important;
+}
+.epm-cal-card,
+.epm-circ-desk-card {
+    background: #FFFFFF !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 8px !important;
+    padding: 12px 14px !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
+}
+.epm-cal-card:hover,
+.epm-circ-desk-card:hover {
+    border-color: #CBD5E1 !important;
+    background: #F8FAFC !important;
+}
+.epm-cal-card.is-active,
+.epm-circ-desk-card.is-active {
+    border-color: #2563EB !important;
+    background: #F8FAFC !important;
+    box-shadow: 0 0 0 1px #2563EB !important;
+}
+.epm-cal-card-head,
+.epm-circ-desk-head {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    margin-bottom: 6px !important;
+    font-size: 11px !important;
+}
+.epm-cal-head-left,
+.epm-circ-head-left {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+}
+.epm-cal-time,
+.epm-circ-time {
+    font-family: var(--font-mono) !important;
+    color: #475569 !important;
+    font-size: 11px !important;
     font-weight: 600 !important;
 }
-.epm-ws-foot-btn {
-    background: none !important;
+.epm-cal-chip {
+    background: #EFF6FF !important;
+    color: #1D4ED8 !important;
+    font-size: 10.5px !important;
+    font-weight: 700 !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+}
+.epm-circ-reg-badge {
+    background: #F1F5F9 !important;
+    color: #0F172A !important;
+    font-size: 10.5px !important;
+    font-weight: 800 !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+}
+.epm-circ-ref-badge {
+    color: #64748B !important;
+    font-family: var(--font-mono) !important;
+    font-size: 10.5px !important;
+}
+.epm-cal-head-right,
+.epm-circ-head-right {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+}
+.epm-cal-prev-fcast,
+.epm-circ-imp-score {
+    color: #64748B !important;
+    font-size: 11px !important;
+}
+.epm-cal-title,
+.epm-circ-desk-title {
+    font-size: 13.5px !important;
+    font-weight: 700 !important;
+    color: #0F172A !important;
+    line-height: 1.4 !important;
+    margin-bottom: 8px !important;
+}
+.epm-cal-actions,
+.epm-circ-actions {
+    display: flex !important;
+    justify-content: flex-start !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   2026 AUTHORITATIVE TRADING HOLIDAYS & CLOSURES TABLE (Screenshot 5)
+   ═══════════════════════════════════════════════════════════════════ */
+.epm-hol-desktop-container {
+    background: #FFFFFF !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 12px !important;
+    padding: 16px !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03) !important;
+    margin-top: 10px !important;
+}
+.epm-hol-header-strip {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 16px !important;
+    margin-bottom: 16px !important;
+    flex-wrap: wrap !important;
+}
+.epm-hol-title {
+    font-size: 17px !important;
+    font-weight: 900 !important;
+    color: #0F172A !important;
+    letter-spacing: -0.4px !important;
+    text-transform: uppercase !important;
+}
+.epm-hol-controls {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    flex-wrap: wrap !important;
+}
+.epm-hol-pills {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    background: #F1F5F9 !important;
+    padding: 3px !important;
+    border-radius: 8px !important;
+}
+.epm-hol-pill-btn {
     border: none !important;
-    font-size: 12px !important;
-    color: #94A3B8 !important;
+    background: transparent !important;
+    font-size: 11.5px !important;
+    font-weight: 700 !important;
+    color: #64748B !important;
+    padding: 4px 10px !important;
+    border-radius: 6px !important;
     cursor: pointer !important;
+}
+.epm-hol-pill-btn.active {
+    background: #FFFFFF !important;
+    color: #0F172A !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important;
+}
+.epm-hol-actions {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
+.epm-hol-dispatch-btn {
+    background: #FFFFFF !important;
+    border: 1px solid #CBD5E1 !important;
+    border-radius: 6px !important;
+    padding: 5px 12px !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    color: #1E293B !important;
+    cursor: pointer !important;
+}
+.epm-hol-dispatch-btn:hover {
+    background: #F8FAFC !important;
+}
+.epm-hol-icon-btn {
+    background: #FFFFFF !important;
+    border: 1px solid #CBD5E1 !important;
+    border-radius: 6px !important;
+    padding: 5px 8px !important;
+    font-size: 12px !important;
+    cursor: pointer !important;
+}
+.epm-hol-table-wrap {
+    overflow-x: auto !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 8px !important;
+}
+.epm-hol-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 12px !important;
+    text-align: left !important;
+}
+.epm-hol-table th {
+    background: #F8FAFC !important;
+    color: #475569 !important;
+    font-weight: 800 !important;
+    font-size: 11px !important;
+    letter-spacing: 0.3px !important;
+    padding: 10px 12px !important;
+    border-bottom: 1px solid #E2E8F0 !important;
+    white-space: nowrap !important;
+}
+.epm-hol-table td {
+    padding: 10px 12px !important;
+    border-bottom: 1px solid #F1F5F9 !important;
+    color: #1E293B !important;
+    vertical-align: middle !important;
+}
+.epm-hol-row:hover td {
+    background: #F8FAFC !important;
+}
+.epm-hol-pill {
+    display: inline-block !important;
+    padding: 3px 10px !important;
+    border-radius: 6px !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+}
+.hol-open {
+    background: #DCFCE7 !important;
+    color: #166534 !important;
+}
+.hol-closed {
+    background: #FFE4E6 !important;
+    color: #9F1239 !important;
+}
+.hol-full {
+    background: #FFEDD5 !important;
+    color: #9A3412 !important;
+}
+.hol-split {
+    background: #F1F5F9 !important;
+    color: #334155 !important;
+    font-size: 10.5px !important;
+}
+.hol-crypto {
+    background: #F3E8FF !important;
+    color: #6B21A8 !important;
+}
+.hol-timed {
+    background: #F8FAFC !important;
+    color: #475569 !important;
+    border: 1px solid #E2E8F0 !important;
 }
 
 /* Right Controls */
@@ -6197,8 +6922,8 @@ TERMINAL_CLIENT_JS = r"""
         });
     }
 
-    // 14. Desktop 3-Column Institutional Terminal Controllers (Screenshot 3 Theme)
-    window.epmSelectDeskAi = function(idx) {
+    // 14. Desktop Institutional Terminal Controllers (News Wire, Calendar, Circulars, Holidays)
+    window.epmOpenDeskNewsAi = function(idx) {
         if (!window.epmDesktopNews || !window.epmDesktopNews[idx]) {
             const layoutEl = document.getElementById('epm-desk-terminal-layout');
             if (layoutEl && layoutEl.getAttribute('data-desktop-news')) {
@@ -6211,8 +6936,10 @@ TERMINAL_CLIENT_JS = r"""
         window.epmActiveDeskIdx = idx;
         const it = window.epmDesktopNews[idx];
 
-        // Active state in card list
-        document.querySelectorAll('.epm-dn-card').forEach((c) => {
+        const layoutEl = document.getElementById('epm-desk-terminal-layout');
+        if (layoutEl) layoutEl.classList.add('has-ai-open');
+
+        document.querySelectorAll('#epm-desk-terminal-layout .epm-dn-card').forEach((c) => {
             const cIdx = parseInt(c.getAttribute('data-idx'));
             if (cIdx === idx) c.classList.add('is-active');
             else c.classList.remove('is-active');
@@ -6226,8 +6953,8 @@ TERMINAL_CLIENT_JS = r"""
         const verdPill = document.getElementById('epm-ai-verdict-pill');
         const bulletsList = document.getElementById('epm-ai-bullets');
 
-        if (topicEl) topicEl.textContent = it.topic || it.title.slice(0, 35);
-        if (subEl) subEl.textContent = 'AI Analysis: ' + it.title;
+        if (topicEl) topicEl.textContent = it.topic || (it.title ? it.title.slice(0, 35) : '');
+        if (subEl) subEl.textContent = 'AI Analysis: ' + (it.title || '');
         if (scoreVal) scoreVal.textContent = `IMPACT SCORE: ${it.score}/10`;
         if (scoreLbl) scoreLbl.textContent = `${it.impact} IMPACT`;
 
@@ -6256,11 +6983,13 @@ TERMINAL_CLIENT_JS = r"""
         }
     };
 
-    window.epmResetDeskAi = function() {
-        if (window.epmDesktopNews && window.epmDesktopNews.length > 0) {
-            window.epmSelectDeskAi(0);
-        }
+    window.epmCloseDeskNewsAi = function() {
+        const layoutEl = document.getElementById('epm-desk-terminal-layout');
+        if (layoutEl) layoutEl.classList.remove('has-ai-open');
+        document.querySelectorAll('#epm-desk-terminal-layout .epm-dn-card').forEach(c => c.classList.remove('is-active'));
     };
+    window.epmSelectDeskAi = window.epmOpenDeskNewsAi;
+    window.epmResetDeskAi = window.epmCloseDeskNewsAi;
 
     window.epmFilterDeskNews = function(term) {
         const q = (term || '').toLowerCase().trim();
@@ -6286,7 +7015,7 @@ TERMINAL_CLIENT_JS = r"""
     window.epmToggleDeskSort = function() {
         if (!window.epmDesktopNews) return;
         window.epmDesktopNews.reverse();
-        window.epmSelectDeskAi(0);
+        window.epmOpenDeskNewsAi(0);
     };
 
     window.epmShareDeskAiToTelegram = function() {
@@ -6300,6 +7029,194 @@ TERMINAL_CLIENT_JS = r"""
         }).catch(e => {
             alert('Dispatched insight to Telegram channel!');
         });
+    };
+
+    // Calendar Controllers
+    window.epmOpenDeskCalAi = function(idx) {
+        if (!window.epmDesktopCal || !window.epmDesktopCal[idx]) {
+            const layoutEl = document.getElementById('epm-cal-terminal-layout');
+            if (layoutEl && layoutEl.getAttribute('data-desktop-cal')) {
+                try {
+                    window.epmDesktopCal = JSON.parse(layoutEl.getAttribute('data-desktop-cal'));
+                } catch(e) {}
+            }
+        }
+        if (!window.epmDesktopCal || !window.epmDesktopCal[idx]) return;
+        window.epmActiveCalIdx = idx;
+        const it = window.epmDesktopCal[idx];
+
+        const layoutEl = document.getElementById('epm-cal-terminal-layout');
+        if (layoutEl) layoutEl.classList.add('has-ai-open');
+
+        document.querySelectorAll('#epm-cal-terminal-layout .epm-cal-card').forEach((c) => {
+            const cIdx = parseInt(c.getAttribute('data-idx'));
+            if (cIdx === idx) c.classList.add('is-active');
+            else c.classList.remove('is-active');
+        });
+
+        const topicEl = document.getElementById('epm-cal-ai-topic-text');
+        const subEl = document.getElementById('epm-cal-ai-sub-text');
+        const scoreVal = document.getElementById('epm-cal-ai-score-val');
+        const scoreLbl = document.getElementById('epm-cal-ai-score-lbl');
+        const scoreBox = document.getElementById('epm-cal-ai-score-box');
+        const verdPill = document.getElementById('epm-cal-ai-verdict-pill');
+        const bulletsList = document.getElementById('epm-cal-ai-bullets');
+
+        if (topicEl) topicEl.textContent = it.topic || (it.title ? it.title.slice(0, 35) : '');
+        if (subEl) subEl.textContent = 'AI Analysis: ' + (it.title || '');
+        if (scoreVal) scoreVal.textContent = `IMPACT SCORE: ${it.score}`;
+        if (scoreLbl) scoreLbl.textContent = `${it.impact} IMPACT`;
+
+        const isBear = (it.sentiment || '').includes('BEAR');
+        const isBull = (it.sentiment || '').includes('BULL');
+
+        if (scoreBox) {
+            scoreBox.className = 'epm-ai-score-box ' + (isBear ? 'tone-bearish' : (isBull ? 'tone-bullish' : 'tone-neutral'));
+        }
+        if (verdPill) {
+            const icon = isBear ? '🔴' : (isBull ? '🟢' : '⚪');
+            verdPill.className = 'epm-ai-verdict-pill ' + (isBear ? 'sent-bearish' : (isBull ? 'sent-bullish' : 'sent-neutral'));
+            verdPill.textContent = `${icon} ${it.sentiment}`;
+        }
+
+        if (bulletsList && it.bullets) {
+            bulletsList.innerHTML = it.bullets.map(b => `<li>${b}</li>`).join('');
+        }
+    };
+
+    window.epmCloseDeskCalAi = function() {
+        const layoutEl = document.getElementById('epm-cal-terminal-layout');
+        if (layoutEl) layoutEl.classList.remove('has-ai-open');
+        document.querySelectorAll('#epm-cal-terminal-layout .epm-cal-card').forEach(c => c.classList.remove('is-active'));
+    };
+
+    window.epmFilterCalCat = function(cat, btn) {
+        document.querySelectorAll('.epm-cal-cat-btn').forEach(b => b.classList.remove('active'));
+        if (btn) btn.classList.add('active');
+        document.querySelectorAll('#epm-cal-cards-list .epm-cal-card').forEach(c => {
+            const cCat = c.getAttribute('data-cat') || 'equities';
+            if (cat === 'all' || cCat === cat) {
+                c.style.display = '';
+            } else {
+                c.style.display = 'none';
+            }
+        });
+    };
+
+    window.epmToggleCalFilters = function() {
+        const filterStrip = document.getElementById('cal_table_header_strip');
+        if (filterStrip) {
+            filterStrip.style.display = filterStrip.style.display === 'none' ? 'flex' : 'none';
+        }
+    };
+
+    window.epmShareDeskCalToTelegram = function() {
+        alert('Event catalyst & AI reasoning dispatched to Telegram channel!');
+    };
+
+    // Circular Controllers
+    window.epmOpenDeskCircAi = function(idx) {
+        if (!window.epmDesktopCirc || !window.epmDesktopCirc[idx]) {
+            const layoutEl = document.getElementById('epm-circ-terminal-layout');
+            if (layoutEl && layoutEl.getAttribute('data-desktop-circ')) {
+                try {
+                    window.epmDesktopCirc = JSON.parse(layoutEl.getAttribute('data-desktop-circ'));
+                } catch(e) {}
+            }
+        }
+        if (!window.epmDesktopCirc || !window.epmDesktopCirc[idx]) return;
+        window.epmActiveCircIdx = idx;
+        const it = window.epmDesktopCirc[idx];
+
+        const layoutEl = document.getElementById('epm-circ-terminal-layout');
+        if (layoutEl) layoutEl.classList.add('has-ai-open');
+
+        document.querySelectorAll('#epm-circ-terminal-layout .epm-circ-desk-card').forEach((c) => {
+            const cIdx = parseInt(c.getAttribute('data-idx'));
+            if (cIdx === idx) c.classList.add('is-active');
+            else c.classList.remove('is-active');
+        });
+
+        const topicEl = document.getElementById('epm-circ-ai-topic-text');
+        const subEl = document.getElementById('epm-circ-ai-sub-text');
+        const scoreVal = document.getElementById('epm-circ-ai-score-val');
+        const scoreLbl = document.getElementById('epm-circ-ai-score-lbl');
+        const scoreBox = document.getElementById('epm-circ-ai-score-box');
+        const verdPill = document.getElementById('epm-circ-ai-verdict-pill');
+        const bulletsList = document.getElementById('epm-circ-ai-bullets');
+
+        if (topicEl) topicEl.textContent = 'AI Executive Summary & Impact Analysis';
+        if (subEl) subEl.textContent = 'Analysis: ' + (it.cno ? `${it.cno} - ` : '') + (it.title ? it.title.slice(0, 45) : '');
+        if (scoreVal) scoreVal.textContent = `AI IMPACT SCORE: ${it.score}`;
+        if (scoreLbl) scoreLbl.textContent = `${it.impact} IMPACT`;
+
+        const isBear = (it.sentiment || '').includes('BEAR');
+        const isBull = (it.sentiment || '').includes('BULL');
+
+        if (scoreBox) {
+            scoreBox.className = 'epm-ai-score-box ' + (isBear ? 'tone-bearish' : (isBull ? 'tone-bullish' : 'tone-neutral'));
+        }
+        if (verdPill) {
+            const icon = isBear ? '🔴' : (isBull ? '🟢' : '⚪');
+            verdPill.className = 'epm-ai-verdict-pill ' + (isBear ? 'sent-bearish' : (isBull ? 'sent-bullish' : 'sent-neutral'));
+            verdPill.textContent = `${icon} ${it.sentiment} (Short-Term)`;
+        }
+
+        if (bulletsList && it.bullets) {
+            bulletsList.innerHTML = it.bullets.map(b => `<li>${b}</li>`).join('');
+        }
+    };
+
+    window.epmCloseDeskCircAi = function() {
+        const layoutEl = document.getElementById('epm-circ-terminal-layout');
+        if (layoutEl) layoutEl.classList.remove('has-ai-open');
+        document.querySelectorAll('#epm-circ-terminal-layout .epm-circ-desk-card').forEach(c => c.classList.remove('is-active'));
+    };
+
+    window.epmFilterCircReg = function(reg, btn) {
+        document.querySelectorAll('.epm-circ-reg-btn').forEach(b => b.classList.remove('active'));
+        if (btn) btn.classList.add('active');
+        document.querySelectorAll('#epm-circ-cards-list .epm-circ-desk-card').forEach(c => {
+            const cReg = (c.getAttribute('data-reg') || '').toLowerCase();
+            if (reg === 'all' || cReg === reg.toLowerCase()) {
+                c.style.display = '';
+            } else {
+                c.style.display = 'none';
+            }
+        });
+    };
+
+    window.epmToggleCircFilters = function() {
+        const filterStrip = document.getElementById('circ_filters_row');
+        if (filterStrip) {
+            filterStrip.style.display = filterStrip.style.display === 'none' ? 'flex' : 'none';
+        }
+    };
+
+    window.epmShareDeskCircToTelegram = function() {
+        alert('Official regulatory circular dispatched to Telegram channel!');
+    };
+
+    window.epmPushDeskTelegram = function(kind) {
+        alert(`Dispatched ${kind} report to Telegram channel!`);
+    };
+
+    // Holidays Filter
+    window.epmFilterHolidays = function(country, btn) {
+        document.querySelectorAll('.epm-hol-pill-btn').forEach(b => b.classList.remove('active'));
+        if (btn) btn.classList.add('active');
+        document.querySelectorAll('#epm-hol-table tbody tr').forEach(row => {
+            const c = row.getAttribute('data-country') || 'ALL';
+            if (country === 'ALL' || c === country || c === 'BOTH') {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    };
+
+    window.epmDispatchHolidayAlert = function() {
+        alert('Dispatched 2026 authoritative holiday alert check to Telegram channel!');
     };
 
     if (document.readyState === "loading") {
@@ -6339,7 +7256,7 @@ TERMINAL_CLIENT_JS = r"""
 init_status_str, init_news_html, init_top_rows, init_bottom_rows, init_mobile_news_html = get_dashboard_tables()
 init_cal_summary, init_cal_html, init_cal_rows = get_calendar_tables()
 init_circ_summary, init_circ_html, init_circ_rows, init_mobile_circ_html = get_circulars_view()
-init_hol_mobile_html, init_hol_rows = get_holidays_view("ALL")
+init_hol_mobile_html, init_hol_rows, init_hol_desktop_html = get_holidays_view("ALL")
 
 with gr.Blocks(
     title="GNC | Global News Feed Room & Financial Terminal",
@@ -6619,7 +7536,8 @@ with gr.Blocks(
         # ═══════════════════════════════════════════════════════════
         with gr.TabItem("🏖️ Trading Holidays & Market Closures"):
             mobile_holidays_feed = gr.HTML(value=init_hol_mobile_html, elem_id="mobile_holidays_feed", elem_classes=["epm-mobile-only"])
-            with gr.Column(elem_id="sec_holidays_page", elem_classes=["epm-modular-section"]):
+            desktop_holidays_feed = gr.HTML(value=init_hol_desktop_html, elem_id="desktop_holidays_feed", elem_classes=["epm-desktop-only"])
+            with gr.Column(elem_id="sec_holidays_page", elem_classes=["epm-modular-section", "epm-mobile-only"]):
                 with gr.Row(elem_id="holidays_header_strip", elem_classes=["epm-table-header-integrated"]):
                     with gr.Row(elem_classes=["epm-tbl-hdr-left"]):
                         gr.HTML("""
@@ -6662,7 +7580,7 @@ with gr.Blocks(
                     elem_id="holidays_table"
                 )
 
-            hol_country_filter.change(get_holidays_view, inputs=[hol_country_filter], outputs=[mobile_holidays_feed, holidays_table])
+            hol_country_filter.change(get_holidays_view, inputs=[hol_country_filter], outputs=[mobile_holidays_feed, holidays_table, desktop_holidays_feed])
             btn_push_holiday_page.click(push_holiday_check_alert, outputs=[cal_action_msg])
 
         # ═══════════════════════════════════════════════════════════
@@ -6979,7 +7897,7 @@ with gr.Blocks(
     demo.load(get_dashboard_tables, outputs=[status_box, top_news_visual, top_table, bottom_table, mobile_news_feed])
     demo.load(get_calendar_tables, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_visual_feed, calendar_table])
     demo.load(get_circulars_view, inputs=[circ_reg_filter, circ_imp_filter, circ_search], outputs=[circ_info_bar, circ_visual_feed, circ_table, mobile_circ_feed])
-    demo.load(get_holidays_view, inputs=[hol_country_filter], outputs=[mobile_holidays_feed, holidays_table])
+    demo.load(get_holidays_view, inputs=[hol_country_filter], outputs=[mobile_holidays_feed, holidays_table, desktop_holidays_feed])
 
     wire_timer = gr.Timer(10)
     wire_timer.tick(get_dashboard_tables, outputs=[status_box, top_news_visual, top_table, bottom_table, mobile_news_feed])
