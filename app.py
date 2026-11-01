@@ -847,11 +847,11 @@ def render_news_feed_html(items: List[Dict]) -> str:
         </div>
 
         <!-- Column 2: On-Demand Dismissible AI Impact & Sentiment Drawer -->
-        <div class="epm-desk-ai-col" id="epm-desk-ai-col">
+        <div class="epm-desk-ai-col" id="epm-desk-ai-col" style="display: none !important;">
             <div class="epm-ai-drawer-card">
                 <div class="epm-ai-top">
                     <div class="epm-ai-topic-title">AI Analysis: <span id="epm-ai-topic-text">{html.escape(it0['topic'])}</span></div>
-                    <button type="button" class="epm-ai-close" onclick="window.epmCloseDeskNewsAi()" title="Close AI Analysis">✕</button>
+                    <button type="button" class="epm-ai-close" onclick="window.epmCloseDeskNewsAi(); event.stopPropagation();" title="Close AI Analysis">✕</button>
                 </div>
                 <div class="epm-ai-sub" id="epm-ai-sub-text">AI Analysis: {html.escape(it0['title'])}</div>
 
@@ -1862,11 +1862,11 @@ def render_desktop_calendar_html(events: List[Dict]) -> str:
         </div>
         
         <!-- On-Demand Dismissible AI Impact & Sentiment Drawer -->
-        <div class="epm-desk-ai-col" id="epm-cal-ai-col">
+        <div class="epm-desk-ai-col" id="epm-cal-ai-col" style="display: none !important;">
             <div class="epm-ai-drawer-card">
                 <div class="epm-ai-top">
                     <div class="epm-ai-topic-title">AI Analysis: <span id="epm-cal-ai-topic-text">Selected Event</span></div>
-                    <button type="button" class="epm-ai-close" onclick="window.epmCloseDeskCalAi()" title="Close AI Analysis">✕</button>
+                    <button type="button" class="epm-ai-close" onclick="window.epmCloseDeskCalAi(); event.stopPropagation();" title="Close AI Analysis">✕</button>
                 </div>
                 <div class="epm-ai-sub" id="epm-cal-ai-sub-text">AI Analysis: Selected Market Event</div>
                 
@@ -2001,11 +2001,11 @@ def render_desktop_circulars_html(circulars: List[Dict]) -> str:
         </div>
         
         <!-- On-Demand Dismissible AI Executive Summary & Impact Analysis Drawer -->
-        <div class="epm-desk-ai-col" id="epm-circ-ai-col">
+        <div class="epm-desk-ai-col" id="epm-circ-ai-col" style="display: none !important;">
             <div class="epm-ai-drawer-card">
                 <div class="epm-ai-top">
                     <div class="epm-ai-topic-title"><span id="epm-circ-ai-topic-text">AI Executive Summary & Impact Analysis</span></div>
-                    <button type="button" class="epm-ai-close" onclick="window.epmCloseDeskCircAi()" title="Close AI Analysis">✕</button>
+                    <button type="button" class="epm-ai-close" onclick="window.epmCloseDeskCircAi(); event.stopPropagation();" title="Close AI Analysis">✕</button>
                 </div>
                 <div class="epm-ai-sub" id="epm-circ-ai-sub-text">Analysis: Official Regulatory Directive</div>
                 
@@ -2139,107 +2139,7 @@ def render_desktop_holidays_html(holidays: List[Dict]) -> str:
     '''
 
 
-def get_calendar_tables(filter_range: str = "all", market_filter: str = "ALL"):
-    global_row_idx = 1
-    events = calendar_engine.get_enriched_events(filter_range, market_filter)
-    all_table_rows = []
-    rendered_total = 0
-    max_render = 120
 
-    for ev in events[:max_render]:
-        mkt_code = ev.get("market", "NSE")
-        badge = MARKET_META.get(mkt_code, {}).get("badge", f"[{mkt_code}]")
-        
-        # Clean data fields
-        c_date = clean_table_text(ev.get("date", "—"))
-        c_time = clean_table_text(calendar_pdf_engine._format_event_time(ev))
-        c_day = clean_table_text(ev.get("day", "—"))
-        c_type = clean_table_text(ev.get("category", "Macro"))
-        c_country = clean_table_text(ev.get("country", "IN"))
-        c_sec = clean_table_text(ev.get("sector", "General"))
-        c_event = clean_table_text(ev.get("event", "—"))
-        c_imp = clean_table_text(ev.get("impact", "MEDIUM"))
-        c_prev = clean_table_text(ev.get("previous", "—"))
-        c_fore = clean_table_text(ev.get("forecast", "—"))
-        c_act = clean_table_text(ev.get("actual", "—"))
-        c_sent = clean_table_text(ev.get("outcome_sentiment", "—"))
-        c_reason = clean_table_text(ev.get("ai_reasoning", "—"))
-
-        all_table_rows.append(f"""
-        <tr>
-            <td class="col-idx">{global_row_idx}</td>
-            <td class="col-date">{c_date}</td>
-            <td class="col-time">{c_time}</td>
-            <td class="col-day">{c_day}</td>
-            <td class="col-type">{c_type}</td>
-            <td class="col-country">{c_country}</td>
-            <td class="col-reg">{badge}</td>
-            <td class="col-sec">{c_sec}</td>
-            <td class="col-event">{c_event}</td>
-            <td class="col-imp">{c_imp}</td>
-            <td class="col-prev">{c_prev}</td>
-            <td class="col-fore">{c_fore}</td>
-            <td class="col-outcome">{c_act}</td>
-            <td class="col-sent">{c_sent}</td>
-            <td class="col-reason">{c_reason}</td>
-        </tr>
-        """)
-        global_row_idx += 1
-        rendered_total += 1
-
-    footer_note = ""
-    if len(events) > max_render:
-        footer_note = f"""
-        <div class="epm-dossier-footer-note">
-            <span>Displaying first {rendered_total} of {len(events)} catalysts for this horizon. Filter by timeframe or market above for focused schedules, or click <b>Download Weekly / Monthly Snapshot PDF</b> for the complete ledger archive.</span>
-        </div>
-        """
-
-    desktop_cards_html = render_desktop_calendar_html(events)
-
-    html_content = f"""
-    <div class="epm-mobile-only">{render_calendar_timeline_html(events)}</div>
-    <div class="epm-desktop-only">
-        {desktop_cards_html}
-        <details class="epm-dossier-collapse-wrap" style="margin-top: 24px;">
-            <summary class="epm-dossier-summary" style="cursor: pointer; font-weight: 800; font-size: 13px; color: #1E293B; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 16px;">
-                📊 View Comprehensive 15-Column Multi-Market Catalyst Ledger ({len(events)} Total Catalysts)
-            </summary>
-            <div class="epm-dossier-container" style="margin-top: 12px;">
-                <div class="epm-dossier-table-wrap">
-                    <table class="epm-dossier-table">
-                        <thead>
-                            <tr>
-                                <th class="col-idx">#</th>
-                                <th class="col-date col-clickable-filter" onclick="window.epmFocusFilter('date')" title="Click to filter by date window">Date ▾</th>
-                                <th class="col-time">Time (IST)</th>
-                                <th class="col-day">Day</th>
-                                <th class="col-type">Type</th>
-                                <th class="col-country">Country</th>
-                                <th class="col-reg col-clickable-filter" onclick="window.epmFocusFilter('reg')" title="Click to filter by regulator / market">Reg. ▾</th>
-                                <th class="col-sec">Sector</th>
-                                <th class="col-event">Event Catalyst</th>
-                                <th class="col-imp">Impact</th>
-                                <th class="col-prev">Prev</th>
-                                <th class="col-fore">Fcst</th>
-                                <th class="col-outcome">Results</th>
-                                <th class="col-sent">Sent.</th>
-                                <th class="col-reason">AI Reasoning</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {''.join(all_table_rows)}
-                        </tbody>
-                    </table>
-                </div>
-                {footer_note}
-            </div>
-        </details>
-    </div>
-    """
-
-    summary_msg = f"Synced {len(events)} multi-market events."
-    return summary_msg, html_content, all_table_rows
 
 
 BASELINE_BREAKING_CATALYSTS = [
@@ -2430,7 +2330,25 @@ def get_dashboard_tables():
 def get_calendar_tables(range_filter: str = "all", market_filter: str = "ALL"):
     try:
         events = calendar_engine.get_enriched_events(filter_range=range_filter, market_filter=market_filter)
-        calendar_visual_html = render_calendar_dossier_html(events)
+        desktop_cal_cards = render_desktop_calendar_html(events)
+        mobile_cal_timeline = render_calendar_timeline_html(events)
+        dossier_table = render_calendar_dossier_html(events)
+
+        calendar_visual_html = f"""
+        <div class="epm-mobile-only">{mobile_cal_timeline}</div>
+        <div class="epm-desktop-only">
+            {desktop_cal_cards}
+            <details class="epm-dossier-collapse-wrap" style="margin-top: 24px; border: 1px solid #E2E8F0; border-radius: 10px; background: #FFFFFF; overflow: hidden;">
+                <summary class="epm-dossier-summary" style="cursor: pointer; font-weight: 700; font-size: 13px; color: #1E293B; background: #F8FAFC; border-bottom: 1px solid #E2E8F0; padding: 12px 18px; outline: none; display: flex; align-items: center; justify-content: space-between;">
+                    <span>📊 Multi-Market Catalyst Ledger (15-Column Institutional Archive • {len(events)} Catalysts)</span>
+                    <span style="font-size: 11px; color: #64748B; font-weight: normal;">Click to expand / collapse ▾</span>
+                </summary>
+                <div style="padding: 12px;">
+                    {dossier_table}
+                </div>
+            </details>
+        </div>
+        """
         cal_rows = []
         global_idx = 1
         for ev in events:
@@ -4334,12 +4252,31 @@ tbody tr:hover td {
     color: #0F172A !important;
 }
 .epm-ai-close {
-    background: none !important;
-    border: none !important;
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    min-height: 28px !important;
+    border-radius: 50% !important;
+    background: #F1F5F9 !important;
+    border: 1px solid #CBD5E1 !important;
+    color: #334155 !important;
     font-size: 14px !important;
-    color: #64748B !important;
+    font-weight: 800 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
     cursor: pointer !important;
-    padding: 0 4px !important;
+    padding: 0 !important;
+    line-height: 1 !important;
+    transition: all 0.15s ease !important;
+    z-index: 20 !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+}
+.epm-ai-close:hover {
+    background: #E2E8F0 !important;
+    color: #0F172A !important;
+    border-color: #94A3B8 !important;
+    transform: scale(1.05) !important;
 }
 .epm-ai-sub {
     font-size: 11px !important;
@@ -6938,6 +6875,13 @@ TERMINAL_CLIENT_JS = r"""
 
         const layoutEl = document.getElementById('epm-desk-terminal-layout');
         if (layoutEl) layoutEl.classList.add('has-ai-open');
+        const aiCol = document.getElementById('epm-desk-ai-col');
+        if (aiCol) aiCol.style.setProperty('display', 'flex', 'important');
+        const newsCol = document.querySelector('#epm-desk-terminal-layout .epm-desk-news-col');
+        if (newsCol) {
+            newsCol.style.setProperty('max-width', '63%', 'important');
+            newsCol.style.setProperty('flex', '1 1 63%', 'important');
+        }
 
         document.querySelectorAll('#epm-desk-terminal-layout .epm-dn-card').forEach((c) => {
             const cIdx = parseInt(c.getAttribute('data-idx'));
@@ -6986,6 +6930,13 @@ TERMINAL_CLIENT_JS = r"""
     window.epmCloseDeskNewsAi = function() {
         const layoutEl = document.getElementById('epm-desk-terminal-layout');
         if (layoutEl) layoutEl.classList.remove('has-ai-open');
+        const aiCol = document.getElementById('epm-desk-ai-col');
+        if (aiCol) aiCol.style.setProperty('display', 'none', 'important');
+        const newsCol = document.querySelector('#epm-desk-terminal-layout .epm-desk-news-col');
+        if (newsCol) {
+            newsCol.style.setProperty('max-width', '100%', 'important');
+            newsCol.style.setProperty('flex', '1 1 100%', 'important');
+        }
         document.querySelectorAll('#epm-desk-terminal-layout .epm-dn-card').forEach(c => c.classList.remove('is-active'));
     };
     window.epmSelectDeskAi = window.epmOpenDeskNewsAi;
@@ -7047,6 +6998,13 @@ TERMINAL_CLIENT_JS = r"""
 
         const layoutEl = document.getElementById('epm-cal-terminal-layout');
         if (layoutEl) layoutEl.classList.add('has-ai-open');
+        const aiCol = document.getElementById('epm-cal-ai-col');
+        if (aiCol) aiCol.style.setProperty('display', 'flex', 'important');
+        const feedCol = document.querySelector('#epm-cal-terminal-layout .epm-desk-feed-col');
+        if (feedCol) {
+            feedCol.style.setProperty('max-width', '63%', 'important');
+            feedCol.style.setProperty('flex', '1 1 63%', 'important');
+        }
 
         document.querySelectorAll('#epm-cal-terminal-layout .epm-cal-card').forEach((c) => {
             const cIdx = parseInt(c.getAttribute('data-idx'));
@@ -7087,6 +7045,13 @@ TERMINAL_CLIENT_JS = r"""
     window.epmCloseDeskCalAi = function() {
         const layoutEl = document.getElementById('epm-cal-terminal-layout');
         if (layoutEl) layoutEl.classList.remove('has-ai-open');
+        const aiCol = document.getElementById('epm-cal-ai-col');
+        if (aiCol) aiCol.style.setProperty('display', 'none', 'important');
+        const feedCol = document.querySelector('#epm-cal-terminal-layout .epm-desk-feed-col');
+        if (feedCol) {
+            feedCol.style.setProperty('max-width', '100%', 'important');
+            feedCol.style.setProperty('flex', '1 1 100%', 'important');
+        }
         document.querySelectorAll('#epm-cal-terminal-layout .epm-cal-card').forEach(c => c.classList.remove('is-active'));
     };
 
@@ -7130,6 +7095,13 @@ TERMINAL_CLIENT_JS = r"""
 
         const layoutEl = document.getElementById('epm-circ-terminal-layout');
         if (layoutEl) layoutEl.classList.add('has-ai-open');
+        const aiCol = document.getElementById('epm-circ-ai-col');
+        if (aiCol) aiCol.style.setProperty('display', 'flex', 'important');
+        const feedCol = document.querySelector('#epm-circ-terminal-layout .epm-desk-feed-col');
+        if (feedCol) {
+            feedCol.style.setProperty('max-width', '63%', 'important');
+            feedCol.style.setProperty('flex', '1 1 63%', 'important');
+        }
 
         document.querySelectorAll('#epm-circ-terminal-layout .epm-circ-desk-card').forEach((c) => {
             const cIdx = parseInt(c.getAttribute('data-idx'));
@@ -7170,6 +7142,13 @@ TERMINAL_CLIENT_JS = r"""
     window.epmCloseDeskCircAi = function() {
         const layoutEl = document.getElementById('epm-circ-terminal-layout');
         if (layoutEl) layoutEl.classList.remove('has-ai-open');
+        const aiCol = document.getElementById('epm-circ-ai-col');
+        if (aiCol) aiCol.style.setProperty('display', 'none', 'important');
+        const feedCol = document.querySelector('#epm-circ-terminal-layout .epm-desk-feed-col');
+        if (feedCol) {
+            feedCol.style.setProperty('max-width', '100%', 'important');
+            feedCol.style.setProperty('flex', '1 1 100%', 'important');
+        }
         document.querySelectorAll('#epm-circ-terminal-layout .epm-circ-desk-card').forEach(c => c.classList.remove('is-active'));
     };
 
@@ -7311,7 +7290,7 @@ with gr.Blocks(
 
             with gr.Column(elem_id="sec_catalyst_ledger", elem_classes=["epm-modular-section"]):
                 with gr.Column(elem_id="calendar_dossier_wrap"):
-                    with gr.Row(elem_id="cal_table_header_strip", elem_classes=["epm-table-header-integrated"]):
+                    with gr.Row(elem_id="cal_table_header_strip", elem_classes=["epm-table-header-integrated", "epm-mobile-only"]):
                         with gr.Row(elem_classes=["epm-tbl-hdr-left"]):
                             gr.HTML("""
                             <div class="epm-tbl-hdr-title-group">
@@ -7442,8 +7421,9 @@ with gr.Blocks(
         with gr.TabItem("📜 Regulatory Circulars & Official PDFs"):
             circ_info_bar = gr.Markdown(value=init_circ_summary, elem_id="circ_info_bar", visible=False)
             mobile_circ_feed = gr.HTML(value=init_mobile_circ_html, elem_id="mobile_circ_feed", elem_classes=["epm-mobile-only"])
+            circ_visual_feed = gr.HTML(value=init_circ_html, elem_id="circ_visual_feed", elem_classes=["epm-desktop-only"])
 
-            with gr.Row(elem_id="circ_filters_row", elem_classes=["epm-desktop-only"]):
+            with gr.Row(elem_id="circ_filters_row", elem_classes=["epm-desktop-only"], visible=False):
                 circ_reg_filter = gr.Radio(
                     choices=[
                         ("🌐 ALL", "ALL"),
@@ -7477,7 +7457,7 @@ with gr.Blocks(
                     scale=3
                 )
 
-            with gr.Column(elem_id="sec_circ_directory", elem_classes=["epm-modular-section", "epm-desktop-only"]):
+            with gr.Column(elem_id="sec_circ_directory", elem_classes=["epm-modular-section"], visible=False):
                 with gr.Row(elem_id="circ_action_toolbar", elem_classes=["epm-toolbar-card"]):
                     circ_refresh_btn = gr.Button("🔄 Check & Poll Official Circulars (NSE, BSE, MCX, RBI, FINMIN, FOMC)", variant="primary", scale=3)
                     circ_dispatch_btn = gr.Button("📲 Forward Latest Circular to Telegram", variant="secondary", scale=2)
@@ -7502,8 +7482,6 @@ with gr.Blocks(
                     wrap=True,
                     elem_id="circ_table"
                 )
-
-            circ_visual_feed = gr.HTML(value="", elem_id="circ_visual_feed", visible=False)
 
             circ_reg_filter.change(
                 get_circulars_view,
