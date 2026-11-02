@@ -58,7 +58,15 @@ app.add_middleware(
 )
 
 from starlette.middleware.base import BaseHTTPMiddleware
-from image_assets import generate_og_image, generate_holidays_image, generate_placeholder_thumb
+from image_assets import (
+    generate_og_image,
+    generate_holidays_image,
+    generate_placeholder_thumb,
+    generate_holiday_thumb,
+    generate_calendar_thumb,
+    generate_regulator_logo,
+    generate_news_thumb
+)
 
 class TerminalSecurityAndMetaMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
@@ -163,27 +171,118 @@ async def serve_holidays_image():
     )
 
 
+@app.api_route("/api/holiday-thumb/{holiday_key}", methods=["GET", "HEAD"])
+async def serve_holiday_thumb(holiday_key: str, title: str = ""):
+    """Renders and serves high-contrast festive, seasonal, and holiday picture thumbnails."""
+    png = generate_holiday_thumb(holiday_key, title=title)
+    from fastapi.responses import Response
+    return Response(content=png, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.api_route("/api/calendar-thumb", methods=["GET", "HEAD"])
+async def serve_calendar_thumb(sym: str = "", mkt: str = "", cat: str = "", t: str = ""):
+    """Renders and serves authoritative corporate stock logos or government/regulator emblems for calendar events."""
+    png = generate_calendar_thumb(symbol=sym, market=mkt, category=cat, title=t)
+    from fastapi.responses import Response
+    return Response(content=png, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.api_route("/api/regulator-logo/{reg_code}", methods=["GET", "HEAD"])
+async def serve_regulator_logo(reg_code: str):
+    """Renders and serves official source logos for statutory circulars (SEBI, RBI, NSE, BSE, MCX)."""
+    png = generate_regulator_logo(reg_code)
+    from fastapi.responses import Response
+    return Response(content=png, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.api_route("/api/news-thumb", methods=["GET", "HEAD"])
+async def serve_news_thumb(topic: str = "", cat: str = "", s: str = "", title: str = ""):
+    """Renders and serves high-definition editorial pictures with topic imagery and source badges."""
+    png = generate_news_thumb(topic=topic, category=cat, source=s, title=title)
+    from fastapi.responses import Response
+    return Response(content=png, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+
+
 @app.api_route("/api/placeholder-thumb", methods=["GET", "HEAD"])
 async def serve_placeholder_thumb(cat: str = "all", s: str = "", t: str = ""):
-    """Delivers a sharp, sector-themed 120x120 editorial icon thumbnail for news events."""
+    """Delivers a sharp, sector-themed editorial picture for news events."""
     png = generate_placeholder_thumb(category=cat, source=s, title=t)
     from fastapi.responses import Response
     return Response(content=png, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+
+
+WORKSPACE_DIR = os.path.dirname(os.path.abspath(__file__))
+AUTH_CONFIG_FILE = os.path.join(WORKSPACE_DIR, "config", "security_auth.json")
+ADMIN_EMAIL = "eshanparek@gmail.com"
+
+
+def load_security_auth() -> Dict:
+    if os.path.exists(AUTH_CONFIG_FILE):
+        try:
+            with open(AUTH_CONFIG_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {
+        "admin_email": ADMIN_EMAIL,
+        "master_pin": os.getenv("ADMIN_PIN", "202688").strip(),
+        "recovery_codes": ["GNC-SEC-9842", "GNC-SEC-5719", "GNC-SEC-3381"],
+        "last_updated": datetime.now().isoformat()
+    }
+
+
+def save_security_auth(data: Dict):
+    os.makedirs(os.path.dirname(AUTH_CONFIG_FILE), exist_ok=True)
+    with open(AUTH_CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
 
 
 class PinVerifyRequest(BaseModel):
     pin: str
 
 
+class ChangePinRequest(BaseModel):
+    current_pin: str
+    new_pin: str
+    confirm_pin: str
+
+
 @app.post("/api/settings/verify-pin")
 async def verify_admin_pin(req: PinVerifyRequest):
     """Authenticates admin access for Tab 5 settings with Master PIN or Emergency Recovery Codes."""
-    master_pin = os.getenv("ADMIN_PIN", "202688").strip()
-    recovery_codes = {"GNC-SEC-9842", "GNC-SEC-5719", "GNC-SEC-3381"}
+    auth_data = load_security_auth()
+    master_pin = str(auth_data.get("master_pin", "202688")).strip()
+    recovery_codes = {str(c).upper().strip() for c in auth_data.get("recovery_codes", ["GNC-SEC-9842", "GNC-SEC-5719", "GNC-SEC-3381"])}
     cleaned = (req.pin or "").strip()
     if cleaned == master_pin or cleaned.upper() in recovery_codes:
         return JSONResponse({"ok": True, "token": "gnc_auth_valid_session"})
     return JSONResponse({"ok": False, "error": "Invalid PIN or Recovery Code"}, status_code=401)
+
+
+@app.post("/api/settings/change-pin")
+async def change_admin_pin(req: ChangePinRequest):
+    """Updates the Master PIN after verifying the current PIN or Emergency Recovery Passcode."""
+    auth_data = load_security_auth()
+    master_pin = str(auth_data.get("master_pin", "202688")).strip()
+    recovery_codes = {str(c).upper().strip() for c in auth_data.get("recovery_codes", ["GNC-SEC-9842", "GNC-SEC-5719", "GNC-SEC-3381"])}
+    
+    cur = (req.current_pin or "").strip()
+    if cur != master_pin and cur.upper() not in recovery_codes:
+        return JSONResponse({"ok": False, "error": "Current Master PIN verification failed."}, status_code=401)
+    
+    new_p = (req.new_pin or "").strip()
+    conf_p = (req.confirm_pin or "").strip()
+    if len(new_p) < 4 or len(new_p) > 16:
+        return JSONResponse({"ok": False, "error": "New PIN must be between 4 and 16 characters."}, status_code=400)
+    if new_p != conf_p:
+        return JSONResponse({"ok": False, "error": "New PIN and Confirmation PIN do not match."}, status_code=400)
+    
+    auth_data["master_pin"] = new_p
+    auth_data["admin_email"] = ADMIN_EMAIL
+    auth_data["last_updated"] = datetime.now().isoformat()
+    save_security_auth(auth_data)
+    logger.info(f"Master Admin PIN successfully updated and saved for {ADMIN_EMAIL}")
+    return JSONResponse({"ok": True, "message": "Master Security PIN updated successfully. Use your new PIN for future logins."})
 
 
 @app.api_route("/api/story/{kind}/{idx}.png", methods=["GET", "HEAD"])
@@ -1127,7 +1226,7 @@ def render_news_feed_html(items: List[Dict]) -> str:
         is_inst = filter_category in ("inst_domestic", "inst_global")
         scope = filter_category
         source_type = "Regulatory Document" if "SEBI" in (source + " " + title).upper() else ("Market Authority" if any(m in (source + " " + title).upper() for m in ["MCX", "NSE", "BSE"]) else "Outbound Link")
-        thumb_url = it.get("image") or it.get("thumbnail") or f"/api/placeholder-thumb?cat={filter_category}&s={source[:4]}"
+        thumb_url = it.get("image_url") or it.get("image") or it.get("thumbnail") or f"/api/news-thumb?topic={filter_category}&s={source[:8]}&title={html.escape(topic[:14])}"
 
         item_obj = {
             "idx": i,
@@ -1190,7 +1289,7 @@ def render_news_feed_html(items: List[Dict]) -> str:
                 </div>
             </div>
             <div class="epm-chron-thumb">
-                <img src="{it['thumb_url']}" alt="{html.escape(it['source'])}" class="epm-news-thumb-img" onerror="this.onerror=null;this.src='/api/placeholder-thumb?cat={it['filter_category']}';" />
+                <img src="{it['thumb_url']}" alt="{html.escape(it['source'])}" class="epm-news-thumb-img" onerror="this.onerror=null;this.src='/api/news-thumb?topic={it['filter_category']}&s={it['source'][:8]}';" />
             </div>
             <div class="epm-chron-content">
                 <div class="epm-chron-headline">{html.escape(it['title'])}</div>
@@ -1385,6 +1484,7 @@ def build_story_items(kind: str = "news", limit: int = 100) -> List[Dict]:
                 "source": reg,
                 "time": f"{ev.get('date', '')} {calendar_pdf_engine._format_event_time(ev)} IST".strip(),
                 "link": ev.get("linked_news_url") or "/api/calendar/pdf/weekly",
+                "image_url": f"/api/calendar-thumb?sym={ev.get('symbol', '')}&mkt={country}&cat={reg}&t={clean_table_text(ev.get('event', ''))[:16]}",
             })
     elif kind == "circulars":
         try:
@@ -1426,7 +1526,8 @@ def build_story_items(kind: str = "news", limit: int = 100) -> List[Dict]:
                 "takeaway": action or f"Mandatory compliance directive enforced by {reg}. Verified document archived in official repository.",
                 "source": reg,
                 "time": date_str or now_str,
-                "link": doc_url
+                "link": doc_url,
+                "image_url": f"/api/regulator-logo/{reg}",
             })
     elif kind == "holidays":
         try:
@@ -1454,7 +1555,8 @@ def build_story_items(kind: str = "news", limit: int = 100) -> List[Dict]:
                 "takeaway": f"Settlement cycles and trading sessions deferred across affected exchange venues.",
                 "source": "Holiday Calendar",
                 "time": d,
-                "link": ""
+                "link": "",
+                "image_url": f"/api/holiday-thumb/{d}?title={desc}",
             })
     else:
         for it in get_merged_news_pool()[:limit]:
@@ -1477,6 +1579,7 @@ def build_story_items(kind: str = "news", limit: int = 100) -> List[Dict]:
                     "Elevated liquidity velocity and heightened derivatives volume expected across correlated contracts."
                 ]
 
+            news_img = it.get("image_url") or it.get("image") or it.get("thumbnail") or f"/api/news-thumb?topic={clean_table_text(it.get('title', ''))[:14]}&s={clean_table_text(it.get('source', ''))[:8]}"
             out.append({
                 "kind": "news",
                 "title": clean_table_text(it.get("title", "")),
@@ -1493,6 +1596,7 @@ def build_story_items(kind: str = "news", limit: int = 100) -> List[Dict]:
                 "source": clean_table_text(it.get("source", "Wire")),
                 "time": clean_table_text(str(it.get("timestamp", ""))[:16]) or now_str,
                 "link": it.get("link", ""),
+                "image_url": news_img,
             })
     return out
 
@@ -1542,7 +1646,7 @@ def render_story_strip_html(stories: List[Dict], kind: str, is_desktop: bool = F
         else:
             ribbon_cls = "tone-neutral"
 
-        thumb_img_url = s.get("image") or f"/api/placeholder-thumb?cat={kind}&s={emblem}&t={title[:10]}"
+        thumb_img_url = s.get("image_url") or s.get("image") or s.get("thumbnail") or f"/api/placeholder-thumb?cat={kind}&s={emblem}&t={title[:10]}"
         thumbs.append(
             f'<div class="epm-story-thumbnail {ribbon_cls}" onclick="window.epmOpenStory(\'{kind}\',{i})">'
             f'  <div class="epm-thumb-inner">'
@@ -1551,7 +1655,7 @@ def render_story_strip_html(stories: List[Dict], kind: str, is_desktop: bool = F
             f'      <span class="epm-thumb-score">{score}</span>'
             f'    </div>'
             f'    <div class="epm-thumb-mid">'
-            f'      <img src="{thumb_img_url}" class="epm-story-card-thumb" alt="{title}" onerror="this.onerror=null;this.src=\'/api/placeholder-thumb?cat=news\';" />'
+            f'      <img src="{thumb_img_url}" class="epm-story-card-thumb" alt="{title}" onerror="this.onerror=null;this.src=\'/api/placeholder-thumb?cat={kind}\';" />'
             f'      <div class="epm-thumb-title">{title}</div>'
             f'    </div>'
             f'    <div class="epm-thumb-btm">'
@@ -1599,12 +1703,12 @@ def render_mobile_news_feed_html(pool: List[Dict]) -> str:
         inst_badge = f'<span class="epm-inst-chip">🏛️ {src[:12]}</span>' if is_inst else ""
         meta_src = f'{inst_badge}<span class="epm-pc-dot"></span>{ts}' if is_inst else f'{src} · {ts}'
 
-        thumb_url = it.get("image") or it.get("thumbnail") or f"/api/placeholder-thumb?cat={filter_cat}&s={src[:4]}"
+        thumb_url = it.get("image_url") or it.get("image") or it.get("thumbnail") or f"/api/news-thumb?topic={filter_cat}&s={src[:8]}"
         rows.append(f"""
         <div class="epm-pc-card tone-{sk} {inst_cls}" data-scope="{filter_cat}" onclick="window.epmToggleProgressive(this)">
             <div class="epm-pc-head">
                 <div class="epm-pc-thumb" style="width:48px;height:48px;min-width:48px;border-radius:8px;overflow:hidden;margin-right:10px;background:#F1F5F9;border:1px solid #E2E8F0;flex-shrink:0;">
-                    <img src="{thumb_url}" style="width:100%;height:100%;object-fit:cover;" onerror="this.onerror=null;this.src='/api/placeholder-thumb?cat={filter_cat}';" alt="{src}" />
+                    <img src="{thumb_url}" style="width:100%;height:100%;object-fit:cover;" onerror="this.onerror=null;this.src='/api/news-thumb?topic={filter_cat}&s={src[:8]}';" alt="{src}" />
                 </div>
                 <div class="epm-pc-head-text">
                     <div class="epm-pc-title">{title}</div>
@@ -1712,6 +1816,7 @@ def render_calendar_timeline_html(events: List[Dict]) -> str:
         flag = COUNTRY_FLAGS.get(country.upper(), "🌐")
         past = "is-past" if ev_key <= now_key else ""
         story_btn = f'<button type="button" class="epm-pc-story-btn" onclick="event.stopPropagation();window.epmOpenStory(\'calendar\',{i})">▶ Story</button>' if i < len(stories) else ""
+        cal_thumb_url = f"/api/calendar-thumb?sym={ev.get('symbol', '')}&mkt={country}&cat={reg}&t={html.escape(name[:16])}"
 
         parts.append(f"""
         <div class="epm-tl-row {past}">
@@ -1722,7 +1827,12 @@ def render_calendar_timeline_html(events: List[Dict]) -> str:
                     <span class="epm-tl-country">{flag} {html.escape(country.title())}</span>
                     <span class="epm-tl-reg">{html.escape(reg)}</span>
                 </div>
-                <div class="epm-tl-name">{html.escape(name)}</div>
+                <div style="display:flex;align-items:center;gap:10px;margin:6px 0;">
+                    <div class="epm-pc-thumb" style="width:48px;height:48px;min-width:48px;border-radius:8px;overflow:hidden;background:#F1F5F9;border:1px solid #E2E8F0;flex-shrink:0;">
+                        <img src="{cal_thumb_url}" style="width:100%;height:100%;object-fit:cover;" alt="{reg}" onerror="this.onerror=null;this.src='/api/placeholder-thumb?cat=calendar';" />
+                    </div>
+                    <div class="epm-tl-name" style="margin-bottom:0;flex:1;">{html.escape(name)}</div>
+                </div>
                 <div class="epm-tl-badges">
                     <span class="epm-tl-sent tone-{sk}">● {html.escape(sent_text.title())}</span>
                     <span class="epm-signal-pips tier-{stars}">{pips}</span>
@@ -1847,6 +1957,9 @@ def render_mobile_circulars_feed_html(items: List[Dict]) -> str:
         cards.append(f"""
         <div class="epm-pc-card tone-neutral" data-circ-reg="{reg}" onclick="window.epmToggleProgressive(this)">
             <div class="epm-pc-head">
+                <div class="epm-pc-thumb" style="width:48px;height:48px;min-width:48px;border-radius:8px;overflow:hidden;margin-right:10px;background:#F1F5F9;border:1px solid #E2E8F0;flex-shrink:0;">
+                    <img src="/api/regulator-logo/{reg}" style="width:100%;height:100%;object-fit:cover;" alt="{reg}" onerror="this.onerror=null;this.src='/api/placeholder-thumb?cat=circular';" />
+                </div>
                 <div class="epm-pc-head-text">
                     <div class="epm-pc-title">{title}</div>
                     <div class="epm-pc-meta">
@@ -1933,7 +2046,12 @@ def render_mobile_holidays_timeline_html(holidays: List[Dict]) -> str:
                     <span class="epm-tl-country">🏖️ {html.escape(lbl)}</span>
                     <span class="epm-tl-reg">2026</span>
                 </div>
-                <div class="epm-tl-name">{html.escape(desc)}</div>
+                <div style="display:flex;align-items:center;gap:10px;margin:6px 0;">
+                    <div class="epm-pc-thumb" style="width:48px;height:48px;min-width:48px;border-radius:8px;overflow:hidden;background:#F1F5F9;border:1px solid #E2E8F0;flex-shrink:0;">
+                        <img src="/api/holiday-thumb/{d}?title={desc}" style="width:100%;height:100%;object-fit:cover;" alt="{desc}" onerror="this.onerror=null;this.src='/api/placeholder-thumb?cat=holiday';" />
+                    </div>
+                    <div class="epm-tl-name" style="margin-bottom:0;flex:1;">{html.escape(desc)}</div>
+                </div>
                 <div class="epm-pc-body">
                     <div class="epm-pc-metrics" style="grid-template-columns:1fr 1fr; margin-bottom:8px;">
                         <div><span>🇮🇳 NSE / BSE</span><b>{html.escape(nse)}</b></div>
@@ -2444,6 +2562,7 @@ def render_desktop_calendar_html(events: List[Dict]) -> str:
         is_inst = mkt in ["RBI", "SEBI", "FOMC", "SEC"] or "Macro" in cat_chip
         dot_class = "dot-inst" if is_inst else "dot-live"
         s_class = sent.lower()
+        cal_thumb_url = f"/api/calendar-thumb?sym={ev.get('symbol', '')}&mkt={mkt}&cat={cat_tab}&t={html.escape(title[:16])}"
 
         rows_html.append(f'''
         <div class="epm-chron-row {'is-institutional' if is_inst else ''}" data-idx="{idx}" data-cat="{cat_tab}" data-mkt="{mkt}" onclick="window.epmOpenDeskCalAi({idx})">
@@ -2454,6 +2573,9 @@ def render_desktop_calendar_html(events: List[Dict]) -> str:
                     <span class="epm-chron-source-name">{flag} {mkt}</span>
                     <span class="epm-chron-source-type">{html.escape(cat_chip[:16])}</span>
                 </div>
+            </div>
+            <div class="epm-chron-thumb">
+                <img src="{cal_thumb_url}" alt="{html.escape(mkt)}" class="epm-news-thumb-img" onerror="this.onerror=null;this.src='/api/placeholder-thumb?cat=calendar';" />
             </div>
             <div class="epm-chron-content">
                 <div class="epm-chron-headline">
@@ -2642,6 +2764,9 @@ def render_desktop_circulars_html(circulars: List[Dict]) -> str:
                     <span class="epm-chron-source-type">Regulatory Directive</span>
                 </div>
             </div>
+            <div class="epm-chron-thumb">
+                <img src="/api/regulator-logo/{reg}" alt="{html.escape(reg)}" class="epm-news-thumb-img" onerror="this.onerror=null;this.src='/api/placeholder-thumb?cat=circular';" />
+            </div>
             <div class="epm-chron-content">
                 <div class="epm-chron-headline">
                     <span style="font-weight:700; color:#0052FF; margin-right:6px;">[{html.escape(cno[:20])}]</span>
@@ -2787,6 +2912,9 @@ def render_desktop_holidays_html(holidays: List[Dict]) -> str:
             <div class="epm-hol-rail">
                 <span class="epm-hol-rail-date">{d}</span>
                 <span class="epm-hol-rail-day">{day}</span>
+            </div>
+            <div class="epm-chron-thumb">
+                <img src="/api/holiday-thumb/{d}?title={desc}" alt="{desc}" class="epm-news-thumb-img" onerror="this.onerror=null;this.src='/api/placeholder-thumb?cat=holiday';" />
             </div>
             <div class="epm-hol-content">
                 <div style="display:flex;align-items:center;gap:10px;justify-content:space-between;">
@@ -3035,6 +3163,10 @@ def render_settings_hub_html() -> str:
                 <button type="button" class="epm-settings-nav-item" data-pane="pane_system_health" onclick="window.epmShowSettingsPane('pane_system_health', this)">
                     <span class="icon">🔒</span>
                     <span class="text">System Status & Legal Notice</span>
+                </button>
+                <button type="button" class="epm-settings-nav-item" data-pane="pane_security_pin" onclick="window.epmShowSettingsPane('pane_security_pin', this)">
+                    <span class="icon">🔐</span>
+                    <span class="text">Security & Admin PIN</span>
                 </button>
             </div>
         </div>
@@ -3329,6 +3461,64 @@ def render_settings_hub_html() -> str:
                 </div>
                 {disclaimer_html}
             </div>
+
+            <!-- Pane: Master Security Credentials & PIN Governance -->
+            <div class="epm-settings-pane" id="pane_security_pin">
+                <div class="epm-card-hdr">
+                    <div class="epm-card-hdr-left">
+                        <span class="epm-card-hdr-icon">🔐</span>
+                        <span class="epm-card-hdr-title">MASTER SECURITY CREDENTIALS & PIN GOVERNANCE</span>
+                    </div>
+                    <span class="epm-card-hdr-tag">Tier-1 Sovereign Security</span>
+                </div>
+                <div class="epm-segregation-banner" style="background:#EFF6FF;border-color:#BFDBFE;">
+                    <span class="epm-segregation-badge" style="background:#0052FF;">AUTHORIZED ROOT ADMINISTRATOR</span>
+                    <p style="color:#1E3A8A;margin:0;">
+                        <b>Registered Sovereign Admin:</b> <code style="background:#DBEAFE;color:#1E40AF;padding:2px 6px;border-radius:4px;font-weight:700;">eshanparek@gmail.com</code><br>
+                        Authorized to modify access passcodes, configure Telegram bot dispatch webhooks, manage API endpoints, and view regulatory audit trails.
+                    </p>
+                </div>
+
+                <div class="epm-config-group" style="background:#FFFFFF;border:1px solid #E2E8F0;border-radius:10px;padding:18px;margin-top:14px;">
+                    <div class="epm-group-hdr" style="margin-bottom:14px;">
+                        <span class="epm-group-icon">🔑</span>
+                        <span class="epm-group-title">UPDATE MASTER ACCESS PIN</span>
+                    </div>
+                    <div style="font-size:12px;color:#64748B;margin-bottom:14px;line-height:1.5;">
+                        Enter your existing Master PIN (or an emergency recovery code) followed by your new chosen PIN. This update persists across server restarts in secured local storage.
+                    </div>
+                    
+                    <div class="epm-field" style="margin-bottom:12px;">
+                        <label class="epm-field-label" style="display:block;font-size:12px;font-weight:700;color:#0F172A;margin-bottom:6px;">Current Master PIN (or Emergency Passcode)</label>
+                        <input type="password" id="epm-cur-pin" class="epm-input" placeholder="Enter current PIN..." style="max-width:320px;" />
+                    </div>
+
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:12px;margin-bottom:14px;">
+                        <div class="epm-field">
+                            <label class="epm-field-label" style="display:block;font-size:12px;font-weight:700;color:#0F172A;margin-bottom:6px;">New Master PIN (4–16 characters)</label>
+                            <input type="password" id="epm-new-pin" class="epm-input" placeholder="Enter new PIN..." maxlength="16" />
+                        </div>
+                        <div class="epm-field">
+                            <label class="epm-field-label" style="display:block;font-size:12px;font-weight:700;color:#0F172A;margin-bottom:6px;">Confirm New Master PIN</label>
+                            <input type="password" id="epm-conf-pin" class="epm-input" placeholder="Re-enter new PIN..." maxlength="16" />
+                        </div>
+                    </div>
+
+                    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:8px;">
+                        <button type="button" class="epm-save-btn" onclick="window.epmChangeAdminPin()" style="background:#0052FF;color:#FFF;border:none;padding:10px 20px;border-radius:8px;font-weight:700;cursor:pointer;">
+                            Update Security PIN 🔐
+                        </button>
+                        <div id="epm-pin-change-status" style="font-size:12.5px;"></div>
+                    </div>
+                </div>
+
+                <div class="epm-config-group" style="background:#F8FAFC;border:1px dashed #CBD5E1;border-radius:10px;padding:14px;margin-top:16px;">
+                    <div style="font-size:12px;font-weight:700;color:#334155;margin-bottom:4px;">🚨 Emergency Account Recovery</div>
+                    <div style="font-size:11.5px;color:#64748B;line-height:1.5;">
+                        If you ever forget your custom PIN, the system maintains emergency recovery codes bound to <code>eshanparek@gmail.com</code>. Entering any valid recovery code into the authentication gate immediately grants emergency access and permits PIN resetting.
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
     '''
@@ -3339,6 +3529,7 @@ BASELINE_BREAKING_CATALYSTS = [
         "title": "Fed Holds Rates Steady Despite Lack of Progress on Inflation, stubborn price pressures persist",
         "link": "https://www.federalreserve.gov",
         "source": "Reuters",
+        "image_url": "/api/news-thumb?topic=fed&cat=global&s=reuters",
         "ai_score": 8.5,
         "ai_sentiment": "BEARISH",
         "ai_impact": "HIGH",
@@ -3351,6 +3542,7 @@ BASELINE_BREAKING_CATALYSTS = [
         "title": "🚨 SEBI Catalyst: Regulator mandates enhanced disclosure rules for foreign portfolio investors (FPIs)",
         "link": "/api/circular/doc/sebi_fpi_disclosure_2026",
         "source": "SEBI",
+        "image_url": "/api/news-thumb?topic=sebi&cat=inst_domestic&s=sebi",
         "ai_score": 9.0,
         "ai_sentiment": "BULLISH",
         "ai_impact": "HIGH",
@@ -3363,6 +3555,7 @@ BASELINE_BREAKING_CATALYSTS = [
         "title": "Relief for IT as hiring surges 15% across tech giants, TCS and Infosys lead Q3 recruitment push",
         "link": "https://www.bloomberg.com",
         "source": "Bloomberg",
+        "image_url": "/api/news-thumb?topic=it_tech&cat=local&s=bloomberg",
         "ai_score": 7.5,
         "ai_sentiment": "NEUTRAL",
         "ai_impact": "MEDIUM",
@@ -3375,6 +3568,7 @@ BASELINE_BREAKING_CATALYSTS = [
         "title": "🚨 MCX Catalyst: Crude oil and base metals margin requirements revised following global volatility",
         "link": "/api/circular/doc/mcx_margin_crude_bullion_2026",
         "source": "MCX",
+        "image_url": "/api/news-thumb?topic=crude_oil&cat=inst_domestic&s=mcx",
         "ai_score": 8.8,
         "ai_sentiment": "BULLISH",
         "ai_impact": "HIGH",
@@ -3387,6 +3581,7 @@ BASELINE_BREAKING_CATALYSTS = [
         "title": "Jio Platforms and Bharti Airtel see steady volume in retail market ahead of major telecom service announcements",
         "link": "https://www.moneycontrol.com",
         "source": "Moneycontrol",
+        "image_url": "/api/news-thumb?topic=telecom_5g&cat=local&s=moneycontrol",
         "ai_score": 7.0,
         "ai_sentiment": "BEARISH",
         "ai_impact": "MEDIUM",
@@ -3399,6 +3594,7 @@ BASELINE_BREAKING_CATALYSTS = [
         "title": "RBI MPC Keeps Repo Rate Unchanged at 6.50% with Stance Focused on Withdrawal of Accommodation",
         "link": "https://www.rbi.org.in",
         "source": "RBI",
+        "image_url": "/api/news-thumb?topic=rbi_mpc&cat=inst_domestic&s=rbi",
         "ai_score": 10,
         "ai_sentiment": "BULLISH",
         "ai_impact": "HIGH",
@@ -3411,6 +3607,7 @@ BASELINE_BREAKING_CATALYSTS = [
         "title": "US Federal Reserve Holds Fed Funds Target at 5.25%-5.50% Amid Resilient Core CPI & Payroll Strength",
         "link": "https://www.federalreserve.gov",
         "source": "FOMC",
+        "image_url": "/api/news-thumb?topic=fed_funds&cat=inst_global&s=fomc",
         "ai_score": 9,
         "ai_sentiment": "NEUTRAL",
         "ai_impact": "HIGH",
@@ -3423,6 +3620,7 @@ BASELINE_BREAKING_CATALYSTS = [
         "title": "Reliance Industries & Jio Platforms Report 28% Profit Surge on Accelerated 5G Monetization & Retail Scale",
         "link": "https://www.bseindia.com",
         "source": "BSE",
+        "image_url": "/api/news-thumb?topic=reliance&cat=local&s=bse",
         "ai_score": 9,
         "ai_sentiment": "BULLISH",
         "ai_impact": "HIGH",
@@ -3435,6 +3633,7 @@ BASELINE_BREAKING_CATALYSTS = [
         "title": "NTPC & NTPC Green Energy Finalize Rs 10,000 Cr Renewable Capex Plan with Ultra-Mega Solar Grid Commissioning",
         "link": "https://www.nseindia.com",
         "source": "NSE",
+        "image_url": "/api/news-thumb?topic=green_energy&cat=local&s=nse",
         "ai_score": 8,
         "ai_sentiment": "BULLISH",
         "ai_impact": "HIGH",
@@ -3447,6 +3646,7 @@ BASELINE_BREAKING_CATALYSTS = [
         "title": "HDFC Bank & ICICI Bank Post Broad-Based Loan Growth of 16.8% with Gross NPAs Declining to Historic Low of 1.18%",
         "link": "https://www.nseindia.com",
         "source": "Banking Wire",
+        "image_url": "/api/news-thumb?topic=banking&cat=local&s=banking_wire",
         "ai_score": 8,
         "ai_sentiment": "BULLISH",
         "ai_impact": "HIGH",
@@ -3459,6 +3659,7 @@ BASELINE_BREAKING_CATALYSTS = [
         "title": "Brent Crude Stabilizes at $74.20/bbl as OPEC+ Reaffirms Voluntary Output Discipline into Q1 2027",
         "link": "https://www.reuters.com",
         "source": "Reuters",
+        "image_url": "/api/news-thumb?topic=brent_crude&cat=global&s=reuters",
         "ai_score": 8,
         "ai_sentiment": "NEUTRAL",
         "ai_impact": "HIGH",
@@ -3471,6 +3672,7 @@ BASELINE_BREAKING_CATALYSTS = [
         "title": "SEBI Releases Framework for Instant Settlement T+0 and Direct Market Access Architecture for FPI Inflows",
         "link": "https://www.sebi.gov.in",
         "source": "SEBI",
+        "image_url": "/api/news-thumb?topic=t0_settlement&cat=inst_domestic&s=sebi",
         "ai_score": 8,
         "ai_sentiment": "BULLISH",
         "ai_impact": "HIGH",
@@ -9498,6 +9700,56 @@ TERMINAL_CLIENT_JS = r"""
         }
     };
 
+    window.epmChangeAdminPin = function() {
+        const curInput = document.getElementById('epm-cur-pin');
+        const newInput = document.getElementById('epm-new-pin');
+        const confInput = document.getElementById('epm-conf-pin');
+        const statusBox = document.getElementById('epm-pin-change-status');
+        
+        const cur = (curInput ? curInput.value : '').trim();
+        const newP = (newInput ? newInput.value : '').trim();
+        const confP = (confInput ? confInput.value : '').trim();
+        
+        if (!cur) {
+            if (statusBox) statusBox.innerHTML = '<span style="color:#DC2626;font-weight:700;">⚠️ Please enter current Master PIN or recovery passcode.</span>';
+            return;
+        }
+        if (newP.length < 4 || newP.length > 16) {
+            if (statusBox) statusBox.innerHTML = '<span style="color:#DC2626;font-weight:700;">⚠️ New PIN must be between 4 and 16 characters.</span>';
+            return;
+        }
+        if (newP !== confP) {
+            if (statusBox) statusBox.innerHTML = '<span style="color:#DC2626;font-weight:700;">⚠️ New PIN and Confirmation PIN do not match.</span>';
+            return;
+        }
+        
+        if (statusBox) statusBox.innerHTML = '<span style="color:#0052FF;font-weight:700;">⏳ Updating security credentials...</span>';
+        
+        fetch('/api/settings/change-pin', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                current_pin: cur,
+                new_pin: newP,
+                confirm_pin: confP
+            })
+        })
+        .then(r => r.json())
+        .then(res => {
+            if (res.ok) {
+                if (statusBox) statusBox.innerHTML = `<span style="color:#16A34A;font-weight:700;">✅ ${res.message}</span>`;
+                if (curInput) curInput.value = '';
+                if (newInput) newInput.value = '';
+                if (confInput) confInput.value = '';
+            } else {
+                if (statusBox) statusBox.innerHTML = `<span style="color:#DC2626;font-weight:700;">❌ ${res.error || 'Failed to update PIN.'}</span>`;
+            }
+        })
+        .catch(() => {
+            if (statusBox) statusBox.innerHTML = '<span style="color:#DC2626;font-weight:700;">❌ Network error connecting to security service.</span>';
+        });
+    };
+
     // 15. Password Reveal Toggle Controller for Settings Hub
     window.epmInitPasswordToggles = function() {
         const passwordInputs = document.querySelectorAll('input[type="password"], input[data-has-reveal="true"]');
@@ -9750,7 +10002,13 @@ TERMINAL_CLIENT_JS = r"""
         const m2 = it.metric2 || '92%';
         const m2_lbl = it.metric2_label || 'Conviction';
 
+        const heroSrc = it.image_url || it.image || it.thumb_url;
+        const heroImgHtml = heroSrc ? `<div class="epm-sv-hero-wrap" style="width:100%;height:140px;border-radius:10px;overflow:hidden;margin-bottom:12px;border:1px solid rgba(0,0,0,0.08);background:#F8FAFC;display:flex;align-items:center;justify-content:center;">
+            <img src="${heroSrc}" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.style.display='none';" alt="Story Hero" />
+        </div>` : '';
+
         document.getElementById('epm-sv-content').innerHTML = `
+            ${heroImgHtml}
             <div class="epm-sv-badges-row">
               <span class="epm-sv-pill">● ${epmEsc(sk.charAt(0).toUpperCase() + sk.slice(1))}</span>
               <span class="epm-sv-tag">${epmEsc(it.tag || it.source || 'WIRE')}</span>
@@ -9773,7 +10031,8 @@ TERMINAL_CLIENT_JS = r"""
             docLink.style.display = it.link ? 'inline-block' : 'none';
         }
 
-        document.getElementById('epm-sv-dl').href = `/api/story/${epmStory.kind}/${i}.png`;
+        const svDl = document.getElementById('epm-sv-dl');
+        if (svDl) svDl.href = `/api/story/${epmStory.kind}/${i}.png`;
         clearTimeout(epmStory.timer);
         epmStory.timer = setTimeout(() => epmStoryGo(epmStory.idx + 1), EPM_STORY_MS);
     }

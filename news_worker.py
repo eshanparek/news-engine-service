@@ -631,12 +631,31 @@ class NewsEngineWorker:
                         pub_date = pub_tag.text if pub_tag else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
                         if title and len(title.strip()) > 10:
+                            # Extract Image / Thumbnail URL from RSS media tags
+                            img_url = ""
+                            media_tag = it.find(["media:content", "media:thumbnail", "content", "thumbnail"])
+                            if media_tag and media_tag.get("url"):
+                                img_url = media_tag["url"].strip()
+                            if not img_url:
+                                enc = it.find("enclosure")
+                                if enc and "image" in enc.get("type", "") and enc.get("url"):
+                                    img_url = enc["url"].strip()
+                            if not img_url and desc_tag:
+                                try:
+                                    d_soup = BeautifulSoup(desc_tag.text or "", "html.parser")
+                                    img_el = d_soup.find("img")
+                                    if img_el and img_el.get("src") and not img_el["src"].startswith("data:"):
+                                        img_url = img_el["src"].strip()
+                                except Exception:
+                                    pass
+
                             results.append({
                                 "title": title.strip(),
                                 "summary": self.clean_text(desc or title),
                                 "source": source["name"],
                                 "link": link.strip(),
                                 "timestamp": str(pub_date).strip(),
+                                "image_url": img_url,
                                 "relevance": self.calculate_relevance(title + " " + desc)
                             })
 

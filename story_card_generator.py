@@ -115,13 +115,16 @@ class StoryCardGenerator:
         d = ImageDraw.Draw(img)
 
         pad = 84
-        # Progress segments (story-style)
+        # Progress segments (story-style, clamped up to 30 for clean visual bar)
         total = max(1, total)
-        seg_gap = 10
-        seg_w = (W - 2 * 48 - seg_gap * (total - 1)) / total
-        for i in range(total):
+        display_total = min(total, 30)
+        display_index = min(index, display_total - 1)
+        seg_gap = 4 if display_total > 15 else 8
+        available_w = max(100.0, W - 2 * 48 - seg_gap * (display_total - 1))
+        seg_w = max(4.0, available_w / display_total)
+        for i in range(display_total):
             x0 = 48 + i * (seg_w + seg_gap)
-            col = INK if i <= index else (203, 213, 225)
+            col = INK if i <= display_index else (203, 213, 225)
             d.rounded_rectangle([x0, 60, x0 + seg_w, 68], radius=4, fill=col)
 
         # Brand header
@@ -139,6 +142,36 @@ class StoryCardGenerator:
         kw = d.textlength(kind_label, font=kf)
         d.rounded_rectangle([W - pad - kw - 36, 112, W - pad, 160], radius=24, outline=(203, 213, 225), width=2, fill=(255, 255, 255))
         d.text((W - pad - kw - 18, 122), kind_label, font=kf, fill=MUTED)
+
+        # Centered Visual Thumbnail (Festive Holiday, Company Logo, Regulator Emblem, News Image)
+        try:
+            import image_assets
+            t_bytes = None
+            if k == "holidays":
+                t_bytes = image_assets.generate_holiday_thumb(item.get("date", ""), item.get("title", ""))
+            elif k == "calendar":
+                t_bytes = image_assets.generate_calendar_thumb(
+                    symbol=item.get("symbol", ""),
+                    market=item.get("market", ""),
+                    category=item.get("tag", ""),
+                    title=item.get("title", "")
+                )
+            elif k == "circulars":
+                t_bytes = image_assets.generate_regulator_logo(item.get("regulator", item.get("source", "NSE")))
+            else:
+                t_bytes = image_assets.generate_news_thumb(
+                    topic=item.get("tag", ""),
+                    category=item.get("category", ""),
+                    source=item.get("source", ""),
+                    title=item.get("title", "")
+                )
+            if t_bytes:
+                t_img = Image.open(io.BytesIO(t_bytes)).convert("RGBA").resize((160, 160), Image.Resampling.LANCZOS)
+                mask = Image.new("L", (160, 160), 0)
+                ImageDraw.Draw(mask).rounded_rectangle([0, 0, 160, 160], radius=24, fill=255)
+                img.paste(t_img, ((W - 160) // 2, 175), mask)
+        except Exception as e:
+            logger.debug(f"Could not paste story thumbnail: {e}")
 
         y = 360
         # Sentiment pill
