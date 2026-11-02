@@ -93,6 +93,14 @@ class TerminalSecurityAndMetaMiddleware(BaseHTTPMiddleware):
                 '<meta name="twitter:image" content="https://p01--news-engine-service--dkhqtlpvx6bh.code.run/api/og-image.png" />\n'
             )
             
+            # Purge all existing og: and twitter: tags from Gradio's template (e.g. Groot image, Gradio branding)
+            html_text = re.sub(
+                r'<meta\s+[^>]*(?:property|name)=["\'](?:og:[^"\']+|twitter:[^"\']+)["\'][^>]*\/?>',
+                '',
+                html_text,
+                flags=re.IGNORECASE | re.DOTALL
+            )
+            
             # Replace default Gradio title
             html_text = re.sub(r'<title>.*?</title>', '<title>Global News and Calender</title>', html_text, count=1)
             if "<head>" in html_text:
