@@ -899,6 +899,44 @@ def extract_clean_time_str(raw_ts: str, fallback_dt: Optional[datetime] = None) 
     return fallback_dt.strftime("%I:%M %p")
 
 
+def classify_news_filter(source: str, title: str) -> str:
+    """
+    Classifies a news article into one of 4 discrete categories:
+    - 'inst_global': Sovereign/central bank/regulator outside India (FOMC, FED, SEC, CFTC, TREASURY, ECB, BOE, etc.)
+    - 'inst_domestic': Sovereign/market regulator in India (SEBI, RBI, MCX, NSE, BSE, FINMIN, MINISTRY, GOVT, CABINET, DGFT, IFSCA, IRDAI, PFRDA, PIB)
+    - 'global': Global financial media (Reuters, Bloomberg, MarketWatch, WSJ, NYT, CNBC, Financial Times, CoinDesk, Yahoo Finance)
+    - 'local': Local Indian market commercial media (Livemint, Moneycontrol, Economic Times, NDTV, Times of India, Financial Express, Zee Business)
+    """
+    text = (str(source) + " " + str(title)).upper()
+    
+    # 1. Institutional Domestic Regulators & SROs
+    INST_DOMESTIC_KW = [
+        "SEBI", "RBI", "MCX", "NSE", "BSE", "FINMIN", "MINISTRY", "GOVT", 
+        "GOVERNMENT", "CABINET", "DGFT", "MOPNG", "IFSCA", "IRDAI", "PFRDA", "PIB"
+    ]
+    if any(k in text for k in INST_DOMESTIC_KW):
+        return "inst_domestic"
+
+    # 2. Institutional Global Regulators & Central Banks
+    INST_GLOBAL_KW = [
+        "FOMC", "FED", "FEDERAL RESERVE", "SEC", "CFTC", "TREASURY", 
+        "ECB", "BOE", "BANK OF ENGLAND", "IMF", "WORLD BANK", "OPEC"
+    ]
+    if any(k in text for k in INST_GLOBAL_KW):
+        return "inst_global"
+
+    # 3. Global Commercial Financial Media
+    GLOBAL_MEDIA_KW = [
+        "REUTERS", "BLOOMBERG", "MARKETWATCH", "WALL STREET JOURNAL", 
+        "WSJ", "NEW YORK TIMES", "NYT", "CNBC", "COINDESK", "YAHOO", "NASDAQ", "DOW JONES", "S&P"
+    ]
+    if any(k in text for k in GLOBAL_MEDIA_KW):
+        return "global"
+
+    # 4. Default to Local Domestic Market News
+    return "local"
+
+
 def render_news_feed_html(items: List[Dict]) -> str:
     """Renders the Desktop Chronological Timeline Feed with left time rail & institutional highlights (Screenshot 5)."""
     if not items:
@@ -953,8 +991,9 @@ def render_news_feed_html(items: List[Dict]) -> str:
         topic = " ".join(words[:6]) if len(words) > 6 else title
         horizon = "Medium-Term" if sentiment == "BEARISH" else "Short-Term"
 
-        is_inst = any(k in (source + " " + title).upper() for k in ["SEBI", "RBI", "MCX", "NSE", "BSE", "IFSCA", "FINMIN", "FOMC", "SEC", "CATALYST"])
-        scope = "institutional" if is_inst else "broad"
+        filter_category = classify_news_filter(source, title)
+        is_inst = filter_category in ("inst_domestic", "inst_global")
+        scope = filter_category
         source_type = "Regulatory Document" if "SEBI" in (source + " " + title).upper() else ("Market Authority" if any(m in (source + " " + title).upper() for m in ["MCX", "NSE", "BSE"]) else "Outbound Link")
 
         processed.append({
@@ -971,6 +1010,7 @@ def render_news_feed_html(items: List[Dict]) -> str:
             "link": link,
             "bullets": bullets,
             "scope": scope,
+            "filter_category": filter_category,
             "is_inst": is_inst,
             "reasoning": " ".join(bullets)
         })
@@ -1054,10 +1094,14 @@ def render_news_feed_html(items: List[Dict]) -> str:
                         <span>🔍</span>
                         <input type="text" placeholder="Search..." oninput="window.epmFilterChronNews(this.value)" />
                     </div>
-                    <div class="epm-chron-pills">
-                        <button type="button" class="epm-chron-pill active" onclick="window.epmFilterNewsScope('all', this)">ALL NEWS</button>
-                        <button type="button" class="epm-chron-pill" onclick="window.epmFilterNewsScope('institutional', this)">INSTITUTIONAL</button>
-                        <button type="button" class="epm-chron-pill" onclick="window.epmFilterNewsScope('broad', this)">BROAD MARKET</button>
+                    <div class="epm-news-filter-wrap">
+                        <select class="epm-news-scope-select" id="epm-desk-news-filter" onchange="window.epmFilterNewsCategory(this.value)">
+                            <option value="all">🌐 All News</option>
+                            <option value="inst_global">🏛️ Institutional News (Global)</option>
+                            <option value="inst_domestic">🏛️ Institutional News (Domestic)</option>
+                            <option value="local">🇮🇳 Local Market News</option>
+                            <option value="global">🌍 Global Market News</option>
+                        </select>
                     </div>
                 </div>
             </div>
@@ -1407,17 +1451,18 @@ def render_mobile_news_feed_html(pool: List[Dict]) -> str:
         link = html.escape(it.get("link", "#") or "#", quote=True)
         story_btn = f'<button type="button" class="epm-pc-story-btn" onclick="event.stopPropagation();window.epmOpenStory(\'news\',{i})">▶ Story</button>' if i < len(stories) else ""
 
-        combined_text = (src + " " + title).upper()
-        is_inst = any(k in combined_text for k in INSTITUTIONAL_KEYWORDS)
+        filter_cat = classify_news_filter(src, title)
+        is_inst = filter_cat in ("inst_domestic", "inst_global") or any(k in (src + " " + title).upper() for k in INSTITUTIONAL_KEYWORDS)
         inst_cls = "is-institutional" if is_inst else ""
         inst_badge = f'<span class="epm-inst-chip">🏛️ {src[:12]}</span>' if is_inst else ""
+        meta_src = f'{inst_badge}<span class="epm-pc-dot"></span>{ts}' if is_inst else f'{src} · {ts}'
 
         rows.append(f"""
-        <div class="epm-pc-card tone-{sk} {inst_cls}" onclick="window.epmToggleProgressive(this)">
+        <div class="epm-pc-card tone-{sk} {inst_cls}" data-scope="{filter_cat}" onclick="window.epmToggleProgressive(this)">
             <div class="epm-pc-head">
                 <div class="epm-pc-head-text">
                     <div class="epm-pc-title">{title}</div>
-                    <div class="epm-pc-meta">{inst_badge}<span class="epm-pc-dot"></span>{src} · {ts}</div>
+                    <div class="epm-pc-meta">{meta_src}</div>
                 </div>
                 <span class="epm-pc-chev">⌄</span>
             </div>
@@ -1446,10 +1491,23 @@ def render_mobile_news_feed_html(pool: List[Dict]) -> str:
     stories_strip_html = render_story_strip_html(stories, "news", is_desktop=False)
     disclaimer_html = render_site_disclaimer_html(is_mobile=True)
 
+    filter_html = """
+    <div class="epm-mobile-filter-bar">
+        <select class="epm-news-scope-select mobile-select" id="epm-mob-news-filter" onchange="window.epmFilterNewsCategory(this.value)">
+            <option value="all">🌐 All News</option>
+            <option value="inst_global">🏛️ Institutional News (Global)</option>
+            <option value="inst_domestic">🏛️ Institutional News (Domestic)</option>
+            <option value="local">🇮🇳 Local Market News</option>
+            <option value="global">🌍 Global Market News</option>
+        </select>
+    </div>
+    """
+
     return f"""
     <div class="epm-mobile-feed" data-stories-news="{_story_attr(stories)}">
         {stories_strip_html}
         <div class="epm-pc-section-title"><span class="epm-ribbon-bullet">●</span> Breaking Wire <span class="epm-live-pill">LIVE</span></div>
+        {filter_html}
         <div class="epm-pc-list">{''.join(rows)}</div>
         {disclaimer_html}
     </div>"""
@@ -1597,9 +1655,18 @@ def render_mobile_circulars_feed_html(items: List[Dict]) -> str:
         if cleaned_bullets:
             reasoning_html = "".join(f'<div style="margin-bottom:4px;">• {html.escape(b)}</div>' for b in cleaned_bullets)
         else:
-            reasoning_html = f'<div>• {html.escape(clean_table_text(it.get("action_takeaway") or it.get("title", "")))}</div>'
+            takeaway = clean_table_text(it.get("action_takeaway") or "")
+            if not takeaway or takeaway.lower() == title.lower() or len(takeaway) < 5:
+                takeaway = f"Official statutory compliance directive and operational guidelines issued by {reg}."
+            reasoning_html = f'<div>• {html.escape(takeaway)}</div>'
 
         story_btn = f'<button type="button" class="epm-pc-story-btn" onclick="event.stopPropagation();window.epmOpenStory(\'circulars\',{i})">▶ Story</button>' if i < len(stories) else ""
+
+        # Avoid redundant duplicate reg prefix in circular number
+        display_circ_no = circ_no
+        if display_circ_no.upper().startswith(reg.upper()):
+            display_circ_no = display_circ_no[len(reg):].lstrip(" :-/")
+        meta_circ_info = f" · {display_circ_no}" if display_circ_no and display_circ_no != "—" else ""
 
         cards.append(f"""
         <div class="epm-pc-card tone-neutral" data-circ-reg="{reg}" onclick="window.epmToggleProgressive(this)">
@@ -1608,23 +1675,19 @@ def render_mobile_circulars_feed_html(items: List[Dict]) -> str:
                     <div class="epm-pc-title">{title}</div>
                     <div class="epm-pc-meta">
                         <span class="epm-reg-badge" style="background:{meta['color']}18; color:{meta['color']}; border:1px solid {meta['color']}40; padding:1px 6px; border-radius:4px; font-weight:700; font-size:10px;">{reg}</span>
-                        <span> · {circ_no} · {date_str}</span>
+                        <span>{meta_circ_info} · {date_str}</span>
                     </div>
                 </div>
                 <span class="epm-pc-chev">⌄</span>
             </div>
             <div class="epm-pc-body">
-                <div class="epm-pc-full-headline">
-                    <span class="epm-full-hl-badge">OFFICIAL REGULATORY DIRECTIVE TITLE</span>
-                    <div class="epm-full-hl-text">{title}</div>
-                </div>
                 <div class="epm-pc-metrics">
                     <div><span>Authority</span><b>{reg}</b></div>
                     <div><span>Classification</span><b>{category[:12]}</b></div>
                     <div><span>Impact</span><b style="color:{'#E11D48' if impact == 'HIGH' else '#2563EB'}">{impact}</b></div>
                 </div>
                 <div class="epm-pc-reason">
-                    <div style="font-weight:700; margin-bottom:6px; color:#0F172A;">💡 AI Directive Breakdown & Takeaway:</div>
+                    <div style="font-weight:700; margin-bottom:6px; color:#0F172A;">💡 Regulatory Summary & Directive Provisions:</div>
                     {reasoning_html}
                 </div>
                 <div class="epm-pc-actions" style="margin-top:10px; display:flex; align-items:center; justify-content:space-between; gap:8px;">
@@ -4705,7 +4768,7 @@ tbody tr:hover td {
     border-radius: 8px !important;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04) !important;
     padding: 6px 14px !important;
-    margin-bottom: 8px !important;
+    margin-bottom: 4px !important;
 }
 
 .epm-nav-single-row {
@@ -4898,7 +4961,7 @@ tbody tr:hover td {
         display: flex !important;
         gap: 16px !important;
         align-items: stretch !important;
-        margin: 12px 0 24px 0 !important;
+        margin: 4px 0 20px 0 !important;
         min-height: 720px !important;
         width: 100% !important;
     }
@@ -4910,7 +4973,7 @@ tbody tr:hover td {
         background: #FFFFFF !important;
         border: 1px solid #E2E8F0 !important;
         border-radius: 12px !important;
-        padding: 16px !important;
+        padding: 8px 12px !important;
         display: flex !important;
         flex-direction: column !important;
         box-shadow: 0 1px 3px rgba(0,0,0,0.03) !important;
@@ -6877,8 +6940,28 @@ tbody tr:hover td {
     body {
         padding-bottom: 60px !important;
     }
+    .gradio-container, 
+    .gradio-container > .main, 
+    .gradio-container > .wrap,
+    div[class*="gradio-container"] {
+        padding: 2px 4px 60px 4px !important;
+        margin: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
     .epm-top-navbar {
-        padding: 6px 10px !important;
+        margin: 0 0 6px 0 !important;
+        padding: 5px 8px !important;
+        border-radius: 6px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    .epm-mobile-feed, .epm-mobile-timeline, .epm-pc-list, .epm-pc-card, .epm-tl-card {
+        width: 100% !important;
+        box-sizing: border-box !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
     }
     .epm-nav-single-row {
         flex-wrap: wrap !important;
@@ -7260,6 +7343,22 @@ tbody tr:hover td {
 .tone-bearish .epm-pc-sent { background: rgba(244,63,94,.12); color: #BE123C; }
 .epm-pc-story-btn { margin-left: auto; font-size: 11px; font-weight: 700; padding: 5px 10px; border-radius: 999px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #0F172A; cursor: pointer; }
 .epm-pc-link { font-size: 11px; font-weight: 700; color: #0052FF !important; text-decoration: none !important; }
+.epm-btn-download {
+    color: #FFFFFF !important;
+    background: #0052FF !important;
+    padding: 6px 12px !important;
+    border-radius: 6px !important;
+    text-decoration: none !important;
+    font-size: 11.5px !important;
+    font-weight: 700 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+}
+.epm-btn-download:hover {
+    background: #0043D6 !important;
+    color: #FFFFFF !important;
+}
 
 /* Chronological timeline */
 .epm-tl-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
@@ -7406,13 +7505,13 @@ tbody tr:hover td {
 /* Desktop Story Circles Strip */
 .epm-story-strip.desktop-strip {
     display: flex;
-    gap: 14px;
+    gap: 12px;
     overflow-x: auto;
-    padding: 10px 14px;
+    padding: 8px 10px;
     background: #FFFFFF;
     border: 1px solid #E2E8F0;
     border-radius: 12px;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
 }
 .epm-story-strip.desktop-strip::-webkit-scrollbar { height: 4px; }
 .epm-story-strip.desktop-strip::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
@@ -7489,6 +7588,50 @@ tbody tr:hover td {
     background: #0F172A;
     color: #FFFFFF;
     border-color: #0F172A;
+}
+
+.epm-news-filter-wrap {
+    display: inline-flex;
+    align-items: center;
+}
+.epm-news-scope-select {
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    border: 1px solid #CBD5E1;
+    background: #FFFFFF;
+    color: #0F172A;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.15s ease;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.epm-news-scope-select:focus, .epm-news-scope-select:hover {
+    border-color: #0052FF;
+}
+.epm-mobile-filter-bar {
+    width: 100% !important;
+    margin: 6px 0 10px 0 !important;
+    display: flex !important;
+}
+.epm-news-scope-select.mobile-select {
+    width: 100% !important;
+    padding: 8px 12px !important;
+    font-size: 12.5px !important;
+    font-weight: 700 !important;
+    border-radius: 8px !important;
+    background: #FFFFFF !important;
+    border: 1px solid #CBD5E1 !important;
+    color: #0F172A !important;
+}
+#tab1_hidden_components {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
 }
 
 .epm-stream-divider {
@@ -9218,19 +9361,50 @@ TERMINAL_CLIENT_JS = r"""
         });
     };
 
-    window.epmFilterNewsScope = function(scope, btn) {
-        document.querySelectorAll('.epm-chron-pill').forEach(b => b.classList.remove('active'));
-        if (btn) btn.classList.add('active');
+    window.epmFilterNewsCategory = function(cat) {
+        // Sync desktop and mobile filter selects
+        const deskSelect = document.getElementById('epm-desk-news-filter');
+        const mobSelect = document.getElementById('epm-mob-news-filter');
+        if (deskSelect && deskSelect.value !== cat) deskSelect.value = cat;
+        if (mobSelect && mobSelect.value !== cat) mobSelect.value = cat;
+
+        // Desktop Chronological Timeline Rows
         document.querySelectorAll('#epm-chron-feed .epm-chron-row').forEach(row => {
-            const rowScope = row.getAttribute('data-scope') || 'broad';
-            if (scope === 'all') {
+            const rowScope = row.getAttribute('data-scope') || 'local';
+            if (cat === 'all') {
                 row.style.display = '';
-            } else if (scope === 'institutional') {
-                row.style.display = (rowScope === 'institutional' || row.classList.contains('is-institutional')) ? '' : 'none';
-            } else if (scope === 'broad') {
-                row.style.display = (rowScope === 'broad' && !row.classList.contains('is-institutional')) ? '' : 'none';
+            } else if (cat === 'inst_global') {
+                row.style.display = (rowScope === 'inst_global') ? '' : 'none';
+            } else if (cat === 'inst_domestic') {
+                row.style.display = (rowScope === 'inst_domestic') ? '' : 'none';
+            } else if (cat === 'local') {
+                row.style.display = (rowScope === 'local') ? '' : 'none';
+            } else if (cat === 'global') {
+                row.style.display = (rowScope === 'global') ? '' : 'none';
             }
         });
+
+        // Mobile News Cards
+        document.querySelectorAll('.epm-pc-list .epm-pc-card').forEach(card => {
+            const cardScope = card.getAttribute('data-scope') || 'local';
+            if (cat === 'all') {
+                card.style.display = '';
+            } else if (cat === 'inst_global') {
+                card.style.display = (cardScope === 'inst_global') ? '' : 'none';
+            } else if (cat === 'inst_domestic') {
+                card.style.display = (cardScope === 'inst_domestic') ? '' : 'none';
+            } else if (cat === 'local') {
+                card.style.display = (cardScope === 'local') ? '' : 'none';
+            } else if (cat === 'global') {
+                card.style.display = (cardScope === 'global') ? '' : 'none';
+            }
+        });
+    };
+
+    window.epmFilterNewsScope = function(scope, btn) {
+        if (scope === 'all') window.epmFilterNewsCategory('all');
+        else if (scope === 'institutional') window.epmFilterNewsCategory('inst_domestic');
+        else if (scope === 'broad') window.epmFilterNewsCategory('local');
     };
 
     window.epmChangeCalPeriod = function(period) {
@@ -9721,29 +9895,12 @@ with gr.Blocks(
             mobile_news_feed = gr.HTML(value=init_mobile_news_html, elem_id="mobile_news_feed", elem_classes=["epm-mobile-only"])
             top_news_visual = gr.HTML(value=init_news_html, elem_id="news_visual_feed", elem_classes=["epm-desktop-only"])
 
-            with gr.Accordion("📊 Institutional Tabular Stream (Secondary Raw Data)", open=False, elem_classes=["epm-desktop-only"]):
-                with gr.Row(elem_id="tab1_header_strip"):
-                    gr.HTML(render_table_ribbon("top_news_table", "Institutional Breaking Wire & Multi-Market Stream", subtitle="All Catalysts · AI Scored", count_badge="Primary Catalysts", section_id="sec_breaking_wire", show_refresh=True))
-                    refresh_btn = gr.Button("🔄 Force Refresh Feeds", variant="primary", elem_id="tab1_refresh_btn", scale=0)
-
-                top_table = gr.Dataframe(
-                    headers=["Score", "Sentiment", "Impact", "Headline", "Sectors/Tickers", "AI Reasoning", "Source", "Relevance", "Time"],
-                    datatype=["str", "str", "str", "markdown", "str", "str", "str", "str", "str"],
-                    value=init_top_rows,
-                    interactive=False,
-                    wrap=True,
-                    elem_id="top_news_table"
-                )
-
-                bottom_table = gr.Dataframe(
-                    headers=["Time", "Source", "Headline", "Relevance", "Sentiment", "URL"],
-                    datatype=["str", "str", "markdown", "str", "str", "markdown"],
-                    value=init_bottom_rows,
-                    interactive=False,
-                    wrap=True,
-                    elem_id="bottom_news_table",
-                    visible=False
-                )
+            # Institutional Tabular Stream removed as requested (data already merged into the live wire).
+            # Dummy hidden components preserved for zero-error Gradio callback arity:
+            with gr.Column(visible=False, elem_id="tab1_hidden_components"):
+                refresh_btn = gr.Button(visible=False, elem_id="tab1_refresh_btn")
+                top_table = gr.Dataframe(visible=False, elem_id="top_news_table")
+                bottom_table = gr.Dataframe(visible=False, elem_id="bottom_news_table")
 
         # ═══════════════════════════════════════════════════════════
         # TAB 2: Multi-Market Calendar, Live Timers & Outcomes
