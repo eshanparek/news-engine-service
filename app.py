@@ -1604,12 +1604,32 @@ def render_calendar_timeline_html(events: List[Dict]) -> str:
     stories_strip_html = render_story_strip_html(stories, "calendar", is_desktop=False)
     disclaimer_html = render_site_disclaimer_html(is_mobile=True)
 
+    filter_bar_html = """
+    <div class="epm-mobile-filter-bar epm-cal-mob-filters" style="display:flex;gap:6px;width:100%;margin:6px 0 10px 0;">
+        <select class="epm-news-scope-select mobile-select" id="epm-mob-cal-period" onchange="window.epmChangeCalPeriod(this.value)" style="flex:1;">
+            <option value="all">📅 Period: All</option>
+            <option value="today">📅 Today</option>
+            <option value="tomorrow">📅 Tomorrow</option>
+            <option value="week">📅 Next 7 Days</option>
+            <option value="upcoming">📅 Active Timers</option>
+        </select>
+        <select class="epm-news-scope-select mobile-select" id="epm-mob-cal-market" onchange="window.epmChangeCalMarket(this.value)" style="flex:1;">
+            <option value="ALL">🏛️ Reg: All</option>
+            <option value="NSE">🇮🇳 NSE</option>
+            <option value="BSE">🇮🇳 BSE</option>
+            <option value="MCX">⛽ MCX</option>
+            <option value="NYSE">🇺🇸 SEC/Fed</option>
+        </select>
+    </div>
+    """
+
     return f"""
     <div class="epm-mobile-timeline" data-stories-calendar="{_story_attr(stories)}">
         {stories_strip_html}
         <div class="epm-tl-header">
             <span class="epm-pc-section-title"><span class="epm-ribbon-bullet">●</span> Chronological Timeline <span class="epm-live-pill">LIVE</span></span>
         </div>
+        {filter_bar_html}
         {''.join(parts)}
         {disclaimer_html}
     </div>"""
@@ -1633,11 +1653,21 @@ def render_mobile_circulars_feed_html(items: List[Dict]) -> str:
         for i, s in enumerate(stories)
     )
 
-    chips = ["ALL", "NSE", "BSE", "MCX", "RBI", "FINMIN", "FOMC", "NYSE"]
-    chip_html = "".join(
-        f'<button type="button" class="epm-circ-chip {"active" if c == "ALL" else ""}" onclick="window.epmFilterCircCards(\'{c}\', this)">{c}</button>'
-        for c in chips
-    )
+    chip_html = """
+    <div class="epm-mobile-filter-bar">
+        <select class="epm-news-scope-select mobile-select" id="epm-mob-circ-filter" onchange="window.epmFilterCircCards(this.value, this)">
+            <option value="ALL">🏛️ All Regulators & SROs</option>
+            <option value="SEBI">🛡️ SEBI (Securities & Exchange Board)</option>
+            <option value="RBI">🏦 RBI (Reserve Bank of India)</option>
+            <option value="NSE">🇮🇳 NSE (National Stock Exchange)</option>
+            <option value="BSE">🇮🇳 BSE (Bombay Stock Exchange)</option>
+            <option value="MCX">⛽ MCX (Multi Commodity Exchange)</option>
+            <option value="FINMIN">🏛️ Ministry of Finance (FinMin)</option>
+            <option value="FOMC">🇺🇸 US Federal Reserve (FOMC)</option>
+            <option value="NYSE">🇺🇸 US SEC / NYSE</option>
+        </select>
+    </div>
+    """
 
     cards = []
     for i, it in enumerate(items):
@@ -2323,12 +2353,14 @@ def render_desktop_calendar_html(events: List[Dict]) -> str:
                         <option value="NYSE">🇺🇸 SEC / NYSE</option>
                     </select>
                 </div>
-                <div class="epm-cal-cat-pills">
-                    <button type="button" class="epm-cal-cat-btn active" onclick="window.epmFilterCalCat('all', this)">All</button>
-                    <button type="button" class="epm-cal-cat-btn" onclick="window.epmFilterCalCat('equities', this)">Equities</button>
-                    <button type="button" class="epm-cal-cat-btn" onclick="window.epmFilterCalCat('fno', this)">Futures & Options</button>
-                    <button type="button" class="epm-cal-cat-btn" onclick="window.epmFilterCalCat('ipos', this)">IPOs</button>
-                    <button type="button" class="epm-cal-cat-btn" onclick="window.epmFilterCalCat('macro', this)">Macro Events</button>
+                <div class="epm-news-filter-wrap">
+                    <select class="epm-news-scope-select epm-cal-category-select" id="epm-cal-category-select" onchange="window.epmFilterCalCat(this.value)">
+                        <option value="all">⚡ All Catalysts</option>
+                        <option value="equities">📈 Equities & Earnings</option>
+                        <option value="fno">📊 Futures & Options</option>
+                        <option value="ipos">🚀 IPOs & Primary Market</option>
+                        <option value="macro">🏛️ Macro & Central Bank</option>
+                    </select>
                 </div>
                 <div class="epm-cal-1row-actions">
                     <div class="epm-dropdown-wrap">
@@ -2492,14 +2524,17 @@ def render_desktop_circulars_html(circulars: List[Dict]) -> str:
 
             <div class="epm-circ-top-strip" style="display:flex; align-items:center; justify-content:space-between; padding:12px 16px; background:#fff; border:1px solid #E2E8F0; border-radius:12px; margin-bottom:10px; flex-wrap:wrap; gap:10px;">
                 <div class="epm-circ-title-text" style="font-size:14px; font-weight:800; color:#0F172A;">OFFICIAL REGULATORY DIRECTIVES & CIRCULARS</div>
-                <div class="epm-circ-reg-pills" style="display:flex; gap:6px;">
-                    <button type="button" class="epm-circ-reg-btn active" onclick="window.epmFilterCircReg('all', this)">ALL</button>
-                    <button type="button" class="epm-circ-reg-btn" onclick="window.epmFilterCircReg('rbi', this)">RBI</button>
-                    <button type="button" class="epm-circ-reg-btn" onclick="window.epmFilterCircReg('sebi', this)">SEBI</button>
-                    <button type="button" class="epm-circ-reg-btn" onclick="window.epmFilterCircReg('nse', this)">NSE</button>
-                    <button type="button" class="epm-circ-reg-btn" onclick="window.epmFilterCircReg('bse', this)">BSE</button>
-                    <button type="button" class="epm-circ-reg-btn" onclick="window.epmFilterCircReg('mcx', this)">MCX</button>
-                    <button type="button" class="epm-circ-reg-btn" onclick="window.epmFilterCircReg('fomc', this)">FOMC</button>
+                <div class="epm-news-filter-wrap">
+                    <select class="epm-news-scope-select" id="epm-desk-circ-filter" onchange="window.epmFilterCircReg(this.value, this)">
+                        <option value="all">🏛️ All Regulators & SROs</option>
+                        <option value="sebi">🛡️ SEBI (Securities & Exchange Board)</option>
+                        <option value="rbi">🏦 RBI (Reserve Bank of India)</option>
+                        <option value="nse">🇮🇳 NSE (National Stock Exchange)</option>
+                        <option value="bse">🇮🇳 BSE (Bombay Stock Exchange)</option>
+                        <option value="mcx">⛽ MCX (Multi Commodity Exchange)</option>
+                        <option value="fomc">🇺🇸 US Federal Reserve (FOMC)</option>
+                        <option value="nyse">🇺🇸 US SEC / NYSE</option>
+                    </select>
                 </div>
                 <div class="epm-circ-action-btns" style="display:flex; gap:8px;">
                     <a href="/api/calendar/pdf/monthly" download target="_blank" class="epm-cal-hdr-btn" style="text-decoration:none;">
@@ -2699,11 +2734,17 @@ INSTITUTIONAL_DIRECTORY = [
 
 def render_settings_hub_html() -> str:
     """
-    Renders institutional Settings Hub with:
-    1. Authoritative Institutional & Key Person Registry (Sovereign vs Commercial Media)
-    2. Dispatch Configuration (Channels 1 & 2, Automated Schedules, Triggers) with Circular TG Disabled
-    3. Active Dispatch List & Monitor
-    4. Global Legal & Compliance Notice
+    Renders institutional Meta / Facebook Business Suite-style Settings & Admin Panel:
+    - Vertical sub-menu sidebar on the left.
+    - Categorically disassociated content panes on the right:
+      1. Indian Regulators & Ministries
+      2. Indian Market Infrastructure & Exchanges
+      3. Global Central Banks & Regulators
+      4. Global Exchanges & CME
+      5. Commercial News Providers & Media (Segregated!)
+      6. Telegram Channels & Bot Setup
+      7. Calendar & PDF Automation (including Site Menu Drawer toggle)
+      8. System Health, Monitors & Disclaimers
     """
     news_tok = html.escape(telegram_notifier.bot_token or "")
     news_chat = html.escape(telegram_notifier.chat_id or "")
@@ -2721,320 +2762,398 @@ def render_settings_hub_html() -> str:
     trig_out = "checked" if telegram_notifier.alert_on_outcome else ""
     trig_link = "checked" if telegram_notifier.alert_on_linked_news else ""
 
-    # Build Directory Rows
-    dir_rows = []
-    for d in INSTITUTIONAL_DIRECTORY:
-        tier_class = "tier-sovereign" if "Sovereign" in d["tier"] else ("tier-exchange" if "Exchange" in d["tier"] else ("tier-media" if "Media" in d["tier"] else "tier-govt"))
-        dir_rows.append(f'''
-        <tr class="epm-dir-row" data-cat="{d['cat']}">
-            <td class="col-dir-name">
-                <b>{html.escape(d['name'])}</b>
-                <span class="epm-dir-code">{html.escape(d['code'])}</span>
-            </td>
-            <td class="col-dir-tier">
-                <span class="epm-tier-badge {tier_class}">{html.escape(d['tier'])}</span>
-            </td>
-            <td class="col-dir-jur">{html.escape(d['jurisdiction'])}</td>
-            <td class="col-dir-scope">{html.escape(d['scope'])}</td>
-            <td class="col-dir-link">
-                <a href="{html.escape(d['url'])}" target="_blank" rel="noopener" class="epm-dir-portal-btn">Portal ↗</a>
-            </td>
-        </tr>
-        ''')
+    def _render_dir_table(items: List[Dict]) -> str:
+        rows = []
+        for d in items:
+            tier_class = "tier-sovereign" if "Sovereign" in d.get("tier", "") else ("tier-exchange" if "Exchange" in d.get("tier", "") else ("tier-media" if "Media" in d.get("tier", "") else "tier-govt"))
+            rows.append(f'''
+            <tr class="epm-dir-row">
+                <td class="col-dir-name">
+                    <b>{html.escape(d['name'])}</b>
+                    <span class="epm-dir-code">{html.escape(d['code'])}</span>
+                </td>
+                <td class="col-dir-tier">
+                    <span class="epm-tier-badge {tier_class}">{html.escape(d['tier'])}</span>
+                </td>
+                <td class="col-dir-jur">{html.escape(d['jurisdiction'])}</td>
+                <td class="col-dir-scope">{html.escape(d['scope'])}</td>
+                <td class="col-dir-link">
+                    <a href="{html.escape(d['url'])}" target="_blank" rel="noopener" class="epm-dir-portal-btn">Portal ↗</a>
+                </td>
+            </tr>''')
+        return f'''
+        <div class="epm-dir-table-wrap">
+            <table class="epm-dir-table">
+                <thead>
+                    <tr>
+                        <th style="width: 26%;">AUTHORITY / ENTITY</th>
+                        <th style="width: 14%;">CLASSIFICATION</th>
+                        <th style="width: 12%;">JURISDICTION</th>
+                        <th style="width: 38%;">STATUTORY SCOPE & SURVEILLANCE</th>
+                        <th style="width: 10%;">PORTAL</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {''.join(rows)}
+                </tbody>
+            </table>
+        </div>'''
+
+    in_reg_items = [d for d in INSTITUTIONAL_DIRECTORY if d.get('cat') in ('regulator', 'ministry', 'person') and 'India' in d.get('jurisdiction', '')]
+    in_mkt_items = [d for d in INSTITUTIONAL_DIRECTORY if d.get('cat') == 'exchange' and 'India' in d.get('jurisdiction', '')]
+    glob_reg_items = [d for d in INSTITUTIONAL_DIRECTORY if d.get('cat') in ('regulator', 'ministry', 'person') and 'India' not in d.get('jurisdiction', '')]
+    glob_mkt_items = [d for d in INSTITUTIONAL_DIRECTORY if d.get('cat') == 'exchange' and 'India' not in d.get('jurisdiction', '')]
+    media_items = [d for d in INSTITUTIONAL_DIRECTORY if d.get('cat') == 'media']
 
     disclaimer_html = render_site_disclaimer_html(is_mobile=False)
 
     return f'''
-    <div class="epm-settings-hub-container">
-        <!-- Top Institutional Header -->
-        <div class="epm-settings-header">
-            <div class="epm-settings-title-cluster">
-                <span class="epm-settings-main-title">INSTITUTIONAL SETTINGS & DIRECTORY HUB</span>
-                <span class="epm-settings-sub-title">Multi-market institutional directory, sovereign vs media segregation, Telegram dispatch channels, and automated cron monitors.</span>
+    <div class="epm-settings-workspace">
+        <!-- Left Column: Meta / Facebook Business Suite Style Vertical Sub-Menu -->
+        <div class="epm-settings-sidebar">
+            <div class="epm-settings-sb-hdr">
+                <span class="epm-settings-sb-title">⚙️ ADMIN & SETTINGS</span>
+                <span class="epm-settings-sb-sub">Institutional Governance Hub</span>
             </div>
-            <div class="epm-settings-status-badge">
-                <span class="epm-status-dot pulse-green">●</span> SYSTEM STATUS: OPERATIONAL
-            </div>
-        </div>
-
-        <!-- 1. AUTHORITATIVE INSTITUTIONAL & KEY PERSON REGISTRY -->
-        <div class="epm-settings-card" style="margin-bottom: 24px;">
-            <div class="epm-card-hdr">
-                <div class="epm-card-hdr-left">
-                    <span class="epm-card-hdr-icon">🏛️</span>
-                    <span class="epm-card-hdr-title">AUTHORITATIVE INSTITUTIONAL & KEY PERSON REGISTRY</span>
-                </div>
-                <span class="epm-card-hdr-tag">Tier-1 Sovereign vs Commercial Media Segregation</span>
-            </div>
-
-            <!-- Explanatory Segregation Banner -->
-            <div class="epm-segregation-banner">
-                <span class="epm-segregation-badge">DATA GOVERNANCE ARCHITECTURE</span>
-                <p><b>Statutory Primacy:</b> Tier-1 Sovereign Regulators, Organized Exchanges, Government Ministries, and Key Public Officials (Ministers & Central Bank Governors) possess legal rulemaking and enforcement authority. Their releases represent definitive market reality.</p>
-                <p><b>Secondary Media Benchmark:</b> Commercial wire services (Reuters, Bloomberg, Livemint, CNBC-TV18, Moneycontrol) are segregated and tracked purely for broad market sentiment, journalistic commentary, and secondary price action analysis.</p>
-            </div>
-
-            <!-- Controls: Category Tabs & Search -->
-            <div class="epm-dir-controls">
-                <div class="epm-dir-tabs">
-                    <button type="button" class="epm-dir-tab active" onclick="window.epmFilterDirCat('all', this)">ALL DIRECTORIES ({len(INSTITUTIONAL_DIRECTORY)})</button>
-                    <button type="button" class="epm-dir-tab" onclick="window.epmFilterDirCat('regulator', this)">🏛️ REGULATORS</button>
-                    <button type="button" class="epm-dir-tab" onclick="window.epmFilterDirCat('exchange', this)">📈 EXCHANGES & SROs</button>
-                    <button type="button" class="epm-dir-tab" onclick="window.epmFilterDirCat('ministry', this)">🏢 MINISTRIES & DEPTS</button>
-                    <button type="button" class="epm-dir-tab" onclick="window.epmFilterDirCat('person', this)">👤 KEY SOVEREIGN OFFICIALS</button>
-                    <button type="button" class="epm-dir-tab" onclick="window.epmFilterDirCat('media', this)">📰 COMMERCIAL MEDIA</button>
-                </div>
-                <div class="epm-dir-search-wrap">
-                    <input type="text" class="epm-search-input" placeholder="🔍 Search directory by authority, name, jurisdiction or scope..." onkeyup="window.epmFilterDirectory(this.value)" />
-                </div>
-            </div>
-
-            <!-- Interactive Directory Table -->
-            <div class="epm-dir-table-wrap">
-                <table class="epm-dir-table" id="epm-directory-table">
-                    <thead>
-                        <tr>
-                            <th style="width: 26%;">AUTHORITY / KEY OFFICIAL</th>
-                            <th style="width: 14%;">TIER & CATEGORY</th>
-                            <th style="width: 12%;">JURISDICTION</th>
-                            <th style="width: 38%;">STATUTORY SCOPE & KEY FOCUS</th>
-                            <th style="width: 10%;">REFERENCE</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {''.join(dir_rows)}
-                    </tbody>
-                </table>
+            <div class="epm-settings-sb-nav">
+                <button type="button" class="epm-settings-nav-item active" data-pane="pane_in_reg" onclick="window.epmShowSettingsPane('pane_in_reg', this)">
+                    <span class="icon">🏛️</span>
+                    <span class="text">Indian Regulators & Govt</span>
+                </button>
+                <button type="button" class="epm-settings-nav-item" data-pane="pane_in_mkt" onclick="window.epmShowSettingsPane('pane_in_mkt', this)">
+                    <span class="icon">📈</span>
+                    <span class="text">Indian Exchanges & SROs</span>
+                </button>
+                <button type="button" class="epm-settings-nav-item" data-pane="pane_glob_reg" onclick="window.epmShowSettingsPane('pane_glob_reg', this)">
+                    <span class="icon">🌐</span>
+                    <span class="text">Global Regulators & Banks</span>
+                </button>
+                <button type="button" class="epm-settings-nav-item" data-pane="pane_glob_mkt" onclick="window.epmShowSettingsPane('pane_glob_mkt', this)">
+                    <span class="icon">🌍</span>
+                    <span class="text">Global Exchanges & CME</span>
+                </button>
+                <button type="button" class="epm-settings-nav-item" data-pane="pane_media" onclick="window.epmShowSettingsPane('pane_media', this)">
+                    <span class="icon">📰</span>
+                    <span class="text">Commercial News Providers</span>
+                </button>
+                <button type="button" class="epm-settings-nav-item" data-pane="pane_telegram" onclick="window.epmShowSettingsPane('pane_telegram', this)">
+                    <span class="icon">✈️</span>
+                    <span class="text">Telegram Channels & Bots</span>
+                </button>
+                <button type="button" class="epm-settings-nav-item" data-pane="pane_pdf_sched" onclick="window.epmShowSettingsPane('pane_pdf_sched', this)">
+                    <span class="icon">📑</span>
+                    <span class="text">Calendar & PDF Automation</span>
+                </button>
+                <button type="button" class="epm-settings-nav-item" data-pane="pane_sec_google" onclick="window.epmShowSettingsPane('pane_sec_google', this)">
+                    <span class="icon">📅</span>
+                    <span class="text">Google Calendar Integration</span>
+                </button>
+                <button type="button" class="epm-settings-nav-item" data-pane="pane_sec_social" onclick="window.epmShowSettingsPane('pane_sec_social', this)">
+                    <span class="icon">📸</span>
+                    <span class="text">Omnichannel Social Media</span>
+                </button>
+                <button type="button" class="epm-settings-nav-item" data-pane="pane_sec_forwarding" onclick="window.epmShowSettingsPane('pane_sec_forwarding', this)">
+                    <span class="icon">🔔</span>
+                    <span class="text">Selective Forwarding Rules</span>
+                </button>
+                <button type="button" class="epm-settings-nav-item" data-pane="pane_system_health" onclick="window.epmShowSettingsPane('pane_system_health', this)">
+                    <span class="icon">🔒</span>
+                    <span class="text">System Status & Legal Notice</span>
+                </button>
             </div>
         </div>
 
-        <div class="epm-settings-grid">
-            <!-- Left Column: DISPATCH CONFIGURATION -->
-            <div class="epm-settings-col epm-config-col">
-                <div class="epm-settings-card">
-                    <div class="epm-card-hdr">
-                        <div class="epm-card-hdr-left">
-                            <span class="epm-card-hdr-icon">⚡</span>
-                            <span class="epm-card-hdr-title">DISPATCH CONFIGURATION</span>
-                        </div>
-                        <span class="epm-card-hdr-tag">Telegram & Webhooks</span>
+        <!-- Right Column: Categorically Disassociated Settings Panes -->
+        <div class="epm-settings-content">
+            
+            <!-- Pane 1: Indian Regulators & Ministries -->
+            <div class="epm-settings-pane active" id="pane_in_reg">
+                <div class="epm-card-hdr">
+                    <div class="epm-card-hdr-left">
+                        <span class="epm-card-hdr-icon">🏛️</span>
+                        <span class="epm-card-hdr-title">INDIAN REGULATORS, MINISTRIES & SOVEREIGN OFFICIALS</span>
+                    </div>
+                    <span class="epm-card-hdr-tag">Tier-1 Sovereign Authority</span>
+                </div>
+                <div class="epm-segregation-banner">
+                    <span class="epm-segregation-badge">STATUTORY MANDATE</span>
+                    <p>Statutory bodies, financial regulators, and sovereign ministries possess official rulemaking, licensing, and enforcement powers under the Constitution of India and Parliament Acts. Their circulars represent definitive compliance instructions.</p>
+                </div>
+                {_render_dir_table(in_reg_items)}
+            </div>
+
+            <!-- Pane 2: Indian Exchanges & SROs -->
+            <div class="epm-settings-pane" id="pane_in_mkt">
+                <div class="epm-card-hdr">
+                    <div class="epm-card-hdr-left">
+                        <span class="epm-card-hdr-icon">📈</span>
+                        <span class="epm-card-hdr-title">INDIAN MARKET INFRASTRUCTURE (EXCHANGES & CLEARING)</span>
+                    </div>
+                    <span class="epm-card-hdr-tag">Regulated Trading Venues</span>
+                </div>
+                <div class="epm-segregation-banner">
+                    <span class="epm-segregation-badge">EXCHANGE SURVEILLANCE</span>
+                    <p>Recognized stock, derivatives, and commodity exchanges operating clearing corporations and depositories under SEBI surveillance framework. Contract specifications, margin revisions, and circuit limit rules originate here.</p>
+                </div>
+                {_render_dir_table(in_mkt_items)}
+            </div>
+
+            <!-- Pane 3: Global Central Banks & Regulators -->
+            <div class="epm-settings-pane" id="pane_glob_reg">
+                <div class="epm-card-hdr">
+                    <div class="epm-card-hdr-left">
+                        <span class="epm-card-hdr-icon">🌐</span>
+                        <span class="epm-card-hdr-title">GLOBAL CENTRAL BANKS, REGULATORS & SUPRANATIONAL BODIES</span>
+                    </div>
+                    <span class="epm-card-hdr-tag">Macro Sovereign Benchmark</span>
+                </div>
+                <div class="epm-segregation-banner">
+                    <span class="epm-segregation-badge">GLOBAL MACRO IMPACT</span>
+                    <p>Monetary policy authorities, treasury departments, and international commodity consortia whose rate decisions, debt issuances, and production quotas drive cross-border liquidity and benchmark asset yields.</p>
+                </div>
+                {_render_dir_table(glob_reg_items)}
+            </div>
+
+            <!-- Pane 4: Global Exchanges & CME Group -->
+            <div class="epm-settings-pane" id="pane_glob_mkt">
+                <div class="epm-card-hdr">
+                    <div class="epm-card-hdr-left">
+                        <span class="epm-card-hdr-icon">🌍</span>
+                        <span class="epm-card-hdr-title">GLOBAL EXCHANGES & INTERNATIONAL INFRASTRUCTURE</span>
+                    </div>
+                    <span class="epm-card-hdr-tag">Global Price Discovery</span>
+                </div>
+                <div class="epm-segregation-banner">
+                    <span class="epm-segregation-badge">INTERNATIONAL BENCHMARKS</span>
+                    <p>Global derivatives and equities exchanges providing primary price discovery for Brent Crude, WTI, Gold, US Treasury yields, and global index futures.</p>
+                </div>
+                {_render_dir_table(glob_mkt_items)}
+            </div>
+
+            <!-- Pane 5: Commercial Financial News Providers (Segregated!) -->
+            <div class="epm-settings-pane" id="pane_media">
+                <div class="epm-card-hdr">
+                    <div class="epm-card-hdr-left">
+                        <span class="epm-card-hdr-icon">📰</span>
+                        <span class="epm-card-hdr-title">COMMERCIAL FINANCIAL NEWS PROVIDERS & MEDIA HOUSES</span>
+                    </div>
+                    <span class="epm-card-hdr-tag">Journalistic & Sentiment Layer</span>
+                </div>
+                <div class="epm-segregation-banner" style="background:#FFFBEB;border-color:#FDE68A;">
+                    <span class="epm-segregation-badge" style="background:#B45309;">COMMERCIAL MEDIA SEGREGATION</span>
+                    <p><b>Strict Segregation:</b> Commercial media outlets (publishers, wire services, and news broadcasters) are tracked purely for market sentiment, earnings gossip, and journalistic reports. They do NOT possess regulatory authority.</p>
+                </div>
+                {_render_dir_table(media_items)}
+            </div>
+
+            <!-- Pane 6: Telegram Channels & Bot Setup -->
+            <div class="epm-settings-pane" id="pane_telegram">
+                <div class="epm-card-hdr">
+                    <div class="epm-card-hdr-left">
+                        <span class="epm-card-hdr-icon">✈️</span>
+                        <span class="epm-card-hdr-title">TELEGRAM CHANNELS & AUTOMATED BOT CONFIGURATION</span>
+                    </div>
+                    <span class="epm-card-hdr-tag">Channel Routing & Webhooks</span>
+                </div>
+
+                <!-- Channel 1: Live Breaking News -->
+                <div class="epm-config-group">
+                    <div class="epm-group-hdr">
+                        <span class="epm-group-icon">📰</span>
+                        <span class="epm-group-title">CHANNEL 1: LIVE BREAKING NEWS TELEGRAM</span>
+                    </div>
+                    <div class="epm-field">
+                        <label class="epm-field-label">News Bot Token</label>
+                        <input type="password" id="cfg_news_token" class="epm-input" value="{news_tok}" placeholder="Paste BotFather token..." />
+                    </div>
+                    <div class="epm-field">
+                        <label class="epm-field-label">News Channel / Group Chat ID</label>
+                        <input type="text" id="cfg_news_chat" class="epm-input" value="{news_chat}" placeholder="e.g. @my_news_channel or -1001234567890" />
+                    </div>
+                    <div class="epm-toggle-row">
+                        <label class="epm-checkbox-label">
+                            <input type="checkbox" id="cfg_news_en" {news_en} />
+                            <span>Enable Live News Telegram Forwarding</span>
+                        </label>
+                        <button type="button" class="epm-btn-test" onclick="window.epmSendTestTg('news')">Send Test Message</button>
+                    </div>
+                </div>
+
+                <!-- Channel 2: Market Calendar & Outcomes -->
+                <div class="epm-config-group">
+                    <div class="epm-group-hdr">
+                        <span class="epm-group-icon">📅</span>
+                        <span class="epm-group-title">CHANNEL 2: MARKET CALENDAR & OUTCOMES TELEGRAM</span>
+                    </div>
+                    <div class="epm-field">
+                        <label class="epm-field-label">Calendar Bot Token (Optional: leave blank to reuse News Bot)</label>
+                        <input type="password" id="cfg_cal_token" class="epm-input" value="{cal_tok}" placeholder="Leave blank to reuse News Bot token..." />
+                    </div>
+                    <div class="epm-field">
+                        <label class="epm-field-label">Calendar Group / Channel Chat ID</label>
+                        <input type="text" id="cfg_cal_chat" class="epm-input" value="{cal_chat}" placeholder="e.g. @my_calendar_channel or -1009876543210" />
+                    </div>
+                    <div class="epm-toggle-row">
+                        <label class="epm-checkbox-label">
+                            <input type="checkbox" id="cfg_cal_en" {cal_en} />
+                            <span>Enable Calendar & Outcomes Telegram Forwarding</span>
+                        </label>
+                        <button type="button" class="epm-btn-test" onclick="window.epmSendTestTg('calendar')">Send Test Message</button>
                     </div>
 
-                    <!-- Channel 1: Live Breaking News -->
-                    <div class="epm-config-group">
-                        <div class="epm-group-hdr">
-                            <span class="epm-group-icon">📰</span>
-                            <span class="epm-group-title">CHANNEL 1: LIVE BREAKING NEWS TELEGRAM</span>
+                    <!-- Policy: Circular Telegram Alert Status -->
+                    <div class="epm-circular-policy-box" style="margin-top:14px;">
+                        <div class="epm-policy-hdr">
+                            <span class="epm-policy-badge">POLICY DIRECTIVE</span>
+                            <b>Official Regulatory Circulars Telegram Forwarding</b>
                         </div>
-                        <div class="epm-field">
-                            <label class="epm-field-label">News Bot Token</label>
-                            <input type="password" id="cfg_news_token" class="epm-input" value="{news_tok}" placeholder="Paste BotFather token..." />
-                        </div>
-                        <div class="epm-field">
-                            <label class="epm-field-label">News Channel / Group Chat ID</label>
-                            <input type="text" id="cfg_news_chat" class="epm-input" value="{news_chat}" placeholder="e.g. @my_news_channel or -1001234567890" />
-                        </div>
-                        <div class="epm-toggle-row">
-                            <label class="epm-checkbox-label">
-                                <input type="checkbox" id="cfg_news_en" {news_en} />
-                                <span>Enable Live News Telegram Forwarding</span>
-                            </label>
-                            <button type="button" class="epm-btn-test" onclick="window.epmSendTestTg('news')">Send Test Message</button>
+                        <div class="epm-policy-desc">
+                            🔴 <b>STATUS: DISABLED (Suppressed by Policy)</b> — Automatic and manual dispatching of official circular notifications to Telegram is permanently turned off as requested. Users access official documents directly on the Circulars portal tab.
                         </div>
                     </div>
+                </div>
 
-                    <!-- Channel 2: Market Calendar & Outcomes -->
-                    <div class="epm-config-group">
-                        <div class="epm-group-hdr">
-                            <span class="epm-group-icon">📅</span>
-                            <span class="epm-group-title">CHANNEL 2: MARKET CALENDAR & OUTCOMES TELEGRAM</span>
-                        </div>
-                        <div class="epm-field">
-                            <label class="epm-field-label">Calendar Bot Token (Optional: leave blank to reuse News Bot)</label>
-                            <input type="password" id="cfg_cal_token" class="epm-input" value="{cal_tok}" placeholder="Leave blank to reuse News Bot token..." />
-                        </div>
-                        <div class="epm-field">
-                            <label class="epm-field-label">Calendar Group / Channel Chat ID</label>
-                            <input type="text" id="cfg_cal_chat" class="epm-input" value="{cal_chat}" placeholder="e.g. @my_calendar_channel or -1009876543210" />
-                        </div>
-                        <div class="epm-toggle-row">
-                            <label class="epm-checkbox-label">
-                                <input type="checkbox" id="cfg_cal_en" {cal_en} />
-                                <span>Enable Calendar & Outcomes Telegram Forwarding</span>
-                            </label>
-                            <button type="button" class="epm-btn-test" onclick="window.epmSendTestTg('calendar')">Send Test Message</button>
-                        </div>
-
-                        <!-- Policy: Circular Telegram Alert Status -->
-                        <div class="epm-circular-policy-box">
-                            <div class="epm-policy-hdr">
-                                <span class="epm-policy-badge">POLICY RESTRICTION</span>
-                                <b>Official Regulatory Circulars Telegram Forwarding</b>
-                            </div>
-                            <div class="epm-policy-desc">
-                                🔴 <b>STATUS: DISABLED (Suppressed by Policy)</b> — Automatic and manual dispatching of official circular notifications to Telegram has been turned off. Users can access official documents directly from the Circulars terminal tab.
-                            </div>
-                        </div>
-
-                        <!-- Automated Schedules Toggles -->
-                        <div class="epm-subgroup-title">Automated Dispatch Schedules (IST Schedule)</div>
-                        <div class="epm-schedule-toggles">
-                            <label class="epm-checkbox-label">
-                                <input type="checkbox" id="cfg_sched_fri" {auto_fri} />
-                                <span>Friday 06:00 AM IST — Auto-Dispatch Weekly Multi-Market A4 PDF Dossier (Next Week Mon–Sat)</span>
-                            </label>
-                            <label class="epm-checkbox-label">
-                                <input type="checkbox" id="cfg_sched_25th" {auto_25th} />
-                                <span>25th of Month 06:00 AM IST — Auto-Dispatch Monthly Multi-Market A4 PDF Outlook (Upcoming Month)</span>
-                            </label>
-                            <label class="epm-checkbox-label">
-                                <input type="checkbox" id="cfg_sched_hol" {auto_hol} />
-                                <span>07:00 AM IST — Auto-Forward Next-Day Trading Holiday Alert (1 Day Before Holiday)</span>
-                            </label>
-                        </div>
-
-                        <!-- Real-time Triggers -->
-                        <div class="epm-subgroup-title">Real-Time Individual Event Triggers</div>
-                        <div class="epm-triggers-grid">
-                            <label class="epm-trigger-pill">
-                                <input type="checkbox" id="cfg_trig_t15" {trig_t15} />
-                                <span>⏰ T-15m Countdown</span>
-                            </label>
-                            <label class="epm-trigger-pill">
-                                <input type="checkbox" id="cfg_trig_out" {trig_out} />
-                                <span>🏁 Unfolded Outcomes</span>
-                            </label>
-                            <label class="epm-trigger-pill">
-                                <input type="checkbox" id="cfg_trig_link" {trig_link} />
-                                <span>🔗 Linked News Results</span>
-                            </label>
-                        </div>
-                    </div>
-
-                    <!-- Action Buttons -->
-                    <div class="epm-save-row">
-                        <button type="button" class="epm-save-btn" onclick="window.epmSaveDispatchSettings()">
-                            💾 Save All Dispatch Settings
-                        </button>
-                        <span id="epm-save-feedback" class="epm-save-feedback"></span>
-                    </div>
+                <!-- Action Button -->
+                <div class="epm-save-row">
+                    <button type="button" class="epm-save-btn" onclick="window.epmSaveDispatchSettings()">
+                        💾 Save All Dispatch Settings
+                    </button>
+                    <span id="epm-save-feedback" class="epm-save-feedback"></span>
                 </div>
             </div>
 
-            <!-- Right Column: ACTIVE DISPATCH LIST & MONITOR -->
-            <div class="epm-settings-col epm-monitor-col">
-                <div class="epm-settings-card">
-                    <div class="epm-card-hdr">
-                        <div class="epm-card-hdr-left">
-                            <span class="epm-card-hdr-icon">⏱️</span>
-                            <span class="epm-card-hdr-title">ACTIVE DISPATCH LIST & MONITOR</span>
-                        </div>
-                        <span class="epm-card-hdr-tag">Live Schedulers</span>
+            <!-- Pane 7: Calendar & PDF Automation -->
+            <div class="epm-settings-pane" id="pane_pdf_sched">
+                <div class="epm-card-hdr">
+                    <div class="epm-card-hdr-left">
+                        <span class="epm-card-hdr-icon">📑</span>
+                        <span class="epm-card-hdr-title">CALENDAR & DOSSIER PDF AUTOMATION</span>
                     </div>
+                    <span class="epm-card-hdr-tag">Scheduled A4 Dossiers & Menu Visibility</span>
+                </div>
 
-                    <!-- Summary Stats Bar -->
-                    <div class="epm-monitor-stats">
-                        <div class="epm-stat-box">
-                            <span class="epm-stat-val">3</span>
-                            <span class="epm-stat-lbl">Active Cron Jobs</span>
-                        </div>
-                        <div class="epm-stat-box">
-                            <span class="epm-stat-val">2</span>
-                            <span class="epm-stat-lbl">Telegram Channels</span>
-                        </div>
-                        <div class="epm-stat-box">
-                            <span class="epm-stat-val">100%</span>
-                            <span class="epm-stat-lbl">Uptime Health</span>
-                        </div>
+                <!-- Site Menu Drawer Visibility Toggle -->
+                <div class="epm-config-group">
+                    <div class="epm-group-hdr">
+                        <span class="epm-group-icon">🗂️</span>
+                        <span class="epm-group-title">MAIN SITE DRAWER NAVIGATION CONTROLS</span>
                     </div>
-
-                    <!-- Search Filter Input -->
-                    <div class="epm-search-wrap" style="margin-bottom:12px;">
-                        <input type="text" class="epm-search-input" placeholder="🔍 Filter schedules..." onkeyup="window.epmFilterSchedules(this.value)" />
-                    </div>
-
-                    <!-- Actionable Schedule Cards -->
-                    <div class="epm-schedule-cards" id="epm-schedule-cards-list">
-                        <!-- Card 1: Weekly Multi-Market PDF Dossier -->
-                        <div class="epm-sched-card" data-name="weekly dossier">
-                            <div class="epm-sched-card-top">
-                                <span class="epm-sched-title">Weekly Multi-Market PDF Dossier (Next Week Mon–Sat)</span>
-                                <div class="epm-sched-badges">
-                                    <span class="epm-badge-blue">WEEKLY</span>
-                                    <span class="epm-badge-slate">CRON: FRI 06:00 AM IST</span>
-                                    <span class="epm-badge-green">ACTIVE</span>
+                    <div class="epm-toggle-row" style="background:#F8FAFC;padding:12px;border:1px solid #E2E8F0;border-radius:8px;">
+                        <label class="epm-checkbox-label" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+                            <input type="checkbox" id="cfg_show_pdf_drawer_menu" onchange="window.epmTogglePdfDrawerMenu(this.checked)" checked style="margin-top:3px;" />
+                            <div>
+                                <b style="font-size:12.5px;color:#0F172A;">Display PDF Export Sub-Menu under "Market Calendar" in Main Side Menu Drawer</b>
+                                <div style="font-size:11px;color:#64748B;margin-top:2px;">
+                                    When checked, the 3 direct download links (Weekly Dossier, 5 PM Daily Outcomes, and Monthly Outlook) appear as a convenient sub-menu directly under Tab 2 in the main navigation flyout drawer.
                                 </div>
                             </div>
-                            <div class="epm-sched-desc">
-                                Auto-generates comprehensive multi-market PDF dossier for global equities, commodities & forex with institutional coverage.
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Automated Schedules Toggles -->
+                <div class="epm-config-group">
+                    <div class="epm-group-hdr">
+                        <span class="epm-group-icon">⏰</span>
+                        <span class="epm-group-title">AUTOMATED CRON DOSSIER SCHEDULES (IST TIMEZONE)</span>
+                    </div>
+                    <div class="epm-schedule-toggles">
+                        <label class="epm-checkbox-label">
+                            <input type="checkbox" id="cfg_sched_fri" {auto_fri} />
+                            <span>Friday 06:00 AM IST — Auto-Dispatch Weekly Multi-Market A4 PDF Dossier (Next Week Mon–Sat)</span>
+                        </label>
+                        <label class="epm-checkbox-label">
+                            <input type="checkbox" id="cfg_sched_25th" {auto_25th} />
+                            <span>25th of Month 06:00 AM IST — Auto-Dispatch Monthly Multi-Market A4 PDF Outlook (Upcoming Month)</span>
+                        </label>
+                        <label class="epm-checkbox-label">
+                            <input type="checkbox" id="cfg_sched_hol" {auto_hol} />
+                            <span>07:00 AM IST — Auto-Forward Next-Day Trading Holiday Alert (1 Day Before Holiday)</span>
+                        </label>
+                    </div>
+
+                    <div class="epm-subgroup-title" style="margin-top:14px;font-weight:700;font-size:12px;color:#0F172A;">Real-Time Individual Event Triggers</div>
+                    <div class="epm-triggers-grid">
+                        <label class="epm-trigger-pill">
+                            <input type="checkbox" id="cfg_trig_t15" {trig_t15} />
+                            <span>⏰ T-15m Countdown</span>
+                        </label>
+                        <label class="epm-trigger-pill">
+                            <input type="checkbox" id="cfg_trig_out" {trig_out} />
+                            <span>🏁 Unfolded Outcomes</span>
+                        </label>
+                        <label class="epm-trigger-pill">
+                            <input type="checkbox" id="cfg_trig_link" {trig_link} />
+                            <span>🔗 Linked News Results</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Active Schedulers Card List -->
+                <div class="epm-config-group">
+                    <div class="epm-group-hdr">
+                        <span class="epm-group-icon">⚡</span>
+                        <span class="epm-group-title">ON-DEMAND MANUAL DOSSIER DISPATCH & EXPORT</span>
+                    </div>
+                    <div class="epm-schedule-cards">
+                        <div class="epm-sched-card">
+                            <div class="epm-sched-card-top">
+                                <span class="epm-sched-title">Weekly Multi-Market PDF Dossier (Next Week Mon–Sat)</span>
+                                <span class="epm-badge-blue">WEEKLY CRON: FRI 06:00 AM</span>
                             </div>
+                            <div class="epm-sched-desc">Institutional multi-market A4 PDF dossier covering scheduled high-impact catalysts.</div>
                             <div class="epm-sched-actions">
                                 <button type="button" class="epm-sched-btn" onclick="window.epmRunScheduleNow('weekly')">Run Now ⚡</button>
                                 <a href="/api/calendar/pdf/weekly" download="weekly_snapshot.pdf" target="_blank" class="epm-sched-link-btn">Export PDF 📥</a>
                             </div>
                         </div>
-
-                        <!-- Card 2: Monthly Multi-Market PDF Outlook -->
-                        <div class="epm-sched-card" data-name="monthly outlook">
+                        <div class="epm-sched-card">
                             <div class="epm-sched-card-top">
                                 <span class="epm-sched-title">Monthly Multi-Market PDF Outlook (Upcoming Month)</span>
-                                <div class="epm-sched-badges">
-                                    <span class="epm-badge-blue">MONTHLY</span>
-                                    <span class="epm-badge-slate">CRON: 25TH 06:00 AM IST</span>
-                                    <span class="epm-badge-green">ACTIVE</span>
-                                </div>
+                                <span class="epm-badge-blue">MONTHLY CRON: 25TH 06:00 AM</span>
                             </div>
-                            <div class="epm-sched-desc">
-                                Strategic monthly outlook dossier detailing high-impact economic releases, central bank decisions and corporate action dates.
-                            </div>
+                            <div class="epm-sched-desc">Strategic monthly macro outlook detailing global central bank decisions and corporate action dates.</div>
                             <div class="epm-sched-actions">
                                 <button type="button" class="epm-sched-btn" onclick="window.epmRunScheduleNow('monthly')">Run Now ⚡</button>
                                 <a href="/api/calendar/pdf/monthly" download="monthly_outlook.pdf" target="_blank" class="epm-sched-link-btn">Export PDF 📥</a>
                             </div>
                         </div>
-
-                        <!-- Card 3: Standard Holiday Update -->
-                        <div class="epm-sched-card" data-name="holiday update">
-                            <div class="epm-sched-card-top">
-                                <span class="epm-sched-title">Standard Holiday Update (1 Day Before Holiday)</span>
-                                <div class="epm-sched-badges">
-                                    <span class="epm-badge-slate">DAILY CRON: 07:00 AM IST</span>
-                                    <span class="epm-badge-green">ACTIVE</span>
-                                </div>
-                            </div>
-                            <div class="epm-sched-desc">
-                                Scans next-day market closures across NSE, BSE, MCX and NYSE, dispatching morning reminders.
-                            </div>
-                            <div class="epm-sched-actions">
-                                <button type="button" class="epm-sched-btn" onclick="window.epmRunScheduleNow('holiday')">Run Now ⚡</button>
-                                <button type="button" class="epm-sched-btn-secondary" onclick="window.epmSwitchTab(3)">Preview 👁️</button>
-                            </div>
-                        </div>
-
-                        <!-- Card 4: Real-Time Outcomes Alert -->
-                        <div class="epm-sched-card" data-name="real-time outcomes">
-                            <div class="epm-sched-card-top">
-                                <span class="epm-sched-title">Real-Time Outcomes Alert (T-15m & Unfolded Events)</span>
-                                <div class="epm-sched-badges">
-                                    <span class="epm-badge-amber">REAL-TIME</span>
-                                    <span class="epm-badge-slate">LIVE TRIGGER</span>
-                                    <span class="epm-badge-green">ACTIVE</span>
-                                </div>
-                            </div>
-                            <div class="epm-sched-desc">
-                                Dispatches immediate alerts upon economic data publication with AI impact score and bullish/bearish classification.
-                            </div>
-                            <div class="epm-sched-actions">
-                                <button type="button" class="epm-sched-btn" onclick="window.epmSendTestTg('calendar')">Test Alert 🔔</button>
-                            </div>
-                        </div>
                     </div>
                 </div>
+
+                <div class="epm-save-row">
+                    <button type="button" class="epm-save-btn" onclick="window.epmSaveDispatchSettings()">
+                        💾 Save Calendar & PDF Settings
+                    </button>
+                </div>
+            </div>
+
+            <!-- Pane 8: System Status & Legal Disclaimers -->
+            <div class="epm-settings-pane" id="pane_system_health">
+                <div class="epm-card-hdr">
+                    <div class="epm-card-hdr-left">
+                        <span class="epm-card-hdr-icon">🔒</span>
+                        <span class="epm-card-hdr-title">SYSTEM STATUS, AUDIT MONITOR & STATUTORY NOTICES</span>
+                    </div>
+                    <span class="epm-card-hdr-tag">Enterprise Health</span>
+                </div>
+                <div class="epm-monitor-stats">
+                    <div class="epm-stat-box">
+                        <span class="epm-stat-val">OPERATIONAL</span>
+                        <span class="epm-stat-lbl">Engine Status</span>
+                    </div>
+                    <div class="epm-stat-box">
+                        <span class="epm-stat-val">3</span>
+                        <span class="epm-stat-lbl">Active Cron Jobs</span>
+                    </div>
+                    <div class="epm-stat-box">
+                        <span class="epm-stat-val">100%</span>
+                        <span class="epm-stat-lbl">Feed Health</span>
+                    </div>
+                </div>
+                {disclaimer_html}
             </div>
         </div>
-
-        <!-- Global Compliance Notice -->
-        {disclaimer_html}
     </div>
     '''
 
@@ -6446,19 +6565,37 @@ tbody tr:hover td {
     border-color: #94A3B8 !important;
 }
 
-/* Right-Side Prominent Menu Button */
+/* Right-Side Prominent Menu Button (Bold White on Royal Blue across all devices) */
+#epm-desktop-menu-btn,
+.epm-top-btn.epm-menu-btn,
 .epm-nav-menu-main {
     background: #0052FF !important;
     color: #FFFFFF !important;
     border: 1px solid #0052FF !important;
-    font-weight: 700 !important;
-    padding: 0 12px !important;
-    box-shadow: 0 1px 3px rgba(0, 82, 255, 0.2) !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.2px !important;
+    padding: 0 14px !important;
+    height: 32px !important;
+    border-radius: 6px !important;
+    box-shadow: 0 2px 4px rgba(0, 82, 255, 0.25) !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
 }
-.epm-nav-menu-main:hover {
-    background: #1A66FF !important;
+#epm-desktop-menu-btn *,
+.epm-top-btn.epm-menu-btn *,
+.epm-nav-menu-main * {
     color: #FFFFFF !important;
-    border-color: #1A66FF !important;
+    font-weight: 800 !important;
+}
+#epm-desktop-menu-btn:hover,
+.epm-top-btn.epm-menu-btn:hover,
+.epm-nav-menu-main:hover {
+    background: #0043D6 !important;
+    border-color: #0043D6 !important;
+    color: #FFFFFF !important;
 }
 
 /* 9. Bento Cards (Settings Hub & User Guide Light Theme) */
@@ -7463,6 +7600,197 @@ tbody tr:hover td {
 .epm-sv-btn-doc { background: #FFFFFF; color: #0052FF; border-color: #BFDBFE; }
 .epm-sv-btn-tg { background: #0088cc; color: #FFFFFF; border-color: #0088cc; }
 .epm-sv-btn-png { background: #0F172A; color: #FFFFFF; border-color: #0F172A; }
+
+/* Story Top Controls & 3-Dot Options Dropdown Menu */
+.epm-sv-top-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: relative;
+}
+.epm-sv-menu-container {
+    position: relative;
+}
+.epm-sv-dots-btn {
+    background: transparent;
+    border: none;
+    font-size: 22px;
+    font-weight: 800;
+    color: #475569;
+    cursor: pointer;
+    padding: 2px 8px;
+    line-height: 1;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+}
+.epm-sv-dots-btn:hover {
+    background: #E2E8F0;
+    color: #0F172A;
+}
+.epm-sv-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18);
+    display: none;
+    flex-direction: column;
+    min-width: 230px;
+    z-index: 200020;
+    overflow: hidden;
+    padding: 6px;
+}
+.epm-sv-dropdown-menu.is-active {
+    display: flex !important;
+}
+.epm-sv-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border: none;
+    background: transparent;
+    color: #0F172A;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background 0.12s ease;
+    width: 100%;
+}
+.epm-sv-menu-item:hover {
+    background: #EFF6FF;
+    color: #0052FF;
+}
+.epm-sv-menu-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+}
+.epm-sv-menu-label {
+    flex: 1;
+}
+
+/* Meta Business Suite Style Admin & Settings Workspace */
+.epm-settings-workspace {
+    display: flex !important;
+    gap: 16px !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    min-height: 800px !important;
+    margin: 8px 0 24px 0 !important;
+}
+.epm-settings-sidebar {
+    flex: 0 0 270px !important;
+    max-width: 270px !important;
+    background: #FFFFFF !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 12px !important;
+    padding: 14px 10px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
+    height: fit-content !important;
+    position: sticky !important;
+    top: 50px !important;
+}
+.epm-settings-sb-hdr {
+    padding: 6px 12px 12px 12px !important;
+    border-bottom: 1px solid #F1F5F9 !important;
+    margin-bottom: 8px !important;
+}
+.epm-settings-sb-title {
+    font-size: 13px !important;
+    font-weight: 800 !important;
+    color: #0F172A !important;
+    letter-spacing: 0.5px !important;
+    text-transform: uppercase !important;
+    display: block !important;
+}
+.epm-settings-sb-sub {
+    font-size: 11px !important;
+    color: #64748B !important;
+    font-weight: 500 !important;
+}
+.epm-settings-sb-nav {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 3px !important;
+}
+.epm-settings-nav-item {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    padding: 9px 12px !important;
+    border-radius: 8px !important;
+    border: 1px solid transparent !important;
+    background: transparent !important;
+    color: #334155 !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    text-align: left !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
+    width: 100% !important;
+}
+.epm-settings-nav-item:hover {
+    background: #F8FAFC !important;
+    color: #0052FF !important;
+    border-color: #E2E8F0 !important;
+}
+.epm-settings-nav-item.active {
+    background: #EFF6FF !important;
+    color: #0052FF !important;
+    border-color: #BFDBFE !important;
+    font-weight: 700 !important;
+}
+.epm-settings-nav-item .icon {
+    font-size: 16px !important;
+    flex-shrink: 0 !important;
+}
+.epm-settings-content {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+    background: #FFFFFF !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 12px !important;
+    padding: 18px 22px !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
+}
+.epm-settings-pane {
+    display: none;
+    animation: epmFadeIn 0.2s ease-out;
+}
+.epm-settings-pane.active {
+    display: block !important;
+}
+@media (max-width: 900px) {
+    .epm-settings-workspace {
+        flex-direction: column !important;
+    }
+    .epm-settings-sidebar {
+        flex: 1 1 100% !important;
+        max-width: 100% !important;
+        position: relative !important;
+        top: 0 !important;
+    }
+    .epm-settings-sb-nav {
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        padding-bottom: 6px !important;
+    }
+    .epm-settings-nav-item {
+        white-space: nowrap !important;
+        flex-shrink: 0 !important;
+        padding: 7px 11px !important;
+    }
+}
 
 /* Floating navigation arrow buttons for desktop stories (Instagram web style) */
 .epm-sv-arrow-nav {
@@ -8608,7 +8936,34 @@ TERMINAL_CLIENT_JS = r"""
         wireTableInshortsClicks();
         setupInshortsSwipeDismiss();
         window.epmInitPasswordToggles();
+        window.epmMountSettingsPanes();
+
+        const activeSettingsPane = localStorage.getItem('epm_active_settings_pane') || 'pane_in_reg';
+        if (window.epmShowSettingsPane) {
+            window.epmShowSettingsPane(activeSettingsPane);
+        }
+
+        const showPdfDrawer = localStorage.getItem('epm_show_pdf_drawer_menu');
+        if (showPdfDrawer !== null) {
+            const isShown = showPdfDrawer === 'true';
+            const subMenu = document.getElementById('epm-side-cal-submenu');
+            if (subMenu) subMenu.style.setProperty('display', isShown ? 'flex' : 'none', 'important');
+            const chk = document.getElementById('cfg_show_pdf_drawer_menu');
+            if (chk) chk.checked = isShown;
+        }
     }
+
+    // Dynamic Mount of Gradio Settings Panes into Meta Suite Layout
+    window.epmMountSettingsPanes = function() {
+        const content = document.querySelector('.epm-settings-content');
+        if (!content) return;
+        ['pane_sec_forwarding', 'pane_sec_google', 'pane_sec_social'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el && el.parentElement !== content) {
+                content.appendChild(el);
+            }
+        });
+    };
 
     // 15. Password Reveal Toggle Controller for Settings Hub
     window.epmInitPasswordToggles = function() {
@@ -8780,7 +9135,26 @@ TERMINAL_CLIENT_JS = r"""
                 <span class="epm-sv-brand">GNC</span>
                 <span class="epm-sv-time" id="epm-sv-top-time">Live Feed</span>
               </div>
-              <button type="button" class="epm-sv-close" aria-label="Close story">✕</button>
+              <div class="epm-sv-top-controls">
+                <div class="epm-sv-menu-container">
+                  <button type="button" class="epm-sv-dots-btn" id="epm-sv-dots-btn" aria-label="Story actions" onclick="window.epmToggleStoryMenu(event)" title="Options">⋮</button>
+                  <div class="epm-sv-dropdown-menu" id="epm-sv-dropdown-menu">
+                    <button type="button" class="epm-sv-menu-item" onclick="window.epmStoryActionDoc(event)">
+                      <span class="epm-sv-menu-icon">📄</span>
+                      <span class="epm-sv-menu-label">View Document</span>
+                    </button>
+                    <button type="button" class="epm-sv-menu-item" onclick="window.epmStoryActionSavePng(event)">
+                      <span class="epm-sv-menu-icon">💾</span>
+                      <span class="epm-sv-menu-label">Save as Image</span>
+                    </button>
+                    <button type="button" class="epm-sv-menu-item" onclick="window.epmStoryActionShare(event)">
+                      <span class="epm-sv-menu-icon">📤</span>
+                      <span class="epm-sv-menu-label">Share Image (WhatsApp / SMS / Device)</span>
+                    </button>
+                  </div>
+                </div>
+                <button type="button" class="epm-sv-close" aria-label="Close story" onclick="window.epmCloseStory()">✕</button>
+              </div>
             </div>
             <div class="epm-sv-tap left"></div><div class="epm-sv-tap right"></div>
             <div class="epm-sv-content" id="epm-sv-content"></div>
@@ -8886,6 +9260,89 @@ TERMINAL_CLIENT_JS = r"""
         v.classList.add('is-open');
         document.body.classList.add('epm-drawer-locked');
         epmStoryGo(Math.min(startIdx || 0, items.length - 1));
+    };
+
+    window.epmToggleStoryMenu = function(e) {
+        if (e) e.stopPropagation();
+        const menu = document.getElementById('epm-sv-dropdown-menu');
+        if (menu) {
+            const isOpen = menu.classList.contains('is-active');
+            menu.classList.toggle('is-active');
+            if (!isOpen) {
+                clearTimeout(epmStory.timer);
+            } else {
+                epmStory.timer = setTimeout(() => epmStoryGo(epmStory.idx + 1), EPM_STORY_MS);
+            }
+        }
+    };
+
+    window.epmStoryActionDoc = function(e) {
+        if (e) e.stopPropagation();
+        const menu = document.getElementById('epm-sv-dropdown-menu');
+        if (menu) menu.classList.remove('is-active');
+        if (!epmStory.items || !epmStory.items.length) return;
+        const it = epmStory.items[epmStory.idx];
+        const url = it.link || it.doc_url || (it.id ? `/api/circular/doc/${it.id}` : '#');
+        if (url && url !== '#') {
+            window.open(url, '_blank');
+        } else {
+            alert('Official document link is loading or unavailable.');
+        }
+    };
+
+    window.epmStoryActionSavePng = function(e) {
+        if (e) e.stopPropagation();
+        const menu = document.getElementById('epm-sv-dropdown-menu');
+        if (menu) menu.classList.remove('is-active');
+        const dl = document.createElement('a');
+        dl.href = `/api/story/${epmStory.kind}/${epmStory.idx}.png`;
+        dl.download = `gnc_${epmStory.kind}_story_${epmStory.idx + 1}.png`;
+        document.body.appendChild(dl);
+        dl.click();
+        document.body.removeChild(dl);
+    };
+
+    window.epmStoryActionShare = async function(e) {
+        if (e) e.stopPropagation();
+        const menu = document.getElementById('epm-sv-dropdown-menu');
+        if (menu) menu.classList.remove('is-active');
+        if (!epmStory.items || !epmStory.items.length) return;
+        const it = epmStory.items[epmStory.idx];
+        const imgUrl = `/api/story/${epmStory.kind}/${epmStory.idx}.png`;
+        const title = `GNC: ${it.title || it.headline || 'Market Catalyst'}`;
+        const text = `GNC Market Alert: ${it.title || ''}\nScore: ${it.score || 'High'}/10 | Sentiment: ${it.sentiment || 'Live'}`;
+        
+        if (navigator.share) {
+            try {
+                const resp = await fetch(imgUrl);
+                const blob = await resp.blob();
+                const file = new File([blob], `gnc_story_${epmStory.idx + 1}.png`, { type: 'image/png' });
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                        files: [file],
+                        title: title,
+                        text: text
+                    });
+                    return;
+                } else {
+                    await navigator.share({
+                        title: title,
+                        text: text,
+                        url: window.location.origin + imgUrl
+                    });
+                    return;
+                }
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    console.log('Share API error, falling back:', err);
+                } else {
+                    return;
+                }
+            }
+        }
+        
+        const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(title + '\n' + text + '\n' + window.location.origin + imgUrl)}`;
+        window.open(waUrl, '_blank');
     };
 
     window.epmDispatchCurrentStoryToTelegram = function() {
@@ -9408,6 +9865,11 @@ TERMINAL_CLIENT_JS = r"""
     };
 
     window.epmChangeCalPeriod = function(period) {
+        const deskSel = document.getElementById('epm-cal-period-select');
+        const mobSel = document.getElementById('epm-mob-cal-period');
+        if (deskSel && deskSel.value !== period) deskSel.value = period;
+        if (mobSel && mobSel.value !== period) mobSel.value = period;
+
         const rows = document.querySelectorAll('#epm-cal-cards-list .epm-chron-row');
         rows.forEach(r => {
             r.style.display = '';
@@ -9420,6 +9882,11 @@ TERMINAL_CLIENT_JS = r"""
     };
 
     window.epmChangeCalMarket = function(mkt) {
+        const deskSel = document.getElementById('epm-cal-market-select');
+        const mobSel = document.getElementById('epm-mob-cal-market');
+        if (deskSel && deskSel.value !== mkt) deskSel.value = mkt;
+        if (mobSel && mobSel.value !== mkt) mobSel.value = mkt;
+
         const rows = document.querySelectorAll('#epm-cal-cards-list .epm-chron-row');
         rows.forEach(r => {
             const rowMkt = (r.getAttribute('data-mkt') || '').toUpperCase();
@@ -9646,17 +10113,61 @@ TERMINAL_CLIENT_JS = r"""
         document.querySelectorAll('#epm-circ-terminal-layout .epm-circ-desk-card').forEach(c => c.classList.remove('is-active'));
     };
 
-    window.epmFilterCircReg = function(reg, btn) {
-        document.querySelectorAll('.epm-circ-reg-btn').forEach(b => b.classList.remove('active'));
-        if (btn) btn.classList.add('active');
+    window.epmFilterCircReg = function(reg, el) {
+        const val = String(reg || 'all').toLowerCase();
+        const deskSel = document.getElementById('epm-desk-circ-filter');
+        const mobSel = document.getElementById('epm-mob-circ-filter');
+        if (deskSel && deskSel.value.toLowerCase() !== val) deskSel.value = (val === 'all' ? 'all' : reg);
+        if (mobSel && mobSel.value.toLowerCase() !== val) mobSel.value = (val === 'all' ? 'ALL' : reg.toUpperCase());
+
         document.querySelectorAll('#epm-circ-cards-list .epm-circ-desk-card').forEach(c => {
             const cReg = (c.getAttribute('data-reg') || '').toLowerCase();
-            if (reg === 'all' || cReg === reg.toLowerCase()) {
+            if (val === 'all' || cReg === val) {
                 c.style.display = '';
             } else {
                 c.style.display = 'none';
             }
         });
+
+        document.querySelectorAll('#epm-circ-mobile-list .epm-pc-card, #mobile_circ_feed .epm-pc-card').forEach(card => {
+            const cardReg = (card.getAttribute('data-circ-reg') || '').toLowerCase();
+            if (val === 'all' || cardReg === val) {
+                card.style.display = '';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    };
+    window.epmFilterCircCards = function(reg, el) {
+        window.epmFilterCircReg(reg, el);
+    };
+
+    window.epmShowSettingsPane = function(paneId, btn) {
+        document.querySelectorAll('.epm-settings-nav-item').forEach(b => b.classList.remove('active'));
+        if (btn) btn.classList.add('active');
+        else {
+            const match = document.querySelector(`.epm-settings-nav-item[data-pane="${paneId}"]`);
+            if (match) match.classList.add('active');
+        }
+
+        // Hide all HTML and Gradio panes
+        document.querySelectorAll('.epm-settings-pane, #pane_sec_forwarding, #pane_sec_google, #pane_sec_social').forEach(p => {
+            p.style.setProperty('display', 'none', 'important');
+        });
+
+        const target = document.getElementById(paneId);
+        if (target) {
+            target.style.setProperty('display', 'block', 'important');
+        }
+        localStorage.setItem('epm_active_settings_pane', paneId);
+    };
+
+    window.epmTogglePdfDrawerMenu = function(show) {
+        localStorage.setItem('epm_show_pdf_drawer_menu', show ? 'true' : 'false');
+        const subMenu = document.getElementById('epm-side-cal-submenu');
+        if (subMenu) {
+            subMenu.style.setProperty('display', show ? 'flex' : 'none', 'important');
+        }
     };
 
     window.epmToggleCircFilters = function() {
@@ -9859,6 +10370,10 @@ TERMINAL_CLIENT_JS = r"""
 
         if (window.epmInitPasswordToggles) {
             window.epmInitPasswordToggles();
+        }
+
+        if (window.epmMountSettingsPanes) {
+            window.epmMountSettingsPanes();
         }
     }, 1500);
 })();
@@ -10187,7 +10702,7 @@ with gr.Blocks(
             gr.HTML(render_settings_hub_html())
 
             # Section 1: Connected News Sources & Selective Forwarding Rules
-            with gr.Column(elem_classes=["epm-bento-card", "epm-settings-card"]):
+            with gr.Column(elem_classes=["epm-bento-card", "epm-settings-card", "epm-settings-pane"], elem_id="pane_sec_forwarding"):
                 gr.HTML("""
                 <div class="epm-card-hdr">
                     <div class="epm-card-hdr-left">
@@ -10230,7 +10745,7 @@ with gr.Blocks(
                 )
 
             # Section 2: Google Calendar Direct API Integration
-            with gr.Column(elem_classes=["epm-bento-card", "epm-settings-card"]):
+            with gr.Column(elem_classes=["epm-bento-card", "epm-settings-card", "epm-settings-pane"], elem_id="pane_sec_google"):
                 gr.HTML("""
                 <div class="epm-card-hdr">
                     <div class="epm-card-hdr-left">
@@ -10280,7 +10795,7 @@ with gr.Blocks(
                 sync_gcal_admin_btn.click(trigger_sync_google_cal, outputs=[gcal_admin_status])
 
             # Section 3: Omnichannel Social Media Hub
-            with gr.Column(elem_classes=["epm-bento-card", "epm-settings-card"]):
+            with gr.Column(elem_classes=["epm-bento-card", "epm-settings-card", "epm-settings-pane"], elem_id="pane_sec_social"):
                 gr.HTML("""
                 <div class="epm-card-hdr">
                     <div class="epm-card-hdr-left">
