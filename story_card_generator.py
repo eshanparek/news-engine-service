@@ -143,37 +143,70 @@ class StoryCardGenerator:
         d.rounded_rectangle([W - pad - kw - 36, 112, W - pad, 160], radius=24, outline=(203, 213, 225), width=2, fill=(255, 255, 255))
         d.text((W - pad - kw - 18, 122), kind_label, font=kf, fill=MUTED)
 
-        # Centered Visual Thumbnail (Festive Holiday, Company Logo, Regulator Emblem, News Image)
+        # Hero Image Banner (Web photo if available, or sector-specific vector graphic)
+        banner_w = W - 2 * pad  # 912
+        banner_h = 360
+        hero_y = 175
         try:
             import image_assets
-            t_bytes = None
-            if k == "holidays":
-                t_bytes = image_assets.generate_holiday_thumb(item.get("date", ""), item.get("title", ""))
-            elif k == "calendar":
-                t_bytes = image_assets.generate_calendar_thumb(
-                    symbol=item.get("symbol", ""),
-                    market=item.get("market", ""),
-                    category=item.get("tag", ""),
-                    title=item.get("title", "")
-                )
-            elif k == "circulars":
-                t_bytes = image_assets.generate_regulator_logo(item.get("regulator", item.get("source", "NSE")))
-            else:
-                t_bytes = image_assets.generate_news_thumb(
-                    topic=item.get("tag", ""),
-                    category=item.get("category", ""),
-                    source=item.get("source", ""),
-                    title=item.get("title", "")
-                )
-            if t_bytes:
-                t_img = Image.open(io.BytesIO(t_bytes)).convert("RGBA").resize((160, 160), Image.Resampling.LANCZOS)
-                mask = Image.new("L", (160, 160), 0)
-                ImageDraw.Draw(mask).rounded_rectangle([0, 0, 160, 160], radius=24, fill=255)
-                img.paste(t_img, ((W - 160) // 2, 175), mask)
-        except Exception as e:
-            logger.debug(f"Could not paste story thumbnail: {e}")
+            t_img = None
+            img_url = item.get("image_url") or item.get("image") or item.get("thumbnail")
 
-        y = 360
+            # 1. If it's a web URL, download the real story photo
+            if img_url and str(img_url).startswith(("http://", "https://")):
+                try:
+                    import urllib.request
+                    req = urllib.request.Request(img_url, headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"})
+                    with urllib.request.urlopen(req, timeout=3.0) as r:
+                        raw_data = r.read()
+                        if raw_data:
+                            src_img = Image.open(io.BytesIO(raw_data)).convert("RGBA")
+                            src_w, src_h = src_img.size
+                            ratio = max(banner_w / max(1, src_w), banner_h / max(1, src_h))
+                            new_size = (max(banner_w, int(src_w * ratio)), max(banner_h, int(src_h * ratio)))
+                            resized = src_img.resize(new_size, Image.Resampling.LANCZOS)
+                            left = max(0, (resized.width - banner_w) // 2)
+                            top = max(0, (resized.height - banner_h) // 2)
+                            t_img = resized.crop((left, top, left + banner_w, top + banner_h))
+                except Exception as ex:
+                    logger.debug(f"Failed to load web image {img_url}: {ex}")
+
+            # 2. Vector fallback or regulatory/holiday/calendar art
+            if t_img is None:
+                t_bytes = None
+                if k == "holidays":
+                    t_bytes = image_assets.generate_holiday_thumb(item.get("date", ""), item.get("title", ""))
+                elif k == "calendar":
+                    t_bytes = image_assets.generate_calendar_thumb(
+                        symbol=item.get("symbol", ""),
+                        market=item.get("market", ""),
+                        category=item.get("tag", ""),
+                        title=item.get("title", "")
+                    )
+                elif k == "circulars":
+                    t_bytes = image_assets.generate_regulator_logo(item.get("regulator", item.get("source", "NSE")))
+                else:
+                    t_bytes = image_assets.generate_news_thumb(
+                        topic=item.get("tag", ""),
+                        category=item.get("category", ""),
+                        source=item.get("source", ""),
+                        title=item.get("title", "")
+                    )
+                if t_bytes:
+                    v_raw = Image.open(io.BytesIO(t_bytes)).convert("RGBA")
+                    t_img = Image.new("RGBA", (banner_w, banner_h), (241, 245, 249, 255))
+                    v_scaled = v_raw.resize((260, 260), Image.Resampling.LANCZOS)
+                    t_img.paste(v_scaled, ((banner_w - 260) // 2, (banner_h - 260) // 2), v_scaled if v_scaled.mode == "RGBA" else None)
+
+            if t_img:
+                mask = Image.new("L", (banner_w, banner_h), 0)
+                ImageDraw.Draw(mask).rounded_rectangle([0, 0, banner_w, banner_h], radius=24, fill=255)
+                img.paste(t_img, (pad, hero_y), mask)
+                d.rounded_rectangle([pad, hero_y, W - pad, hero_y + banner_h], radius=24, outline=(203, 213, 225), width=2)
+        except Exception as e:
+            logger.debug(f"Could not render hero banner: {e}")
+
+        y = hero_y + banner_h + 30
         # Sentiment pill
         pf = self._font(38)
         label = key.title()
@@ -182,14 +215,14 @@ class StoryCardGenerator:
         d.rounded_rectangle([px0, y, px0 + pw + 80, y + 72], radius=36, fill=th["pill_bg"])
         d.ellipse([px0 + 26, y + 29, px0 + 40, y + 43], fill=th["accent"])
         d.text((px0 + 52, y + 14), label, font=pf, fill=th["pill_fg"])
-        y += 110
+        y += 100
 
         tag = clean_text_for_image(item.get("tag", "")).upper()
         if tag:
             tf = self._font(30)
             tw = d.textlength(tag, font=tf)
             d.text(((W - tw) / 2, y), tag, font=tf, fill=MUTED)
-            y += 60
+            y += 55
 
         # Headline (centered)
         title = clean_text_for_image(item.get("title", "Market Catalyst"))
@@ -199,11 +232,11 @@ class StoryCardGenerator:
             lw = d.textlength(ln, font=hf)
             d.text(((W - lw) / 2, y), ln, font=hf, fill=INK)
             y += lh
-        y += 40
+        y += 35
 
         # Divider + two metrics
         d.line([pad, y, W - pad, y], fill=(226, 232, 240), width=3)
-        y += 50
+        y += 45
         m1, m1l = clean_text_for_image(str(item.get("metric1", "—"))), clean_text_for_image(item.get("metric1_label", ""))
         m2, m2l = clean_text_for_image(str(item.get("metric2", "—"))), clean_text_for_image(item.get("metric2_label", ""))
         col_w = (W - 2 * pad) / 2
@@ -217,30 +250,30 @@ class StoryCardGenerator:
             d.text((cx - mw / 2, y), mv, font=mf, fill=th["accent"] if ci == 1 else INK)
             lf = self._font(30, bold=False)
             lw = d.textlength(ml, font=lf)
-            d.text((cx - lw / 2, y + 130), ml, font=lf, fill=MUTED)
-        d.line([W / 2, y + 10, W / 2, y + 160], fill=(226, 232, 240), width=3)
-        y += 210
+            d.text((cx - lw / 2, y + 120), ml, font=lf, fill=MUTED)
+        d.line([W / 2, y + 10, W / 2, y + 150], fill=(226, 232, 240), width=3)
+        y += 190
         d.line([pad, y, W - pad, y], fill=(226, 232, 240), width=3)
-        y += 60
+        y += 50
 
         # Bullets
-        bf_bold = self._font(40)
-        bf = self._font(38, bold=False)
+        bf_bold = self._font(38)
+        bf = self._font(36, bold=False)
         impact = clean_text_for_image(item.get("impact", ""))
         if impact:
-            d.ellipse([pad, y + 16, pad + 14, y + 30], fill=INK)
+            d.ellipse([pad, y + 14, pad + 14, y + 28], fill=INK)
             d.text((pad + 36, y), f"Impact: {impact}", font=bf_bold, fill=INK)
-            y += 70
+            y += 65
         for b in (item.get("bullets") or [])[:2]:
             b = clean_text_for_image(b)
             if not b:
                 continue
-            blines = self._wrap(d, b, bf, W - 2 * pad - 36, 4)
-            d.ellipse([pad, y + 16, pad + 14, y + 30], fill=INK)
+            blines = self._wrap(d, b, bf, W - 2 * pad - 36, 3)
+            d.ellipse([pad, y + 14, pad + 14, y + 28], fill=INK)
             for bl in blines:
                 d.text((pad + 36, y), bl, font=bf, fill=MUTED)
-                y += 54
-            y += 20
+                y += 50
+            y += 15
 
         # Footer
         ff = self._font(28, bold=False)
@@ -264,11 +297,15 @@ class StoryCardGenerator:
         cw = d.textlength(cta, font=cf)
         d.text(((W - cw) / 2, H - 110), cta, font=cf, fill=FAINT)
 
-        # Tiny Regulatory Disclaimer
-        disc_font = self._font(17, bold=False)
-        disc_msg = "This page/Image/Site is for Educational and knowledge purpose only, and not a Investment advice, donot take it as a investment advise. We are not responsible for your actions or loss."
-        disc_w = d.textlength(disc_msg, font=disc_font)
-        d.text(((W - disc_w) / 2, H - 55), disc_msg, font=disc_font, fill=(148, 163, 184))
+        # Tiny Regulatory Disclaimer wrapped to 2 clean lines
+        disc_font = self._font(19, bold=False)
+        disc_msg = "This document and information in this document is not an investment advise. The creator and publisher are not responsible for your actions; for knowledge and educational purpose only."
+        disc_lines = self._wrap(d, disc_msg, disc_font, W - 140, 2)
+        disc_y = H - 65
+        for dline in disc_lines:
+            dw = d.textlength(dline, font=disc_font)
+            d.text(((W - dw) / 2, disc_y), dline, font=disc_font, fill=(148, 163, 184))
+            disc_y += 24
 
         buf = io.BytesIO()
         img.save(buf, format="PNG", optimize=True)

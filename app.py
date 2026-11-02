@@ -1288,9 +1288,6 @@ def render_news_feed_html(items: List[Dict]) -> str:
                     <span class="epm-chron-source-type">{html.escape(it['source_type'])}</span>
                 </div>
             </div>
-            <div class="epm-chron-thumb">
-                <img src="{it['thumb_url']}" alt="{html.escape(it['source'])}" class="epm-news-thumb-img" onerror="this.onerror=null;this.src='/api/news-thumb?topic={it['filter_category']}&s={it['source'][:8]}';" />
-            </div>
             <div class="epm-chron-content">
                 <div class="epm-chron-headline">{html.escape(it['title'])}</div>
             </div>
@@ -1618,7 +1615,7 @@ def render_site_disclaimer_html(is_mobile: bool = False) -> str:
 
 
 def render_story_strip_html(stories: List[Dict], kind: str, is_desktop: bool = False) -> str:
-    """Renders sleek rectangular story preview thumbnails with mid-gray canvas and green, red, or yellow ribbons."""
+    """Renders sleek full-size stretched story preview tiles with background image, dark gradient overlay, and bold colored badges."""
     cls = "epm-story-strip desktop-strip" if is_desktop else "epm-story-strip"
     thumbs = []
     INSTITUTIONAL_TAGS = {
@@ -1630,36 +1627,39 @@ def render_story_strip_html(stories: List[Dict], kind: str, is_desktop: bool = F
         sk = _sent_key(s.get("sentiment", "NEUTRAL")).lower()
         title = html.escape(clean_table_text(s.get("title", "Market Story")))
         raw_auth = str(s.get("emblem") or s.get("source") or "GNC").strip()
-        emblem = html.escape(raw_auth.upper()[:10])
+        emblem = html.escape(raw_auth.upper()[:12])
         score = html.escape(str(s.get("metric1", "8.5/10")).split("/")[0])
         sent_label = html.escape(str(s.get("sentiment", "NEUTRAL")).upper())
 
         is_inst = s.get("is_institutional", False) or any(k in (raw_auth + " " + s.get("title", "")).upper() for k in INSTITUTIONAL_TAGS)
 
-        # Yellow ribbon for institutional news; green for bullish; red for bearish; neutral for others
+        # Ribbon border tone and pill style
         if kind == "news" and is_inst:
             ribbon_cls = "ribbon-yellow is-inst-thumb"
+            tone_class = "pill-inst"
         elif sk == "bullish":
             ribbon_cls = "tone-bullish"
+            tone_class = "pill-bullish"
         elif sk == "bearish":
             ribbon_cls = "tone-bearish"
+            tone_class = "pill-bearish"
         else:
             ribbon_cls = "tone-neutral"
+            tone_class = "pill-neutral"
 
         thumb_img_url = s.get("image_url") or s.get("image") or s.get("thumbnail") or f"/api/placeholder-thumb?cat={kind}&s={emblem}&t={title[:10]}"
         thumbs.append(
             f'<div class="epm-story-thumbnail {ribbon_cls}" onclick="window.epmOpenStory(\'{kind}\',{i})">'
-            f'  <div class="epm-thumb-inner">'
-            f'    <div class="epm-thumb-top">'
-            f'      <span class="epm-thumb-auth">{emblem}</span>'
-            f'      <span class="epm-thumb-score">{score}</span>'
+            f'  <img src="{thumb_img_url}" class="epm-tile-bg-img" alt="{title}" onerror="this.onerror=null;this.src=\'/api/placeholder-thumb?cat={kind}\';" loading="eager" />'
+            f'  <div class="epm-tile-overlay"></div>'
+            f'  <div class="epm-tile-content">'
+            f'    <div class="epm-tile-top">'
+            f'      <span class="epm-tile-auth">{emblem}</span>'
+            f'      <span class="epm-tile-score">{score}</span>'
             f'    </div>'
-            f'    <div class="epm-thumb-mid">'
-            f'      <img src="{thumb_img_url}" class="epm-story-card-thumb" alt="{title}" onerror="this.onerror=null;this.src=\'/api/placeholder-thumb?cat={kind}\';" />'
-            f'      <div class="epm-thumb-title">{title}</div>'
-            f'    </div>'
-            f'    <div class="epm-thumb-btm">'
-            f'      <span class="epm-thumb-pill">{sent_label}</span>'
+            f'    <div class="epm-tile-btm">'
+            f'      <div class="epm-tile-title">{title}</div>'
+            f'      <span class="epm-tile-pill {tone_class}">{sent_label}</span>'
             f'    </div>'
             f'  </div>'
             f'</div>'
@@ -1707,9 +1707,6 @@ def render_mobile_news_feed_html(pool: List[Dict]) -> str:
         rows.append(f"""
         <div class="epm-pc-card tone-{sk} {inst_cls}" data-scope="{filter_cat}" onclick="window.epmToggleProgressive(this)">
             <div class="epm-pc-head">
-                <div class="epm-pc-thumb" style="width:48px;height:48px;min-width:48px;border-radius:8px;overflow:hidden;margin-right:10px;background:#F1F5F9;border:1px solid #E2E8F0;flex-shrink:0;">
-                    <img src="{thumb_url}" style="width:100%;height:100%;object-fit:cover;" onerror="this.onerror=null;this.src='/api/news-thumb?topic={filter_cat}&s={src[:8]}';" alt="{src}" />
-                </div>
                 <div class="epm-pc-head-text">
                     <div class="epm-pc-title">{title}</div>
                     <div class="epm-pc-meta">{meta_src}</div>
@@ -1827,12 +1824,7 @@ def render_calendar_timeline_html(events: List[Dict]) -> str:
                     <span class="epm-tl-country">{flag} {html.escape(country.title())}</span>
                     <span class="epm-tl-reg">{html.escape(reg)}</span>
                 </div>
-                <div style="display:flex;align-items:center;gap:10px;margin:6px 0;">
-                    <div class="epm-pc-thumb" style="width:48px;height:48px;min-width:48px;border-radius:8px;overflow:hidden;background:#F1F5F9;border:1px solid #E2E8F0;flex-shrink:0;">
-                        <img src="{cal_thumb_url}" style="width:100%;height:100%;object-fit:cover;" alt="{reg}" onerror="this.onerror=null;this.src='/api/placeholder-thumb?cat=calendar';" />
-                    </div>
-                    <div class="epm-tl-name" style="margin-bottom:0;flex:1;">{html.escape(name)}</div>
-                </div>
+                <div class="epm-tl-name">{html.escape(name)}</div>
                 <div class="epm-tl-badges">
                     <span class="epm-tl-sent tone-{sk}">● {html.escape(sent_text.title())}</span>
                     <span class="epm-signal-pips tier-{stars}">{pips}</span>
@@ -1957,9 +1949,6 @@ def render_mobile_circulars_feed_html(items: List[Dict]) -> str:
         cards.append(f"""
         <div class="epm-pc-card tone-neutral" data-circ-reg="{reg}" onclick="window.epmToggleProgressive(this)">
             <div class="epm-pc-head">
-                <div class="epm-pc-thumb" style="width:48px;height:48px;min-width:48px;border-radius:8px;overflow:hidden;margin-right:10px;background:#F1F5F9;border:1px solid #E2E8F0;flex-shrink:0;">
-                    <img src="/api/regulator-logo/{reg}" style="width:100%;height:100%;object-fit:cover;" alt="{reg}" onerror="this.onerror=null;this.src='/api/placeholder-thumb?cat=circular';" />
-                </div>
                 <div class="epm-pc-head-text">
                     <div class="epm-pc-title">{title}</div>
                     <div class="epm-pc-meta">
@@ -2046,12 +2035,7 @@ def render_mobile_holidays_timeline_html(holidays: List[Dict]) -> str:
                     <span class="epm-tl-country">🏖️ {html.escape(lbl)}</span>
                     <span class="epm-tl-reg">2026</span>
                 </div>
-                <div style="display:flex;align-items:center;gap:10px;margin:6px 0;">
-                    <div class="epm-pc-thumb" style="width:48px;height:48px;min-width:48px;border-radius:8px;overflow:hidden;background:#F1F5F9;border:1px solid #E2E8F0;flex-shrink:0;">
-                        <img src="/api/holiday-thumb/{d}?title={desc}" style="width:100%;height:100%;object-fit:cover;" alt="{desc}" onerror="this.onerror=null;this.src='/api/placeholder-thumb?cat=holiday';" />
-                    </div>
-                    <div class="epm-tl-name" style="margin-bottom:0;flex:1;">{html.escape(desc)}</div>
-                </div>
+                <div class="epm-tl-name">{html.escape(desc)}</div>
                 <div class="epm-pc-body">
                     <div class="epm-pc-metrics" style="grid-template-columns:1fr 1fr; margin-bottom:8px;">
                         <div><span>🇮🇳 NSE / BSE</span><b>{html.escape(nse)}</b></div>
@@ -2574,9 +2558,6 @@ def render_desktop_calendar_html(events: List[Dict]) -> str:
                     <span class="epm-chron-source-type">{html.escape(cat_chip[:16])}</span>
                 </div>
             </div>
-            <div class="epm-chron-thumb">
-                <img src="{cal_thumb_url}" alt="{html.escape(mkt)}" class="epm-news-thumb-img" onerror="this.onerror=null;this.src='/api/placeholder-thumb?cat=calendar';" />
-            </div>
             <div class="epm-chron-content">
                 <div class="epm-chron-headline">
                     <b>{html.escape(title)}</b>
@@ -2764,9 +2745,6 @@ def render_desktop_circulars_html(circulars: List[Dict]) -> str:
                     <span class="epm-chron-source-type">Regulatory Directive</span>
                 </div>
             </div>
-            <div class="epm-chron-thumb">
-                <img src="/api/regulator-logo/{reg}" alt="{html.escape(reg)}" class="epm-news-thumb-img" onerror="this.onerror=null;this.src='/api/placeholder-thumb?cat=circular';" />
-            </div>
             <div class="epm-chron-content">
                 <div class="epm-chron-headline">
                     <span style="font-weight:700; color:#0052FF; margin-right:6px;">[{html.escape(cno[:20])}]</span>
@@ -2912,9 +2890,6 @@ def render_desktop_holidays_html(holidays: List[Dict]) -> str:
             <div class="epm-hol-rail">
                 <span class="epm-hol-rail-date">{d}</span>
                 <span class="epm-hol-rail-day">{day}</span>
-            </div>
-            <div class="epm-chron-thumb">
-                <img src="/api/holiday-thumb/{d}?title={desc}" alt="{desc}" class="epm-news-thumb-img" onerror="this.onerror=null;this.src='/api/placeholder-thumb?cat=holiday';" />
             </div>
             <div class="epm-hol-content">
                 <div style="display:flex;align-items:center;gap:10px;justify-content:space-between;">
@@ -6995,12 +6970,17 @@ tbody tr:hover td {
     border-top: 1px solid #E2E8F0 !important;
 }
 .epm-sv-foot-disclaimer {
-    font-size: 10px !important;
-    line-height: 1.35 !important;
+    font-size: 9px !important;
+    line-height: 1.25 !important;
     color: #64748B !important;
     text-align: center !important;
-    max-width: 80% !important;
+    max-width: 82% !important;
     margin: 0 auto !important;
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+    word-break: break-word !important;
 }
 .epm-sv-foot-actions {
     position: absolute !important;
@@ -7922,121 +7902,141 @@ tbody tr:hover td {
     border-radius: 12px;
     margin-bottom: 12px;
 }
-/* Story Thumbnails - Mid-gray canvas, distinct green, red, yellow ribbons */
+/* Story Thumbnails - Stretched full-size tile with edge-to-edge imagery & vibrant overlay */
 .epm-story-thumbnail {
-    flex: 0 0 84px !important;
-    height: 114px !important;
-    border-radius: 10px !important;
-    padding: 2.5px !important;
-    background: #CBD5E1 !important;
+    flex: 0 0 116px !important;
+    height: 172px !important;
+    border-radius: 12px !important;
+    position: relative !important;
+    overflow: hidden !important;
     cursor: pointer !important;
-    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08) !important;
-    transition: transform 0.18s ease, box-shadow 0.18s ease !important;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12) !important;
+    transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
     user-select: none !important;
     -webkit-tap-highlight-color: transparent !important;
-    display: flex !important;
     box-sizing: border-box !important;
+    border: 2px solid #CBD5E1 !important;
+    background: #0F172A !important;
 }
 .epm-story-thumbnail:hover {
-    transform: translateY(-2px) !important;
-    box-shadow: 0 6px 14px rgba(15, 23, 42, 0.15) !important;
+    transform: translateY(-3px) scale(1.02) !important;
+    box-shadow: 0 10px 22px rgba(15, 23, 42, 0.22) !important;
 }
 .epm-story-thumbnail.tone-bullish {
-    background: linear-gradient(135deg, #10B981, #059669) !important;
+    border-color: #10B981 !important;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.22) !important;
 }
 .epm-story-thumbnail.tone-bearish {
-    background: linear-gradient(135deg, #EF4444, #DC2626) !important;
+    border-color: #EF4444 !important;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.22) !important;
 }
 .epm-story-thumbnail.ribbon-yellow, .epm-story-thumbnail.is-inst-thumb {
-    background: linear-gradient(135deg, #F59E0B, #D97706) !important;
+    border-color: #F59E0B !important;
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25) !important;
 }
 .epm-story-thumbnail.tone-neutral {
-    background: linear-gradient(135deg, #94A3B8, #64748B) !important;
+    border-color: #94A3B8 !important;
 }
 
-.epm-thumb-inner {
+.epm-tile-bg-img {
+    position: absolute !important;
+    inset: 0 !important;
     width: 100% !important;
     height: 100% !important;
-    border-radius: 8px !important;
-    background: #E2E8F0 !important;
-    border: 1px solid #CBD5E1 !important;
+    object-fit: cover !important;
+    z-index: 1 !important;
+    transition: transform 0.35s ease !important;
+}
+.epm-story-thumbnail:hover .epm-tile-bg-img {
+    transform: scale(1.08) !important;
+}
+.epm-tile-overlay {
+    position: absolute !important;
+    inset: 0 !important;
+    z-index: 2 !important;
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.72) 0%, rgba(15, 23, 42, 0.12) 38%, rgba(15, 23, 42, 0.85) 75%, rgba(15, 23, 42, 0.98) 100%) !important;
+}
+.epm-tile-content {
+    position: relative !important;
+    z-index: 3 !important;
+    width: 100% !important;
+    height: 100% !important;
     display: flex !important;
     flex-direction: column !important;
     justify-content: space-between !important;
-    padding: 6px !important;
+    padding: 8px !important;
     box-sizing: border-box !important;
-    overflow: hidden !important;
-    position: relative !important;
 }
-.epm-thumb-top {
+.epm-tile-top {
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
-    gap: 2px !important;
+    gap: 4px !important;
 }
-.epm-thumb-auth {
+.epm-tile-auth {
     font-size: 8px !important;
     font-weight: 800 !important;
-    letter-spacing: 0.04em !important;
-    color: #1E293B !important;
+    letter-spacing: 0.05em !important;
+    color: #FFFFFF !important;
     text-transform: uppercase !important;
+    background: rgba(0, 0, 0, 0.65) !important;
+    backdrop-filter: blur(4px) !important;
+    padding: 2px 5px !important;
+    border-radius: 4px !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
-    max-width: 48px !important;
+    max-width: 60px !important;
 }
-.ribbon-yellow .epm-thumb-auth, .is-inst-thumb .epm-thumb-auth {
-    color: #92400E !important;
-    font-weight: 900 !important;
-}
-.epm-thumb-score {
+.epm-tile-score {
     font: 800 8.5px var(--font-mono, monospace) !important;
-    color: #0F172A !important;
-    background: rgba(0, 0, 0, 0.08) !important;
-    padding: 1px 4px !important;
+    color: #F8FAFC !important;
+    background: rgba(0, 0, 0, 0.65) !important;
+    backdrop-filter: blur(4px) !important;
+    padding: 2px 5px !important;
     border-radius: 4px !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
 }
-.epm-thumb-mid {
-    flex: 1 !important;
-    margin: 3px 0 !important;
+.epm-tile-btm {
     display: flex !important;
-    align-items: center !important;
+    flex-direction: column !important;
+    gap: 4px !important;
 }
-.epm-thumb-title {
-    font-size: 9px !important;
+.epm-tile-title {
+    font-size: 10px !important;
     font-weight: 700 !important;
     line-height: 1.25 !important;
-    color: #0F172A !important;
+    color: #FFFFFF !important;
     display: -webkit-box !important;
     -webkit-line-clamp: 3 !important;
     -webkit-box-orient: vertical !important;
     overflow: hidden !important;
     word-break: break-word !important;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 0 1px rgba(0,0,0,0.8) !important;
 }
-.epm-thumb-btm {
-    display: flex !important;
-    align-items: center !important;
-}
-.epm-thumb-pill {
+.epm-tile-pill {
     font-size: 7.5px !important;
     font-weight: 800 !important;
-    letter-spacing: 0.05em !important;
-    padding: 1px 4px !important;
-    border-radius: 3px !important;
+    letter-spacing: 0.04em !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
     text-transform: uppercase !important;
+    align-self: flex-start !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) !important;
 }
-.tone-bullish .epm-thumb-pill { background: #DCFCE7 !important; color: #166534 !important; border: 1px solid #86EFAC !important; font-weight: 800 !important; }
-.tone-bearish .epm-thumb-pill { background: #FEE2E2 !important; color: #991B1B !important; border: 1px solid #FCA5A5 !important; font-weight: 800 !important; }
-.tone-neutral .epm-thumb-pill { background: #F1F5F9 !important; color: #475569 !important; border: 1px solid #CBD5E1 !important; font-weight: 700 !important; }
-.ribbon-yellow .epm-thumb-pill, .is-inst-thumb .epm-thumb-pill { background: #FEF3C7 !important; color: #92400E !important; border: 1px solid #FCD34D !important; font-weight: 800 !important; }
+.pill-bullish { background: #10B981 !important; color: #FFFFFF !important; }
+.pill-bearish { background: #EF4444 !important; color: #FFFFFF !important; }
+.pill-inst { background: #F59E0B !important; color: #000000 !important; }
+.pill-neutral { background: #64748B !important; color: #FFFFFF !important; }
 
 @media (max-width: 640px) {
     .epm-story-thumbnail {
-        flex: 0 0 76px !important;
-        height: 104px !important;
+        flex: 0 0 102px !important;
+        height: 154px !important;
     }
-    .epm-thumb-title {
-        font-size: 8.5px !important;
+    .epm-tile-title {
+        font-size: 9.5px !important;
         -webkit-line-clamp: 3 !important;
     }
 }
@@ -9926,7 +9926,7 @@ TERMINAL_CLIENT_JS = r"""
             <div class="epm-sv-content" id="epm-sv-content"></div>
             <div class="epm-sv-foot">
               <div class="epm-sv-foot-disclaimer">
-                This page/Image/Site is for Educational and knowledge purpose only, and not a Investment advice, donot take it as a investment advise. We are not responsible for your actions or loss.
+                Educational & knowledge purpose only; not an investment advice. We are not responsible for your actions or loss.
               </div>
               <div class="epm-sv-foot-actions">
                 <button type="button" class="epm-sv-dots-btn epm-sv-dots-bottom" id="epm-sv-dots-btn" aria-label="Story actions" onclick="window.epmToggleStoryMenu(event)" title="Options">⋮</button>
@@ -9964,12 +9964,49 @@ TERMINAL_CLIENT_JS = r"""
             epmStory.timer = setTimeout(() => epmStoryGo(epmStory.idx + 1), EPM_STORY_MS);
         });
 
-        let sx = 0, sy = 0;
-        frame.addEventListener('touchstart', e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, { passive: true });
+        // Tap Left half or Right half to go Back / Next
+        frame.addEventListener('click', e => {
+            if (e.target.closest('.epm-sv-close, .epm-sv-foot-actions, #epm-sv-dropdown-menu, a, button, input')) return;
+            const rect = frame.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            if (clickX < rect.width * 0.45) {
+                epmStoryGo(epmStory.idx - 1);
+            } else {
+                epmStoryGo(epmStory.idx + 1);
+            }
+        });
+
+        let sx = 0, sy = 0, stTime = 0;
+        frame.addEventListener('touchstart', e => {
+            sx = e.touches[0].clientX;
+            sy = e.touches[0].clientY;
+            stTime = Date.now();
+        }, { passive: true });
         frame.addEventListener('touchend', e => {
-            const dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy;
-            if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) epmStoryGo(epmStory.idx + (dx < 0 ? 1 : -1));
-            else if (dy > 90) window.epmCloseStory();
+            const dx = e.changedTouches[0].clientX - sx;
+            const dy = e.changedTouches[0].clientY - sy;
+            const elapsed = Date.now() - stTime;
+            // Swipe horizontally
+            if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
+                epmStoryGo(epmStory.idx + (dx < 0 ? 1 : -1));
+                return;
+            }
+            // Swipe down to dismiss
+            if (dy > 80 && Math.abs(dy) > Math.abs(dx)) {
+                window.epmCloseStory();
+                return;
+            }
+            // Tap on mobile (left half: back, right half: next)
+            if (Math.abs(dx) < 15 && Math.abs(dy) < 15 && elapsed < 350) {
+                if (e.target.closest('.epm-sv-close, .epm-sv-foot-actions, #epm-sv-dropdown-menu, a, button, input')) return;
+                const rect = frame.getBoundingClientRect();
+                const tapX = e.changedTouches[0].clientX - rect.left;
+                if (tapX < rect.width * 0.45) {
+                    epmStoryGo(epmStory.idx - 1);
+                } else {
+                    epmStoryGo(epmStory.idx + 1);
+                }
+            }
         }, { passive: true });
         document.addEventListener('keydown', e => {
             if (!v.classList.contains('is-open')) return;
@@ -10098,8 +10135,7 @@ TERMINAL_CLIENT_JS = r"""
         if (!epmStory.items || !epmStory.items.length) return;
         const it = epmStory.items[epmStory.idx];
         const imgUrl = `/api/story/${epmStory.kind}/${epmStory.idx}.png`;
-        const title = `GNC: ${it.title || it.headline || 'Market Catalyst'}`;
-        const text = `GNC Market Alert: ${it.title || ''}\nScore: ${it.score || 'High'}/10 | Sentiment: ${it.sentiment || 'Live'}`;
+        const sourceUrl = it.link || it.doc_url || '';
         
         if (navigator.share) {
             try {
@@ -10109,14 +10145,12 @@ TERMINAL_CLIENT_JS = r"""
                 if (navigator.canShare && navigator.canShare({ files: [file] })) {
                     await navigator.share({
                         files: [file],
-                        title: title,
-                        text: text
+                        text: sourceUrl ? `Source link: ${sourceUrl}` : ''
                     });
                     return;
                 } else {
                     await navigator.share({
-                        title: title,
-                        text: text,
+                        text: sourceUrl ? `Source link: ${sourceUrl}` : '',
                         url: window.location.origin + imgUrl
                     });
                     return;
@@ -10130,7 +10164,8 @@ TERMINAL_CLIENT_JS = r"""
             }
         }
         
-        const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(title + '\n' + text + '\n' + window.location.origin + imgUrl)}`;
+        const shareMsg = sourceUrl ? `Source link: ${sourceUrl}\n${window.location.origin + imgUrl}` : `${window.location.origin + imgUrl}`;
+        const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareMsg)}`;
         window.open(waUrl, '_blank');
     };
 
@@ -11179,9 +11214,17 @@ init_circ_summary, init_circ_html, init_circ_rows, init_mobile_circ_html = get_c
 init_hol_mobile_html, init_hol_rows, init_hol_desktop_html = get_holidays_view("ALL")
 
 with gr.Blocks(
-    title="GNC | Global News Feed Room & Financial Terminal",
+    title="Global News and Calender",
     fill_width=True,
     head=(
+        '<title>Global News and Calender</title>'
+        '<meta name="title" content="Global News and Calender" />'
+        '<meta property="og:title" content="Global News and Calender" />'
+        '<meta property="og:description" content="Live multi-market financial news, economic calendar, and regulatory circulars." />'
+        '<meta property="og:image" content="https://p01--news-engine-service--dkhqtlpvx6bh.code.run/api/og-image.png" />'
+        '<meta name="twitter:title" content="Global News and Calender" />'
+        '<meta name="twitter:description" content="Live multi-market financial news, economic calendar, and regulatory circulars." />'
+        '<meta name="twitter:image" content="https://p01--news-engine-service--dkhqtlpvx6bh.code.run/api/og-image.png" />'
         '<link rel="preconnect" href="https://fonts.googleapis.com">'
         '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
         '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">'
