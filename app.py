@@ -10,7 +10,7 @@ import threading
 import glob
 import logging
 from typing import Optional, List, Dict
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import FastAPI, Query, BackgroundTasks, HTTPException, Body
 from fastapi.responses import PlainTextResponse, FileResponse, StreamingResponse, RedirectResponse, JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -2969,7 +2969,7 @@ def render_settings_hub_html() -> str:
             </div>
             <button type="button" class="epm-gate-unlock-btn" onclick="window.epmUnlockAdmin()">Unlock Admin Hub 🔓</button>
             <div id="epm-gate-err" class="epm-gate-err"></div>
-            <div class="epm-gate-note">Master PIN: <b>202688</b> • Emergency Recovery Codes: <b>GNC-SEC-9842</b>, <b>GNC-SEC-5719</b></div>
+            <div class="epm-gate-note">Restricted Terminal Console • Authorized Personnel Only</div>
         </div>
     </div>
 
