@@ -9467,15 +9467,8 @@ TERMINAL_CLIENT_JS = r"""
             }
         })
         .catch(() => {
-            if (pin === '202688' || ['GNC-SEC-9842', 'GNC-SEC-5719', 'GNC-SEC-3381'].includes(pin.toUpperCase())) {
-                sessionStorage.setItem('epm_admin_unlocked', 'true');
-                const gate = document.getElementById('epm-admin-gate');
-                if (gate) gate.style.setProperty('display', 'none', 'important');
-                const ws = document.getElementById('epm-settings-workspace');
-                if (ws) ws.style.setProperty('display', 'flex', 'important');
-                if (window.epmMountSettingsPanes) window.epmMountSettingsPanes();
-            } else if (err) {
-                err.textContent = 'Invalid Master PIN or Recovery Code.';
+            if (err) {
+                err.textContent = 'Verification server unreachable. Please try again.';
             }
         });
     };
