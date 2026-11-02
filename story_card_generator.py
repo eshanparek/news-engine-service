@@ -233,7 +233,7 @@ class StoryCardGenerator:
 
         # Tiny Regulatory Disclaimer
         disc_font = self._font(17, bold=False)
-        disc_msg = "Disclaimer: This document and information is not a investment advise, creator/publisher not responsible, for knowledge/information only."
+        disc_msg = "This page/Image/Site is for Educational and knowledge purpose only, and not a Investment advice, donot take it as a investment advise. We are not responsible for your actions or loss."
         disc_w = d.textlength(disc_msg, font=disc_font)
         d.text(((W - disc_w) / 2, H - 55), disc_msg, font=disc_font, fill=(148, 163, 184))
 

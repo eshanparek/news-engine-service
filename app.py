@@ -12,7 +12,7 @@ import logging
 from typing import Optional, List, Dict
 from datetime import datetime
 from fastapi import FastAPI, Query, BackgroundTasks, HTTPException, Body
-from fastapi.responses import PlainTextResponse, FileResponse, StreamingResponse, RedirectResponse
+from fastapi.responses import PlainTextResponse, FileResponse, StreamingResponse, RedirectResponse, JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -57,6 +57,58 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from starlette.middleware.base import BaseHTTPMiddleware
+from image_assets import generate_og_image, generate_holidays_image, generate_placeholder_thumb
+
+class TerminalSecurityAndMetaMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        # 1. Institutional Security Hardening Headers
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        
+        # 2. Intercept root HTML response to set OpenGraph & change Gradio title to Global News and Calender
+        if request.url.path == "/" and "text/html" in response.headers.get("content-type", ""):
+            body = b""
+            async for chunk in response.body_iterator:
+                body += chunk
+            html_text = body.decode("utf-8", errors="replace")
+            
+            og_meta = (
+                '<title>Global News and Calender</title>\n'
+                '<meta name="title" content="Global News and Calender" />\n'
+                '<meta property="og:title" content="Global News and Calender" />\n'
+                '<meta property="og:description" content="Institutional Real-Time Multi-Market Intelligence Terminal & Catalyst Engine" />\n'
+                '<meta property="og:image" content="https://p01--news-engine-service--dkhqtlpvx6bh.code.run/api/og-image.png" />\n'
+                '<meta property="og:image:width" content="1200" />\n'
+                '<meta property="og:image:height" content="630" />\n'
+                '<meta property="og:url" content="https://p01--news-engine-service--dkhqtlpvx6bh.code.run/" />\n'
+                '<meta property="og:type" content="website" />\n'
+                '<meta property="og:site_name" content="Global News and Calender" />\n'
+                '<meta name="twitter:card" content="summary_large_image" />\n'
+                '<meta name="twitter:title" content="Global News and Calender" />\n'
+                '<meta name="twitter:description" content="Institutional Real-Time Multi-Market Intelligence Terminal & Catalyst Engine" />\n'
+                '<meta name="twitter:image" content="https://p01--news-engine-service--dkhqtlpvx6bh.code.run/api/og-image.png" />\n'
+            )
+            
+            # Replace default Gradio title
+            html_text = re.sub(r'<title>.*?</title>', '<title>Global News and Calender</title>', html_text, count=1)
+            if "<head>" in html_text:
+                html_text = html_text.replace("<head>", f"<head>\n{og_meta}", 1)
+            else:
+                html_text = og_meta + html_text
+                
+            from starlette.responses import HTMLResponse
+            new_headers = dict(response.headers)
+            new_headers["content-length"] = str(len(html_text.encode("utf-8")))
+            return HTMLResponse(content=html_text, status_code=response.status_code, headers=new_headers)
+            
+        return response
+
+app.add_middleware(TerminalSecurityAndMetaMiddleware)
+
 START_TIME = time.time()
 
 
@@ -79,16 +131,70 @@ async def serve_logo():
     return PlainTextResponse("Logo not found", status_code=404)
 
 
+@app.get("/api/og-image.png")
+async def serve_og_image():
+    """Serves high-contrast 1200x630 social share thumbnail for WhatsApp, iMessage, and Twitter previews."""
+    png = generate_og_image()
+    from fastapi.responses import Response
+    return Response(content=png, media_type="image/png", headers={"Cache-Control": "public, max-age=3600"})
+
+
+@app.get("/api/calendar/holiday-image")
+async def serve_holidays_image():
+    """Renders and delivers a high-resolution PNG image of the 2026 trading holidays comparison."""
+    holidays = calendar_engine.get_holiday_snapshot().get("comparison", [])
+    png = generate_holidays_image(holidays)
+    from fastapi.responses import Response
+    return Response(
+        content=png,
+        media_type="image/png",
+        headers={
+            "Cache-Control": "no-store",
+            "Content-Disposition": 'attachment; filename="trading_holidays_2026.png"'
+        }
+    )
+
+
+@app.get("/api/placeholder-thumb")
+async def serve_placeholder_thumb(cat: str = "all", s: str = "", t: str = ""):
+    """Delivers a sharp, sector-themed 120x120 editorial icon thumbnail for news events."""
+    png = generate_placeholder_thumb(category=cat, source=s, title=t)
+    from fastapi.responses import Response
+    return Response(content=png, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+
+
+class PinVerifyRequest(BaseModel):
+    pin: str
+
+
+@app.post("/api/settings/verify-pin")
+async def verify_admin_pin(req: PinVerifyRequest):
+    """Authenticates admin access for Tab 5 settings with Master PIN or Emergency Recovery Codes."""
+    master_pin = os.getenv("ADMIN_PIN", "202688").strip()
+    recovery_codes = {"GNC-SEC-9842", "GNC-SEC-5719", "GNC-SEC-3381"}
+    cleaned = (req.pin or "").strip()
+    if cleaned == master_pin or cleaned.upper() in recovery_codes:
+        return JSONResponse({"ok": True, "token": "gnc_auth_valid_session"})
+    return JSONResponse({"ok": False, "error": "Invalid PIN or Recovery Code"}, status_code=401)
+
+
 @app.get("/api/story/{kind}/{idx}.png")
 async def serve_story_frame(kind: str, idx: int):
     """Renders a 1080x1920 Instagram Story flashcard (read-only preview / download)."""
     kind = "calendar" if kind == "calendar" else "news"
-    items = build_story_items(kind, 8)
+    items = build_story_items(kind, limit=max(100, idx + 10))
     if not items or idx < 0 or idx >= len(items):
         return PlainTextResponse("Story frame not found", status_code=404)
     png = story_card_generator.render_story(items[idx], idx, len(items))
     from fastapi.responses import Response
-    return Response(content=png, media_type="image/png", headers={"Cache-Control": "no-store"})
+    return Response(
+        content=png,
+        media_type="image/png",
+        headers={
+            "Cache-Control": "no-store",
+            "Content-Disposition": f'inline; filename="gnc_{kind}_story_{idx + 1}.png"'
+        }
+    )
 
 
 class NewsItem(BaseModel):
@@ -938,7 +1044,7 @@ def classify_news_filter(source: str, title: str) -> str:
 
 
 def render_news_feed_html(items: List[Dict]) -> str:
-    """Renders the Desktop Chronological Timeline Feed with left time rail & institutional highlights (Screenshot 5)."""
+    """Renders the Desktop Chronological Timeline Feed with left time rail, date dividers, thumbnails & institutional highlights."""
     if not items:
         return (
             '<div class="epm-empty-state">'
@@ -949,10 +1055,14 @@ def render_news_feed_html(items: List[Dict]) -> str:
         )
 
     # Process items into structured clean format
-    processed = []
     now = now_ist()
     today_banner_str = now.strftime("TODAY • %A, %d %B %Y")
+    yesterday_dt = now - timedelta(days=1)
+    yesterday_banner_str = yesterday_dt.strftime("YESTERDAY • %A, %d %B %Y")
     now_time_str = now.strftime("%H:%M")
+
+    today_list = []
+    yesterday_list = []
 
     for i, it in enumerate(items[:60]):
         title = clean_table_text(str(it.get("title", "")))
@@ -973,6 +1083,20 @@ def render_news_feed_html(items: List[Dict]) -> str:
         # Time format strictly time-only (e.g. 12:50:30 PM or 16:30 IST)
         ts = str(it.get("timestamp", "")).strip()
         time_str = extract_clean_time_str(ts, fallback_dt=now)
+
+        # Check whether this item is from today or past session
+        is_past_day = "Yesterday" in ts or "01 Nov" in ts
+        try:
+            m_time = re.search(r'(\d{1,2}):(\d{2})(?::\d{2})?\s*([AP]M)', time_str, re.I)
+            if m_time:
+                h = int(m_time.group(1))
+                m = int(m_time.group(2))
+                is_pm = m_time.group(3).upper() == "PM"
+                h24 = (h % 12) + (12 if is_pm else 0)
+                if (h24 > now.hour) or (h24 == now.hour and m > now.minute):
+                    is_past_day = True
+        except Exception:
+            pass
 
         # Bullets & Reasoning
         raw_reasoning = str(it.get("ai_reasoning", "")).strip()
@@ -995,8 +1119,9 @@ def render_news_feed_html(items: List[Dict]) -> str:
         is_inst = filter_category in ("inst_domestic", "inst_global")
         scope = filter_category
         source_type = "Regulatory Document" if "SEBI" in (source + " " + title).upper() else ("Market Authority" if any(m in (source + " " + title).upper() for m in ["MCX", "NSE", "BSE"]) else "Outbound Link")
+        thumb_url = it.get("image") or it.get("thumbnail") or f"/api/placeholder-thumb?cat={filter_category}&s={source[:4]}"
 
-        processed.append({
+        item_obj = {
             "idx": i,
             "title": title,
             "topic": topic,
@@ -1012,11 +1137,21 @@ def render_news_feed_html(items: List[Dict]) -> str:
             "scope": scope,
             "filter_category": filter_category,
             "is_inst": is_inst,
+            "thumb_url": thumb_url,
             "reasoning": " ".join(bullets)
-        })
+        }
+        if is_past_day:
+            yesterday_list.append(item_obj)
+        else:
+            today_list.append(item_obj)
 
+    processed = today_list + yesterday_list
     if not processed:
         return '<div class="epm-empty-state"><div class="epm-empty-title">No catalysts available</div></div>'
+
+    # Re-index
+    for idx_n, itm in enumerate(processed):
+        itm["idx"] = idx_n
 
     # Prepare default active item (Item 0)
     it0 = processed[0]
@@ -1029,27 +1164,12 @@ def render_news_feed_html(items: List[Dict]) -> str:
     stories = build_story_items("news", limit=len(processed))
     desktop_stories_strip = render_story_strip_html(stories, "news", is_desktop=True)
 
-    # Render Chronological News Rows with Left Rail
-    rows_html = [
-        f'<div class="epm-chron-day-divider"><span>📅 {today_banner_str}</span></div>'
-    ]
-    seen_broad_divider = False
-
-    for it in processed:
+    def _render_row(it):
         i = it["idx"]
         s_class = "bullish" if it["sentiment"] == "BULLISH" else ("bearish" if it["sentiment"] == "BEARISH" else "neutral")
         is_inst = it["is_inst"]
-        dot_class = "dot-inst" if is_inst else ("dot-secondary" if seen_broad_divider else "dot-live")
-
-        if i == 3 and not seen_broad_divider:
-            seen_broad_divider = True
-            rows_html.append(
-                '<div class="epm-stream-divider broad-stream">'
-                '  <span class="line"></span> BROAD MARKET SECONDARY STREAM 📰 <span class="line"></span>'
-                '</div>'
-            )
-
-        row = f'''
+        dot_class = "dot-inst" if is_inst else "dot-live"
+        return f'''
         <div class="epm-chron-row {'is-institutional' if is_inst else ''}" data-idx="{i}" data-scope="{it['scope']}" onclick="window.epmOpenDeskNewsAi({i})">
             <div class="epm-chron-left-rail">
                 <span class="epm-chron-time">{it['time_str']}</span>
@@ -1060,6 +1180,9 @@ def render_news_feed_html(items: List[Dict]) -> str:
                     </a>
                     <span class="epm-chron-source-type">{html.escape(it['source_type'])}</span>
                 </div>
+            </div>
+            <div class="epm-chron-thumb">
+                <img src="{it['thumb_url']}" alt="{html.escape(it['source'])}" class="epm-news-thumb-img" onerror="this.onerror=null;this.src='/api/placeholder-thumb?cat={it['filter_category']}';" />
             </div>
             <div class="epm-chron-content">
                 <div class="epm-chron-headline">{html.escape(it['title'])}</div>
@@ -1072,7 +1195,16 @@ def render_news_feed_html(items: List[Dict]) -> str:
             </div>
         </div>
         '''
-        rows_html.append(row)
+
+    rows_html = []
+    if today_list:
+        rows_html.append(f'<div class="epm-chron-day-divider"><span>📅 {today_banner_str}</span></div>')
+        for it in today_list:
+            rows_html.append(_render_row(it))
+    if yesterday_list:
+        rows_html.append(f'<div class="epm-chron-day-divider is-yesterday" style="margin-top:20px; border-top:1px dashed #CBD5E1; padding-top:14px;"><span>📅 {yesterday_banner_str}</span></div>')
+        for it in yesterday_list:
+            rows_html.append(_render_row(it))
 
     feed_joined = "".join(rows_html)
     json_attr = html.escape(json.dumps(processed), quote=True)
@@ -1402,6 +1534,7 @@ def render_story_strip_html(stories: List[Dict], kind: str, is_desktop: bool = F
         else:
             ribbon_cls = "tone-neutral"
 
+        thumb_img_url = s.get("image") or f"/api/placeholder-thumb?cat={kind}&s={emblem}&t={title[:10]}"
         thumbs.append(
             f'<div class="epm-story-thumbnail {ribbon_cls}" onclick="window.epmOpenStory(\'{kind}\',{i})">'
             f'  <div class="epm-thumb-inner">'
@@ -1410,6 +1543,7 @@ def render_story_strip_html(stories: List[Dict], kind: str, is_desktop: bool = F
             f'      <span class="epm-thumb-score">{score}</span>'
             f'    </div>'
             f'    <div class="epm-thumb-mid">'
+            f'      <img src="{thumb_img_url}" class="epm-story-card-thumb" alt="{title}" onerror="this.onerror=null;this.src=\'/api/placeholder-thumb?cat=news\';" />'
             f'      <div class="epm-thumb-title">{title}</div>'
             f'    </div>'
             f'    <div class="epm-thumb-btm">'
@@ -1457,9 +1591,13 @@ def render_mobile_news_feed_html(pool: List[Dict]) -> str:
         inst_badge = f'<span class="epm-inst-chip">🏛️ {src[:12]}</span>' if is_inst else ""
         meta_src = f'{inst_badge}<span class="epm-pc-dot"></span>{ts}' if is_inst else f'{src} · {ts}'
 
+        thumb_url = it.get("image") or it.get("thumbnail") or f"/api/placeholder-thumb?cat={filter_cat}&s={src[:4]}"
         rows.append(f"""
         <div class="epm-pc-card tone-{sk} {inst_cls}" data-scope="{filter_cat}" onclick="window.epmToggleProgressive(this)">
             <div class="epm-pc-head">
+                <div class="epm-pc-thumb" style="width:48px;height:48px;min-width:48px;border-radius:8px;overflow:hidden;margin-right:10px;background:#F1F5F9;border:1px solid #E2E8F0;flex-shrink:0;">
+                    <img src="{thumb_url}" style="width:100%;height:100%;object-fit:cover;" onerror="this.onerror=null;this.src='/api/placeholder-thumb?cat={filter_cat}';" alt="{src}" />
+                </div>
                 <div class="epm-pc-head-text">
                     <div class="epm-pc-title">{title}</div>
                     <div class="epm-pc-meta">{meta_src}</div>
@@ -2374,6 +2512,9 @@ def render_desktop_calendar_html(events: List[Dict]) -> str:
                             <a href="/api/calendar/ics" download class="epm-dropdown-item">📲 Apple & Google Calendar (.ICS)</a>
                         </div>
                     </div>
+                    <a href="/api/calendar/holiday-image" download="trading_holidays_2026.png" class="epm-cal-hdr-btn" style="text-decoration:none;" title="Download 2026 Trading Holidays & Calendar as PNG image">
+                        Save Calendar 📷
+                    </a>
                     <button type="button" class="epm-cal-hdr-btn" onclick="window.epmPushDeskTelegram('weekly')">
                         Forward to Telegram ✈️
                     </button>
@@ -2586,10 +2727,10 @@ def render_desktop_circulars_html(circulars: List[Dict]) -> str:
 
 
 def render_desktop_holidays_html(holidays: List[Dict]) -> str:
-    """Renders authoritative 2026 market holidays matching Screenshot 5."""
+    """Renders authoritative 2026 market holidays matching the wide Chronological Time Rail card layout."""
     if not holidays:
-        return '<div class="epm-empty-state"><div class="epm-empty-title">No holidays found</div></div>'
-        
+        return '<div class="epm-empty-state"><div class="epm-empty-title">No holidays recorded</div></div>'
+
     rows_html = []
     for h in holidays:
         d = clean_table_text(h.get("date", ""))
@@ -2600,7 +2741,7 @@ def render_desktop_holidays_html(holidays: List[Dict]) -> str:
         mcx = clean_table_text(h.get("mcx_status", "Open"))
         nyse = clean_table_text(h.get("nyse_status", "Open"))
         crypto = clean_table_text(h.get("crypto_status", "Open 24/7 (Holiday)"))
-        
+
         is_india = "Closed" in nse or "Closed" in bse or "Closed" in mcx or "FULL HOLIDAY" in mcx.upper()
         is_usa = "Closed" in nyse
         c_tag = "ALL"
@@ -2611,74 +2752,75 @@ def render_desktop_holidays_html(holidays: List[Dict]) -> str:
         elif is_india and is_usa:
             c_tag = "BOTH"
 
-        def _status_pill(st: str) -> str:
+        def _hol_badge(label: str, st: str) -> str:
             st_u = st.upper()
-            if "FULL HOLIDAY" in st_u:
-                return f'<span class="epm-hol-pill hol-full">FULL HOLIDAY</span>'
-            elif "CLOSED" in st_u and "MORN" not in st_u and "EVE" not in st_u:
-                return f'<span class="epm-hol-pill hol-closed">Closed</span>'
+            if "CLOSED" in st_u or "FULL" in st_u:
+                return f'<span class="epm-hol-badge closed">🔴 {label}: Closed</span>'
             elif "MORN: CLOSED" in st_u:
-                return f'<span class="epm-hol-pill hol-split">{html.escape(st)}</span>'
-            elif "OPEN" in st_u and "24/7" in st_u:
-                return f'<span class="epm-hol-pill hol-crypto">{html.escape(st)}</span>'
-            elif "OPEN" in st_u and ("IST" in st_u or "09:" in st_u or "19:" in st_u):
-                return f'<span class="epm-hol-pill hol-timed">{html.escape(st)}</span>'
+                return f'<span class="epm-hol-badge split">🟡 {label}: Eve Open (17:00 IST)</span>'
+            elif "24/7" in st_u:
+                return f'<span class="epm-hol-badge open">🟢 {label}: 24/7 Open</span>'
             elif "OPEN" in st_u:
-                return f'<span class="epm-hol-pill hol-open">Open</span>'
-            return f'<span class="epm-hol-pill">{html.escape(st)}</span>'
+                return f'<span class="epm-hol-badge open">🟢 {label}: Open</span>'
+            return f'<span class="epm-hol-badge">{label}: {html.escape(st)}</span>'
+
+        badges = "".join([
+            _hol_badge("NSE", nse),
+            _hol_badge("BSE", bse),
+            _hol_badge("MCX", mcx),
+            _hol_badge("NYSE", nyse),
+            _hol_badge("Crypto", crypto)
+        ])
+
+        cat_tag = "🇮🇳 Indian Sovereign Holiday" if is_india else ("🇺🇸 US Federal Holiday" if is_usa else "🌐 Global Holiday")
 
         rows_html.append(f'''
-        <tr class="epm-hol-row" data-country="{c_tag}">
-            <td class="col-hol-date"><b>{d}</b></td>
-            <td class="col-hol-day">{day}</td>
-            <td class="col-hol-desc">{desc}</td>
-            <td class="col-hol-nse">{_status_pill(nse)}</td>
-            <td class="col-hol-bse">{_status_pill(bse)}</td>
-            <td class="col-hol-mcx">{_status_pill(mcx)}</td>
-            <td class="col-hol-nyse">{_status_pill(nyse)}</td>
-            <td class="col-hol-crypto">{_status_pill(crypto)}</td>
-        </tr>
+        <div class="epm-hol-chron-row" data-country="{c_tag}">
+            <div class="epm-hol-rail">
+                <span class="epm-hol-rail-date">{d}</span>
+                <span class="epm-hol-rail-day">{day}</span>
+            </div>
+            <div class="epm-hol-content">
+                <div style="display:flex;align-items:center;gap:10px;justify-content:space-between;">
+                    <div class="epm-hol-title">{desc}</div>
+                    <span style="font-size:11px;font-weight:700;color:#64748B;background:#F1F5F9;border:1px solid #E2E8F0;padding:2px 8px;border-radius:4px;">{cat_tag}</span>
+                </div>
+                <div class="epm-hol-badges-strip">
+                    {badges}
+                </div>
+            </div>
+            <div class="epm-hol-actions">
+                <a href="/api/calendar/holiday-image" download="trading_holidays_2026.png" class="epm-chron-analyze-btn" style="text-decoration:none;">
+                    Save Holiday 📷
+                </a>
+            </div>
+        </div>
         ''')
 
     return f'''
     <div class="epm-hol-desktop-container">
-        <div class="epm-hol-header-strip">
+        <div class="epm-hol-header-strip" style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;margin-bottom:12px;flex-wrap:wrap;gap:12px;">
             <div class="epm-hol-title-wrap">
-                <span class="epm-hol-title">2026 AUTHORITATIVE TRADING HOLIDAYS & CLOSURES</span>
+                <span class="epm-hol-title" style="font-size:14px;font-weight:800;color:#0F172A;">2026 AUTHORITATIVE TRADING HOLIDAYS & CLOSURES</span>
             </div>
-            <div class="epm-hol-controls">
+            <div class="epm-hol-controls" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
                 <div class="epm-hol-pills">
                     <button type="button" class="epm-hol-pill-btn active" onclick="window.epmFilterHolidays('ALL', this)">● All Markets</button>
                     <button type="button" class="epm-hol-pill-btn" onclick="window.epmFilterHolidays('INDIA', this)">Indian Markets (NSE, BSE, MCX)</button>
                     <button type="button" class="epm-hol-pill-btn" onclick="window.epmFilterHolidays('USA', this)">US Markets (NYSE)</button>
                 </div>
-                <div class="epm-hol-actions">
-                    <button type="button" class="epm-hol-dispatch-btn" onclick="window.epmDispatchHolidayAlert()">
-                        Dispatch Holiday Alert to Telegram 📥
+                <div class="epm-hol-actions" style="display:flex;align-items:center;gap:8px;">
+                    <a href="/api/calendar/holiday-image" download="trading_holidays_2026.png" class="epm-cal-hdr-btn" style="text-decoration:none;" title="Download 2026 Holidays Schedule as Image">
+                        Save Calendar 📷
+                    </a>
+                    <button type="button" class="epm-cal-hdr-btn" onclick="window.epmDispatchHolidayAlert()">
+                        Forward to Telegram ✈️
                     </button>
-                    <button type="button" class="epm-hol-icon-btn" title="Filter Funnel">🝖</button>
-                    <button type="button" class="epm-hol-icon-btn" title="Settings">⚙️</button>
                 </div>
             </div>
         </div>
-        <div class="epm-hol-table-wrap">
-            <table class="epm-hol-table" id="epm-hol-table">
-                <thead>
-                    <tr>
-                        <th class="col-hol-date">DATE</th>
-                        <th class="col-hol-day">DAY</th>
-                        <th class="col-hol-desc">HOLIDAY / OCCASION</th>
-                        <th class="col-hol-nse">NSE STATUS</th>
-                        <th class="col-hol-bse">BSE STATUS</th>
-                        <th class="col-hol-mcx">MCX STATUS (MORNING / EVENING)</th>
-                        <th class="col-hol-nyse">NYSE STATUS (EST / IST)</th>
-                        <th class="col-hol-crypto">CRYPTO STATUS</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {''.join(rows_html)}
-                </tbody>
-            </table>
+        <div class="epm-hol-chron-feed" id="epm-hol-cards-list">
+            {''.join(rows_html)}
         </div>
         {render_site_disclaimer_html(is_mobile=False)}
     </div>
@@ -2808,12 +2950,30 @@ def render_settings_hub_html() -> str:
     disclaimer_html = render_site_disclaimer_html(is_mobile=False)
 
     return f'''
-    <div class="epm-settings-workspace">
+    <!-- Institutional Admin Security Gate Overlay -->
+    <div id="epm-admin-gate" class="epm-admin-gate-overlay">
+        <div class="epm-gate-card">
+            <div class="epm-gate-shield">🔒</div>
+            <div class="epm-gate-title">INSTITUTIONAL ADMIN AUTHENTICATION</div>
+            <div class="epm-gate-sub">Enter Master Security PIN or Emergency Recovery Passcode to access system governance, API keys, and dispatch controls.</div>
+            <div class="epm-gate-input-wrap">
+                <input type="password" id="epm-admin-pin-input" class="epm-gate-input" maxlength="16" placeholder="Enter PIN or Passcode..." onkeydown="if(event.key==='Enter') window.epmUnlockAdmin();" />
+            </div>
+            <button type="button" class="epm-gate-unlock-btn" onclick="window.epmUnlockAdmin()">Unlock Admin Hub 🔓</button>
+            <div id="epm-gate-err" class="epm-gate-err"></div>
+            <div class="epm-gate-note">Master PIN: <b>202688</b> • Emergency Recovery Codes: <b>GNC-SEC-9842</b>, <b>GNC-SEC-5719</b></div>
+        </div>
+    </div>
+
+    <div class="epm-settings-workspace" id="epm-settings-workspace" style="display:none !important;">
         <!-- Left Column: Meta / Facebook Business Suite Style Vertical Sub-Menu -->
         <div class="epm-settings-sidebar">
-            <div class="epm-settings-sb-hdr">
-                <span class="epm-settings-sb-title">⚙️ ADMIN & SETTINGS</span>
-                <span class="epm-settings-sb-sub">Institutional Governance Hub</span>
+            <div class="epm-settings-sb-hdr" style="display:flex;align-items:center;justify-content:space-between;">
+                <div>
+                    <span class="epm-settings-sb-title">⚙️ ADMIN & SETTINGS</span>
+                    <span class="epm-settings-sb-sub">Institutional Governance Hub</span>
+                </div>
+                <button type="button" class="epm-lock-btn" onclick="window.epmLockAdmin()" title="Lock Admin Settings">🔒 Lock</button>
             </div>
             <div class="epm-settings-sb-nav">
                 <button type="button" class="epm-settings-nav-item active" data-pane="pane_in_reg" onclick="window.epmShowSettingsPane('pane_in_reg', this)">
@@ -2855,6 +3015,14 @@ def render_settings_hub_html() -> str:
                 <button type="button" class="epm-settings-nav-item" data-pane="pane_sec_forwarding" onclick="window.epmShowSettingsPane('pane_sec_forwarding', this)">
                     <span class="icon">🔔</span>
                     <span class="text">Selective Forwarding Rules</span>
+                </button>
+                <button type="button" class="epm-settings-nav-item" data-pane="pane_sec_stories_publisher" onclick="window.epmShowSettingsPane('pane_sec_stories_publisher', this)">
+                    <span class="icon">📸</span>
+                    <span class="text">Stories Flashcard Publisher</span>
+                </button>
+                <button type="button" class="epm-settings-nav-item" data-pane="pane_sec_telegram_adv" onclick="window.epmShowSettingsPane('pane_sec_telegram_adv', this)">
+                    <span class="icon">🔧</span>
+                    <span class="text">Advanced Telegram Overrides</span>
                 </button>
                 <button type="button" class="epm-settings-nav-item" data-pane="pane_system_health" onclick="window.epmShowSettingsPane('pane_system_health', this)">
                     <span class="icon">🔒</span>
@@ -6565,6 +6733,279 @@ tbody tr:hover td {
     border-color: #94A3B8 !important;
 }
 
+
+/* News Event Thumbnail (Google News / Dailyhunt Editorial Style) */
+.epm-chron-thumb {
+    width: 72px;
+    height: 72px;
+    min-width: 72px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #F1F5F9;
+    border: 1px solid #E2E8F0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 12px;
+    flex-shrink: 0;
+}
+.epm-chron-thumb img,
+.epm-news-thumb-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.epm-story-thumb-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+    display: block;
+}
+.epm-thumb-inner img.epm-story-card-thumb {
+    width: 44px;
+    height: 44px;
+    border-radius: 6px;
+    object-fit: cover;
+    display: block;
+    margin: 4px auto;
+    border: 1px solid #E2E8F0;
+}
+
+/* Story Modal Bottom 3-Dots & Regulatory Disclaimer */
+.epm-sv-foot {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 10px 16px 14px 16px !important;
+    position: relative !important;
+    background: #FFFFFF !important;
+    border-top: 1px solid #E2E8F0 !important;
+}
+.epm-sv-foot-disclaimer {
+    font-size: 10px !important;
+    line-height: 1.35 !important;
+    color: #64748B !important;
+    text-align: center !important;
+    max-width: 80% !important;
+    margin: 0 auto !important;
+}
+.epm-sv-foot-actions {
+    position: absolute !important;
+    bottom: 8px !important;
+    right: 12px !important;
+}
+.epm-sv-dots-bottom {
+    background: #F8FAFC !important;
+    border: 1px solid #CBD5E1 !important;
+    border-radius: 50% !important;
+    width: 32px !important;
+    height: 32px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 18px !important;
+    cursor: pointer !important;
+    color: #0F172A !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important;
+    transition: all 0.15s ease !important;
+}
+.epm-sv-dots-bottom:hover {
+    background: #0052FF !important;
+    color: #FFFFFF !important;
+    border-color: #0052FF !important;
+}
+.epm-sv-dropdown-up {
+    bottom: 38px !important;
+    top: auto !important;
+    right: 0 !important;
+}
+
+/* Holiday Desktop Time Rail Chronological Cards */
+.epm-hol-chron-feed {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px 0;
+}
+.epm-hol-chron-row {
+    display: flex;
+    align-items: center;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+    padding: 12px 18px;
+    gap: 16px;
+    transition: all 0.15s ease;
+}
+.epm-hol-chron-row:hover {
+    border-color: #0052FF;
+    box-shadow: 0 2px 8px rgba(0,82,255,0.06);
+}
+.epm-hol-rail {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    min-width: 110px;
+}
+.epm-hol-rail-date {
+    font-size: 13px;
+    font-weight: 800;
+    color: #0F172A;
+    font-family: 'JetBrains Mono', monospace;
+}
+.epm-hol-rail-day {
+    font-size: 11px;
+    color: #64748B;
+    font-weight: 600;
+}
+.epm-hol-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.epm-hol-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #0F172A;
+}
+.epm-hol-badges-strip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.epm-hol-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 5px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.epm-hol-badge.closed {
+    background: #FEF2F2;
+    color: #DC2626;
+    border: 1px solid #FECACA;
+}
+.epm-hol-badge.open {
+    background: #F0FDF4;
+    color: #16A34A;
+    border: 1px solid #BBF7D0;
+}
+.epm-hol-badge.split {
+    background: #FFFBEB;
+    color: #B45309;
+    border: 1px solid #FDE68A;
+}
+
+/* Institutional Admin Security PIN Gate Overlay */
+.epm-admin-gate-overlay {
+    padding: 40px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #F8FAFC;
+    border-radius: 12px;
+    border: 1px solid #E2E8F0;
+    margin-bottom: 20px;
+}
+.epm-gate-card {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    box-shadow: 0 4px 16px rgba(15,23,42,0.06);
+    border-radius: 14px;
+    padding: 32px;
+    max-width: 440px;
+    width: 100%;
+    text-align: center;
+}
+.epm-gate-shield {
+    font-size: 40px;
+    margin-bottom: 12px;
+}
+.epm-gate-title {
+    font-size: 16px;
+    font-weight: 800;
+    color: #0F172A;
+    letter-spacing: 0.02em;
+    margin-bottom: 6px;
+}
+.epm-gate-sub {
+    font-size: 12px;
+    color: #64748B;
+    line-height: 1.45;
+    margin-bottom: 20px;
+}
+.epm-gate-input-wrap {
+    margin-bottom: 16px;
+}
+.epm-gate-input {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    text-align: center;
+    border: 2px solid #E2E8F0;
+    border-radius: 8px;
+    outline: none;
+    transition: border 0.15s ease;
+    box-sizing: border-box;
+}
+.epm-gate-input:focus {
+    border-color: #0052FF;
+}
+.epm-gate-unlock-btn {
+    width: 100%;
+    padding: 12px;
+    background: #0052FF;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+.epm-gate-unlock-btn:hover {
+    background: #0043D6;
+}
+.epm-gate-err {
+    font-size: 12px;
+    font-weight: 700;
+    color: #DC2626;
+    margin-top: 10px;
+    min-height: 16px;
+}
+.epm-gate-note {
+    font-size: 11px;
+    color: #94A3B8;
+    margin-top: 14px;
+    border-top: 1px solid #F1F5F9;
+    padding-top: 10px;
+}
+.epm-lock-btn {
+    background: #F1F5F9;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.epm-lock-btn:hover {
+    background: #FEF2F2;
+    color: #DC2626;
+    border-color: #FECACA;
+}
+
 /* Right-Side Prominent Menu Button (Bold White on Royal Blue across all devices) */
 #epm-desktop-menu-btn,
 .epm-top-btn.epm-menu-btn,
@@ -8633,6 +9074,9 @@ TERMINAL_CLIENT_JS = r"""
         if (badge && TAB_NAMES[tabIdx]) {
             badge.textContent = TAB_NAMES[tabIdx];
         }
+        if (tabIdx === 4 && window.epmCheckAdminLock) {
+            window.epmCheckAdminLock();
+        }
     }
 
     // 3. Feed Refresh Engine
@@ -8951,18 +9395,106 @@ TERMINAL_CLIENT_JS = r"""
             const chk = document.getElementById('cfg_show_pdf_drawer_menu');
             if (chk) chk.checked = isShown;
         }
+
+        if (window.epmCheckAdminLock) {
+            window.epmCheckAdminLock();
+        }
     }
 
     // Dynamic Mount of Gradio Settings Panes into Meta Suite Layout
     window.epmMountSettingsPanes = function() {
         const content = document.querySelector('.epm-settings-content');
         if (!content) return;
-        ['pane_sec_forwarding', 'pane_sec_google', 'pane_sec_social'].forEach(id => {
+        ['pane_sec_forwarding', 'pane_sec_google', 'pane_sec_social', 'pane_sec_stories_publisher', 'pane_sec_telegram_adv'].forEach(id => {
             const el = document.getElementById(id);
             if (el && el.parentElement !== content) {
                 content.appendChild(el);
             }
         });
+    };
+
+    // Client-Side Anti-Inspect & DevTools Keyboard Shortcut Shield
+    document.addEventListener('contextmenu', function(e) {
+        if (!e.target.closest('input, textarea')) {
+            e.preventDefault();
+        }
+    });
+    document.addEventListener('keydown', function(e) {
+        const k = (e.key || '').toUpperCase();
+        if (k === 'F12' ||
+            (e.ctrlKey && e.shiftKey && ['I', 'J', 'C'].includes(k)) ||
+            (e.ctrlKey && k === 'U') ||
+            (e.metaKey && e.altKey && ['I', 'J', 'C'].includes(k)) ||
+            (e.metaKey && k === 'U')) {
+            e.preventDefault();
+        }
+    });
+
+    // Institutional Admin Security PIN Gate Logic
+    window.epmUnlockAdmin = function() {
+        const input = document.getElementById('epm-admin-pin-input');
+        const err = document.getElementById('epm-gate-err');
+        const pin = (input ? input.value : '').trim();
+        if (!pin) {
+            if (err) err.textContent = 'Please enter Master PIN or Recovery Passcode.';
+            return;
+        }
+        fetch('/api/settings/verify-pin', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ pin: pin })
+        })
+        .then(r => r.json())
+        .then(res => {
+            if (res.ok) {
+                sessionStorage.setItem('epm_admin_unlocked', 'true');
+                const gate = document.getElementById('epm-admin-gate');
+                if (gate) gate.style.setProperty('display', 'none', 'important');
+                const ws = document.getElementById('epm-settings-workspace');
+                if (ws) ws.style.setProperty('display', 'flex', 'important');
+                if (err) err.textContent = '';
+                if (window.epmMountSettingsPanes) window.epmMountSettingsPanes();
+            } else {
+                if (err) err.textContent = 'Invalid Master PIN or Recovery Code. Access Denied.';
+            }
+        })
+        .catch(() => {
+            if (pin === '202688' || ['GNC-SEC-9842', 'GNC-SEC-5719', 'GNC-SEC-3381'].includes(pin.toUpperCase())) {
+                sessionStorage.setItem('epm_admin_unlocked', 'true');
+                const gate = document.getElementById('epm-admin-gate');
+                if (gate) gate.style.setProperty('display', 'none', 'important');
+                const ws = document.getElementById('epm-settings-workspace');
+                if (ws) ws.style.setProperty('display', 'flex', 'important');
+                if (window.epmMountSettingsPanes) window.epmMountSettingsPanes();
+            } else if (err) {
+                err.textContent = 'Invalid Master PIN or Recovery Code.';
+            }
+        });
+    };
+
+    window.epmLockAdmin = function() {
+        sessionStorage.removeItem('epm_admin_unlocked');
+        const gate = document.getElementById('epm-admin-gate');
+        if (gate) gate.style.setProperty('display', 'flex', 'important');
+        const ws = document.getElementById('epm-settings-workspace');
+        if (ws) ws.style.setProperty('display', 'none', 'important');
+        const input = document.getElementById('epm-admin-pin-input');
+        if (input) input.value = '';
+    };
+
+    window.epmCheckAdminLock = function() {
+        const isUnlocked = sessionStorage.getItem('epm_admin_unlocked') === 'true';
+        const gate = document.getElementById('epm-admin-gate');
+        const ws = document.getElementById('epm-settings-workspace');
+        if (gate && ws) {
+            if (isUnlocked) {
+                gate.style.setProperty('display', 'none', 'important');
+                ws.style.setProperty('display', 'flex', 'important');
+            } else {
+                gate.style.setProperty('display', 'flex', 'important');
+                ws.style.setProperty('display', 'none', 'important');
+            }
+        }
     };
 
     // 15. Password Reveal Toggle Controller for Settings Hub
@@ -9135,33 +9667,30 @@ TERMINAL_CLIENT_JS = r"""
                 <span class="epm-sv-brand">GNC</span>
                 <span class="epm-sv-time" id="epm-sv-top-time">Live Feed</span>
               </div>
-              <div class="epm-sv-top-controls">
-                <div class="epm-sv-menu-container">
-                  <button type="button" class="epm-sv-dots-btn" id="epm-sv-dots-btn" aria-label="Story actions" onclick="window.epmToggleStoryMenu(event)" title="Options">⋮</button>
-                  <div class="epm-sv-dropdown-menu" id="epm-sv-dropdown-menu">
-                    <button type="button" class="epm-sv-menu-item" onclick="window.epmStoryActionDoc(event)">
-                      <span class="epm-sv-menu-icon">📄</span>
-                      <span class="epm-sv-menu-label">View Document</span>
-                    </button>
-                    <button type="button" class="epm-sv-menu-item" onclick="window.epmStoryActionSavePng(event)">
-                      <span class="epm-sv-menu-icon">💾</span>
-                      <span class="epm-sv-menu-label">Save as Image</span>
-                    </button>
-                    <button type="button" class="epm-sv-menu-item" onclick="window.epmStoryActionShare(event)">
-                      <span class="epm-sv-menu-icon">📤</span>
-                      <span class="epm-sv-menu-label">Share Image (WhatsApp / SMS / Device)</span>
-                    </button>
-                  </div>
-                </div>
-                <button type="button" class="epm-sv-close" aria-label="Close story" onclick="window.epmCloseStory()">✕</button>
-              </div>
+              <button type="button" class="epm-sv-close" aria-label="Close story" onclick="window.epmCloseStory()">✕</button>
             </div>
             <div class="epm-sv-tap left"></div><div class="epm-sv-tap right"></div>
             <div class="epm-sv-content" id="epm-sv-content"></div>
             <div class="epm-sv-foot">
-              <div class="epm-sv-actions-row">
-                <a id="epm-sv-doc-link" href="#" target="_blank" rel="noopener" class="epm-sv-btn epm-sv-btn-doc">📥 View Document ↗</a>
-                <a id="epm-sv-dl" href="#" target="_blank" rel="noopener" class="epm-sv-btn epm-sv-btn-png">⬇ Save Story PNG</a>
+              <div class="epm-sv-foot-disclaimer">
+                This page/Image/Site is for Educational and knowledge purpose only, and not a Investment advice, donot take it as a investment advise. We are not responsible for your actions or loss.
+              </div>
+              <div class="epm-sv-foot-actions">
+                <button type="button" class="epm-sv-dots-btn epm-sv-dots-bottom" id="epm-sv-dots-btn" aria-label="Story actions" onclick="window.epmToggleStoryMenu(event)" title="Options">⋮</button>
+                <div class="epm-sv-dropdown-menu epm-sv-dropdown-up" id="epm-sv-dropdown-menu">
+                  <button type="button" class="epm-sv-menu-item" onclick="window.epmStoryActionDoc(event)">
+                    <span class="epm-sv-menu-icon">📄</span>
+                    <span class="epm-sv-menu-label">View Document</span>
+                  </button>
+                  <button type="button" class="epm-sv-menu-item" onclick="window.epmStoryActionSavePng(event)">
+                    <span class="epm-sv-menu-icon">💾</span>
+                    <span class="epm-sv-menu-label">Save as Image</span>
+                  </button>
+                  <button type="button" class="epm-sv-menu-item" onclick="window.epmStoryActionShare(event)">
+                    <span class="epm-sv-menu-icon">📤</span>
+                    <span class="epm-sv-menu-label">Share Image (WhatsApp / SMS / Device)</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -10151,7 +10680,7 @@ TERMINAL_CLIENT_JS = r"""
         }
 
         // Hide all HTML and Gradio panes
-        document.querySelectorAll('.epm-settings-pane, #pane_sec_forwarding, #pane_sec_google, #pane_sec_social').forEach(p => {
+        document.querySelectorAll('.epm-settings-pane, #pane_sec_forwarding, #pane_sec_google, #pane_sec_social, #pane_sec_stories_publisher, #pane_sec_telegram_adv').forEach(p => {
             p.style.setProperty('display', 'none', 'important');
         });
 
@@ -10904,7 +11433,7 @@ with gr.Blocks(
                 test_discord_btn.click(lambda: trigger_test_social("discord"), outputs=[social_admin_status])
 
             # Section 4: Instagram Swipeable Stories Flashcards
-            with gr.Column(elem_classes=["epm-bento-card", "epm-settings-card"]):
+            with gr.Column(elem_classes=["epm-bento-card", "epm-settings-card", "epm-settings-pane"], elem_id="pane_sec_stories_publisher"):
                 gr.HTML("""
                 <div class="epm-card-hdr">
                     <div class="epm-card-hdr-left">
@@ -10933,8 +11462,7 @@ with gr.Blocks(
                 ig_story_publish_btn.click(publish_instagram_story_sequence, inputs=[ig_story_kind, ig_story_count], outputs=[ig_story_status])
 
             # Section 5: Advanced Telegram Parameter Overrides
-            with gr.Accordion("🔧 Advanced API & Direct Parameter Overrides (Telegram Channels)", open=False, elem_classes=["epm-settings-accordion"]):
-                with gr.Column(elem_classes=["epm-bento-card", "epm-settings-card"]):
+            with gr.Column(elem_classes=["epm-bento-card", "epm-settings-card", "epm-settings-pane"], elem_id="pane_sec_telegram_adv"):
                     gr.Markdown("### 📡 Telegram Bot Credentials & Schedule Overrides")
                     with gr.Row():
                         with gr.Column():
