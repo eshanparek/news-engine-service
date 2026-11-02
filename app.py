@@ -122,7 +122,7 @@ async def serve_media(filename: str):
     return PlainTextResponse("Media card not found", status_code=404)
 
 
-@app.get("/api/logo")
+@app.api_route("/api/logo", methods=["GET", "HEAD"])
 async def serve_logo():
     """Serves the official GNC brand broadcast emblem."""
     logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "global_news_feed_room_logo.png")
@@ -131,7 +131,7 @@ async def serve_logo():
     return PlainTextResponse("Logo not found", status_code=404)
 
 
-@app.get("/api/og-image.png")
+@app.api_route("/api/og-image.png", methods=["GET", "HEAD"])
 async def serve_og_image():
     """Serves high-contrast 1200x630 social share thumbnail for WhatsApp, iMessage, and Twitter previews."""
     png = generate_og_image()
@@ -139,7 +139,7 @@ async def serve_og_image():
     return Response(content=png, media_type="image/png", headers={"Cache-Control": "public, max-age=3600"})
 
 
-@app.get("/api/calendar/holiday-image")
+@app.api_route("/api/calendar/holiday-image", methods=["GET", "HEAD"])
 async def serve_holidays_image():
     """Renders and delivers a high-resolution PNG image of the 2026 trading holidays comparison."""
     holidays = calendar_engine.get_holiday_snapshot().get("comparison", [])
@@ -155,7 +155,7 @@ async def serve_holidays_image():
     )
 
 
-@app.get("/api/placeholder-thumb")
+@app.api_route("/api/placeholder-thumb", methods=["GET", "HEAD"])
 async def serve_placeholder_thumb(cat: str = "all", s: str = "", t: str = ""):
     """Delivers a sharp, sector-themed 120x120 editorial icon thumbnail for news events."""
     png = generate_placeholder_thumb(category=cat, source=s, title=t)
@@ -178,7 +178,7 @@ async def verify_admin_pin(req: PinVerifyRequest):
     return JSONResponse({"ok": False, "error": "Invalid PIN or Recovery Code"}, status_code=401)
 
 
-@app.get("/api/story/{kind}/{idx}.png")
+@app.api_route("/api/story/{kind}/{idx}.png", methods=["GET", "HEAD"])
 async def serve_story_frame(kind: str, idx: int):
     """Renders a 1080x1920 Instagram Story flashcard (read-only preview / download)."""
     kind = "calendar" if kind == "calendar" else "news"
