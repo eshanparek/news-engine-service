@@ -138,7 +138,7 @@ class TerminalSecurityAndMetaMiddleware(BaseHTTPMiddleware):
             
             # Replace default Gradio title
             html_text = re.sub(r'<title>.*?</title>', '<title>Global News and Calender</title>', html_text, count=1)
-            injected_head = f"{og_meta}\n<script src=\"/api/terminal-client.js\"></script>\n"
+            injected_head = f"{og_meta}\n<script src=\"/api/terminal-client.js?v=20261103_2300\"></script>\n"
             if "<head>" in html_text:
                 html_text = html_text.replace("<head>", f"<head>\n{injected_head}", 1)
             else:
@@ -696,21 +696,36 @@ def get_ready_pdf(kind: str) -> str:
     return p
 
 def background_refresh_all_pdfs():
-    """Background task to ensure all 3 PDFs remain pre-generated and ready for instantaneous mobile download."""
+    """Background task to ensure all 3 PDFs remain pre-generated with memory collection."""
+    time.sleep(60)  # Defer initial pre-warming to avoid memory contention during container boot
     try:
         w = calendar_pdf_engine.generate_and_save_weekly_pdf()
+        gc.collect()
         m = calendar_pdf_engine.generate_and_save_monthly_pdf()
+        gc.collect()
         d = calendar_pdf_engine.generate_and_save_daily_outcomes_pdf()
         with _pdf_cache_lock:
             _PDF_READY_CACHE["weekly"] = w
             _PDF_READY_CACHE["monthly"] = m
             _PDF_READY_CACHE["daily_outcomes"] = d
+        gc.collect()
         logger.info(f"⚡ [PDF CACHE READY] Pre-warmed all 3 Calendar PDFs: Weekly={w}, Monthly={m}, Daily={d}")
     except Exception as e:
         logger.error(f"Error pre-warming calendar PDFs: {e}")
 
-# Kick off PDF pre-generation immediately in background
-threading.Thread(target=background_refresh_all_pdfs, daemon=True).start()
+# Kick off PDF pre-generation in background
+threading.Thread(target=background_refresh_all_pdfs, daemon=True, name="PdfPrewarmThread").start()
+
+# Background memory watchdog daemon to keep container heap well below 512MB limit
+def _memory_reaper_daemon():
+    while True:
+        try:
+            time.sleep(90)
+            gc.collect()
+        except Exception:
+            pass
+
+threading.Thread(target=_memory_reaper_daemon, daemon=True, name="MemoryReaperDaemon").start()
 
 
 @app.get("/api/calendar/pdf/weekly")
@@ -1931,7 +1946,7 @@ def render_mobile_news_feed_html(pool: List[Dict]) -> str:
 
     filter_html = """
     <div class="epm-mobile-filter-bar">
-        <select class="epm-news-scope-select mobile-select" id="epm-mob-news-filter" onchange="window.epmFilterNewsCategory(this.value)">
+        <select class="epm-news-scope-select mobile-select" id="epm-mob-news-filter" oninput="window.epmFilterNewsCategory(this.value)" onchange="window.epmFilterNewsCategory(this.value)">
             <option value="all">🌐 All News</option>
             <option value="inst_global">🏛️ Institutional News (Global)</option>
             <option value="inst_domestic">🏛️ Institutional News (Domestic)</option>
@@ -2045,14 +2060,14 @@ def render_calendar_timeline_html(events: List[Dict]) -> str:
 
     filter_bar_html = """
     <div class="epm-mobile-filter-bar epm-cal-mob-filters" style="display:flex;gap:6px;width:100%;margin:6px 0 10px 0;">
-        <select class="epm-news-scope-select mobile-select" id="epm-mob-cal-period" onchange="window.epmChangeCalPeriod(this.value)" style="flex:1;">
+        <select class="epm-news-scope-select mobile-select" id="epm-mob-cal-period" oninput="window.epmChangeCalPeriod(this.value)" onchange="window.epmChangeCalPeriod(this.value)" style="flex:1;">
             <option value="all">📅 Period: All</option>
             <option value="today">📅 Today</option>
             <option value="tomorrow">📅 Tomorrow</option>
             <option value="week">📅 Next 7 Days</option>
             <option value="upcoming">📅 Active Timers</option>
         </select>
-        <select class="epm-news-scope-select mobile-select" id="epm-mob-cal-market" onchange="window.epmChangeCalMarket(this.value)" style="flex:1;">
+        <select class="epm-news-scope-select mobile-select" id="epm-mob-cal-market" oninput="window.epmChangeCalMarket(this.value)" onchange="window.epmChangeCalMarket(this.value)" style="flex:1;">
             <option value="ALL">🏛️ All Bodies / Regulators</option>
             <option value="NSE">🇮🇳 NSE (National Stock Exchange)</option>
             <option value="BSE">🇮🇳 BSE (Bombay Stock Exchange)</option>
@@ -2102,7 +2117,7 @@ def render_mobile_circulars_feed_html(items: List[Dict]) -> str:
 
     chip_html = """
     <div class="epm-mobile-filter-bar">
-        <select class="epm-news-scope-select mobile-select" id="epm-mob-circ-filter" onchange="window.epmFilterCircCards(this.value, this)">
+        <select class="epm-news-scope-select mobile-select" id="epm-mob-circ-filter" oninput="window.epmFilterCircCards(this.value, this)" onchange="window.epmFilterCircCards(this.value, this)">
             <option value="ALL">🏛️ All Regulators & SROs</option>
             <option value="RBI">🏦 RBI (Reserve Bank of India)</option>
             <option value="SEBI">🛡️ SEBI (Securities & Exchange Board)</option>
@@ -2238,7 +2253,7 @@ def render_mobile_holidays_timeline_html(holidays: List[Dict]) -> str:
         story_btn = f'<button type="button" class="epm-pc-story-btn" onclick="event.stopPropagation();window.epmOpenStory(\'holidays\',{i})">▶ Story</button>' if i < len(stories) else ""
 
         parts.append(f"""
-        <div class="epm-tl-row">
+        <div class="epm-tl-row" data-nse="{html.escape(nse.upper())}" data-bse="{html.escape(bse.upper())}" data-mcx="{html.escape(mcx.upper())}" data-nyse="{html.escape(nyse.upper())}" data-crypto="{html.escape(crypto.upper())}">
             <div class="epm-tl-time" style="font-size:11px; font-weight:700; color:#475569;">{html.escape(d[5:])}</div>
             <div class="epm-tl-rail"><span class="epm-tl-dot tone-neutral"></span></div>
             <div class="epm-tl-card tone-neutral" onclick="window.epmToggleProgressive(this)">
@@ -2266,12 +2281,24 @@ def render_mobile_holidays_timeline_html(holidays: List[Dict]) -> str:
     stories_strip_html = render_story_strip_html(stories, "holidays", is_desktop=False)
     disclaimer_html = render_site_disclaimer_html(is_mobile=True)
 
+    filter_html = """
+    <div class="epm-mobile-filter-bar">
+        <select class="epm-news-scope-select mobile-select" id="epm-mob-hol-filter" oninput="window.epmFilterHolidays(this.value)" onchange="window.epmFilterHolidays(this.value)">
+            <option value="ALL">🏛️ All 2026 Holidays (All Markets)</option>
+            <option value="NSE">🇮🇳 NSE / BSE Holidays (Closed)</option>
+            <option value="MCX">⛽ MCX Holidays (Closed)</option>
+            <option value="NYSE">🇺🇸 US NYSE Holidays (Closed)</option>
+        </select>
+    </div>
+    """
+
     return f"""
     <div class="epm-mobile-timeline" data-stories-holidays="{_story_attr(stories)}">
         {stories_strip_html}
         <div class="epm-tl-header" style="padding-top:8px;">
             <span class="epm-pc-section-title"><span class="epm-ribbon-bullet">●</span> 2026 Authoritative Holidays Timeline</span>
         </div>
+        {filter_html}
         {''.join(parts)}
         {disclaimer_html}
     </div>"""
@@ -9578,6 +9605,31 @@ tbody tr:hover td {
     }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   UNIVERSAL FILTER & FEED VISIBILITY RULES (HIGHEST CASCADE SPECIFICITY)
+   ═══════════════════════════════════════════════════════════════════════════ */
+.epm-filtered-hidden,
+.epm-pc-card.epm-filtered-hidden,
+.epm-tl-row.epm-filtered-hidden,
+.epm-tl-card.epm-filtered-hidden,
+.epm-circ-desk-card.epm-filtered-hidden,
+.epm-chron-row.epm-filtered-hidden,
+.epm-chron-item-group.epm-filtered-hidden,
+div.epm-filtered-hidden,
+div.epm-pc-card.epm-filtered-hidden,
+div.epm-tl-row.epm-filtered-hidden {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    max-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    overflow: hidden !important;
+}
+
 """
 
 
@@ -9716,7 +9768,6 @@ TOP_NAVBAR_HTML = f"""
                     <span class="epm-side-item-name">Settings & Dispatches Hub</span>
                     <span class="epm-side-item-desc">Telegram bots & calendar configuration</span>
                 </div>
-                <span class="epm-side-item-tag">Tab 5</span>
             </div>
         </div>
 
@@ -11303,11 +11354,19 @@ TERMINAL_CLIENT_JS = r"""
             const rowScope = (row ? row.getAttribute('data-scope') : group.getAttribute('data-scope')) || 'local';
             const matches = (targetScope === 'all') || (rowScope === targetScope);
             if (matches) {
+                group.style.removeProperty('display');
                 group.classList.remove('epm-filtered-hidden');
-                if (row) row.classList.remove('epm-filtered-hidden');
+                if (row) {
+                    row.style.removeProperty('display');
+                    row.classList.remove('epm-filtered-hidden');
+                }
             } else {
+                group.style.setProperty('display', 'none', 'important');
                 group.classList.add('epm-filtered-hidden');
-                if (row) row.classList.add('epm-filtered-hidden');
+                if (row) {
+                    row.style.setProperty('display', 'none', 'important');
+                    row.classList.add('epm-filtered-hidden');
+                }
             }
         });
 
@@ -11316,8 +11375,10 @@ TERMINAL_CLIENT_JS = r"""
             const cardScope = card.getAttribute('data-scope') || 'local';
             const matches = (targetScope === 'all') || (cardScope === targetScope);
             if (matches) {
+                card.style.removeProperty('display');
                 card.classList.remove('epm-filtered-hidden');
             } else {
+                card.style.setProperty('display', 'none', 'important');
                 card.classList.add('epm-filtered-hidden');
             }
         });
@@ -11368,8 +11429,13 @@ TERMINAL_CLIENT_JS = r"""
             else if (p === 'week') matches = (rDate >= todayStr && rDate <= weekStr);
             else if (p === 'upcoming') matches = !r.classList.contains('is-past');
 
-            if (matches) r.classList.remove('epm-filtered-hidden');
-            else r.classList.add('epm-filtered-hidden');
+            if (matches) {
+                r.style.removeProperty('display');
+                r.classList.remove('epm-filtered-hidden');
+            } else {
+                r.style.setProperty('display', 'none', 'important');
+                r.classList.add('epm-filtered-hidden');
+            }
         });
 
         const dd = document.querySelector('#cal_date_filter_dd select, #cal_date_filter_dd input');
@@ -11396,8 +11462,13 @@ TERMINAL_CLIENT_JS = r"""
                             (target === 'NYSE' && (rowMkt === 'SEC' || rowMkt === 'FOMC' || rowMkt === 'US' || rowTxt.includes('NYSE'))) ||
                             (target === 'FOMC' && (rowReg.includes('FED') || rowTxt.includes('FED') || rowTxt.includes('FOMC'))) ||
                             (target === 'WHO' && (rowReg.includes('WHO') || rowTxt.includes('WHO')));
-            if (matches) r.classList.remove('epm-filtered-hidden');
-            else r.classList.add('epm-filtered-hidden');
+            if (matches) {
+                r.style.removeProperty('display');
+                r.classList.remove('epm-filtered-hidden');
+            } else {
+                r.style.setProperty('display', 'none', 'important');
+                r.classList.add('epm-filtered-hidden');
+            }
         });
 
         // 2. Mobile calendar rows
@@ -11409,8 +11480,13 @@ TERMINAL_CLIENT_JS = r"""
                             (target === 'NYSE' && (rowMkt === 'SEC' || rowMkt === 'FOMC' || rowMkt === 'US' || rowTxt.includes('NYSE'))) ||
                             (target === 'FOMC' && (rowReg.includes('FED') || rowTxt.includes('FED') || rowTxt.includes('FOMC'))) ||
                             (target === 'WHO' && (rowReg.includes('WHO') || rowTxt.includes('WHO')));
-            if (matches) r.classList.remove('epm-filtered-hidden');
-            else r.classList.add('epm-filtered-hidden');
+            if (matches) {
+                r.style.removeProperty('display');
+                r.classList.remove('epm-filtered-hidden');
+            } else {
+                r.style.setProperty('display', 'none', 'important');
+                r.classList.add('epm-filtered-hidden');
+            }
         });
 
         const dd = document.querySelector('#cal_reg_filter_dd select, #cal_reg_filter_dd input');
@@ -11548,8 +11624,13 @@ TERMINAL_CLIENT_JS = r"""
             const cReg = (c.getAttribute('data-circ-reg') || c.getAttribute('data-reg') || '').toUpperCase();
             const cText = (c.textContent || '').toUpperCase();
             const matches = (val === 'ALL') || (cReg === val) || cText.includes(val);
-            if (matches) c.classList.remove('epm-filtered-hidden');
-            else c.classList.add('epm-filtered-hidden');
+            if (matches) {
+                c.style.removeProperty('display');
+                c.classList.remove('epm-filtered-hidden');
+            } else {
+                c.style.setProperty('display', 'none', 'important');
+                c.classList.add('epm-filtered-hidden');
+            }
         });
 
         // 2. Mobile circular cards
@@ -11557,12 +11638,34 @@ TERMINAL_CLIENT_JS = r"""
             const cardReg = (card.getAttribute('data-circ-reg') || card.getAttribute('data-reg') || '').toUpperCase();
             const cardText = (card.textContent || '').toUpperCase();
             const matches = (val === 'ALL') || (cardReg === val) || cardText.includes(val);
-            if (matches) card.classList.remove('epm-filtered-hidden');
-            else card.classList.add('epm-filtered-hidden');
+            if (matches) {
+                card.style.removeProperty('display');
+                card.classList.remove('epm-filtered-hidden');
+            } else {
+                card.style.setProperty('display', 'none', 'important');
+                card.classList.add('epm-filtered-hidden');
+            }
         });
     };
     window.epmFilterCircCards = function(reg, el) {
         window.epmFilterCircReg(reg, el);
+    };
+
+    window.epmFilterHolidays = function(mkt) {
+        const val = String(mkt || 'ALL').toUpperCase();
+        document.querySelectorAll('.epm-mobile-timeline .epm-tl-row[data-nse]').forEach(r => {
+            let matches = true;
+            if (val === 'NSE') matches = (r.getAttribute('data-nse') || '').includes('CLOSED') || (r.getAttribute('data-bse') || '').includes('CLOSED');
+            else if (val === 'MCX') matches = (r.getAttribute('data-mcx') || '').includes('CLOSED');
+            else if (val === 'NYSE') matches = (r.getAttribute('data-nyse') || '').includes('CLOSED');
+            if (matches) {
+                r.style.removeProperty('display');
+                r.classList.remove('epm-filtered-hidden');
+            } else {
+                r.style.setProperty('display', 'none', 'important');
+                r.classList.add('epm-filtered-hidden');
+            }
+        });
     };
 
     window.epmSaveApprovedLogos = function() {
@@ -11951,7 +12054,7 @@ with gr.Blocks(
         '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
         '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">'
         f"<style>{CUSTOM_CSS}</style>"
-        '<script src="/api/terminal-client.js"></script>'
+        '<script src="/api/terminal-client.js?v=20261103_2300"></script>'
     )
 ) as demo:
     gr.HTML(f"<style>{CUSTOM_CSS}</style>{TOP_NAVBAR_HTML}")
@@ -12610,12 +12713,12 @@ demo.queue(default_concurrency_limit=20)
 
 @app.api_route("/api/terminal-client.js", methods=["GET", "HEAD"])
 async def serve_terminal_client_js():
-    """Serves pure client-side reactive navigation and interactive JS bundle."""
+    """Serves pure client-side reactive navigation and interactive JS bundle with strict anti-caching."""
     from starlette.responses import Response
     return Response(
         content=TERMINAL_CLIENT_JS,
         media_type="application/javascript",
-        headers={"Cache-Control": "public, max-age=3600"}
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate, max-age=0", "Pragma": "no-cache", "Expires": "0"}
     )
 
 @app.api_route("/api/entity-logo", methods=["GET", "HEAD"])
@@ -12656,7 +12759,7 @@ app = gr.mount_gradio_app(
         '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
         '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">'
         f"<style>{CUSTOM_CSS}</style>"
-        '<script src="/api/terminal-client.js"></script>'
+        '<script src="/api/terminal-client.js?v=20261103_2300"></script>'
     ),
     js=TERMINAL_CLIENT_JS
 )
