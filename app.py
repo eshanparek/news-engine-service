@@ -86,6 +86,14 @@ from image_assets import (
     generate_news_thumb
 )
 
+ENTITIES_TAXONOMY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config", "entities_taxonomy.json")
+try:
+    with open(ENTITIES_TAXONOMY_PATH, "r", encoding="utf-8") as f:
+        ENTITIES_TAXONOMY = json.load(f)
+except Exception:
+    ENTITIES_TAXONOMY = {"groups": {}}
+
+
 class TerminalSecurityAndMetaMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         response = await call_next(request)
@@ -106,17 +114,18 @@ class TerminalSecurityAndMetaMiddleware(BaseHTTPMiddleware):
                 '<title>Global News and Calender</title>\n'
                 '<meta name="title" content="Global News and Calender" />\n'
                 '<meta property="og:title" content="Global News and Calender" />\n'
-                '<meta property="og:description" content="Institutional Real-Time Multi-Market Intelligence Terminal & Catalyst Engine" />\n'
-                '<meta property="og:image" content="https://p01--news-engine-service--dkhqtlpvx6bh.code.run/api/og-image.png" />\n'
-                '<meta property="og:image:width" content="1200" />\n'
-                '<meta property="og:image:height" content="630" />\n'
+                '<meta property="og:description" content="US and Indian Economic and Financial Market News and Calender" />\n'
+                '<meta property="og:image" content="https://p01--news-engine-service--dkhqtlpvx6bh.code.run/api/logo" />\n'
+                '<meta property="og:image:type" content="image/png" />\n'
+                '<meta property="og:image:width" content="512" />\n'
+                '<meta property="og:image:height" content="512" />\n'
                 '<meta property="og:url" content="https://p01--news-engine-service--dkhqtlpvx6bh.code.run/" />\n'
                 '<meta property="og:type" content="website" />\n'
                 '<meta property="og:site_name" content="Global News and Calender" />\n'
-                '<meta name="twitter:card" content="summary_large_image" />\n'
+                '<meta name="twitter:card" content="summary" />\n'
                 '<meta name="twitter:title" content="Global News and Calender" />\n'
-                '<meta name="twitter:description" content="Institutional Real-Time Multi-Market Intelligence Terminal & Catalyst Engine" />\n'
-                '<meta name="twitter:image" content="https://p01--news-engine-service--dkhqtlpvx6bh.code.run/api/og-image.png" />\n'
+                '<meta name="twitter:description" content="US and Indian Economic and Financial Market News and Calender" />\n'
+                '<meta name="twitter:image" content="https://p01--news-engine-service--dkhqtlpvx6bh.code.run/api/logo" />\n'
             )
             
             # Purge all existing og: and twitter: tags from Gradio's template (e.g. Groot image, Gradio branding)
@@ -167,7 +176,10 @@ async def serve_logo():
 
 @app.api_route("/api/og-image.png", methods=["GET", "HEAD"])
 async def serve_og_image():
-    """Serves high-contrast 1200x630 social share thumbnail for WhatsApp, iMessage, and Twitter previews."""
+    """Serves official site broadcast logo as preview image for social link sharing."""
+    logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "global_news_feed_room_logo.png")
+    if os.path.exists(logo_path):
+        return FileResponse(logo_path, media_type="image/png", headers={"Cache-Control": "public, max-age=3600"})
     png = generate_og_image()
     from fastapi.responses import Response
     return Response(content=png, media_type="image/png", headers={"Cache-Control": "public, max-age=3600"})
@@ -1235,36 +1247,47 @@ def extract_clean_time_str(raw_ts: str, fallback_dt: Optional[datetime] = None) 
 
 def classify_news_filter(source: str, title: str) -> str:
     """
-    Classifies a news article into one of 4 discrete categories:
-    - 'inst_global': Sovereign/central bank/regulator outside India (FOMC, FED, SEC, CFTC, TREASURY, ECB, BOE, etc.)
-    - 'inst_domestic': Sovereign/market regulator in India (SEBI, RBI, MCX, NSE, BSE, FINMIN, MINISTRY, GOVT, CABINET, DGFT, IFSCA, IRDAI, PFRDA, PIB)
-    - 'global': Global financial media (Reuters, Bloomberg, MarketWatch, WSJ, NYT, CNBC, Financial Times, CoinDesk, Yahoo Finance)
-    - 'local': Local Indian market commercial media (Livemint, Moneycontrol, Economic Times, NDTV, Times of India, Financial Express, Zee Business)
+    Classifies a news article into one of 4 discrete categories based on country and entity type:
+    - 'inst_global': Sovereign/central bank/regulator outside India (FOMC, FED, SEC, CFTC, TREASURY, ECB, BOE, BOJ, IMF, OPEC, etc.)
+    - 'inst_domestic': Sovereign/market regulator in India (SEBI, RBI, VRRR, LAF, REPO, MCX, NSE, BSE, FINMIN, MINISTRY, GOVT, DGFT, IFSCA, IRDAI, PFRDA, PIB)
+    - 'global': Global financial media & crypto (Reuters, Bloomberg, MarketWatch, WSJ, NYT, CNBC, CoinDesk, Binance, Bitcoin, etc.)
+    - 'local': Local Indian market commercial media (Livemint, Moneycontrol, Economic Times, NDTV, Times of India, Financial Express, Zee Business, Sensex, Nifty)
     """
     text = (str(source) + " " + str(title)).upper()
+    groups = ENTITIES_TAXONOMY.get("groups", {})
     
-    # 1. Institutional Domestic Regulators & SROs
-    INST_DOMESTIC_KW = [
-        "SEBI", "RBI", "MCX", "NSE", "BSE", "FINMIN", "MINISTRY", "GOVT", 
-        "GOVERNMENT", "CABINET", "DGFT", "MOPNG", "IFSCA", "IRDAI", "PFRDA", "PIB"
-    ]
-    if any(k in text for k in INST_DOMESTIC_KW):
+    # 1. Institutional Domestic Regulators, Central Bank (RBI, VRRR, LAF) & SROs
+    inst_dom_kw = groups.get("inst_domestic", {}).get("keywords", [
+        "RBI", "RESERVE BANK OF INDIA", "VRRR", "LAF", "REPO RATE", "REVERSE REPO", 
+        "SEBI", "SECURITIES AND EXCHANGE BOARD OF INDIA", 
+        "NSE", "NATIONAL STOCK EXCHANGE", "BSE", "BOMBAY STOCK EXCHANGE", 
+        "MCX", "MULTI COMMODITY EXCHANGE", "FINMIN", "MINISTRY OF FINANCE", 
+        "IFSCA", "GIFT CITY", "IRDAI", "PFRDA", "DGFT", "MOPNG", "MCA", 
+        "PIB", "GOVERNMENT OF INDIA", "CENTRAL GOVT", "CABINET COMMITTEE"
+    ])
+    if any(k in text for k in inst_dom_kw):
         return "inst_domestic"
 
-    # 2. Institutional Global Regulators & Central Banks
-    INST_GLOBAL_KW = [
-        "FOMC", "FED", "FEDERAL RESERVE", "SEC", "CFTC", "TREASURY", 
-        "ECB", "BOE", "BANK OF ENGLAND", "IMF", "WORLD BANK", "OPEC"
-    ]
-    if any(k in text for k in INST_GLOBAL_KW):
+    # 2. Institutional Global Central Banks & Regulators (FOMC, Fed, SEC, ECB, BOE, etc.)
+    inst_glob_kw = groups.get("inst_global", {}).get("keywords", [
+        "FOMC", "FED", "FEDERAL RESERVE", "JEROME POWELL", "US FED", "US TREASURY", 
+        "SEC", "SECURITIES AND EXCHANGE COMMISSION", "CFTC", "COMMODITY FUTURES", 
+        "ECB", "EUROPEAN CENTRAL BANK", "CHRISTINE LAGARDE", 
+        "BOE", "BANK OF ENGLAND", "BOJ", "BANK OF JAPAN", 
+        "PBOC", "PEOPLE'S BANK OF CHINA", "IMF", "INTERNATIONAL MONETARY FUND", 
+        "WORLD BANK", "BIS", "BANK FOR INTERNATIONAL SETTLEMENTS", "OPEC", "IEA"
+    ])
+    if any(k in text for k in inst_glob_kw):
         return "inst_global"
 
-    # 3. Global Commercial Financial Media
-    GLOBAL_MEDIA_KW = [
-        "REUTERS", "BLOOMBERG", "MARKETWATCH", "WALL STREET JOURNAL", 
-        "WSJ", "NEW YORK TIMES", "NYT", "CNBC", "COINDESK", "YAHOO", "NASDAQ", "DOW JONES", "S&P"
-    ]
-    if any(k in text for k in GLOBAL_MEDIA_KW):
+    # 3. Global Commercial Financial Media & Crypto Wire
+    glob_kw = groups.get("global", {}).get("keywords", [
+        "REUTERS", "BLOOMBERG", "MARKETWATCH", "WALL STREET JOURNAL", "WSJ", 
+        "NEW YORK TIMES", "NYT", "CNBC", "COINDESK", "COINTELEGRAPH", 
+        "BINANCE", "BITCOIN", "CRYPTO", "NASDAQ", "DOW JONES", "S&P 500", 
+        "APPLE", "MICROSOFT", "TESLA", "ALPHABET", "NORTH KOREA", "MIDTERM"
+    ])
+    if any(k in text for k in glob_kw):
         return "global"
 
     # 4. Default to Local Domestic Market News
@@ -1395,7 +1418,7 @@ def render_news_feed_html(items: List[Dict]) -> str:
         summary_text = it.get("summary") or it.get("reasoning") or it.get("title")
 
         return f'''
-        <div class="epm-chron-item-group" id="epm-chron-group-{i}">
+        <div class="epm-chron-item-group" id="epm-chron-group-{i}" data-scope="{it['scope']}">
             <div class="epm-chron-row {'is-institutional' if is_inst else ''}" data-idx="{i}" data-scope="{it['scope']}" onclick="window.epmToggleDeskRowExpand({i})">
                 <div class="epm-chron-left-rail">
                     <span class="epm-chron-time">{it['time_str']}</span>
@@ -3197,6 +3220,64 @@ def render_settings_hub_html() -> str:
             </table>
         </div>'''
 
+    def _render_entities_taxonomy_html() -> str:
+        groups = ENTITIES_TAXONOMY.get("groups", {})
+        html_blocks = []
+        for gkey, ginfo in groups.items():
+            glabel = html.escape(ginfo.get("label", gkey))
+            gbadge = html.escape(ginfo.get("badge", gkey))
+            gcountry = html.escape(ginfo.get("country", "Global"))
+            gtype = html.escape(ginfo.get("type", "Financial Entity"))
+            entities = ginfo.get("entities", [])
+            keywords = ginfo.get("keywords", [])
+            
+            e_rows = []
+            for ent in entities:
+                e_rows.append(f"""
+                <tr class="epm-dir-row">
+                    <td class="col-dir-name"><b>{html.escape(ent.get('name', ''))}</b></td>
+                    <td class="col-dir-tier"><span class="epm-tier-badge tier-sovereign">{html.escape(ent.get('short', ''))}</span></td>
+                    <td class="col-dir-jur"><span style="font-weight:700; color:#0052FF;">{html.escape(ent.get('jurisdiction', gcountry))}</span></td>
+                    <td class="col-dir-scope">{html.escape(ent.get('category', gtype))}</td>
+                    <td class="col-dir-link"><span class="epm-inst-chip" style="font-size:10px;">{html.escape(gkey)}</span></td>
+                </tr>
+                """)
+                
+            kw_pills = "".join(f'<span class="epm-pc-tag" style="margin:2px;">{html.escape(k)}</span>' for k in keywords[:20])
+            
+            html_blocks.append(f"""
+            <div class="epm-config-group" style="margin-bottom:20px;">
+                <div class="epm-group-hdr" style="display:flex; align-items:center; justify-content:space-between;">
+                    <div>
+                        <span class="epm-group-icon">🏷️</span>
+                        <span class="epm-group-title">{glabel} — {gcountry} ({gtype})</span>
+                    </div>
+                    <span class="epm-tier-badge tier-exchange">{gbadge}</span>
+                </div>
+                <div style="margin:8px 0 12px; font-size:11px; color:#475569;">
+                    <b>Filter Scope Tag:</b> <code>{gkey}</code> • <b>Trigger Keywords & Entities:</b><br/>
+                    <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:6px;">{kw_pills}</div>
+                </div>
+                <div class="epm-dir-table-wrap">
+                    <table class="epm-dir-table">
+                        <thead>
+                            <tr>
+                                <th style="width:35%;">OFFICIAL ENTITY / BODY NAME</th>
+                                <th style="width:15%;">CODE</th>
+                                <th style="width:20%;">COUNTRY / REGION</th>
+                                <th style="width:20%;">CLASSIFICATION TYPE</th>
+                                <th style="width:10%;">FILTER SCOPE</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {''.join(e_rows)}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            """)
+        return "".join(html_blocks)
+
     in_reg_items = [d for d in INSTITUTIONAL_DIRECTORY if d.get('cat') in ('regulator', 'ministry', 'person') and 'India' in d.get('jurisdiction', '')]
     in_mkt_items = [d for d in INSTITUTIONAL_DIRECTORY if d.get('cat') == 'exchange' and 'India' in d.get('jurisdiction', '')]
     glob_reg_items = [d for d in INSTITUTIONAL_DIRECTORY if d.get('cat') in ('regulator', 'ministry', 'person') and 'India' not in d.get('jurisdiction', '')]
@@ -3251,6 +3332,10 @@ def render_settings_hub_html() -> str:
                 <button type="button" class="epm-settings-nav-item" data-pane="pane_media" onclick="window.epmShowSettingsPane('pane_media', this)">
                     <span class="icon">📰</span>
                     <span class="text">Commercial News Providers</span>
+                </button>
+                <button type="button" class="epm-settings-nav-item" data-pane="pane_taxonomy" onclick="window.epmShowSettingsPane('pane_taxonomy', this)">
+                    <span class="icon">🗂️</span>
+                    <span class="text">Entities & Sources Taxonomy</span>
                 </button>
                 <button type="button" class="epm-settings-nav-item" data-pane="pane_telegram" onclick="window.epmShowSettingsPane('pane_telegram', this)">
                     <span class="icon">✈️</span>
@@ -3376,6 +3461,22 @@ def render_settings_hub_html() -> str:
                     <p><b>Strict Segregation:</b> Commercial media outlets (publishers, wire services, and news broadcasters) are tracked purely for market sentiment, earnings gossip, and journalistic reports. They do NOT possess regulatory authority.</p>
                 </div>
                 {_render_dir_table(media_items)}
+            </div>
+
+            <!-- Pane Taxonomy: Country & Type Institutional Classification Registry -->
+            <div class="epm-settings-pane" id="pane_taxonomy">
+                <div class="epm-card-hdr">
+                    <div class="epm-card-hdr-left">
+                        <span class="epm-card-hdr-icon">🗂️</span>
+                        <span class="epm-card-hdr-title">ENTITIES & SOURCES TAXONOMY REGISTRY (COUNTRY & TYPE)</span>
+                    </div>
+                    <span class="epm-card-hdr-tag">Governance & Scope Mapping</span>
+                </div>
+                <div class="epm-segregation-banner" style="background:#F0FDF4; border-color:#BBF7D0;">
+                    <span class="epm-segregation-badge" style="background:#15803D;">STRICT TAXONOMY ARCHITECTURE</span>
+                    <p>Every news source, regulatory authority, central bank, and public institution is partitioned by <b>Country / Jurisdiction</b> and <b>Institutional Type</b>. The Breaking Wire data-grid filters (Domestic Institutional, Global Institutional, Local News, Global News) evaluate feed scopes against this authoritative registry.</p>
+                </div>
+                {_render_entities_taxonomy_html()}
             </div>
 
             <!-- Pane 6: Telegram Channels & Bot Setup -->
@@ -5594,14 +5695,64 @@ tbody tr:hover td {
     font-weight: 600 !important;
 }
 
-/* Side Drawer Sub-Menu */
+/* Universal Filter & Feed Visibility Rule */
+.epm-filtered-hidden {
+    display: none !important;
+}
+
+/* Side Drawer Sub-Menu (Crisp & Collapsible) */
 .epm-side-submenu {
-    display: flex !important;
+    display: none;
     flex-direction: column !important;
-    gap: 5px !important;
-    margin: 4px 0 8px 34px !important;
-    padding-left: 8px !important;
-    border-left: 2px solid #E2E8F0 !important;
+    gap: 4px !important;
+    margin: 4px 0 8px 32px !important;
+    padding-left: 10px !important;
+    border-left: 2px solid #0052FF !important;
+    animation: epmSubSlide 0.16s ease-out;
+}
+.epm-side-submenu.is-open {
+    display: flex !important;
+}
+@keyframes epmSubSlide {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.epm-sub-toggle-btn {
+    width: 24px !important;
+    height: 24px !important;
+    border-radius: 50% !important;
+    background: #F1F5F9 !important;
+    border: 1px solid #CBD5E1 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    padding: 0 !important;
+    margin-left: auto !important;
+    flex-shrink: 0 !important;
+    transition: all 0.18s ease !important;
+    color: #475569 !important;
+}
+.epm-sub-toggle-btn:hover {
+    background: #0052FF !important;
+    border-color: #0052FF !important;
+    color: #FFFFFF !important;
+    transform: scale(1.08);
+}
+.epm-sub-toggle-btn.is-active {
+    background: #0052FF !important;
+    border-color: #0052FF !important;
+    color: #FFFFFF !important;
+}
+.epm-sub-toggle-icon {
+    font-size: 11px !important;
+    line-height: 1 !important;
+    transition: transform 0.2s ease !important;
+    display: inline-block !important;
+    pointer-events: none;
+}
+.epm-sub-toggle-btn.is-active .epm-sub-toggle-icon {
+    transform: rotate(180deg) !important;
 }
 .epm-side-sublink {
     display: flex !important;
@@ -9377,14 +9528,16 @@ TOP_NAVBAR_HTML = f"""
         <div class="epm-side-nav-list">
             <!-- News Page with Submenu -->
             <div class="epm-side-nav-group">
-                <button type="button" class="epm-side-nav-item active" data-tab="0" onclick="window.epmSwitchTab(0);window.epmCloseSideMenu()">
+                <div class="epm-side-nav-item active" data-tab="0" onclick="window.epmSwitchTab(0);window.epmCloseSideMenu()">
                     <span class="epm-side-item-icon">📰</span>
                     <div class="epm-side-item-info">
                         <span class="epm-side-item-name">Live Breaking Wire</span>
                         <span class="epm-side-item-desc">Real-time multi-market intelligence feed</span>
                     </div>
-                    <span class="epm-side-item-tag">Tab 1</span>
-                </button>
+                    <button type="button" class="epm-sub-toggle-btn" onclick="event.stopPropagation(); window.epmToggleSubmenu(this);" title="Submenu Options">
+                        <span class="epm-sub-toggle-icon">▾</span>
+                    </button>
+                </div>
                 <div class="epm-side-submenu">
                     <a href="javascript:void(0)" onclick="window.epmDownloadNewsSnapshot()" class="epm-side-sublink" style="font-weight:700; color:#0052FF;">
                         <span>📥</span> Download News Snapshot (PDF) ↗
@@ -9394,14 +9547,16 @@ TOP_NAVBAR_HTML = f"""
 
             <!-- Calendar Page with Submenu -->
             <div class="epm-side-nav-group">
-                <button type="button" class="epm-side-nav-item" data-tab="1" onclick="window.epmSwitchTab(1);window.epmCloseSideMenu()">
+                <div class="epm-side-nav-item" data-tab="1" onclick="window.epmSwitchTab(1);window.epmCloseSideMenu()">
                     <span class="epm-side-item-icon">📅</span>
                     <div class="epm-side-item-info">
                         <span class="epm-side-item-name">Market Calendar & Outcomes</span>
                         <span class="epm-side-item-desc">5-market event dossier & timers</span>
                     </div>
-                    <span class="epm-side-item-tag">Tab 2</span>
-                </button>
+                    <button type="button" class="epm-sub-toggle-btn" onclick="event.stopPropagation(); window.epmToggleSubmenu(this);" title="Submenu Options">
+                        <span class="epm-sub-toggle-icon">▾</span>
+                    </button>
+                </div>
                 <div class="epm-side-submenu">
                     <a href="/api/calendar/pdf/today" download target="_blank" class="epm-side-sublink" style="font-weight:700; color:#0052FF;">
                         <span>📥</span> Today's Calendar (PDF) ↗
@@ -9420,14 +9575,16 @@ TOP_NAVBAR_HTML = f"""
 
             <!-- Circulars Page with Submenu -->
             <div class="epm-side-nav-group">
-                <button type="button" class="epm-side-nav-item" data-tab="2" onclick="window.epmSwitchTab(2);window.epmCloseSideMenu()">
+                <div class="epm-side-nav-item" data-tab="2" onclick="window.epmSwitchTab(2);window.epmCloseSideMenu()">
                     <span class="epm-side-item-icon">🏛️</span>
                     <div class="epm-side-item-info">
                         <span class="epm-side-item-name">Regulatory Circulars</span>
                         <span class="epm-side-item-desc">SEBI, RBI, NSE, BSE, MCX directives</span>
                     </div>
-                    <span class="epm-side-item-tag">Tab 3</span>
-                </button>
+                    <button type="button" class="epm-sub-toggle-btn" onclick="event.stopPropagation(); window.epmToggleSubmenu(this);" title="Submenu Options">
+                        <span class="epm-sub-toggle-icon">▾</span>
+                    </button>
+                </div>
                 <div class="epm-side-submenu">
                     <a href="/api/calendar/pdf/monthly" download="regulatory_circulars.pdf" target="_blank" class="epm-side-sublink">
                         <span>📥</span> Export Circulars Directory (PDF) ↗
@@ -9437,14 +9594,16 @@ TOP_NAVBAR_HTML = f"""
 
             <!-- Holidays Page with Submenu -->
             <div class="epm-side-nav-group">
-                <button type="button" class="epm-side-nav-item" data-tab="3" onclick="window.epmSwitchTab(3);window.epmCloseSideMenu()">
+                <div class="epm-side-nav-item" data-tab="3" onclick="window.epmSwitchTab(3);window.epmCloseSideMenu()">
                     <span class="epm-side-item-icon">🏖️</span>
                     <div class="epm-side-item-info">
                         <span class="epm-side-item-name">Trading Holidays & Closures</span>
                         <span class="epm-side-item-desc">Authoritative 2026 market holidays</span>
                     </div>
-                    <span class="epm-side-item-tag">Tab 4</span>
-                </button>
+                    <button type="button" class="epm-sub-toggle-btn" onclick="event.stopPropagation(); window.epmToggleSubmenu(this);" title="Submenu Options">
+                        <span class="epm-sub-toggle-icon">▾</span>
+                    </button>
+                </div>
                 <div class="epm-side-submenu">
                     <a href="/api/calendar/holiday-image" download="trading_holidays_2026.png" target="_blank" class="epm-side-sublink">
                         <span>📷</span> Save 2026 Holidays Schedule (PNG) ↗
@@ -9452,14 +9611,14 @@ TOP_NAVBAR_HTML = f"""
                 </div>
             </div>
 
-            <button type="button" class="epm-side-nav-item" data-tab="4" onclick="window.epmSwitchTab(4);window.epmCloseSideMenu()">
+            <div class="epm-side-nav-item" data-tab="4" onclick="window.epmSwitchTab(4);window.epmCloseSideMenu()">
                 <span class="epm-side-item-icon">⚙️</span>
                 <div class="epm-side-item-info">
                     <span class="epm-side-item-name">Settings & Dispatches Hub</span>
                     <span class="epm-side-item-desc">Telegram bots & calendar configuration</span>
                 </div>
                 <span class="epm-side-item-tag">Tab 5</span>
-            </button>
+            </div>
         </div>
 
         <div class="epm-side-section-label">ACTIONS & UTILITIES</div>
@@ -11001,45 +11160,77 @@ TERMINAL_CLIENT_JS = r"""
         });
     };
 
+    window.epmToggleSubmenu = function(btn) {
+        if (!btn) return;
+        const group = btn.closest('.epm-side-nav-group');
+        if (!group) return;
+        const sub = group.querySelector('.epm-side-submenu');
+        if (!sub) return;
+        const isOpen = sub.classList.contains('is-open');
+        if (isOpen) {
+            sub.classList.remove('is-open');
+            btn.classList.remove('is-active');
+        } else {
+            // Close other submenus first for crisp, clean accordion feel
+            document.querySelectorAll('.epm-side-submenu').forEach(s => s.classList.remove('is-open'));
+            document.querySelectorAll('.epm-sub-toggle-btn').forEach(b => b.classList.remove('is-active'));
+            sub.classList.add('is-open');
+            btn.classList.add('is-active');
+        }
+    };
+
+    window.epmCurrentNewsFilter = 'all';
+
     window.epmFilterNewsCategory = function(cat) {
+        window.epmCurrentNewsFilter = cat || 'all';
+        const targetScope = window.epmCurrentNewsFilter;
+
         // Sync desktop and mobile filter selects
         const deskSelect = document.getElementById('epm-desk-news-filter');
         const mobSelect = document.getElementById('epm-mob-news-filter');
-        if (deskSelect && deskSelect.value !== cat) deskSelect.value = cat;
-        if (mobSelect && mobSelect.value !== cat) mobSelect.value = cat;
+        if (deskSelect && deskSelect.value !== targetScope) deskSelect.value = targetScope;
+        if (mobSelect && mobSelect.value !== targetScope) mobSelect.value = targetScope;
 
-        // Desktop Chronological Timeline Rows
-        document.querySelectorAll('#epm-chron-feed .epm-chron-row').forEach(row => {
-            const rowScope = row.getAttribute('data-scope') || 'local';
-            if (cat === 'all') {
-                row.style.display = '';
-            } else if (cat === 'inst_global') {
-                row.style.display = (rowScope === 'inst_global') ? '' : 'none';
-            } else if (cat === 'inst_domestic') {
-                row.style.display = (rowScope === 'inst_domestic') ? '' : 'none';
-            } else if (cat === 'local') {
-                row.style.display = (rowScope === 'local') ? '' : 'none';
-            } else if (cat === 'global') {
-                row.style.display = (rowScope === 'global') ? '' : 'none';
+        // Desktop Chronological Timeline Rows & Group Wrappers
+        document.querySelectorAll('#epm-chron-feed .epm-chron-item-group').forEach(group => {
+            const row = group.querySelector('.epm-chron-row');
+            const rowScope = (row ? row.getAttribute('data-scope') : group.getAttribute('data-scope')) || 'local';
+            const matches = (targetScope === 'all') || (rowScope === targetScope);
+            if (matches) {
+                group.classList.remove('epm-filtered-hidden');
+                if (row) row.classList.remove('epm-filtered-hidden');
+            } else {
+                group.classList.add('epm-filtered-hidden');
+                if (row) row.classList.add('epm-filtered-hidden');
             }
         });
 
         // Mobile News Cards
         document.querySelectorAll('.epm-pc-list .epm-pc-card').forEach(card => {
             const cardScope = card.getAttribute('data-scope') || 'local';
-            if (cat === 'all') {
-                card.style.display = '';
-            } else if (cat === 'inst_global') {
-                card.style.display = (cardScope === 'inst_global') ? '' : 'none';
-            } else if (cat === 'inst_domestic') {
-                card.style.display = (cardScope === 'inst_domestic') ? '' : 'none';
-            } else if (cat === 'local') {
-                card.style.display = (cardScope === 'local') ? '' : 'none';
-            } else if (cat === 'global') {
-                card.style.display = (cardScope === 'global') ? '' : 'none';
+            const matches = (targetScope === 'all') || (cardScope === targetScope);
+            if (matches) {
+                card.classList.remove('epm-filtered-hidden');
+            } else {
+                card.classList.add('epm-filtered-hidden');
             }
         });
     };
+
+    // Auto-reapply current news category filter if Gradio re-injects HTML
+    setInterval(function() {
+        if (window.epmCurrentNewsFilter && window.epmCurrentNewsFilter !== 'all') {
+            const deskSelect = document.getElementById('epm-desk-news-filter');
+            const mobSelect = document.getElementById('epm-mob-news-filter');
+            if (deskSelect && deskSelect.value !== window.epmCurrentNewsFilter) deskSelect.value = window.epmCurrentNewsFilter;
+            if (mobSelect && mobSelect.value !== window.epmCurrentNewsFilter) mobSelect.value = window.epmCurrentNewsFilter;
+            
+            const visibleWrongCard = document.querySelector(`.epm-pc-list .epm-pc-card:not([data-scope="${window.epmCurrentNewsFilter}"]):not(.epm-filtered-hidden)`);
+            if (visibleWrongCard) {
+                window.epmFilterNewsCategory(window.epmCurrentNewsFilter);
+            }
+        }
+    }, 1000);
 
     window.epmFilterNewsScope = function(scope, btn) {
         if (scope === 'all') window.epmFilterNewsCategory('all');
@@ -11053,9 +11244,9 @@ TERMINAL_CLIENT_JS = r"""
         if (deskSel && deskSel.value !== period) deskSel.value = period;
         if (mobSel && mobSel.value !== period) mobSel.value = period;
 
-        const rows = document.querySelectorAll('#epm-cal-cards-list .epm-chron-row');
+        const rows = document.querySelectorAll('#epm-cal-cards-list .epm-chron-row, #epm-cal-cards-list .epm-chron-item-group');
         rows.forEach(r => {
-            r.style.display = '';
+            r.classList.remove('epm-filtered-hidden');
         });
         const dd = document.querySelector('#cal_date_filter_dd select, #cal_date_filter_dd input');
         if (dd) {
@@ -11070,13 +11261,14 @@ TERMINAL_CLIENT_JS = r"""
         if (deskSel && deskSel.value !== mkt) deskSel.value = mkt;
         if (mobSel && mobSel.value !== mkt) mobSel.value = mkt;
 
-        const rows = document.querySelectorAll('#epm-cal-cards-list .epm-chron-row');
+        const rows = document.querySelectorAll('#epm-cal-cards-list .epm-chron-row, #epm-cal-cards-list .epm-chron-item-group');
         rows.forEach(r => {
             const rowMkt = (r.getAttribute('data-mkt') || '').toUpperCase();
-            if (mkt === 'ALL' || rowMkt === mkt.toUpperCase() || (mkt === 'NYSE' && (rowMkt === 'SEC' || rowMkt === 'FOMC'))) {
-                r.style.display = '';
+            const matches = (mkt === 'ALL' || rowMkt === mkt.toUpperCase() || (mkt === 'NYSE' && (rowMkt === 'SEC' || rowMkt === 'FOMC')));
+            if (matches) {
+                r.classList.remove('epm-filtered-hidden');
             } else {
-                r.style.display = 'none';
+                r.classList.add('epm-filtered-hidden');
             }
         });
         const dd = document.querySelector('#cal_reg_filter_dd select, #cal_reg_filter_dd input');
@@ -11158,9 +11350,9 @@ TERMINAL_CLIENT_JS = r"""
         document.querySelectorAll('#epm-cal-cards-list .epm-chron-item-group, #epm-cal-cards-list .epm-chron-row').forEach(c => {
             const cCat = c.getAttribute('data-cat') || 'equities';
             if (cat === 'all' || cCat === cat) {
-                c.style.display = '';
+                c.classList.remove('epm-filtered-hidden');
             } else {
-                c.style.display = 'none';
+                c.classList.add('epm-filtered-hidden');
             }
         });
     };
@@ -11212,18 +11404,18 @@ TERMINAL_CLIENT_JS = r"""
         document.querySelectorAll('#epm-circ-cards-list .epm-circ-desk-card').forEach(c => {
             const cReg = (c.getAttribute('data-reg') || '').toLowerCase();
             if (val === 'all' || cReg === val) {
-                c.style.display = '';
+                c.classList.remove('epm-filtered-hidden');
             } else {
-                c.style.display = 'none';
+                c.classList.add('epm-filtered-hidden');
             }
         });
 
         document.querySelectorAll('#epm-circ-mobile-list .epm-pc-card, #mobile_circ_feed .epm-pc-card').forEach(card => {
             const cardReg = (card.getAttribute('data-circ-reg') || '').toLowerCase();
             if (val === 'all' || cardReg === val) {
-                card.style.display = '';
+                card.classList.remove('epm-filtered-hidden');
             } else {
-                card.style.display = 'none';
+                card.classList.add('epm-filtered-hidden');
             }
         });
     };
@@ -11558,11 +11750,18 @@ with gr.Blocks(
         '<title>Global News and Calender</title>'
         '<meta name="title" content="Global News and Calender" />'
         '<meta property="og:title" content="Global News and Calender" />'
-        '<meta property="og:description" content="Live multi-market financial news, economic calendar, and regulatory circulars." />'
-        '<meta property="og:image" content="https://p01--news-engine-service--dkhqtlpvx6bh.code.run/api/og-image.png" />'
+        '<meta property="og:description" content="US and Indian Economic and Financial Market News and Calender" />'
+        '<meta property="og:image" content="https://p01--news-engine-service--dkhqtlpvx6bh.code.run/api/logo" />'
+        '<meta property="og:image:type" content="image/png" />'
+        '<meta property="og:image:width" content="512" />'
+        '<meta property="og:image:height" content="512" />'
+        '<meta property="og:url" content="https://p01--news-engine-service--dkhqtlpvx6bh.code.run/" />'
+        '<meta property="og:type" content="website" />'
+        '<meta property="og:site_name" content="Global News and Calender" />'
+        '<meta name="twitter:card" content="summary" />'
         '<meta name="twitter:title" content="Global News and Calender" />'
-        '<meta name="twitter:description" content="Live multi-market financial news, economic calendar, and regulatory circulars." />'
-        '<meta name="twitter:image" content="https://p01--news-engine-service--dkhqtlpvx6bh.code.run/api/og-image.png" />'
+        '<meta name="twitter:description" content="US and Indian Economic and Financial Market News and Calender" />'
+        '<meta name="twitter:image" content="https://p01--news-engine-service--dkhqtlpvx6bh.code.run/api/logo" />'
         '<link rel="preconnect" href="https://fonts.googleapis.com">'
         '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
         '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">'
@@ -12234,17 +12433,18 @@ app = gr.mount_gradio_app(
         '<title>Global News and Calender</title>'
         '<meta name="title" content="Global News and Calender" />'
         '<meta property="og:title" content="Global News and Calender" />'
-        '<meta property="og:description" content="Institutional Real-Time Multi-Market Intelligence Terminal & Catalyst Engine" />'
-        '<meta property="og:image" content="https://p01--news-engine-service--dkhqtlpvx6bh.code.run/api/og-image.png" />'
-        '<meta property="og:image:width" content="1200" />'
-        '<meta property="og:image:height" content="630" />'
+        '<meta property="og:description" content="US and Indian Economic and Financial Market News and Calender" />'
+        '<meta property="og:image" content="https://p01--news-engine-service--dkhqtlpvx6bh.code.run/api/logo" />'
+        '<meta property="og:image:type" content="image/png" />'
+        '<meta property="og:image:width" content="512" />'
+        '<meta property="og:image:height" content="512" />'
         '<meta property="og:url" content="https://p01--news-engine-service--dkhqtlpvx6bh.code.run/" />'
         '<meta property="og:type" content="website" />'
         '<meta property="og:site_name" content="Global News and Calender" />'
-        '<meta name="twitter:card" content="summary_large_image" />'
+        '<meta name="twitter:card" content="summary" />'
         '<meta name="twitter:title" content="Global News and Calender" />'
-        '<meta name="twitter:description" content="Institutional Real-Time Multi-Market Intelligence Terminal & Catalyst Engine" />'
-        '<meta name="twitter:image" content="https://p01--news-engine-service--dkhqtlpvx6bh.code.run/api/og-image.png" />'
+        '<meta name="twitter:description" content="US and Indian Economic and Financial Market News and Calender" />'
+        '<meta name="twitter:image" content="https://p01--news-engine-service--dkhqtlpvx6bh.code.run/api/logo" />'
         '<link rel="preconnect" href="https://fonts.googleapis.com">'
         '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
         '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">'

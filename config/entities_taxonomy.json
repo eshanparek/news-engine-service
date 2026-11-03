@@ -1,0 +1,101 @@
+{
+  "last_updated": "2026-11-03T19:30:00+05:30",
+  "groups": {
+    "inst_domestic": {
+      "key": "inst_domestic",
+      "label": "Institutional News (Domestic)",
+      "badge": "🏛️ Institutional (Domestic)",
+      "country": "India",
+      "type": "Sovereign / Regulatory / Central Bank",
+      "keywords": [
+        "RBI", "RESERVE BANK OF INDIA", "VRRR", "LAF", "REPO RATE", "REVERSE REPO", 
+        "SEBI", "SECURITIES AND EXCHANGE BOARD OF INDIA", 
+        "NSE", "NATIONAL STOCK EXCHANGE", "BSE", "BOMBAY STOCK EXCHANGE", 
+        "MCX", "MULTI COMMODITY EXCHANGE", "FINMIN", "MINISTRY OF FINANCE", 
+        "IFSCA", "GIFT CITY", "IRDAI", "PFRDA", "DGFT", "MOPNG", "MCA", 
+        "PIB", "GOVERNMENT OF INDIA", "CENTRAL GOVT", "CABINET COMMITTEE"
+      ],
+      "entities": [
+        {"name": "Reserve Bank of India (RBI)", "short": "RBI", "category": "Central Bank", "jurisdiction": "India"},
+        {"name": "Securities and Exchange Board of India (SEBI)", "short": "SEBI", "category": "Securities Regulator", "jurisdiction": "India"},
+        {"name": "National Stock Exchange (NSE)", "short": "NSE", "category": "Securities Exchange", "jurisdiction": "India"},
+        {"name": "Bombay Stock Exchange (BSE)", "short": "BSE", "category": "Securities Exchange", "jurisdiction": "India"},
+        {"name": "Multi Commodity Exchange (MCX)", "short": "MCX", "category": "Commodity Exchange", "jurisdiction": "India"},
+        {"name": "Ministry of Finance (FinMin)", "short": "FinMin", "category": "Sovereign Ministry", "jurisdiction": "India"},
+        {"name": "International Financial Services Centres Authority (IFSCA)", "short": "IFSCA", "category": "Statutory Authority", "jurisdiction": "India (GIFT City)"},
+        {"name": "Insurance Regulatory & Dev Authority (IRDAI)", "short": "IRDAI", "category": "Insurance Regulator", "jurisdiction": "India"},
+        {"name": "Pension Fund Regulatory & Dev Authority (PFRDA)", "short": "PFRDA", "category": "Pension Regulator", "jurisdiction": "India"},
+        {"name": "Directorate General of Foreign Trade (DGFT)", "short": "DGFT", "category": "Trade Policy", "jurisdiction": "India"}
+      ]
+    },
+    "inst_global": {
+      "key": "inst_global",
+      "label": "Institutional News (Global)",
+      "badge": "🏛️ Institutional (Global)",
+      "country": "Global / US / Europe",
+      "type": "Sovereign Central Bank & Global Regulatory Authority",
+      "keywords": [
+        "FOMC", "FED", "FEDERAL RESERVE", "JEROME POWELL", "US FED", "US TREASURY", 
+        "SEC", "SECURITIES AND EXCHANGE COMMISSION", "CFTC", "COMMODITY FUTURES", 
+        "ECB", "EUROPEAN CENTRAL BANK", "CHRISTINE LAGARDE", 
+        "BOE", "BANK OF ENGLAND", "BOJ", "BANK OF JAPAN", 
+        "PBOC", "PEOPLE'S BANK OF CHINA", "IMF", "INTERNATIONAL MONETARY FUND", 
+        "WORLD BANK", "BIS", "BANK FOR INTERNATIONAL SETTLEMENTS", "OPEC", "IEA"
+      ],
+      "entities": [
+        {"name": "Federal Reserve System / FOMC", "short": "Fed / FOMC", "category": "Central Bank", "jurisdiction": "United States"},
+        {"name": "US Department of the Treasury", "short": "US Treasury", "category": "Sovereign Treasury", "jurisdiction": "United States"},
+        {"name": "Securities and Exchange Commission (SEC)", "short": "US SEC", "category": "Securities Regulator", "jurisdiction": "United States"},
+        {"name": "Commodity Futures Trading Commission (CFTC)", "short": "CFTC", "category": "Derivatives Regulator", "jurisdiction": "United States"},
+        {"name": "European Central Bank (ECB)", "short": "ECB", "category": "Central Bank", "jurisdiction": "Eurozone"},
+        {"name": "Bank of England (BOE)", "short": "BOE", "category": "Central Bank", "jurisdiction": "United Kingdom"},
+        {"name": "Bank of Japan (BOJ)", "short": "BOJ", "category": "Central Bank", "jurisdiction": "Japan"},
+        {"name": "International Monetary Fund (IMF)", "short": "IMF", "category": "Multilateral Body", "jurisdiction": "Global"},
+        {"name": "Organization of Petroleum Exporting Countries (OPEC)", "short": "OPEC", "category": "Commodity Body", "jurisdiction": "Global"}
+      ]
+    },
+    "local": {
+      "key": "local",
+      "label": "Local Market News",
+      "badge": "🇮🇳 Local News (India)",
+      "country": "India",
+      "type": "Commercial Domestic Financial News & Corporate Wire",
+      "keywords": [
+        "LIVEMINT", "MINT", "MONEYCONTROL", "ECONOMIC TIMES", "ET NOW", 
+        "NDTV", "NDTV PROFIT", "TIMES OF INDIA", "FINANCIAL EXPRESS", 
+        "BUSINESS STANDARD", "ZEE BUSINESS", "CNBC-TV18", "HINDU BUSINESSLINE",
+        "SENSEX", "NIFTY", "DALAL STREET", "DHANTERAS", "DIWALI"
+      ],
+      "entities": [
+        {"name": "Livemint Markets", "short": "Livemint", "category": "Commercial Financial News", "jurisdiction": "India"},
+        {"name": "Moneycontrol Pro Wire", "short": "Moneycontrol", "category": "Financial Portal", "jurisdiction": "India"},
+        {"name": "The Economic Times", "short": "Economic Times", "category": "Financial Newspaper", "jurisdiction": "India"},
+        {"name": "NDTV Profit", "short": "NDTV", "category": "Business Broadcast", "jurisdiction": "India"},
+        {"name": "Times of India Business", "short": "TOI Business", "category": "Commercial Media", "jurisdiction": "India"},
+        {"name": "Financial Express", "short": "FE", "category": "Financial News", "jurisdiction": "India"},
+        {"name": "Business Standard", "short": "BS", "category": "Financial Daily", "jurisdiction": "India"}
+      ]
+    },
+    "global": {
+      "key": "global",
+      "label": "Global Market News",
+      "badge": "🌍 Global News (US / Intl)",
+      "country": "Global / US / International",
+      "type": "Commercial Global Media, Macro & Crypto Wire",
+      "keywords": [
+        "REUTERS", "BLOOMBERG", "MARKETWATCH", "WALL STREET JOURNAL", "WSJ", 
+        "NEW YORK TIMES", "NYT", "CNBC", "COINDESK", "COINTELEGRAPH", 
+        "BINANCE", "BITCOIN", "CRYPTO", "NASDAQ", "DOW JONES", "S&P 500", 
+        "APPLE", "MICROSOFT", "TESLA", "ALPHABET", "NORTH KOREA", "MIDTERM"
+      ],
+      "entities": [
+        {"name": "Reuters Financial Wire", "short": "Reuters", "category": "Global News Agency", "jurisdiction": "Global / UK / US"},
+        {"name": "Bloomberg Markets", "short": "Bloomberg", "category": "Financial News & Terminal", "jurisdiction": "Global / US"},
+        {"name": "MarketWatch (Dow Jones)", "short": "MarketWatch", "category": "Financial Media", "jurisdiction": "United States"},
+        {"name": "The Wall Street Journal", "short": "WSJ", "category": "Financial Newspaper", "jurisdiction": "United States"},
+        {"name": "CNBC International", "short": "CNBC", "category": "Business TV & Web", "jurisdiction": "United States"},
+        {"name": "CoinDesk Crypto & Macro", "short": "CoinDesk", "category": "Digital Asset Wire", "jurisdiction": "Global"}
+      ]
+    }
+  }
+}
