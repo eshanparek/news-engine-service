@@ -13,7 +13,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta, timezone
 import email.utils
 IST_TZ = timezone(timedelta(hours=5, minutes=30))
-from fastapi import FastAPI, Query, BackgroundTasks, HTTPException, Body
+from fastapi import FastAPI, Query, BackgroundTasks, HTTPException, Body, Request
 from fastapi.responses import PlainTextResponse, FileResponse, StreamingResponse, RedirectResponse, JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -38,6 +38,7 @@ from calendar_pdf_engine import calendar_pdf_engine
 from story_card_generator import story_card_generator
 import market_ticker
 import circular_pdf_generator
+from visitor_tracker import visitor_tracker
 
 # 1. Start Background Scraper, Scorer & Multi-Market Calendar Timer Daemons
 news_worker.start()
@@ -58,6 +59,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def visitor_telemetry_middleware(request: Request, call_next):
+    path = request.url.path
+    if not (path.startswith("/static") or path.endswith(".ico") or path.endswith(".png") or path.endswith(".jpg") or path.endswith(".svg") or path == "/healthz"):
+        ip = request.headers.get("x-forwarded-for") or request.headers.get("x-real-ip") or (request.client.host if request.client else "127.0.0.1")
+        ua = request.headers.get("user-agent", "")
+        country = request.headers.get("cf-ipcountry") or request.headers.get("x-country") or "IN"
+        try:
+            visitor_tracker["record_visit"](ip, ua, path, country)
+        except Exception:
+            pass
+    response = await call_next(request)
+    return response
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from image_assets import (
@@ -1028,6 +1044,12 @@ def upsert_calendar_event(payload: CalendarEventUpdate):
         forward_now=bool(payload.forward_telegram)
     )
     return {"status": "success", "event": ev}
+
+
+@app.get("/api/admin/telemetry/visitors")
+def get_admin_visitor_telemetry():
+    """Returns aggregated real-time visitor metrics and active sessions list for Admin Console."""
+    return visitor_tracker["get_visitor_telemetry"]()
 
 
 @app.get("/api/admin/settings")
@@ -3266,6 +3288,10 @@ def render_settings_hub_html() -> str:
                     <span class="icon">🔐</span>
                     <span class="text">Security & Admin PIN</span>
                 </button>
+                <button type="button" class="epm-settings-nav-item" data-pane="pane_visitors" onclick="window.epmShowSettingsPane('pane_visitors', this)">
+                    <span class="icon">👥</span>
+                    <span class="text">Live Visitor Telemetry</span>
+                </button>
             </div>
         </div>
 
@@ -3614,6 +3640,73 @@ def render_settings_hub_html() -> str:
                     <div style="font-size:12px;font-weight:700;color:#334155;margin-bottom:4px;">🚨 Emergency Account Recovery</div>
                     <div style="font-size:11.5px;color:#64748B;line-height:1.5;">
                         If you ever forget your custom PIN, the system maintains emergency recovery codes bound to <code>eshanparek@gmail.com</code>. Entering any valid recovery code into the authentication gate immediately grants emergency access and permits PIN resetting.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pane: Live Visitor Telemetry & Traffic Intelligence -->
+            <div class="epm-settings-pane" id="pane_visitors">
+                <div class="epm-card-hdr">
+                    <div class="epm-card-hdr-left">
+                        <span class="epm-card-hdr-icon">👥</span>
+                        <span class="epm-card-hdr-title">LIVE VISITOR TELEMETRY & TRAFFIC INTELLIGENCE</span>
+                    </div>
+                    <span class="epm-card-hdr-tag">Real-Time User Monitoring</span>
+                </div>
+                <div class="epm-segregation-banner" style="background:#EFF6FF; border-color:#BFDBFE; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+                    <div>
+                        <span class="epm-segregation-badge" style="background:#0052FF;">REAL-TIME NETWORK METRICS</span>
+                        <p style="color:#1E3A8A; margin:4px 0 0 0; font-size:12px;">
+                            Monitors active user sessions, device types, geographic origins, and viewed screens without tracking PII.
+                        </p>
+                    </div>
+                    <button type="button" class="epm-top-btn" onclick="window.epmRefreshVisitorTelemetry()" style="background:#0052FF; color:#fff; border:none; padding:7px 14px; border-radius:6px; font-weight:700; cursor:pointer;">
+                        🔄 Refresh Telemetry
+                    </button>
+                </div>
+
+                <div class="epm-stats-strip" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin:14px 0;">
+                    <div class="epm-stat-box" style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:10px; text-align:center;">
+                        <span class="epm-stat-val" id="epm-vis-active-count" style="font-size:20px; font-weight:800; color:#166534;">1</span>
+                        <span class="epm-stat-lbl" style="display:block; font-size:10px; font-weight:700; color:#64748B;">Active Now (10m)</span>
+                    </div>
+                    <div class="epm-stat-box" style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:10px; text-align:center;">
+                        <span class="epm-stat-val" id="epm-vis-total-today" style="font-size:20px; font-weight:800; color:#0F172A;">1</span>
+                        <span class="epm-stat-lbl" style="display:block; font-size:10px; font-weight:700; color:#64748B;">Unique Visitors Today</span>
+                    </div>
+                    <div class="epm-stat-box" style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:10px; text-align:center;">
+                        <span class="epm-stat-val" id="epm-vis-mobile-ratio" style="font-size:20px; font-weight:800; color:#2563EB;">50%</span>
+                        <span class="epm-stat-lbl" style="display:block; font-size:10px; font-weight:700; color:#64748B;">📱 Mobile Devices</span>
+                    </div>
+                    <div class="epm-stat-box" style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:10px; text-align:center;">
+                        <span class="epm-stat-val" id="epm-vis-desktop-ratio" style="font-size:20px; font-weight:800; color:#0F172A;">50%</span>
+                        <span class="epm-stat-lbl" style="display:block; font-size:10px; font-weight:700; color:#64748B;">💻 Desktop PCs</span>
+                    </div>
+                </div>
+
+                <div class="epm-settings-dir-wrap" style="background:#fff; border:1px solid #E2E8F0; border-radius:8px; overflow:hidden;">
+                    <div style="padding:10px 14px; background:#F8FAFC; border-bottom:1px solid #E2E8F0; display:flex; align-items:center; justify-content:space-between;">
+                        <span style="font-size:12px; font-weight:800; color:#0F172A;">ACTIVE SESSIONS & CONNECTED AUDIENCE</span>
+                        <span id="epm-vis-last-updated" style="font-size:11px; font-weight:600; color:#64748B;">Synchronized: Just now</span>
+                    </div>
+                    <div style="overflow-x:auto;">
+                        <table class="epm-settings-table" id="epm-vis-table" style="width:100%; border-collapse:collapse; font-size:12px;">
+                            <thead>
+                                <tr style="background:#F1F5F9; border-bottom:1px solid #E2E8F0; text-align:left;">
+                                    <th style="padding:8px 10px; font-weight:700; color:#475569;">SESSION / CLIENT</th>
+                                    <th style="padding:8px 10px; font-weight:700; color:#475569;">DEVICE & PLATFORM</th>
+                                    <th style="padding:8px 10px; font-weight:700; color:#475569;">LOCATION</th>
+                                    <th style="padding:8px 10px; font-weight:700; color:#475569;">CURRENT SCREEN</th>
+                                    <th style="padding:8px 10px; font-weight:700; color:#475569;">STATUS</th>
+                                    <th style="padding:8px 10px; font-weight:700; color:#475569;">LAST ACTIVE (IST)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="epm-vis-tbody">
+                                <tr>
+                                    <td colspan="6" style="padding:18px; text-align:center; color:#64748B;">Loading live visitor telemetry...</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -9293,7 +9386,7 @@ TOP_NAVBAR_HTML = f"""
                     <span class="epm-side-item-tag">Tab 1</span>
                 </button>
                 <div class="epm-side-submenu">
-                    <a href="/api/news/pdf/today-snapshot" download target="_blank" class="epm-side-sublink" style="font-weight:700; color:#0052FF;">
+                    <a href="javascript:void(0)" onclick="window.epmDownloadNewsSnapshot()" class="epm-side-sublink" style="font-weight:700; color:#0052FF;">
                         <span>📥</span> Download News Snapshot (PDF) ↗
                     </a>
                 </div>
@@ -9359,7 +9452,7 @@ TOP_NAVBAR_HTML = f"""
                 </div>
             </div>
 
-            <button type="button" class="epm-side-nav-item epm-desktop-only" data-tab="4" onclick="window.epmSwitchTab(4);window.epmCloseSideMenu()">
+            <button type="button" class="epm-side-nav-item" data-tab="4" onclick="window.epmSwitchTab(4);window.epmCloseSideMenu()">
                 <span class="epm-side-item-icon">⚙️</span>
                 <div class="epm-side-item-info">
                     <span class="epm-side-item-name">Settings & Dispatches Hub</span>
@@ -11156,6 +11249,79 @@ TERMINAL_CLIENT_JS = r"""
             target.style.setProperty('display', 'block', 'important');
         }
         localStorage.setItem('epm_active_settings_pane', paneId);
+        if (paneId === 'pane_visitors' && window.epmRefreshVisitorTelemetry) {
+            window.epmRefreshVisitorTelemetry();
+        }
+    };
+
+    window.epmShowToast = function(msg, duration = 4000) {
+        let toast = document.getElementById('epm-global-toast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'epm-global-toast';
+            toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#0F172A;color:#FFFFFF;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:600;box-shadow:0 10px 25px rgba(0,0,0,0.25);z-index:999999;display:flex;align-items:center;gap:10px;transition:all 0.3s ease;border:1px solid #334155;max-width:90vw;text-align:center;';
+            document.body.appendChild(toast);
+        }
+        toast.innerHTML = msg;
+        toast.style.opacity = '1';
+        toast.style.pointerEvents = 'auto';
+        if (window._epmToastTimer) clearTimeout(window._epmToastTimer);
+        window._epmToastTimer = setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.pointerEvents = 'none';
+        }, duration);
+    };
+
+    window.epmDownloadNewsSnapshot = function() {
+        window.epmShowToast('⏳ <b>Preparing News Snapshot PDF...</b> Generating comprehensive dossier from 00:00 IST to present. Please wait...', 6000);
+        const link = document.createElement('a');
+        link.href = '/api/news/pdf/today-snapshot';
+        link.download = `News_Snapshot_${new Date().toISOString().slice(0, 10)}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => {
+            window.epmShowToast('✅ <b>Dossier Dispatched!</b> Your News Snapshot PDF download has started.', 3000);
+        }, 2500);
+    };
+
+    window.epmRefreshVisitorTelemetry = function() {
+        fetch('/api/admin/telemetry/visitors')
+            .then(r => r.json())
+            .then(data => {
+                const actCount = document.getElementById('epm-vis-active-count');
+                const totToday = document.getElementById('epm-vis-total-today');
+                const mobRatio = document.getElementById('epm-vis-mobile-ratio');
+                const dskRatio = document.getElementById('epm-vis-desktop-ratio');
+                const lastUpd = document.getElementById('epm-vis-last-updated');
+                const tbody = document.getElementById('epm-vis-tbody');
+
+                if (actCount) actCount.textContent = data.active_now || 1;
+                if (totToday) totToday.textContent = data.total_today || 1;
+                if (mobRatio) mobRatio.textContent = (data.mobile_pct || 50) + '%';
+                if (dskRatio) dskRatio.textContent = (data.desktop_pct || 50) + '%';
+                if (lastUpd) lastUpd.textContent = 'Synchronized: ' + (data.as_of || 'Just now');
+
+                if (tbody && data.sessions) {
+                    if (data.sessions.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="6" style="padding:16px;text-align:center;color:#64748B;">No recent external visits recorded in this cycle.</td></tr>';
+                    } else {
+                        tbody.innerHTML = data.sessions.map(s => `
+                            <tr style="border-bottom:1px solid #E2E8F0;">
+                                <td style="padding:8px 10px;font-family:monospace;font-weight:700;color:#0F172A;">${s.user_id}</td>
+                                <td style="padding:8px 10px;color:#334155;">${s.device}</td>
+                                <td style="padding:8px 10px;font-weight:600;color:#0F172A;">${s.location}</td>
+                                <td style="padding:8px 10px;color:#0052FF;font-weight:600;">${s.screen}</td>
+                                <td style="padding:8px 10px;"><span style="background:#DCFCE7;color:#166534;font-size:10px;font-weight:700;padding:2px 6px;border-radius:999px;">🟢 Active</span></td>
+                                <td style="padding:8px 10px;color:#64748B;">${s.last_seen_str}</td>
+                            </tr>
+                        `).join('');
+                    }
+                }
+            })
+            .catch(err => {
+                console.warn('Could not refresh visitor telemetry:', err);
+            });
     };
 
     window.epmTogglePdfDrawerMenu = function(show) {
