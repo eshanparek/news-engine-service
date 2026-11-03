@@ -8,7 +8,8 @@ import hashlib
 import threading
 import tempfile
 import concurrent.futures
-from datetime import datetime
+import email.utils
+from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Optional, Set, Any
 from urllib.parse import urlparse, urlunparse, urljoin
 import requests
@@ -19,13 +20,72 @@ from bs4 import BeautifulSoup
 from ai_analyzer import ai_analyzer
 from telegram_notifier import telegram_notifier
 from whatsapp_notifier import whatsapp_notifier
-from calendar_engine import calendar_engine
+from calendar_engine import calendar_engine, now_ist
 from semantic_dedup import semantic_clusterer
 
 logger = logging.getLogger("NewsWorker")
 
 DB_PATH = os.getenv("ALERT_DB_PATH", "news_alerts.db")
 CONFIG_FILE = "sources_config.json"
+DB_LOCK = threading.Lock()
+IST = timezone(timedelta(hours=5, minutes=30))
+
+def parse_timestamp_to_epoch(raw_ts: Any) -> float:
+    """Robustly parses ISO, RFC 822 (RSS), and 12-hour timestamps into numeric unix epoch."""
+    if not raw_ts:
+        return 0.0
+    if isinstance(raw_ts, (int, float)):
+        return float(raw_ts)
+    if isinstance(raw_ts, datetime):
+        if raw_ts.tzinfo is None:
+            raw_ts = raw_ts.replace(tzinfo=IST)
+        return raw_ts.timestamp()
+    ts = str(raw_ts).strip()
+    is_yesterday = "yesterday" in ts.lower()
+
+    # 1. ISO 8601
+    try:
+        dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=IST)
+        return dt.timestamp()
+    except Exception:
+        pass
+
+    # 2. RFC 822 / 2822 (standard RSS pubDate)
+    try:
+        dt = email.utils.parsedate_to_datetime(ts)
+        return dt.timestamp()
+    except Exception:
+        pass
+
+    # 3. 12-hour or 24-hour time strings (e.g. 'Today 12:50:30 PM', '10:45:00 AM')
+    try:
+        m = re.search(r'(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([AP]M)?', ts, re.I)
+        if m:
+            h = int(m.group(1))
+            minute = int(m.group(2))
+            sec = int(m.group(3)) if m.group(3) else 0
+            ampm = (m.group(4) or "").upper()
+            if ampm == "PM" and h < 12:
+                h += 12
+            elif ampm == "AM" and h == 12:
+                h = 0
+            now = now_ist()
+            base_date = now.date()
+            if is_yesterday or "yesterday" in ts.lower():
+                base_date = base_date - timedelta(days=1)
+            else:
+                if h > now.hour or (h == now.hour and minute > now.minute):
+                    base_date = base_date - timedelta(days=1)
+            target_dt = datetime.combine(base_date, datetime.min.time(), tzinfo=IST).replace(
+                hour=h, minute=minute, second=sec
+            )
+            return target_dt.timestamp()
+    except Exception:
+        pass
+
+    return 0.0
 
 def atomic_write_json(file_path: str, data: Any, indent: int = 2) -> None:
     """Writes JSON atomically via temporary file and rename to prevent 0-byte corruptions."""
@@ -48,43 +108,46 @@ def atomic_write_json(file_path: str, data: Any, indent: int = 2) -> None:
         raise e
 
 def init_alert_db():
-    try:
-        conn = sqlite3.connect(DB_PATH, timeout=10.0)
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA synchronous=NORMAL")
-        c = conn.cursor()
-        c.execute("""
-            CREATE TABLE IF NOT EXISTS sent_news (
-                hash_id TEXT PRIMARY KEY,
-                title TEXT,
-                sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        logger.error(f"Error initializing alert database: {e}")
+    with DB_LOCK:
+        try:
+            conn = sqlite3.connect(DB_PATH, timeout=15.0)
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA synchronous=NORMAL")
+            c = conn.cursor()
+            c.execute("""
+                CREATE TABLE IF NOT EXISTS sent_news (
+                    hash_id TEXT PRIMARY KEY,
+                    title TEXT,
+                    sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            logger.error(f"Error initializing alert database: {e}")
 
 def is_hash_in_db(hash_id: str) -> bool:
-    try:
-        conn = sqlite3.connect(DB_PATH, timeout=10.0)
-        c = conn.cursor()
-        c.execute("SELECT 1 FROM sent_news WHERE hash_id = ?", (hash_id,))
-        row = c.fetchone()
-        conn.close()
-        return bool(row)
-    except Exception:
-        return False
+    with DB_LOCK:
+        try:
+            conn = sqlite3.connect(DB_PATH, timeout=15.0)
+            c = conn.cursor()
+            c.execute("SELECT 1 FROM sent_news WHERE hash_id = ?", (hash_id,))
+            row = c.fetchone()
+            conn.close()
+            return bool(row)
+        except Exception:
+            return False
 
 def record_hash_in_db(hash_id: str, title: str):
-    try:
-        conn = sqlite3.connect(DB_PATH, timeout=10.0)
-        c = conn.cursor()
-        c.execute("INSERT OR IGNORE INTO sent_news (hash_id, title) VALUES (?, ?)", (hash_id, title[:200]))
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        logger.debug(f"Error saving hash to DB: {e}")
+    with DB_LOCK:
+        try:
+            conn = sqlite3.connect(DB_PATH, timeout=15.0)
+            c = conn.cursor()
+            c.execute("INSERT OR IGNORE INTO sent_news (hash_id, title) VALUES (?, ?)", (hash_id, title[:200]))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            logger.debug(f"Error saving hash to DB: {e}")
 
 init_alert_db()
 
@@ -730,9 +793,9 @@ class NewsEngineWorker:
 
     def fetch_all_sources(self) -> List[Dict]:
         all_news = []
-        with concurrent.futures.ThreadPoolExecutor(max_workers=25) as executor:
-            futures = [executor.submit(self.fetch_single_feed, src) for src in self.sources]
-            for fut in concurrent.futures.as_completed(futures):
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            future_to_src = {executor.submit(self.fetch_single_feed, src): src for src in self.sources}
+            for fut in concurrent.futures.as_completed(future_to_src, timeout=12.0):
                 try:
                     res = fut.result()
                     if res:
@@ -761,9 +824,17 @@ class NewsEngineWorker:
         newly_arrived, all_scraped = self.fetch_all_sources()
 
         if all_scraped:
-            combined = newly_arrived + self.news_cache
-            combined.sort(key=lambda x: x.get("relevance", 0), reverse=True)
-            self.news_cache = combined[:80]
+            # Deduplicate by unique hash
+            seen = set()
+            combined = []
+            for it in (newly_arrived + self.news_cache + all_scraped):
+                hid = it.get("id") or compute_dedup_key(it)
+                if hid not in seen:
+                    seen.add(hid)
+                    combined.append(it)
+            # Sort strictly in descending chronological order (newest first)
+            combined.sort(key=lambda x: parse_timestamp_to_epoch(x.get("timestamp")), reverse=True)
+            self.news_cache = combined[:100]
 
         if not self.is_initialized:
             for it in all_scraped:
@@ -772,7 +843,7 @@ class NewsEngineWorker:
                 record_hash_in_db(hid, it.get("title", ""))
             self.is_initialized = True
             logger.info(f"Cold-start warmup complete. {len(all_scraped)} backlog items cached without alerting.")
-            for it in self.news_cache[:15]:
+            for it in self.news_cache[:20]:
                 if "ai_score" not in it:
                     r = ai_analyzer.analyze_news(it["title"], it.get("summary", "") or it["title"], it.get("source", ""))
                     it["ai_score"] = r.get("score", 5)

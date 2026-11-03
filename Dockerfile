@@ -35,4 +35,4 @@ COPY --chown=user:user . .
 # Expose port 7860
 EXPOSE 7860
 
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "7860"]
+CMD ["sh", "-c", "exec uvicorn app:app --host 0.0.0.0 --port ${PORT:-7860} --workers 1 --limit-concurrency 100 --timeout-keep-alive 65"]

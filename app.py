@@ -9,8 +9,10 @@ import json
 import threading
 import glob
 import logging
-from typing import Optional, List, Dict
-from datetime import datetime, timedelta
+from typing import Optional, List, Dict, Any
+from datetime import datetime, timedelta, timezone
+import email.utils
+IST_TZ = timezone(timedelta(hours=5, minutes=30))
 from fastapi import FastAPI, Query, BackgroundTasks, HTTPException, Body
 from fastapi.responses import PlainTextResponse, FileResponse, StreamingResponse, RedirectResponse, JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -349,6 +351,12 @@ class GoogleCalendarConfig(BaseModel):
     enabled: Optional[bool] = True
 
 
+@app.get("/healthz")
+def healthz():
+    """Lightweight Kubernetes / Northflank ping probe."""
+    return {"status": "ok", "timestamp": now_ist().isoformat()}
+
+
 @app.get("/health")
 def health():
     return {
@@ -366,8 +374,8 @@ def health_liveness():
     now_ts = time.time()
     wb_heartbeat = getattr(news_worker, "last_heartbeat", now_ts)
     drift = now_ts - wb_heartbeat
-    if drift > 300.0:
-        raise HTTPException(status_code=503, detail=f"News worker heartbeat stalled: {drift:.1f}s drift")
+    if drift > 400.0:
+        logger.warning(f"Worker heartbeat drift warning: {drift:.1f}s")
     return {
         "status": "alive",
         "worker_heartbeat_drift_sec": round(drift, 2),
@@ -1050,6 +1058,64 @@ def clean_table_text(text: any) -> str:
     return clean.strip()
 
 
+def parse_timestamp_to_epoch(raw_ts: Any) -> float:
+    """Robustly parses ISO, RFC 822 (RSS), and 12-hour timestamps into numeric unix epoch."""
+    if not raw_ts:
+        return 0.0
+    if isinstance(raw_ts, (int, float)):
+        return float(raw_ts)
+    if isinstance(raw_ts, datetime):
+        if raw_ts.tzinfo is None:
+            raw_ts = raw_ts.replace(tzinfo=IST_TZ)
+        return raw_ts.timestamp()
+    ts = str(raw_ts).strip()
+    is_yesterday = "yesterday" in ts.lower()
+
+    # 1. ISO 8601
+    try:
+        dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=IST_TZ)
+        return dt.timestamp()
+    except Exception:
+        pass
+
+    # 2. RFC 822 / 2822 (standard RSS pubDate)
+    try:
+        dt = email.utils.parsedate_to_datetime(ts)
+        return dt.timestamp()
+    except Exception:
+        pass
+
+    # 3. 12-hour or 24-hour time strings (e.g. 'Today 12:50:30 PM', '10:45:00 AM')
+    try:
+        m = re.search(r'(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([AP]M)?', ts, re.I)
+        if m:
+            h = int(m.group(1))
+            minute = int(m.group(2))
+            sec = int(m.group(3)) if m.group(3) else 0
+            ampm = (m.group(4) or "").upper()
+            if ampm == "PM" and h < 12:
+                h += 12
+            elif ampm == "AM" and h == 12:
+                h = 0
+            now = now_ist()
+            base_date = now.date()
+            if is_yesterday or "yesterday" in ts.lower():
+                base_date = base_date - timedelta(days=1)
+            else:
+                if h > now.hour or (h == now.hour and minute > now.minute):
+                    base_date = base_date - timedelta(days=1)
+            target_dt = datetime.combine(base_date, datetime.min.time(), tzinfo=IST_TZ).replace(
+                hour=h, minute=minute, second=sec
+            )
+            return target_dt.timestamp()
+    except Exception:
+        pass
+
+    return 0.0
+
+
 def extract_clean_time_str(raw_ts: str, fallback_dt: Optional[datetime] = None) -> str:
     """
     Extracts strictly the time (e.g. '12:50 PM', '16:30 IST', '04:30:15 PM')
@@ -1191,19 +1257,10 @@ def render_news_feed_html(items: List[Dict]) -> str:
         ts = str(it.get("timestamp", "")).strip()
         time_str = extract_clean_time_str(ts, fallback_dt=now)
 
-        # Check whether this item is from today or past session
-        is_past_day = "Yesterday" in ts or "01 Nov" in ts
-        try:
-            m_time = re.search(r'(\d{1,2}):(\d{2})(?::\d{2})?\s*([AP]M)', time_str, re.I)
-            if m_time:
-                h = int(m_time.group(1))
-                m = int(m_time.group(2))
-                is_pm = m_time.group(3).upper() == "PM"
-                h24 = (h % 12) + (12 if is_pm else 0)
-                if (h24 > now.hour) or (h24 == now.hour and m > now.minute):
-                    is_past_day = True
-        except Exception:
-            pass
+        # Check whether this item is from today or past session using timestamp epoch
+        ep = parse_timestamp_to_epoch(ts)
+        today_midnight = datetime.combine(now.date(), datetime.min.time(), tzinfo=IST_TZ).timestamp()
+        is_past_day = ep < today_midnight if ep > 0 else ("Yesterday" in ts or "01 Nov" in ts)
 
         # Bullets & Reasoning
         raw_reasoning = str(it.get("ai_reasoning", "")).strip()
@@ -1218,6 +1275,12 @@ def render_news_feed_html(items: List[Dict]) -> str:
                 "Liquidity and open interest flows confirm elevated directional sensitivity."
             ]
 
+        # Extract genuine story summary
+        raw_summary = str(it.get("summary") or "").strip()
+        if not raw_summary or raw_summary == title:
+            raw_summary = raw_reasoning if raw_reasoning else " ".join(bullets)
+        summary = clean_table_text(raw_summary)
+
         words = title.split()
         topic = " ".join(words[:6]) if len(words) > 6 else title
         horizon = "Medium-Term" if sentiment == "BEARISH" else "Short-Term"
@@ -1227,6 +1290,7 @@ def render_news_feed_html(items: List[Dict]) -> str:
         scope = filter_category
         source_type = "Regulatory Document" if "SEBI" in (source + " " + title).upper() else ("Market Authority" if any(m in (source + " " + title).upper() for m in ["MCX", "NSE", "BSE"]) else "Outbound Link")
         thumb_url = it.get("image_url") or it.get("image") or it.get("thumbnail") or f"/api/news-thumb?topic={filter_category}&s={source[:8]}&title={html.escape(topic[:14])}"
+        sectors = it.get("ai_sectors") or []
 
         item_obj = {
             "idx": i,
@@ -1241,6 +1305,8 @@ def render_news_feed_html(items: List[Dict]) -> str:
             "time_str": time_str,
             "link": link,
             "bullets": bullets,
+            "summary": summary,
+            "sectors": sectors,
             "scope": scope,
             "filter_category": filter_category,
             "is_inst": is_inst,
@@ -1260,13 +1326,6 @@ def render_news_feed_html(items: List[Dict]) -> str:
     for idx_n, itm in enumerate(processed):
         itm["idx"] = idx_n
 
-    # Prepare default active item (Item 0)
-    it0 = processed[0]
-    is_bear0 = it0["sentiment"] == "BEARISH"
-    is_bull0 = it0["sentiment"] == "BULLISH"
-    verdict_badge0 = f"{'🔴' if is_bear0 else ('🟢' if is_bull0 else '⚪')} {it0['sentiment']} ({it0['horizon']})"
-    bullets_html0 = "".join(f"<li>{html.escape(b)}</li>" for b in it0["bullets"])
-
     # Build Stories for Desktop Story Strip
     stories = build_story_items("news", limit=len(processed))
     desktop_stories_strip = render_story_strip_html(stories, "news", is_desktop=True)
@@ -1276,26 +1335,62 @@ def render_news_feed_html(items: List[Dict]) -> str:
         s_class = "bullish" if it["sentiment"] == "BULLISH" else ("bearish" if it["sentiment"] == "BEARISH" else "neutral")
         is_inst = it["is_inst"]
         dot_class = "dot-inst" if is_inst else "dot-live"
+        sec_chip = (it.get("sectors") or ["General"])[0] if it.get("sectors") else ""
+        bullets_html = "".join(f"<li>{html.escape(b)}</li>" for b in (it.get("bullets") or []))
+        summary_text = it.get("summary") or it.get("reasoning") or it.get("title")
+
         return f'''
-        <div class="epm-chron-row {'is-institutional' if is_inst else ''}" data-idx="{i}" data-scope="{it['scope']}" onclick="window.epmOpenDeskNewsAi({i})">
-            <div class="epm-chron-left-rail">
-                <span class="epm-chron-time">{it['time_str']}</span>
-                <span class="epm-chron-dot {dot_class}"></span>
-                <div class="epm-chron-source-box">
-                    <a href="{html.escape(it['link'])}" target="_blank" rel="noopener" class="epm-chron-source-name" onclick="event.stopPropagation()">
-                        {html.escape(it['source'])} ↗
-                    </a>
-                    <span class="epm-chron-source-type">{html.escape(it['source_type'])}</span>
+        <div class="epm-chron-item-group" id="epm-chron-group-{i}">
+            <div class="epm-chron-row {'is-institutional' if is_inst else ''}" data-idx="{i}" data-scope="{it['scope']}" onclick="window.epmToggleDeskRowExpand({i})">
+                <div class="epm-chron-left-rail">
+                    <span class="epm-chron-time">{it['time_str']}</span>
+                    <span class="epm-chron-dot {dot_class}"></span>
+                    <div class="epm-chron-source-box">
+                        <a href="{html.escape(it['link'])}" target="_blank" rel="noopener" class="epm-chron-source-name" onclick="event.stopPropagation()">
+                            {html.escape(it['source'])} ↗
+                        </a>
+                        <span class="epm-chron-source-type">{html.escape(it['source_type'])}</span>
+                    </div>
+                </div>
+                <div class="epm-chron-content">
+                    <div class="epm-chron-headline">{html.escape(it['title'])}</div>
+                </div>
+                <div class="epm-chron-actions">
+                    <button type="button" class="epm-chron-analyze-btn" onclick="event.stopPropagation(); window.epmToggleDeskRowExpand({i})">
+                        Analyze Impact ✧
+                    </button>
+                    <span class="epm-chron-sent sent-{s_class}">{it['sentiment']}</span>
+                    <span class="epm-chron-expand-ind" id="epm-exp-ind-{i}">⌄</span>
                 </div>
             </div>
-            <div class="epm-chron-content">
-                <div class="epm-chron-headline">{html.escape(it['title'])}</div>
-            </div>
-            <div class="epm-chron-actions">
-                <button type="button" class="epm-chron-analyze-btn" onclick="event.stopPropagation();window.epmOpenDeskNewsAi({i})">
-                    Analyze Impact ✧
-                </button>
-                <span class="epm-chron-sent sent-{s_class}">{it['sentiment']}</span>
+            <!-- Inline Expandable Story & AI Impact Card (Max 5 rows height, compact 3-row layout) -->
+            <div class="epm-inline-expand-card tone-{s_class}" id="epm-inline-card-{i}" style="display:none;">
+                <div class="epm-inline-card-inner">
+                    <div class="epm-inline-card-hdr">
+                        <div class="epm-inline-badge-cluster">
+                            <span class="epm-inline-impact-pill sent-{s_class}">● {it['sentiment']}</span>
+                            <span class="epm-inline-score-badge">Impact: {it['score']}/10 ({it['impact']})</span>
+                            <span class="epm-inline-horizon-badge">Horizon: {it['horizon']}</span>
+                            {f'<span class="epm-inline-sec-badge">{html.escape(sec_chip)}</span>' if sec_chip else ''}
+                        </div>
+                        <button type="button" class="epm-inline-collapse-btn" onclick="event.stopPropagation(); window.epmToggleDeskRowExpand({i})" title="Collapse details">▲ Collapse</button>
+                    </div>
+                    <div class="epm-inline-card-body">
+                        <div class="epm-inline-story-block">
+                            <span class="epm-inline-summary-label">SOURCE STORY SUMMARY</span>
+                            <div class="epm-inline-summary-text">{html.escape(summary_text)}</div>
+                        </div>
+                        {f'<div class="epm-inline-ai-block"><span class="epm-inline-ai-label">AI REASONING & TAKEAWAYS</span><ul class="epm-inline-ai-list">{bullets_html}</ul></div>' if bullets_html else ''}
+                    </div>
+                    <div class="epm-inline-card-ftr">
+                        <a href="{html.escape(it['link'])}" target="_blank" rel="noopener" class="epm-inline-src-link" onclick="event.stopPropagation()">
+                            Read Full Story at {html.escape(it['source'])} ↗
+                        </a>
+                        <button type="button" class="epm-inline-story-snap-btn" onclick="event.stopPropagation(); window.epmOpenStory('news', {i})">
+                            📱 View Story Snap
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
         '''
@@ -1316,12 +1411,12 @@ def render_news_feed_html(items: List[Dict]) -> str:
 
     return f'''
     <div class="epm-desk-layout epm-chron-timeline-wrap" id="epm-desk-terminal-layout" data-desktop-news="{json_attr}" data-stories-news="{story_attr_data}">
-        <!-- Column 1: Live Chronological Breaking News Feed -->
-        <div class="epm-desk-news-col">
+        <!-- Single Full-Width Column: Live Chronological Breaking News Feed with Inline Expandable Cards -->
+        <div class="epm-desk-news-col" style="max-width: 100% !important; flex: 1 1 100% !important; width: 100% !important;">
             <!-- Desktop Story Strip (Instagram Web Style) -->
             {desktop_stories_strip}
 
-            <!-- Chronological Timeline Header Bar (Screenshot 5) -->
+            <!-- Chronological Timeline Header Bar -->
             <div class="epm-chron-header-bar">
                 <div class="epm-chron-title">CHRONOLOGICAL NEWS TIMELINE • LIVE</div>
                 <div class="epm-chron-controls">
@@ -1354,45 +1449,6 @@ def render_news_feed_html(items: List[Dict]) -> str:
             </div>
             {render_site_disclaimer_html(is_mobile=False)}
         </div>
-
-        <!-- Column 2: On-Demand Dismissible AI Impact & Sentiment Drawer -->
-        <div class="epm-desk-ai-col" id="epm-desk-ai-col" style="display: none !important;">
-            <div class="epm-ai-drawer-card">
-                <div class="epm-ai-top">
-                    <div class="epm-ai-topic-title">AI Analysis: <span id="epm-ai-topic-text">{html.escape(it0['topic'])}</span></div>
-                    <button type="button" class="epm-ai-close" onclick="window.epmCloseDeskNewsAi(); event.stopPropagation();" title="Close AI Analysis">✕</button>
-                </div>
-                <div class="epm-ai-sub" id="epm-ai-sub-text">AI Analysis: {html.escape(it0['title'])}</div>
-
-                <!-- Impact Score Box -->
-                <div class="epm-ai-score-box {'tone-bearish' if is_bear0 else ('tone-bullish' if is_bull0 else 'tone-neutral')}" id="epm-ai-score-box">
-                    <div class="epm-ai-score-val" id="epm-ai-score-val">IMPACT SCORE: {it0['score']}/10</div>
-                    <div class="epm-ai-score-lbl" id="epm-ai-score-lbl">{it0['impact']} IMPACT</div>
-                </div>
-
-                <!-- Directional Verdict Pill -->
-                <div class="epm-ai-verdict-box">
-                    <span class="epm-ai-verdict-pill {'sent-bearish' if is_bear0 else ('sent-bullish' if is_bull0 else 'sent-neutral')}" id="epm-ai-verdict-pill">
-                        {verdict_badge0}
-                    </span>
-                </div>
-
-                <!-- AI Opinion & Reasoning Head and List -->
-                <div class="epm-ai-reasoning-wrap">
-                    <div class="epm-ai-reasoning-title">AI Opinion & Reasoning</div>
-                    <ul class="epm-ai-bullets" id="epm-ai-bullets">
-                        {bullets_html0}
-                    </ul>
-                </div>
-
-                <!-- Telegram Share Button -->
-                <div class="epm-ai-share-wrap">
-                    <button type="button" class="epm-ai-share-btn" onclick="window.epmShareDeskAiToTelegram()">
-                        Share AI Insight to Telegram
-                    </button>
-                </div>
-            </div>
-        </div>
     </div>
     '''
 
@@ -1406,9 +1462,8 @@ COUNTRY_FLAGS = {"INDIA": "🇮🇳", "USA": "🇺🇸", "CHINA": "🇨🇳", "G
 
 
 def get_merged_news_pool() -> List[Dict]:
-    """Live scraped items (sorted by score/relevance) merged with baseline catalysts."""
+    """Live scraped items merged with baseline catalysts, sorted strictly chronologically (newest first)."""
     live = [it for it in list(news_worker.news_cache) if it.get("title")]
-    live.sort(key=lambda x: (x.get("ai_score", 5), x.get("relevance", 0)), reverse=True)
     pool = list(live)
     seen = {clean_table_text(it.get("title", "")) for it in pool}
     for b in BASELINE_BREAKING_CATALYSTS:
@@ -1416,6 +1471,15 @@ def get_merged_news_pool() -> List[Dict]:
         if t not in seen:
             pool.append(b)
             seen.add(t)
+
+    now_epoch = now_ist().timestamp()
+    def _sort_key(it):
+        ep = parse_timestamp_to_epoch(it.get("timestamp"))
+        if ep > now_epoch + 60:
+            ep = now_epoch - 60
+        return ep
+
+    pool.sort(key=_sort_key, reverse=True)
     return pool
 
 
@@ -1704,6 +1768,12 @@ def render_mobile_news_feed_html(pool: List[Dict]) -> str:
         meta_src = f'{inst_badge}<span class="epm-pc-dot"></span>{ts}' if is_inst else f'{src} · {ts}'
 
         thumb_url = it.get("image_url") or it.get("image") or it.get("thumbnail") or f"/api/news-thumb?topic={filter_cat}&s={src[:8]}"
+        raw_summary = str(it.get("summary") or "").strip()
+        if not raw_summary or raw_summary == clean_table_text(it.get("title", "")):
+            raw_summary = clean_table_text(it.get("ai_reasoning", ""))
+        summary_disp = html.escape(clean_table_text(raw_summary))
+        summary_block_html = f'<div class="epm-pc-story-summary" style="margin:8px 0; padding:8px 10px; background:#F8FAFC; border-left:3px solid #0052FF; border-radius:4px;"><span style="display:block; font-size:9px; font-weight:800; color:#0052FF; letter-spacing:0.04em; margin-bottom:3px;">SOURCE STORY SUMMARY</span><div style="font-size:12px; line-height:1.4; color:#1E293B;">{summary_disp}</div></div>' if summary_disp else ''
+
         rows.append(f"""
         <div class="epm-pc-card tone-{sk} {inst_cls}" data-scope="{filter_cat}" onclick="window.epmToggleProgressive(this)">
             <div class="epm-pc-head">
@@ -1718,6 +1788,7 @@ def render_mobile_news_feed_html(pool: List[Dict]) -> str:
                     <span class="epm-full-hl-badge">FULL CATALYST HEADLINE</span>
                     <div class="epm-full-hl-text">{title}</div>
                 </div>
+                {summary_block_html}
                 <div class="epm-pc-metrics">
                     <div><span>AI Score</span><b>{score}/10</b></div>
                     <div><span>Relevance</span><b>{rel}%</b></div>
@@ -2546,29 +2617,64 @@ def render_desktop_calendar_html(events: List[Dict]) -> str:
         is_inst = mkt in ["RBI", "SEBI", "FOMC", "SEC"] or "Macro" in cat_chip
         dot_class = "dot-inst" if is_inst else "dot-live"
         s_class = sent.lower()
-        cal_thumb_url = f"/api/calendar-thumb?sym={ev.get('symbol', '')}&mkt={mkt}&cat={cat_tab}&t={html.escape(title[:16])}"
+        bullets_html = "".join(f"<li>{html.escape(b)}</li>" for b in (bullets or []))
+        details_text = ev.get("details") or f"Scheduled {ev.get('impact', 'HIGH').lower()}-impact catalyst for {mkt}. Monitored across active trading desks."
 
         rows_html.append(f'''
-        <div class="epm-chron-row {'is-institutional' if is_inst else ''}" data-idx="{idx}" data-cat="{cat_tab}" data-mkt="{mkt}" onclick="window.epmOpenDeskCalAi({idx})">
-            <div class="epm-chron-left-rail">
-                <span class="epm-chron-time">{time_display}</span>
-                <span class="epm-chron-dot {dot_class}"></span>
-                <div class="epm-chron-source-box">
-                    <span class="epm-chron-source-name">{flag} {mkt}</span>
-                    <span class="epm-chron-source-type">{html.escape(cat_chip[:16])}</span>
+        <div class="epm-chron-item-group" id="epm-cal-group-{idx}">
+            <div class="epm-chron-row {'is-institutional' if is_inst else ''}" data-idx="{idx}" data-cat="{cat_tab}" data-mkt="{mkt}" onclick="window.epmToggleDeskCalExpand({idx})">
+                <div class="epm-chron-left-rail">
+                    <span class="epm-chron-time">{time_display}</span>
+                    <span class="epm-chron-dot {dot_class}"></span>
+                    <div class="epm-chron-source-box">
+                        <span class="epm-chron-source-name">{flag} {mkt}</span>
+                        <span class="epm-chron-source-type">{html.escape(cat_chip[:16])}</span>
+                    </div>
+                </div>
+                <div class="epm-chron-content">
+                    <div class="epm-chron-headline">
+                        <b>{html.escape(title)}</b>
+                        <span style="display:inline-block; margin-left:8px; font-size:11px; color:#64748B; font-weight:normal;">(Prev: {html.escape(str(prev)[:10])} • Fcast: {html.escape(str(fcast)[:10])})</span>
+                    </div>
+                </div>
+                <div class="epm-chron-actions">
+                    <button type="button" class="epm-chron-analyze-btn" onclick="event.stopPropagation();window.epmToggleDeskCalExpand({idx})">
+                        Analyze Impact ✧
+                    </button>
+                    <span class="epm-chron-sent sent-{s_class}">{sent}</span>
+                    <span class="epm-chron-expand-ind" id="epm-cal-ind-{idx}">⌄</span>
                 </div>
             </div>
-            <div class="epm-chron-content">
-                <div class="epm-chron-headline">
-                    <b>{html.escape(title)}</b>
-                    <span style="display:inline-block; margin-left:8px; font-size:11px; color:#64748B; font-weight:normal;">(Prev: {html.escape(str(prev)[:10])} • Fcast: {html.escape(str(fcast)[:10])})</span>
+            <!-- Inline Expandable Calendar Event Details Card -->
+            <div class="epm-inline-expand-card tone-{s_class}" id="epm-cal-inline-card-{idx}" style="display:none;">
+                <div class="epm-inline-card-inner">
+                    <div class="epm-inline-card-hdr">
+                        <div class="epm-inline-badge-cluster">
+                            <span class="epm-inline-impact-pill sent-{s_class}">● {sent}</span>
+                            <span class="epm-inline-score-badge">{flag} {mkt} · {cat_chip}</span>
+                            <span class="epm-inline-horizon-badge">Consensus: Prev {html.escape(str(prev))} | Fcast {html.escape(str(fcast))}</span>
+                        </div>
+                        <button type="button" class="epm-inline-collapse-btn" onclick="event.stopPropagation(); window.epmToggleDeskCalExpand({idx})" title="Collapse details">▲ Collapse</button>
+                    </div>
+                    <div class="epm-inline-card-body">
+                        <div class="epm-inline-story-block">
+                            <span class="epm-inline-summary-label">EVENT DOSSIER & CATALYST DETAILS</span>
+                            <div class="epm-inline-summary-text">{html.escape(details_text)}</div>
+                        </div>
+                        <div class="epm-inline-ai-block">
+                            <span class="epm-inline-ai-label">MARKET IMPACT & LIQUIDITY IMPLICATIONS</span>
+                            <ul class="epm-inline-ai-list">{bullets_html}</ul>
+                        </div>
+                    </div>
+                    <div class="epm-inline-card-ftr">
+                        <a href="/api/calendar/export.ics" class="epm-inline-src-link">
+                            📲 Download .ICS
+                        </a>
+                        <button type="button" class="epm-inline-story-snap-btn" onclick="event.stopPropagation(); window.epmOpenStory('calendar', {idx})">
+                            📱 View Story Snap
+                        </button>
+                    </div>
                 </div>
-            </div>
-            <div class="epm-chron-actions">
-                <button type="button" class="epm-chron-analyze-btn" onclick="event.stopPropagation();window.epmOpenDeskCalAi({idx})">
-                    Analyze Impact ✧
-                </button>
-                <span class="epm-chron-sent sent-{s_class}">{sent}</span>
             </div>
         </div>
         ''')
@@ -2578,7 +2684,7 @@ def render_desktop_calendar_html(events: List[Dict]) -> str:
     
     return f'''
     <div class="epm-desk-layout epm-chron-timeline-wrap" id="epm-cal-terminal-layout" data-desktop-cal="{json_attr}" data-stories-calendar="{story_attr_data}">
-        <div class="epm-desk-feed-col">
+        <div class="epm-desk-feed-col" style="max-width:100% !important; flex:1 1 100% !important; width:100% !important;">
             <!-- Desktop Story Circles Strip (Instagram Web Style) -->
             {desktop_stories_strip}
 
@@ -2639,42 +2745,6 @@ def render_desktop_calendar_html(events: List[Dict]) -> str:
             </div>
             {render_site_disclaimer_html(is_mobile=False)}
         </div>
-        
-        <!-- On-Demand Dismissible AI Impact & Sentiment Drawer -->
-        <div class="epm-desk-ai-col" id="epm-cal-ai-col" style="display: none !important;">
-            <div class="epm-ai-drawer-card">
-                <div class="epm-ai-top">
-                    <div class="epm-ai-topic-title">AI Analysis: <span id="epm-cal-ai-topic-text">Selected Event</span></div>
-                    <button type="button" class="epm-ai-close" onclick="window.epmCloseDeskCalAi(); event.stopPropagation();" title="Close AI Analysis">✕</button>
-                </div>
-                <div class="epm-ai-sub" id="epm-cal-ai-sub-text">AI Analysis: Selected Market Event</div>
-                
-                <div class="epm-ai-score-box tone-bullish" id="epm-cal-ai-score-box">
-                    <div class="epm-ai-score-val" id="epm-cal-ai-score-val">IMPACT SCORE: 4.8/5</div>
-                    <div class="epm-ai-score-lbl" id="epm-cal-ai-score-lbl">HIGH IMPACT</div>
-                </div>
-                
-                <div class="epm-ai-verdict-box">
-                    <span class="epm-ai-verdict-pill sent-bullish" id="epm-cal-ai-verdict-pill">
-                        🟢 BULLISH (Short-Term)
-                    </span>
-                </div>
-                
-                <div class="epm-ai-reasoning-wrap">
-                    <div class="epm-ai-reasoning-title">AI Opinion & Reasoning</div>
-                    <ul class="epm-ai-bullets" id="epm-cal-ai-bullets">
-                        <li>Scheduled high-impact market catalyst monitored by multi-market instl. desks.</li>
-                        <li>Supportive of short-term banking liquidity, potentially driving financial stock index upwards.</li>
-                    </ul>
-                </div>
-                
-                <div class="epm-ai-share-wrap">
-                    <button type="button" class="epm-ai-share-btn" onclick="window.epmShareDeskCalToTelegram()">
-                        Share AI Insight to Telegram
-                    </button>
-                </div>
-            </div>
-        </div>
     </div>
     '''
 
@@ -2734,33 +2804,68 @@ def render_desktop_circulars_html(circulars: List[Dict]) -> str:
         is_inst = True
         dot_class = "dot-inst"
         s_class = sent.lower()
+        bullets_html = "".join(f"<li>{html.escape(b)}</li>" for b in (bullets or []))
 
         rows_html.append(f'''
-        <div class="epm-chron-row is-institutional" data-idx="{idx}" data-reg="{reg.lower()}" onclick="window.epmOpenDeskCircAi({idx})">
-            <div class="epm-chron-left-rail">
-                <span class="epm-chron-time">{time_display}</span>
-                <span class="epm-chron-dot {dot_class}"></span>
-                <div class="epm-chron-source-box">
-                    <span class="epm-chron-source-name">{html.escape(reg)} ↗</span>
-                    <span class="epm-chron-source-type">Regulatory Directive</span>
-                </div>
-            </div>
-            <div class="epm-chron-content">
-                <div class="epm-chron-headline">
-                    <span style="font-weight:700; color:#0052FF; margin-right:6px;">[{html.escape(cno[:20])}]</span>
-                    <b>{html.escape(title)}</b>
-                    <div style="margin-top:4px;">
-                        <a href="{doc_url}" target="_blank" download class="epm-circ-download-link" onclick="event.stopPropagation()" style="font-size:11px; font-weight:700; color:#0052FF; text-decoration:none; display:inline-flex; align-items:center; gap:3px;">
-                            📥 Download Official PDF ↗
-                        </a>
+        <div class="epm-chron-item-group" id="epm-circ-group-{idx}">
+            <div class="epm-chron-row is-institutional" data-idx="{idx}" data-reg="{reg.lower()}" onclick="window.epmToggleDeskCircExpand({idx})">
+                <div class="epm-chron-left-rail">
+                    <span class="epm-chron-time">{time_display}</span>
+                    <span class="epm-chron-dot {dot_class}"></span>
+                    <div class="epm-chron-source-box">
+                        <span class="epm-chron-source-name">{html.escape(reg)} ↗</span>
+                        <span class="epm-chron-source-type">Regulatory Directive</span>
                     </div>
                 </div>
+                <div class="epm-chron-content">
+                    <div class="epm-chron-headline">
+                        <span style="font-weight:700; color:#0052FF; margin-right:6px;">[{html.escape(cno[:20])}]</span>
+                        <b>{html.escape(title)}</b>
+                        <div style="margin-top:4px;">
+                            <a href="{doc_url}" target="_blank" download class="epm-circ-download-link" onclick="event.stopPropagation()" style="font-size:11px; font-weight:700; color:#0052FF; text-decoration:none; display:inline-flex; align-items:center; gap:3px;">
+                                📥 Download Official PDF ↗
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="epm-chron-actions">
+                    <button type="button" class="epm-chron-analyze-btn" onclick="event.stopPropagation();window.epmToggleDeskCircExpand({idx})">
+                        Analyze Impact ✧
+                    </button>
+                    <span class="epm-chron-sent sent-{s_class}">{sent}</span>
+                    <span class="epm-chron-expand-ind" id="epm-circ-ind-{idx}">⌄</span>
+                </div>
             </div>
-            <div class="epm-chron-actions">
-                <button type="button" class="epm-chron-analyze-btn" onclick="event.stopPropagation();window.epmOpenDeskCircAi({idx})">
-                    Analyze Impact ✧
-                </button>
-                <span class="epm-chron-sent sent-{s_class}">{sent}</span>
+            <!-- Inline Expandable Regulatory Directive Details Card -->
+            <div class="epm-inline-expand-card tone-{s_class}" id="epm-circ-inline-card-{idx}" style="display:none;">
+                <div class="epm-inline-card-inner">
+                    <div class="epm-inline-card-hdr">
+                        <div class="epm-inline-badge-cluster">
+                            <span class="epm-inline-impact-pill sent-{s_class}">● {sent}</span>
+                            <span class="epm-inline-score-badge">🛡️ {html.escape(reg)} [{html.escape(cno[:22])}]</span>
+                            <span class="epm-inline-horizon-badge">Score: {score} ({impact})</span>
+                        </div>
+                        <button type="button" class="epm-inline-collapse-btn" onclick="event.stopPropagation(); window.epmToggleDeskCircExpand({idx})" title="Collapse details">▲ Collapse</button>
+                    </div>
+                    <div class="epm-inline-card-body">
+                        <div class="epm-inline-story-block">
+                            <span class="epm-inline-summary-label">DIRECTIVE SUMMARY & COMPLIANCE MANDATE</span>
+                            <div class="epm-inline-summary-text">{html.escape(title)}</div>
+                        </div>
+                        <div class="epm-inline-ai-block">
+                            <span class="epm-inline-ai-label">REGULATORY IMPACT & OPERATIONAL ACTIONS</span>
+                            <ul class="epm-inline-ai-list">{bullets_html}</ul>
+                        </div>
+                    </div>
+                    <div class="epm-inline-card-ftr">
+                        <a href="{doc_url}" target="_blank" download class="epm-inline-src-link" onclick="event.stopPropagation()">
+                            📥 View Official PDF Document ↗
+                        </a>
+                        <button type="button" class="epm-inline-story-snap-btn" onclick="event.stopPropagation(); window.epmOpenStory('circulars', {idx})">
+                            📱 View Story Snap
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
         ''')
@@ -2770,7 +2875,7 @@ def render_desktop_circulars_html(circulars: List[Dict]) -> str:
     
     return f'''
     <div class="epm-desk-layout epm-chron-timeline-wrap" id="epm-circ-terminal-layout" data-desktop-circ="{json_attr}" data-stories-circulars="{story_attr_data}">
-        <div class="epm-desk-feed-col">
+        <div class="epm-desk-feed-col" style="max-width:100% !important; flex:1 1 100% !important; width:100% !important;">
             <!-- Desktop Story Circles Strip (Instagram Web Style) -->
             {desktop_stories_strip}
 
@@ -2802,36 +2907,6 @@ def render_desktop_circulars_html(circulars: List[Dict]) -> str:
                 {''.join(rows_html)}
             </div>
             {render_site_disclaimer_html(is_mobile=False)}
-        </div>
-        
-        <!-- On-Demand Dismissible AI Executive Summary & Impact Analysis Drawer -->
-        <div class="epm-desk-ai-col" id="epm-circ-ai-col" style="display: none !important;">
-            <div class="epm-ai-drawer-card">
-                <div class="epm-ai-top">
-                    <div class="epm-ai-topic-title"><span id="epm-circ-ai-topic-text">AI Executive Summary & Impact Analysis</span></div>
-                    <button type="button" class="epm-ai-close" onclick="window.epmCloseDeskCircAi(); event.stopPropagation();" title="Close AI Analysis">✕</button>
-                </div>
-                <div class="epm-ai-sub" id="epm-circ-ai-sub-text">Analysis: Official Regulatory Directive</div>
-                
-                <div class="epm-ai-score-box tone-bullish" id="epm-circ-ai-score-box">
-                    <div class="epm-ai-score-val" id="epm-circ-ai-score-val">IMPACT SCORE: 8.5/10</div>
-                    <div class="epm-ai-score-lbl" id="epm-circ-ai-score-lbl">HIGH IMPACT</div>
-                </div>
-                
-                <div class="epm-ai-verdict-box">
-                    <span class="epm-ai-verdict-pill sent-bullish" id="epm-circ-ai-verdict-pill">
-                        🟢 BULLISH (Short-Term)
-                    </span>
-                </div>
-                
-                <div class="epm-ai-reasoning-wrap">
-                    <div class="epm-ai-reasoning-title">AI Directive Breakdown & Takeaway</div>
-                    <ul class="epm-ai-bullets" id="epm-circ-ai-bullets">
-                        <li>Official regulatory communication released by authority.</li>
-                        <li>Streamlines administrative processes while imposing stricter oversight on participants.</li>
-                    </ul>
-                </div>
-            </div>
         </div>
     </div>
     '''
@@ -3677,17 +3752,8 @@ def get_dashboard_tables():
         top_rows = []
         bottom_rows = []
 
-        # Sort live items by score and relevance
-        live_items = [it for it in items if it.get("title")]
-        live_items.sort(key=lambda x: (x.get("ai_score", 5), x.get("relevance", 0)), reverse=True)
-
-        # Merge baseline institutional catalysts first so the wire follows the authoritative timeline
-        all_pool = list(BASELINE_BREAKING_CATALYSTS)
-        seen_titles = {clean_table_text(it.get("title", "")) for it in all_pool}
-        for live_it in live_items:
-            if clean_table_text(live_it.get("title", "")) not in seen_titles:
-                all_pool.append(live_it)
-                seen_titles.add(clean_table_text(live_it.get("title", "")))
+        # Unified chronological pool (strictly descending timestamp, newest first)
+        all_pool = get_merged_news_pool()
 
         # Institutional Breaking Wire gets all primary and broad catalysts merged into one unified table
         for it in all_pool:
@@ -8701,6 +8767,173 @@ tbody tr:hover td {
     border-left: 4px solid #4F46E5 !important;
     border-color: #C7D2FE;
 }
+.epm-chron-item-group {
+    margin-bottom: 7px;
+    position: relative;
+}
+.epm-chron-row.is-expanded {
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    margin-bottom: 0 !important;
+    border-bottom: 1px dashed #E2E8F0 !important;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04) !important;
+}
+.epm-chron-expand-ind {
+    font-size: 13px !important;
+    font-weight: 800 !important;
+    color: #64748B !important;
+    margin-left: 6px !important;
+    display: inline-block !important;
+    line-height: 1 !important;
+    user-select: none !important;
+}
+.epm-inline-expand-card {
+    background: #FFFFFF !important;
+    border: 1px solid #E2E8F0 !important;
+    border-top: none !important;
+    border-left: 4px solid #3B82F6 !important;
+    border-radius: 0 0 8px 8px !important;
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06) !important;
+    padding: 10px 16px !important;
+    margin-top: 0 !important;
+    max-height: 230px !important;
+    overflow-y: auto !important;
+    animation: epmSlideDown 0.18s ease-out !important;
+    z-index: 10 !important;
+    position: relative !important;
+}
+.epm-inline-expand-card.tone-bullish { border-left-color: #10B981 !important; }
+.epm-inline-expand-card.tone-bearish { border-left-color: #EF4444 !important; }
+.epm-inline-expand-card.tone-neutral { border-left-color: #64748B !important; }
+
+.epm-inline-card-hdr {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    margin-bottom: 7px !important;
+    padding-bottom: 6px !important;
+    border-bottom: 1px solid #F1F5F9 !important;
+}
+.epm-inline-badge-cluster {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    flex-wrap: wrap !important;
+}
+.epm-inline-impact-pill {
+    font-size: 10px !important;
+    font-weight: 800 !important;
+    padding: 2px 7px !important;
+    border-radius: 4px !important;
+    text-transform: uppercase !important;
+}
+.epm-inline-impact-pill.sent-bullish { background: #DCFCE7 !important; color: #166534 !important; }
+.epm-inline-impact-pill.sent-bearish { background: #FEE2E2 !important; color: #991B1B !important; }
+.epm-inline-impact-pill.sent-neutral { background: #F1F5F9 !important; color: #475569 !important; }
+
+.epm-inline-score-badge {
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    color: #0F172A !important;
+    background: #F8FAFC !important;
+    border: 1px solid #E2E8F0 !important;
+    padding: 2px 7px !important;
+    border-radius: 4px !important;
+}
+.epm-inline-horizon-badge, .epm-inline-sec-badge {
+    font-size: 10px !important;
+    color: #475569 !important;
+    background: #F1F5F9 !important;
+    padding: 2px 7px !important;
+    border-radius: 4px !important;
+}
+.epm-inline-collapse-btn {
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    color: #64748B !important;
+    background: #F8FAFC !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 4px !important;
+    padding: 2px 8px !important;
+    cursor: pointer !important;
+}
+.epm-inline-collapse-btn:hover {
+    background: #E2E8F0 !important;
+    color: #0F172A !important;
+}
+
+.epm-inline-card-body {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 14px !important;
+    margin-bottom: 8px !important;
+}
+@media (max-width: 900px) {
+    .epm-inline-card-body {
+        grid-template-columns: 1fr !important;
+        gap: 6px !important;
+    }
+}
+.epm-inline-summary-label, .epm-inline-ai-label {
+    display: block !important;
+    font-size: 9px !important;
+    font-weight: 800 !important;
+    color: #0052FF !important;
+    letter-spacing: 0.05em !important;
+    margin-bottom: 3px !important;
+}
+.epm-inline-summary-text {
+    font-size: 12px !important;
+    line-height: 1.45 !important;
+    color: #1E293B !important;
+    display: -webkit-box !important;
+    -webkit-line-clamp: 4 !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+}
+.epm-inline-ai-list {
+    margin: 0 !important;
+    padding-left: 14px !important;
+    font-size: 11.5px !important;
+    line-height: 1.4 !important;
+    color: #475569 !important;
+}
+.epm-inline-ai-list li {
+    margin-bottom: 2px !important;
+}
+
+.epm-inline-card-ftr {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    padding-top: 6px !important;
+    border-top: 1px solid #F1F5F9 !important;
+}
+.epm-inline-src-link, .epm-inline-story-snap-btn {
+    font-size: 10.5px !important;
+    font-weight: 700 !important;
+    padding: 3px 10px !important;
+    border-radius: 5px !important;
+    text-decoration: none !important;
+    cursor: pointer !important;
+    display: inline-flex !important;
+    align-items: center !important;
+}
+.epm-inline-src-link {
+    background: #0052FF !important;
+    color: #FFFFFF !important;
+}
+.epm-inline-src-link:hover {
+    background: #0041CC !important;
+}
+.epm-inline-story-snap-btn {
+    background: #F1F5F9 !important;
+    color: #0F172A !important;
+    border: 1px solid #CBD5E1 !important;
+}
+.epm-inline-story-snap-btn:hover {
+    background: #E2E8F0 !important;
+}
 
 .epm-chron-left-rail {
     position: absolute;
@@ -10551,94 +10784,47 @@ TERMINAL_CLIENT_JS = r"""
         });
     }
 
-    // 14. Desktop Institutional Terminal Controllers (News Wire, Calendar, Circulars, Holidays)
-    window.epmOpenDeskNewsAi = function(idx) {
-        if (!window.epmDesktopNews || !window.epmDesktopNews[idx]) {
-            const layoutEl = document.getElementById('epm-desk-terminal-layout');
-            if (layoutEl && layoutEl.getAttribute('data-desktop-news')) {
-                try {
-                    window.epmDesktopNews = JSON.parse(layoutEl.getAttribute('data-desktop-news'));
-                } catch(e) {}
-            }
-        }
-        if (!window.epmDesktopNews || !window.epmDesktopNews[idx]) return;
-        window.epmActiveDeskIdx = idx;
-        const it = window.epmDesktopNews[idx];
+    // 14. Desktop Institutional Inline Accordion Controllers (News Wire, Calendar, Circulars)
+    window.epmToggleDeskRowExpand = function(idx) {
+        const card = document.getElementById(`epm-inline-card-${idx}`);
+        const row = document.querySelector(`.epm-chron-row[data-idx="${idx}"]`);
+        const ind = document.getElementById(`epm-exp-ind-${idx}`);
+        if (!card) return;
+        const isCurrentlyOpen = card.style.display !== 'none';
 
-        const layoutEl = document.getElementById('epm-desk-terminal-layout');
-        if (layoutEl) layoutEl.classList.add('has-ai-open');
-        const aiCol = document.getElementById('epm-desk-ai-col');
-        if (aiCol) aiCol.style.setProperty('display', 'flex', 'important');
-        const newsCol = document.querySelector('#epm-desk-terminal-layout .epm-desk-news-col');
-        if (newsCol) {
-            newsCol.style.setProperty('max-width', '63%', 'important');
-            newsCol.style.setProperty('flex', '1 1 63%', 'important');
-        }
-
-        document.querySelectorAll('#epm-desk-terminal-layout .epm-chron-row, #epm-desk-terminal-layout .epm-dn-card').forEach((c) => {
-            const cIdx = parseInt(c.getAttribute('data-idx'));
-            if (cIdx === idx) c.classList.add('is-active');
-            else c.classList.remove('is-active');
+        // Close any other open inline cards
+        document.querySelectorAll('#epm-chron-feed .epm-inline-expand-card').forEach(c => {
+            c.style.display = 'none';
+        });
+        document.querySelectorAll('#epm-chron-feed .epm-chron-row').forEach(r => {
+            r.classList.remove('is-active', 'is-expanded');
+        });
+        document.querySelectorAll('#epm-chron-feed .epm-chron-expand-ind').forEach(i => {
+            i.textContent = '⌄';
         });
 
-        const topicEl = document.getElementById('epm-ai-topic-text');
-        const subEl = document.getElementById('epm-ai-sub-text');
-        const scoreVal = document.getElementById('epm-ai-score-val');
-        const scoreLbl = document.getElementById('epm-ai-score-lbl');
-        const scoreBox = document.getElementById('epm-ai-score-box');
-        const verdPill = document.getElementById('epm-ai-verdict-pill');
-        const bulletsList = document.getElementById('epm-ai-bullets');
-
-        if (topicEl) topicEl.textContent = it.topic || (it.title ? it.title.slice(0, 35) : '');
-        if (subEl) subEl.textContent = 'AI Analysis: ' + (it.title || '');
-        if (scoreVal) scoreVal.textContent = `IMPACT SCORE: ${it.score}/10`;
-        if (scoreLbl) scoreLbl.textContent = `${it.impact} IMPACT`;
-
-        const isBear = (it.sentiment || '').includes('BEAR');
-        const isBull = (it.sentiment || '').includes('BULL');
-
-        if (scoreBox) {
-            scoreBox.className = 'epm-ai-score-box ' + (isBear ? 'tone-bearish' : (isBull ? 'tone-bullish' : 'tone-neutral'));
-        }
-        if (verdPill) {
-            const icon = isBear ? '🔴' : (isBull ? '🟢' : '⚪');
-            verdPill.className = 'epm-ai-verdict-pill ' + (isBear ? 'sent-bearish' : (isBull ? 'sent-bullish' : 'sent-neutral'));
-            verdPill.textContent = `${icon} ${it.sentiment} (${it.horizon || 'Short-Term'})`;
-        }
-
-        if (bulletsList) {
-            let bHtml = '';
-            if (it.bullets && it.bullets.length > 0) {
-                bHtml = it.bullets.map(b => `<li>${b}</li>`).join('');
-            } else if (it.reasoning) {
-                const sentences = it.reasoning.split(/(?<=[.?!])\s+/).filter(s => s.trim().length > 10);
-                bHtml = sentences.slice(0, 4).map(s => `<li>${s.trim()}</li>`).join('');
-            }
-            if (!bHtml) bHtml = `<li>Multi-market catalyst with direct valuation spillover.</li>`;
-            bulletsList.innerHTML = bHtml;
+        // Toggle
+        if (!isCurrentlyOpen) {
+            card.style.display = 'block';
+            if (row) row.classList.add('is-active', 'is-expanded');
+            if (ind) ind.textContent = '⌃';
+            card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
     };
-
+    window.epmOpenDeskNewsAi = window.epmToggleDeskRowExpand;
     window.epmCloseDeskNewsAi = function() {
-        const layoutEl = document.getElementById('epm-desk-terminal-layout');
-        if (layoutEl) layoutEl.classList.remove('has-ai-open');
-        const aiCol = document.getElementById('epm-desk-ai-col');
-        if (aiCol) aiCol.style.setProperty('display', 'none', 'important');
-        const newsCol = document.querySelector('#epm-desk-terminal-layout .epm-desk-news-col');
-        if (newsCol) {
-            newsCol.style.setProperty('max-width', '100%', 'important');
-            newsCol.style.setProperty('flex', '1 1 100%', 'important');
-        }
-        document.querySelectorAll('#epm-desk-terminal-layout .epm-chron-row, #epm-desk-terminal-layout .epm-dn-card').forEach(c => c.classList.remove('is-active'));
+        document.querySelectorAll('#epm-chron-feed .epm-inline-expand-card').forEach(c => c.style.display = 'none');
+        document.querySelectorAll('#epm-chron-feed .epm-chron-row').forEach(r => r.classList.remove('is-active', 'is-expanded'));
+        document.querySelectorAll('#epm-chron-feed .epm-chron-expand-ind').forEach(i => i.textContent = '⌄');
     };
     window.epmSelectDeskAi = window.epmOpenDeskNewsAi;
     window.epmResetDeskAi = window.epmCloseDeskNewsAi;
 
     window.epmFilterChronNews = function(term) {
         const q = (term || '').toLowerCase().trim();
-        document.querySelectorAll('#epm-chron-feed .epm-chron-row').forEach(row => {
-            const txt = row.textContent.toLowerCase();
-            row.style.display = (!q || txt.includes(q)) ? '' : 'none';
+        document.querySelectorAll('#epm-chron-feed .epm-chron-item-group').forEach(group => {
+            const txt = group.textContent.toLowerCase();
+            group.style.display = (!q || txt.includes(q)) ? '' : 'none';
         });
     };
 
@@ -10768,82 +10954,35 @@ TERMINAL_CLIENT_JS = r"""
     };
 
     // Calendar Controllers
-    window.epmOpenDeskCalAi = function(idx) {
-        if (!window.epmDesktopCal || !window.epmDesktopCal[idx]) {
-            const layoutEl = document.getElementById('epm-cal-terminal-layout');
-            if (layoutEl && layoutEl.getAttribute('data-desktop-cal')) {
-                try {
-                    window.epmDesktopCal = JSON.parse(layoutEl.getAttribute('data-desktop-cal'));
-                } catch(e) {}
-            }
-        }
-        if (!window.epmDesktopCal || !window.epmDesktopCal[idx]) return;
-        window.epmActiveCalIdx = idx;
-        const it = window.epmDesktopCal[idx];
+    window.epmToggleDeskCalExpand = function(idx) {
+        const card = document.getElementById(`epm-cal-inline-card-${idx}`);
+        const row = document.querySelector('#epm-cal-cards-list .epm-chron-row[data-idx="' + idx + '"]');
+        const ind = document.getElementById(`epm-cal-ind-${idx}`);
+        if (!card) return;
+        const isCurrentlyOpen = card.style.display !== 'none';
 
-        const layoutEl = document.getElementById('epm-cal-terminal-layout');
-        if (layoutEl) layoutEl.classList.add('has-ai-open');
-        const aiCol = document.getElementById('epm-cal-ai-col');
-        if (aiCol) aiCol.style.setProperty('display', 'flex', 'important');
-        const feedCol = document.querySelector('#epm-cal-terminal-layout .epm-desk-feed-col');
-        if (feedCol) {
-            feedCol.style.setProperty('max-width', '63%', 'important');
-            feedCol.style.setProperty('flex', '1 1 63%', 'important');
-        }
+        document.querySelectorAll('#epm-cal-cards-list .epm-inline-expand-card').forEach(c => c.style.display = 'none');
+        document.querySelectorAll('#epm-cal-cards-list .epm-chron-row').forEach(r => r.classList.remove('is-active', 'is-expanded'));
+        document.querySelectorAll('#epm-cal-cards-list .epm-chron-expand-ind').forEach(i => i.textContent = '⌄');
 
-        document.querySelectorAll('#epm-cal-terminal-layout .epm-chron-row, #epm-cal-terminal-layout .epm-cal-card').forEach((c) => {
-            const cIdx = parseInt(c.getAttribute('data-idx'));
-            if (cIdx === idx) c.classList.add('is-active');
-            else c.classList.remove('is-active');
-        });
-
-        const topicEl = document.getElementById('epm-cal-ai-topic-text');
-        const subEl = document.getElementById('epm-cal-ai-sub-text');
-        const scoreVal = document.getElementById('epm-cal-ai-score-val');
-        const scoreLbl = document.getElementById('epm-cal-ai-score-lbl');
-        const scoreBox = document.getElementById('epm-cal-ai-score-box');
-        const verdPill = document.getElementById('epm-cal-ai-verdict-pill');
-        const bulletsList = document.getElementById('epm-cal-ai-bullets');
-
-        if (topicEl) topicEl.textContent = it.topic || (it.title ? it.title.slice(0, 35) : '');
-        if (subEl) subEl.textContent = 'AI Analysis: ' + (it.title || '');
-        if (scoreVal) scoreVal.textContent = `IMPACT SCORE: ${it.score}`;
-        if (scoreLbl) scoreLbl.textContent = `${it.impact} IMPACT`;
-
-        const isBear = (it.sentiment || '').includes('BEAR');
-        const isBull = (it.sentiment || '').includes('BULL');
-
-        if (scoreBox) {
-            scoreBox.className = 'epm-ai-score-box ' + (isBear ? 'tone-bearish' : (isBull ? 'tone-bullish' : 'tone-neutral'));
-        }
-        if (verdPill) {
-            const icon = isBear ? '🔴' : (isBull ? '🟢' : '⚪');
-            verdPill.className = 'epm-ai-verdict-pill ' + (isBear ? 'sent-bearish' : (isBull ? 'sent-bullish' : 'sent-neutral'));
-            verdPill.textContent = `${icon} ${it.sentiment}`;
-        }
-
-        if (bulletsList && it.bullets) {
-            bulletsList.innerHTML = it.bullets.map(b => `<li>${b}</li>`).join('');
+        if (!isCurrentlyOpen) {
+            card.style.display = 'block';
+            if (row) row.classList.add('is-active', 'is-expanded');
+            if (ind) ind.textContent = '⌃';
+            card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
     };
-
+    window.epmOpenDeskCalAi = window.epmToggleDeskCalExpand;
     window.epmCloseDeskCalAi = function() {
-        const layoutEl = document.getElementById('epm-cal-terminal-layout');
-        if (layoutEl) layoutEl.classList.remove('has-ai-open');
-        const aiCol = document.getElementById('epm-cal-ai-col');
-        if (aiCol) aiCol.style.setProperty('display', 'none', 'important');
-        const feedCol = document.querySelector('#epm-cal-terminal-layout .epm-desk-feed-col');
-        if (feedCol) {
-            feedCol.style.setProperty('max-width', '100%', 'important');
-            feedCol.style.setProperty('flex', '1 1 100%', 'important');
-        }
-        document.querySelectorAll('#epm-cal-terminal-layout .epm-chron-row, #epm-cal-terminal-layout .epm-cal-card').forEach(c => c.classList.remove('is-active'));
+        document.querySelectorAll('#epm-cal-cards-list .epm-inline-expand-card').forEach(c => c.style.display = 'none');
+        document.querySelectorAll('#epm-cal-cards-list .epm-chron-row').forEach(r => r.classList.remove('is-active', 'is-expanded'));
+        document.querySelectorAll('#epm-cal-cards-list .epm-chron-expand-ind').forEach(i => i.textContent = '⌄');
     };
 
     window.epmFilterCalCat = function(cat, btn) {
         document.querySelectorAll('.epm-cal-cat-btn').forEach(b => b.classList.remove('active'));
         if (btn) btn.classList.add('active');
-        document.querySelectorAll('#epm-cal-cards-list .epm-chron-row, #epm-cal-cards-list .epm-cal-card').forEach(c => {
+        document.querySelectorAll('#epm-cal-cards-list .epm-chron-item-group, #epm-cal-cards-list .epm-chron-row').forEach(c => {
             const cCat = c.getAttribute('data-cat') || 'equities';
             if (cat === 'all' || cCat === cat) {
                 c.style.display = '';
@@ -10865,76 +11004,29 @@ TERMINAL_CLIENT_JS = r"""
     };
 
     // Circular Controllers
-    window.epmOpenDeskCircAi = function(idx) {
-        if (!window.epmDesktopCirc || !window.epmDesktopCirc[idx]) {
-            const layoutEl = document.getElementById('epm-circ-terminal-layout');
-            if (layoutEl && layoutEl.getAttribute('data-desktop-circ')) {
-                try {
-                    window.epmDesktopCirc = JSON.parse(layoutEl.getAttribute('data-desktop-circ'));
-                } catch(e) {}
-            }
-        }
-        if (!window.epmDesktopCirc || !window.epmDesktopCirc[idx]) return;
-        window.epmActiveCircIdx = idx;
-        const it = window.epmDesktopCirc[idx];
+    window.epmToggleDeskCircExpand = function(idx) {
+        const card = document.getElementById(`epm-circ-inline-card-${idx}`);
+        const row = document.querySelector('#epm-circ-cards-list .epm-chron-row[data-idx="' + idx + '"]');
+        const ind = document.getElementById(`epm-circ-ind-${idx}`);
+        if (!card) return;
+        const isCurrentlyOpen = card.style.display !== 'none';
 
-        const layoutEl = document.getElementById('epm-circ-terminal-layout');
-        if (layoutEl) layoutEl.classList.add('has-ai-open');
-        const aiCol = document.getElementById('epm-circ-ai-col');
-        if (aiCol) aiCol.style.setProperty('display', 'flex', 'important');
-        const feedCol = document.querySelector('#epm-circ-terminal-layout .epm-desk-feed-col');
-        if (feedCol) {
-            feedCol.style.setProperty('max-width', '63%', 'important');
-            feedCol.style.setProperty('flex', '1 1 63%', 'important');
-        }
+        document.querySelectorAll('#epm-circ-cards-list .epm-inline-expand-card').forEach(c => c.style.display = 'none');
+        document.querySelectorAll('#epm-circ-cards-list .epm-chron-row').forEach(r => r.classList.remove('is-active', 'is-expanded'));
+        document.querySelectorAll('#epm-circ-cards-list .epm-chron-expand-ind').forEach(i => i.textContent = '⌄');
 
-        document.querySelectorAll('#epm-circ-terminal-layout .epm-circ-desk-card').forEach((c) => {
-            const cIdx = parseInt(c.getAttribute('data-idx'));
-            if (cIdx === idx) c.classList.add('is-active');
-            else c.classList.remove('is-active');
-        });
-
-        const topicEl = document.getElementById('epm-circ-ai-topic-text');
-        const subEl = document.getElementById('epm-circ-ai-sub-text');
-        const scoreVal = document.getElementById('epm-circ-ai-score-val');
-        const scoreLbl = document.getElementById('epm-circ-ai-score-lbl');
-        const scoreBox = document.getElementById('epm-circ-ai-score-box');
-        const verdPill = document.getElementById('epm-circ-ai-verdict-pill');
-        const bulletsList = document.getElementById('epm-circ-ai-bullets');
-
-        if (topicEl) topicEl.textContent = 'AI Executive Summary & Impact Analysis';
-        if (subEl) subEl.textContent = 'Analysis: ' + (it.cno ? `${it.cno} - ` : '') + (it.title ? it.title.slice(0, 45) : '');
-        if (scoreVal) scoreVal.textContent = `AI IMPACT SCORE: ${it.score}`;
-        if (scoreLbl) scoreLbl.textContent = `${it.impact} IMPACT`;
-
-        const isBear = (it.sentiment || '').includes('BEAR');
-        const isBull = (it.sentiment || '').includes('BULL');
-
-        if (scoreBox) {
-            scoreBox.className = 'epm-ai-score-box ' + (isBear ? 'tone-bearish' : (isBull ? 'tone-bullish' : 'tone-neutral'));
-        }
-        if (verdPill) {
-            const icon = isBear ? '🔴' : (isBull ? '🟢' : '⚪');
-            verdPill.className = 'epm-ai-verdict-pill ' + (isBear ? 'sent-bearish' : (isBull ? 'sent-bullish' : 'sent-neutral'));
-            verdPill.textContent = `${icon} ${it.sentiment} (Short-Term)`;
-        }
-
-        if (bulletsList && it.bullets) {
-            bulletsList.innerHTML = it.bullets.map(b => `<li>${b}</li>`).join('');
+        if (!isCurrentlyOpen) {
+            card.style.display = 'block';
+            if (row) row.classList.add('is-active', 'is-expanded');
+            if (ind) ind.textContent = '⌃';
+            card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
     };
-
+    window.epmOpenDeskCircAi = window.epmToggleDeskCircExpand;
     window.epmCloseDeskCircAi = function() {
-        const layoutEl = document.getElementById('epm-circ-terminal-layout');
-        if (layoutEl) layoutEl.classList.remove('has-ai-open');
-        const aiCol = document.getElementById('epm-circ-ai-col');
-        if (aiCol) aiCol.style.setProperty('display', 'none', 'important');
-        const feedCol = document.querySelector('#epm-circ-terminal-layout .epm-desk-feed-col');
-        if (feedCol) {
-            feedCol.style.setProperty('max-width', '100%', 'important');
-            feedCol.style.setProperty('flex', '1 1 100%', 'important');
-        }
-        document.querySelectorAll('#epm-circ-terminal-layout .epm-circ-desk-card').forEach(c => c.classList.remove('is-active'));
+        document.querySelectorAll('#epm-circ-cards-list .epm-inline-expand-card').forEach(c => c.style.display = 'none');
+        document.querySelectorAll('#epm-circ-cards-list .epm-chron-row').forEach(r => r.classList.remove('is-active', 'is-expanded'));
+        document.querySelectorAll('#epm-circ-cards-list .epm-chron-expand-ind').forEach(i => i.textContent = '⌄');
     };
 
     window.epmFilterCircReg = function(reg, el) {
