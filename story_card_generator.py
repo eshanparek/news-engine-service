@@ -203,6 +203,29 @@ class StoryCardGenerator:
                 ImageDraw.Draw(mask).rounded_rectangle([0, 0, banner_w, banner_h], radius=24, fill=255)
                 img.paste(t_img, (pad, hero_y), mask)
                 d.rounded_rectangle([pad, hero_y, W - pad, hero_y + banner_h], radius=24, outline=(203, 213, 225), width=2)
+
+                # Stamp official entity logo in the top-left of the banner for institutional recognition
+                entity_code = str(item.get("regulator") or item.get("source") or item.get("market") or "").upper()
+                full_txt = f"{item.get('title', '')} {item.get('tag', '')} {item.get('category', '')}".upper()
+                matched_code = None
+                for key_code in ["WHO", "RBI", "SEBI", "NSE", "BSE", "MCX", "FOMC", "SEC", "NYSE", "NASDAQ", "DOWJONES", "CFTC", "FINMIN", "IFSCA", "REUTERS", "BLOOMBERG", "LIVEMINT", "COINDESK"]:
+                    if key_code in entity_code or key_code in full_txt:
+                        matched_code = key_code
+                        break
+                if matched_code:
+                    try:
+                        logo_bytes = image_assets.generate_regulator_logo(matched_code)
+                        if logo_bytes:
+                            logo_im = Image.open(io.BytesIO(logo_bytes)).convert("RGBA")
+                            logo_im = logo_im.resize((84, 84), Image.Resampling.LANCZOS)
+                            logo_bg = Image.new("RGBA", (96, 96), (255, 255, 255, 245))
+                            logo_mask = Image.new("L", (96, 96), 0)
+                            ImageDraw.Draw(logo_mask).rounded_rectangle([0, 0, 96, 96], radius=16, fill=255)
+                            logo_bg.paste(logo_im, (6, 6), logo_im if logo_im.mode == "RGBA" else None)
+                            img.paste(logo_bg, (pad + 16, hero_y + 16), logo_mask)
+                            d.rounded_rectangle([pad + 16, hero_y + 16, pad + 112, hero_y + 112], radius=16, outline=(203, 213, 225), width=2)
+                    except Exception as ex_logo:
+                        logger.debug(f"Could not stamp entity logo: {ex_logo}")
         except Exception as e:
             logger.debug(f"Could not render hero banner: {e}")
 

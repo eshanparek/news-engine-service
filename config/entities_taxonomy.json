@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-11-03T19:30:00+05:30",
+  "last_updated": "2026-11-03T20:45:00+05:30",
   "groups": {
     "inst_domestic": {
       "key": "inst_domestic",
@@ -16,16 +16,16 @@
         "PIB", "GOVERNMENT OF INDIA", "CENTRAL GOVT", "CABINET COMMITTEE"
       ],
       "entities": [
-        {"name": "Reserve Bank of India (RBI)", "short": "RBI", "category": "Central Bank", "jurisdiction": "India"},
-        {"name": "Securities and Exchange Board of India (SEBI)", "short": "SEBI", "category": "Securities Regulator", "jurisdiction": "India"},
-        {"name": "National Stock Exchange (NSE)", "short": "NSE", "category": "Securities Exchange", "jurisdiction": "India"},
-        {"name": "Bombay Stock Exchange (BSE)", "short": "BSE", "category": "Securities Exchange", "jurisdiction": "India"},
-        {"name": "Multi Commodity Exchange (MCX)", "short": "MCX", "category": "Commodity Exchange", "jurisdiction": "India"},
-        {"name": "Ministry of Finance (FinMin)", "short": "FinMin", "category": "Sovereign Ministry", "jurisdiction": "India"},
-        {"name": "International Financial Services Centres Authority (IFSCA)", "short": "IFSCA", "category": "Statutory Authority", "jurisdiction": "India (GIFT City)"},
-        {"name": "Insurance Regulatory & Dev Authority (IRDAI)", "short": "IRDAI", "category": "Insurance Regulator", "jurisdiction": "India"},
-        {"name": "Pension Fund Regulatory & Dev Authority (PFRDA)", "short": "PFRDA", "category": "Pension Regulator", "jurisdiction": "India"},
-        {"name": "Directorate General of Foreign Trade (DGFT)", "short": "DGFT", "category": "Trade Policy", "jurisdiction": "India"}
+        {"name": "Reserve Bank of India (RBI)", "short": "RBI", "category": "Central Bank", "jurisdiction": "India", "logo_code": "RBI", "logo_url": "/api/entity-logo?code=RBI"},
+        {"name": "Securities and Exchange Board of India (SEBI)", "short": "SEBI", "category": "Securities Regulator", "jurisdiction": "India", "logo_code": "SEBI", "logo_url": "/api/entity-logo?code=SEBI"},
+        {"name": "National Stock Exchange (NSE)", "short": "NSE", "category": "Securities Exchange", "jurisdiction": "India", "logo_code": "NSE", "logo_url": "/api/entity-logo?code=NSE"},
+        {"name": "Bombay Stock Exchange (BSE)", "short": "BSE", "category": "Securities Exchange", "jurisdiction": "India", "logo_code": "BSE", "logo_url": "/api/entity-logo?code=BSE"},
+        {"name": "Multi Commodity Exchange (MCX)", "short": "MCX", "category": "Commodity Exchange", "jurisdiction": "India", "logo_code": "MCX", "logo_url": "/api/entity-logo?code=MCX"},
+        {"name": "Ministry of Finance (FinMin)", "short": "FinMin", "category": "Sovereign Ministry", "jurisdiction": "India", "logo_code": "FINMIN", "logo_url": "/api/entity-logo?code=FINMIN"},
+        {"name": "International Financial Services Centres Authority (IFSCA)", "short": "IFSCA", "category": "Statutory Authority", "jurisdiction": "India (GIFT City)", "logo_code": "IFSCA", "logo_url": "/api/entity-logo?code=IFSCA"},
+        {"name": "Insurance Regulatory & Dev Authority (IRDAI)", "short": "IRDAI", "category": "Insurance Regulator", "jurisdiction": "India", "logo_code": "IRDAI", "logo_url": "/api/entity-logo?code=IRDAI"},
+        {"name": "Pension Fund Regulatory & Dev Authority (PFRDA)", "short": "PFRDA", "category": "Pension Regulator", "jurisdiction": "India", "logo_code": "PFRDA", "logo_url": "/api/entity-logo?code=PFRDA"},
+        {"name": "Directorate General of Foreign Trade (DGFT)", "short": "DGFT", "category": "Trade Policy", "jurisdiction": "India", "logo_code": "DGFT", "logo_url": "/api/entity-logo?code=DGFT"}
       ]
     },
     "inst_global": {
@@ -37,21 +37,29 @@
       "keywords": [
         "FOMC", "FED", "FEDERAL RESERVE", "JEROME POWELL", "US FED", "US TREASURY", 
         "SEC", "SECURITIES AND EXCHANGE COMMISSION", "CFTC", "COMMODITY FUTURES", 
+        "WHO", "WORLD HEALTH ORGANIZATION", "GLOBAL HEALTH", 
+        "NYSE", "NEW YORK STOCK EXCHANGE", "WALL STREET", 
+        "NASDAQ", "TECH EXCHANGE", 
+        "DOW JONES", "DJIA", "S&P DOW JONES", 
         "ECB", "EUROPEAN CENTRAL BANK", "CHRISTINE LAGARDE", 
         "BOE", "BANK OF ENGLAND", "BOJ", "BANK OF JAPAN", 
         "PBOC", "PEOPLE'S BANK OF CHINA", "IMF", "INTERNATIONAL MONETARY FUND", 
         "WORLD BANK", "BIS", "BANK FOR INTERNATIONAL SETTLEMENTS", "OPEC", "IEA"
       ],
       "entities": [
-        {"name": "Federal Reserve System / FOMC", "short": "Fed / FOMC", "category": "Central Bank", "jurisdiction": "United States"},
-        {"name": "US Department of the Treasury", "short": "US Treasury", "category": "Sovereign Treasury", "jurisdiction": "United States"},
-        {"name": "Securities and Exchange Commission (SEC)", "short": "US SEC", "category": "Securities Regulator", "jurisdiction": "United States"},
-        {"name": "Commodity Futures Trading Commission (CFTC)", "short": "CFTC", "category": "Derivatives Regulator", "jurisdiction": "United States"},
-        {"name": "European Central Bank (ECB)", "short": "ECB", "category": "Central Bank", "jurisdiction": "Eurozone"},
-        {"name": "Bank of England (BOE)", "short": "BOE", "category": "Central Bank", "jurisdiction": "United Kingdom"},
-        {"name": "Bank of Japan (BOJ)", "short": "BOJ", "category": "Central Bank", "jurisdiction": "Japan"},
-        {"name": "International Monetary Fund (IMF)", "short": "IMF", "category": "Multilateral Body", "jurisdiction": "Global"},
-        {"name": "Organization of Petroleum Exporting Countries (OPEC)", "short": "OPEC", "category": "Commodity Body", "jurisdiction": "Global"}
+        {"name": "Federal Reserve System / FOMC", "short": "Fed / FOMC", "category": "Central Bank", "jurisdiction": "United States", "logo_code": "FOMC", "logo_url": "/api/entity-logo?code=FOMC"},
+        {"name": "US Department of the Treasury", "short": "US Treasury", "category": "Sovereign Treasury", "jurisdiction": "United States", "logo_code": "TREASURY", "logo_url": "/api/entity-logo?code=TREASURY"},
+        {"name": "Securities and Exchange Commission (SEC)", "short": "US SEC", "category": "Securities Regulator", "jurisdiction": "United States", "logo_code": "SEC", "logo_url": "/api/entity-logo?code=SEC"},
+        {"name": "Commodity Futures Trading Commission (CFTC)", "short": "CFTC", "category": "Derivatives Regulator", "jurisdiction": "United States", "logo_code": "CFTC", "logo_url": "/api/entity-logo?code=CFTC"},
+        {"name": "World Health Organization (WHO)", "short": "WHO", "category": "Multilateral Health Authority", "jurisdiction": "Global / UN", "logo_code": "WHO", "logo_url": "/api/entity-logo?code=WHO"},
+        {"name": "New York Stock Exchange (NYSE)", "short": "NYSE", "category": "Securities Exchange", "jurisdiction": "United States", "logo_code": "NYSE", "logo_url": "/api/entity-logo?code=NYSE"},
+        {"name": "Nasdaq Stock Market (NASDAQ)", "short": "NASDAQ", "category": "Tech Securities Exchange", "jurisdiction": "United States", "logo_code": "NASDAQ", "logo_url": "/api/entity-logo?code=NASDAQ"},
+        {"name": "S&P Dow Jones Indices (DJIA)", "short": "DOW JONES", "category": "Market Indices & Data", "jurisdiction": "United States", "logo_code": "DOWJONES", "logo_url": "/api/entity-logo?code=DOWJONES"},
+        {"name": "European Central Bank (ECB)", "short": "ECB", "category": "Central Bank", "jurisdiction": "Eurozone", "logo_code": "ECB", "logo_url": "/api/entity-logo?code=ECB"},
+        {"name": "Bank of England (BOE)", "short": "BOE", "category": "Central Bank", "jurisdiction": "United Kingdom", "logo_code": "BOE", "logo_url": "/api/entity-logo?code=BOE"},
+        {"name": "Bank of Japan (BOJ)", "short": "BOJ", "category": "Central Bank", "jurisdiction": "Japan", "logo_code": "BOJ", "logo_url": "/api/entity-logo?code=BOJ"},
+        {"name": "International Monetary Fund (IMF)", "short": "IMF", "category": "Multilateral Body", "jurisdiction": "Global", "logo_code": "IMF", "logo_url": "/api/entity-logo?code=IMF"},
+        {"name": "Organization of Petroleum Exporting Countries (OPEC)", "short": "OPEC", "category": "Commodity Body", "jurisdiction": "Global", "logo_code": "OPEC", "logo_url": "/api/entity-logo?code=OPEC"}
       ]
     },
     "local": {
@@ -67,13 +75,13 @@
         "SENSEX", "NIFTY", "DALAL STREET", "DHANTERAS", "DIWALI"
       ],
       "entities": [
-        {"name": "Livemint Markets", "short": "Livemint", "category": "Commercial Financial News", "jurisdiction": "India"},
-        {"name": "Moneycontrol Pro Wire", "short": "Moneycontrol", "category": "Financial Portal", "jurisdiction": "India"},
-        {"name": "The Economic Times", "short": "Economic Times", "category": "Financial Newspaper", "jurisdiction": "India"},
-        {"name": "NDTV Profit", "short": "NDTV", "category": "Business Broadcast", "jurisdiction": "India"},
-        {"name": "Times of India Business", "short": "TOI Business", "category": "Commercial Media", "jurisdiction": "India"},
-        {"name": "Financial Express", "short": "FE", "category": "Financial News", "jurisdiction": "India"},
-        {"name": "Business Standard", "short": "BS", "category": "Financial Daily", "jurisdiction": "India"}
+        {"name": "Livemint Markets", "short": "Livemint", "category": "Commercial Financial News", "jurisdiction": "India", "logo_code": "LIVEMINT", "logo_url": "/api/entity-logo?code=LIVEMINT"},
+        {"name": "Moneycontrol Pro Wire", "short": "Moneycontrol", "category": "Financial Portal", "jurisdiction": "India", "logo_code": "MONEYCONTROL", "logo_url": "/api/entity-logo?code=MONEYCONTROL"},
+        {"name": "The Economic Times", "short": "Economic Times", "category": "Financial Newspaper", "jurisdiction": "India", "logo_code": "ET", "logo_url": "/api/entity-logo?code=ET"},
+        {"name": "NDTV Profit", "short": "NDTV", "category": "Business Broadcast", "jurisdiction": "India", "logo_code": "NDTV", "logo_url": "/api/entity-logo?code=NDTV"},
+        {"name": "Times of India Business", "short": "TOI Business", "category": "Commercial Media", "jurisdiction": "India", "logo_code": "TOI", "logo_url": "/api/entity-logo?code=TOI"},
+        {"name": "Financial Express", "short": "FE", "category": "Financial News", "jurisdiction": "India", "logo_code": "FE", "logo_url": "/api/entity-logo?code=FE"},
+        {"name": "Business Standard", "short": "BS", "category": "Financial Daily", "jurisdiction": "India", "logo_code": "BS", "logo_url": "/api/entity-logo?code=BS"}
       ]
     },
     "global": {
@@ -89,12 +97,12 @@
         "APPLE", "MICROSOFT", "TESLA", "ALPHABET", "NORTH KOREA", "MIDTERM"
       ],
       "entities": [
-        {"name": "Reuters Financial Wire", "short": "Reuters", "category": "Global News Agency", "jurisdiction": "Global / UK / US"},
-        {"name": "Bloomberg Markets", "short": "Bloomberg", "category": "Financial News & Terminal", "jurisdiction": "Global / US"},
-        {"name": "MarketWatch (Dow Jones)", "short": "MarketWatch", "category": "Financial Media", "jurisdiction": "United States"},
-        {"name": "The Wall Street Journal", "short": "WSJ", "category": "Financial Newspaper", "jurisdiction": "United States"},
-        {"name": "CNBC International", "short": "CNBC", "category": "Business TV & Web", "jurisdiction": "United States"},
-        {"name": "CoinDesk Crypto & Macro", "short": "CoinDesk", "category": "Digital Asset Wire", "jurisdiction": "Global"}
+        {"name": "Reuters Financial Wire", "short": "Reuters", "category": "Global News Agency", "jurisdiction": "Global / UK / US", "logo_code": "REUTERS", "logo_url": "/api/entity-logo?code=REUTERS"},
+        {"name": "Bloomberg Markets", "short": "Bloomberg", "category": "Financial News & Terminal", "jurisdiction": "Global / US", "logo_code": "BLOOMBERG", "logo_url": "/api/entity-logo?code=BLOOMBERG"},
+        {"name": "MarketWatch (Dow Jones)", "short": "MarketWatch", "category": "Financial Media", "jurisdiction": "United States", "logo_code": "MARKETWATCH", "logo_url": "/api/entity-logo?code=MARKETWATCH"},
+        {"name": "The Wall Street Journal", "short": "WSJ", "category": "Financial Newspaper", "jurisdiction": "United States", "logo_code": "WSJ", "logo_url": "/api/entity-logo?code=WSJ"},
+        {"name": "CNBC International", "short": "CNBC", "category": "Business TV & Web", "jurisdiction": "United States", "logo_code": "CNBC", "logo_url": "/api/entity-logo?code=CNBC"},
+        {"name": "CoinDesk Crypto & Macro", "short": "CoinDesk", "category": "Digital Asset Wire", "jurisdiction": "Global", "logo_code": "COINDESK", "logo_url": "/api/entity-logo?code=COINDESK"}
       ]
     }
   }

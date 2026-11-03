@@ -505,13 +505,166 @@ def generate_regulator_logo(reg_code: str) -> bytes:
         d.text((75, 85), "SEC", font=_load_font(38, bold=True), fill=(255, 255, 255))
         d.text((45, 208), "US SECURITIES & EXCHANGE", font=f_sub, fill=(191, 219, 254))
 
-    # 8. DEFAULT / MINISTRY / OTHER
+    # 8. WHO (World Health Organization)
+    elif "WHO" in code or "HEALTH" in code:
+        img.paste((240, 249, 255), [0, 0, w, h])
+        d = ImageDraw.Draw(img)
+        cx, cy, r_w = 120, 105, 78
+        d.ellipse([cx - r_w, cy - r_w, cx + r_w, cy + r_w], fill=(2, 132, 199), outline=(186, 230, 253), width=4)
+        # Globe grid lines
+        d.ellipse([cx - 50, cy - 70, cx + 50, cy + 70], outline=(255, 255, 255), width=2)
+        d.line([cx - 75, cy, cx + 75, cy], fill=(255, 255, 255), width=2)
+        # Rod of Asclepius staff representation
+        d.line([cx, cy - 55, cx, cy + 55], fill=(250, 204, 21), width=4)
+        d.text((72, 85), "WHO", font=_load_font(36, bold=True), fill=(255, 255, 255))
+        d.text((40, 208), "WORLD HEALTH ORG", font=f_sub, fill=(2, 132, 199))
+
+    # 9. NYSE (New York Stock Exchange)
+    elif "NYSE" in code or "WALL STREET" in code:
+        img.paste((15, 23, 42), [0, 0, w, h])
+        d = ImageDraw.Draw(img)
+        # Classical 11 Wall Street Facade & Pediment
+        d.polygon([(120, 35), (195, 70), (45, 70)], fill=(217, 119, 6), outline=(250, 204, 21), width=2)
+        # Pillars
+        for px in [60, 85, 110, 135, 160]:
+            d.rectangle([px, 75, px + 12, 150], fill=(255, 255, 255))
+        d.rectangle([45, 150, 195, 165], fill=(217, 119, 6))
+        d.text((68, 170), "NYSE", font=_load_font(28, bold=True), fill=(250, 204, 21))
+        d.text((44, 208), "NEW YORK STOCK EXCHANGE", font=_load_font(12, bold=True), fill=(203, 213, 225))
+
+    # 10. NASDAQ
+    elif "NASDAQ" in code:
+        img.paste((8, 145, 178), [0, 0, w, h])
+        d = ImageDraw.Draw(img)
+        cx, cy, r_q = 120, 100, 72
+        d.ellipse([cx - r_q, cy - r_q, cx + r_q, cy + r_q], outline=(255, 255, 255), width=10)
+        # Q slant slash
+        d.polygon([(155, 135), (185, 170), (170, 175), (145, 145)], fill=(255, 255, 255))
+        d.text((50, 80), "Nasdaq", font=_load_font(32, bold=True), fill=(255, 255, 255))
+        d.text((46, 208), "TECH SECURITIES EXCHANGE", font=_load_font(12, bold=True), fill=(255, 255, 255))
+
+    # 11. DOW JONES
+    elif "DOW" in code or "DJIA" in code:
+        img.paste((220, 38, 38), [0, 0, w, h])
+        d = ImageDraw.Draw(img)
+        d.rounded_rectangle([35, 40, 205, 175], radius=16, fill=(255, 255, 255))
+        d.text((58, 65), "DOW", font=_load_font(36, bold=True), fill=(220, 38, 38))
+        d.text((58, 110), "JONES", font=_load_font(32, bold=True), fill=(15, 23, 42))
+        d.text((48, 208), "S&P DOW JONES INDICES", font=_load_font(12, bold=True), fill=(255, 255, 255))
+
+    # 12. Commercial Media: REUTERS, BLOOMBERG, LIVEMINT, MONEYCONTROL, ET, NDTV, TOI, COINDESK, CNBC, WSJ
+    elif "REUTER" in code:
+        img.paste((255, 255, 255), [0, 0, w, h])
+        d = ImageDraw.Draw(img)
+        cx, cy = 120, 95
+        for r_step in [20, 40, 60]:
+            d.ellipse([cx - r_step, cy - r_step, cx + r_step, cy + r_step], outline=(249, 115, 22), width=5)
+        d.text((52, 160), "REUTERS", font=_load_font(28, bold=True), fill=(249, 115, 22))
+        d.text((48, 208), "GLOBAL FINANCIAL WIRE", font=f_sub, fill=(100, 116, 139))
+
+    elif "BLOOM" in code:
+        img.paste((15, 23, 42), [0, 0, w, h])
+        d = ImageDraw.Draw(img)
+        d.text((36, 90), "Bloomberg", font=_load_font(32, bold=True), fill=(255, 255, 255))
+        d.text((48, 208), "FINANCIAL MARKETS", font=f_sub, fill=(250, 204, 21))
+
+    elif "LIVEMINT" in code or "MINT" in code:
+        img.paste((254, 240, 138), [0, 0, w, h])
+        d = ImageDraw.Draw(img)
+        d.rounded_rectangle([35, 45, 205, 165], radius=16, fill=(249, 115, 22))
+        d.text((60, 85), "mint", font=_load_font(42, bold=True), fill=(255, 255, 255))
+        d.text((46, 208), "LIVEMINT MARKETS", font=f_sub, fill=(180, 83, 9))
+
+    elif "MONEYCONTROL" in code:
+        img.paste((240, 253, 244), [0, 0, w, h])
+        d = ImageDraw.Draw(img)
+        d.ellipse([45, 45, 195, 165], fill=(22, 163, 74))
+        d.text((64, 85), "money", font=_load_font(26, bold=True), fill=(255, 255, 255))
+        d.text((62, 115), "control", font=_load_font(26, bold=True), fill=(250, 204, 21))
+        d.text((44, 208), "MONEYCONTROL PRO", font=f_sub, fill=(22, 163, 74))
+
+    elif "ET" in code or "ECONOMIC" in code:
+        img.paste((254, 242, 242), [0, 0, w, h])
+        d = ImageDraw.Draw(img)
+        d.rounded_rectangle([45, 45, 195, 165], radius=16, fill=(185, 28, 28))
+        d.text((75, 80), "ET", font=_load_font(52, bold=True), fill=(255, 255, 255))
+        d.text((40, 208), "THE ECONOMIC TIMES", font=f_sub, fill=(185, 28, 28))
+
+    elif "NDTV" in code:
+        img.paste((239, 68, 68), [0, 0, w, h])
+        d = ImageDraw.Draw(img)
+        d.rectangle([45, 60, 195, 150], fill=(255, 255, 255))
+        d.text((58, 80), "NDTV", font=_load_font(34, bold=True), fill=(239, 68, 68))
+        d.text((54, 208), "NDTV PROFIT WIRE", font=f_sub, fill=(255, 255, 255))
+
+    elif "TOI" in code or "TIMES" in code:
+        img.paste((248, 250, 252), [0, 0, w, h])
+        d = ImageDraw.Draw(img)
+        d.rectangle([45, 55, 195, 155], fill=(15, 23, 42))
+        d.text((70, 80), "TOI", font=_load_font(42, bold=True), fill=(250, 204, 21))
+        d.text((48, 208), "TIMES OF INDIA", font=f_sub, fill=(15, 23, 42))
+
+    elif "CNBC" in code:
+        img.paste((15, 23, 42), [0, 0, w, h])
+        d = ImageDraw.Draw(img)
+        # Peacock fan arcs
+        cx, cy = 120, 85
+        colors = [(239, 68, 68), (249, 115, 22), (234, 179, 8), (34, 197, 94), (59, 130, 246), (168, 85, 247)]
+        for idx, col in enumerate(colors):
+            d.pieslice([cx - 45, cy - 45, cx + 45, cy + 45], start=180 + idx * 30, end=210 + idx * 30, fill=col)
+        d.text((62, 140), "CNBC", font=_load_font(32, bold=True), fill=(255, 255, 255))
+        d.text((46, 208), "FIRST IN BUSINESS", font=f_sub, fill=(203, 213, 225))
+
+    elif "WSJ" in code or "MARKETWATCH" in code:
+        img.paste((15, 23, 42), [0, 0, w, h])
+        d = ImageDraw.Draw(img)
+        d.text((68, 85), "WSJ", font=_load_font(44, bold=True), fill=(255, 255, 255))
+        d.text((42, 208), "THE WALL STREET JOURNAL", font=_load_font(11, bold=True), fill=(203, 213, 225))
+
+    elif "COINDESK" in code or "CRYPTO" in code:
+        img.paste((24, 24, 27), [0, 0, w, h])
+        d = ImageDraw.Draw(img)
+        d.rounded_rectangle([45, 45, 195, 165], radius=16, fill=(250, 204, 21))
+        d.text((64, 85), "COIN", font=_load_font(34, bold=True), fill=(24, 24, 27))
+        d.text((64, 120), "DESK", font=_load_font(30, bold=True), fill=(24, 24, 27))
+        d.text((54, 208), "CRYPTO & MACRO", font=f_sub, fill=(250, 204, 21))
+
+    # 13. Multilateral: IMF, ECB, BOE, BOJ, OPEC, IFSCA, FINMIN
+    elif "IMF" in code:
+        img.paste((239, 246, 255), [0, 0, w, h])
+        d = ImageDraw.Draw(img)
+        d.ellipse([45, 45, 195, 165], fill=(30, 58, 138), outline=(250, 204, 21), width=3)
+        d.text((70, 85), "IMF", font=_load_font(42, bold=True), fill=(255, 255, 255))
+        d.text((38, 208), "INTL MONETARY FUND", font=f_sub, fill=(30, 58, 138))
+
+    elif "ECB" in code:
+        img.paste((15, 23, 42), [0, 0, w, h])
+        d = ImageDraw.Draw(img)
+        d.ellipse([45, 45, 195, 165], fill=(30, 58, 138), outline=(250, 204, 21), width=3)
+        d.text((72, 85), "ECB", font=_load_font(42, bold=True), fill=(250, 204, 21))
+        d.text((44, 208), "EUROPEAN CENTRAL BANK", font=f_sub, fill=(203, 213, 225))
+
+    elif "IFSCA" in code or "GIFT" in code:
+        img.paste((245, 243, 255), [0, 0, w, h])
+        d = ImageDraw.Draw(img)
+        d.polygon([(120, 35), (195, 75), (195, 155), (120, 195), (45, 155), (45, 75)], fill=(79, 70, 229))
+        d.text((58, 95), "IFSCA", font=_load_font(32, bold=True), fill=(255, 255, 255))
+        d.text((54, 208), "GIFT CITY AUTHORITY", font=f_sub, fill=(79, 70, 229))
+
+    elif "FINMIN" in code or "TREASURY" in code or "MINISTRY" in code:
+        img.paste((255, 251, 235), [0, 0, w, h])
+        d = ImageDraw.Draw(img)
+        d.rounded_rectangle([45, 45, 195, 165], radius=16, fill=(180, 83, 9))
+        d.text((50, 90), "FINMIN", font=_load_font(34, bold=True), fill=(255, 255, 255))
+        d.text((42, 208), "MINISTRY OF FINANCE", font=f_sub, fill=(180, 83, 9))
+
+    # 14. DEFAULT / OTHER
     else:
         img.paste((248, 250, 252), [0, 0, w, h])
         d = ImageDraw.Draw(img)
         d.rounded_rectangle([35, 35, 205, 185], radius=16, fill=(255, 255, 255), outline=(203, 213, 225), width=2)
-        disp = code[:6] or "GOV"
-        d.text((80, 90), disp, font=_load_font(32, bold=True), fill=(15, 23, 42))
+        disp = code[:8] or "INST"
+        d.text((65, 90), disp, font=_load_font(28, bold=True), fill=(15, 23, 42))
         d.text((48, 208), "AUTHORITY REGULATOR", font=f_sub, fill=(100, 116, 139))
 
     buf = io.BytesIO()

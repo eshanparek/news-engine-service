@@ -138,10 +138,11 @@ class TerminalSecurityAndMetaMiddleware(BaseHTTPMiddleware):
             
             # Replace default Gradio title
             html_text = re.sub(r'<title>.*?</title>', '<title>Global News and Calender</title>', html_text, count=1)
+            injected_head = f"{og_meta}\n<script src=\"/api/terminal-client.js\"></script>\n"
             if "<head>" in html_text:
-                html_text = html_text.replace("<head>", f"<head>\n{og_meta}", 1)
+                html_text = html_text.replace("<head>", f"<head>\n{injected_head}", 1)
             else:
-                html_text = og_meta + html_text
+                html_text = injected_head + html_text
                 
             from starlette.responses import HTMLResponse
             new_headers = dict(response.headers)
@@ -3233,9 +3234,14 @@ def render_settings_hub_html() -> str:
             
             e_rows = []
             for ent in entities:
+                l_code = ent.get('logo_code') or ent.get('short', '')
+                logo_tag = f'<img src="/api/entity-logo?code={html.escape(l_code)}" alt="{html.escape(l_code)}" style="width:28px;height:28px;object-fit:contain;border-radius:6px;border:1px solid #cbd5e1;background:#fff;vertical-align:middle;margin-right:8px;box-shadow:0 1px 2px rgba(0,0,0,0.06);" />'
                 e_rows.append(f"""
                 <tr class="epm-dir-row">
-                    <td class="col-dir-name"><b>{html.escape(ent.get('name', ''))}</b></td>
+                    <td class="col-dir-name" style="display:flex;align-items:center;">
+                        {logo_tag}
+                        <span><b>{html.escape(ent.get('name', ''))}</b></span>
+                    </td>
                     <td class="col-dir-tier"><span class="epm-tier-badge tier-sovereign">{html.escape(ent.get('short', ''))}</span></td>
                     <td class="col-dir-jur"><span style="font-weight:700; color:#0052FF;">{html.escape(ent.get('jurisdiction', gcountry))}</span></td>
                     <td class="col-dir-scope">{html.escape(ent.get('category', gtype))}</td>
@@ -3262,9 +3268,9 @@ def render_settings_hub_html() -> str:
                     <table class="epm-dir-table">
                         <thead>
                             <tr>
-                                <th style="width:35%;">OFFICIAL ENTITY / BODY NAME</th>
-                                <th style="width:15%;">CODE</th>
-                                <th style="width:20%;">COUNTRY / REGION</th>
+                                <th style="width:38%;">OFFICIAL ENTITY / BODY & LOGO</th>
+                                <th style="width:14%;">CODE</th>
+                                <th style="width:18%;">COUNTRY / REGION</th>
                                 <th style="width:20%;">CLASSIFICATION TYPE</th>
                                 <th style="width:10%;">FILTER SCOPE</th>
                             </tr>
@@ -11765,10 +11771,11 @@ with gr.Blocks(
         '<link rel="preconnect" href="https://fonts.googleapis.com">'
         '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
         '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">'
-        f"<style>{CUSTOM_CSS}</style><script>{TERMINAL_CLIENT_JS}</script>"
+        f"<style>{CUSTOM_CSS}</style>"
+        '<script src="/api/terminal-client.js"></script>'
     )
 ) as demo:
-    gr.HTML(f"<style>{CUSTOM_CSS}</style>{TOP_NAVBAR_HTML}<script>{TERMINAL_CLIENT_JS}</script>")
+    gr.HTML(f"<style>{CUSTOM_CSS}</style>{TOP_NAVBAR_HTML}")
     status_box = gr.Markdown(value=init_status_str, elem_id="epm-status-box", visible=False)
 
     with gr.Tabs(overflow_behavior="wrap"):
@@ -12422,6 +12429,27 @@ with gr.Blocks(
 
 demo.queue(default_concurrency_limit=20)
 
+@app.api_route("/api/terminal-client.js", methods=["GET", "HEAD"])
+async def serve_terminal_client_js():
+    """Serves pure client-side reactive navigation and interactive JS bundle."""
+    from starlette.responses import Response
+    return Response(
+        content=TERMINAL_CLIENT_JS,
+        media_type="application/javascript",
+        headers={"Cache-Control": "public, max-age=3600"}
+    )
+
+@app.api_route("/api/entity-logo", methods=["GET", "HEAD"])
+async def serve_entity_logo(code: str = "GLOBAL"):
+    """Serves high-contrast vector-drawn logo for financial and public regulatory bodies."""
+    png = generate_regulator_logo(code)
+    from starlette.responses import Response
+    return Response(
+        content=png,
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=86400"}
+    )
+
 # Mount Gradio UI inside FastAPI with full-width responsive CSS and Terminal Engine JS
 app = gr.mount_gradio_app(
     app,
@@ -12448,7 +12476,8 @@ app = gr.mount_gradio_app(
         '<link rel="preconnect" href="https://fonts.googleapis.com">'
         '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
         '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">'
-        f"<style>{CUSTOM_CSS}</style><script>{TERMINAL_CLIENT_JS}</script>"
+        f"<style>{CUSTOM_CSS}</style>"
+        '<script src="/api/terminal-client.js"></script>'
     ),
     js=TERMINAL_CLIENT_JS
 )

@@ -410,6 +410,49 @@ DEFAULT_SOURCES = [
 
     # Authoritative Institutional & Regulatory Trackers
     {
+        "id": "who_global_alerts",
+        "name": "WHO Global Health Alerts",
+        "category": "Global Multilateral",
+        "type": "RSS",
+        "url": "https://www.who.int/rss-feeds/news-english.xml",
+        "fallback_scrape_url": "https://www.who.int/news",
+        "enabled": True,
+        "forward_telegram": True,
+        "forward_whatsapp": True
+    },
+    {
+        "id": "nyse_announcements",
+        "name": "NYSE Market & Regulatory",
+        "category": "US Exchange",
+        "type": "RSS",
+        "url": "https://feeds.content.dowjones.io/public/rss/mw_marketpulse",
+        "fallback_scrape_url": "https://www.nyse.com/index",
+        "enabled": True,
+        "forward_telegram": True,
+        "forward_whatsapp": True
+    },
+    {
+        "id": "nasdaq_tech_wire",
+        "name": "Nasdaq Markets & Tech Wire",
+        "category": "US Exchange",
+        "type": "RSS",
+        "url": "https://www.nasdaq.com/feed/rssoutbound",
+        "fallback_scrape_url": "https://www.nasdaq.com/market-activity",
+        "enabled": True,
+        "forward_telegram": True,
+        "forward_whatsapp": True
+    },
+    {
+        "id": "dowjones_indices",
+        "name": "S&P Dow Jones Indices",
+        "category": "US Market Indices",
+        "type": "RSS",
+        "url": "https://feeds.a.dj.com/rss/RSSMarketsMain.xml",
+        "enabled": True,
+        "forward_telegram": True,
+        "forward_whatsapp": True
+    },
+    {
         "id": "sebi_regulatory_wire",
         "name": "SEBI Regulatory Wire",
         "category": "Indian Regulatory",

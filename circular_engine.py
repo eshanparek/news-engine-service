@@ -16,7 +16,7 @@ logger = logging.getLogger("CircularEngine")
 DB_FILE = "circulars.db"
 
 # Regulators list & visual metadata
-REGULATORS = ["ALL", "RBI", "SEBI", "NSE", "BSE", "MCX", "NCDEX", "IFSCA", "FOMC", "SEC", "CFTC", "CME", "FINMIN", "DGFT", "MoPNG", "MCA"]
+REGULATORS = ["ALL", "RBI", "SEBI", "NSE", "BSE", "MCX", "NCDEX", "IFSCA", "FOMC", "SEC", "CFTC", "CME", "FINMIN", "DGFT", "MoPNG", "MCA", "WHO", "NYSE", "NASDAQ", "DOWJONES"]
 
 REGULATOR_META = {
     "SEBI": {"badge": "🇮🇳 SEBI", "name": "Securities and Exchange Board of India", "color": "#0284c7", "type": "Primary Securities Regulator"},
@@ -34,7 +34,10 @@ REGULATOR_META = {
     "DGFT": {"badge": "🚢 DGFT", "name": "Directorate General of Foreign Trade", "color": "#0d9488", "type": "Foreign Trade"},
     "MoPNG": {"badge": "🛢️ MoPNG", "name": "Ministry of Petroleum and Natural Gas", "color": "#c2410c", "type": "Energy Ministry"},
     "MCA": {"badge": "🏛️ MCA", "name": "Ministry of Corporate Affairs", "color": "#7c3aed", "type": "Corporate Ministry"},
-    "NYSE": {"badge": "🇺🇸 NYSE", "name": "New York Stock Exchange / SEC", "color": "#0f766e", "type": "Global Exchange"},
+    "WHO": {"badge": "🌐 WHO", "name": "World Health Organization (Global Health & Bio-Security)", "color": "#0284c7", "type": "Global Health & Multilateral Body"},
+    "NYSE": {"badge": "🏛️ NYSE", "name": "New York Stock Exchange", "color": "#1e293b", "type": "Securities Exchange"},
+    "NASDAQ": {"badge": "⚡ NASDAQ", "name": "Nasdaq Global Market", "color": "#0891b2", "type": "Tech Securities Exchange"},
+    "DOWJONES": {"badge": "📊 DOW JONES", "name": "S&P Dow Jones Indices / Wall Street", "color": "#dc2626", "type": "Index Governance"},
     "CRYPTO": {"badge": "₿ CRYPTO", "name": "Binance & Coinbase Regulatory Disclosures", "color": "#d97706", "type": "Digital Assets"}
 }
 

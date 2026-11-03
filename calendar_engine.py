@@ -106,9 +106,9 @@ MARKET_META = {
     },
     "NYSE": {
         "code": "NYSE",
-        "badge": "🇺🇸 [NYSE]",
-        "title": "NYSE & US MARKET — ALL US EARNINGS, DIVIDENDS, FED & ECONOMIC DATA",
-        "exchange": "New York Stock Exchange (NYSE) & Nasdaq (All US Equities)",
+        "badge": "🇺🇸 [NYSE / US]",
+        "title": "NYSE, NASDAQ & DOW JONES — US EQUITIES, TECH, INDICES, FED & WHO MACRO",
+        "exchange": "New York Stock Exchange (NYSE), Nasdaq, Dow Jones & Global Bodies",
         "hours_ist": "19:00 – 01:30 IST (Pre-Market 13:30 IST)",
         "currency": "USD ($)"
     }
