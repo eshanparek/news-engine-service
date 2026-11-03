@@ -12218,7 +12218,7 @@ with gr.Blocks(
     demo.load(get_circulars_view, inputs=[circ_reg_filter, circ_imp_filter, circ_search], outputs=[circ_info_bar, circ_visual_feed, circ_table, mobile_circ_feed])
     demo.load(get_holidays_view, inputs=[hol_country_filter], outputs=[mobile_holidays_feed, holidays_table, desktop_holidays_feed])
 
-    wire_timer = gr.Timer(10)
+    wire_timer = gr.Timer(30)
     wire_timer.tick(get_dashboard_tables, outputs=[status_box, top_news_visual, top_table, bottom_table, mobile_news_feed])
 
 demo.queue(default_concurrency_limit=20)
@@ -12231,6 +12231,20 @@ app = gr.mount_gradio_app(
     theme=gr.themes.Soft(),
     css=CUSTOM_CSS,
     head=(
+        '<title>Global News and Calender</title>'
+        '<meta name="title" content="Global News and Calender" />'
+        '<meta property="og:title" content="Global News and Calender" />'
+        '<meta property="og:description" content="Institutional Real-Time Multi-Market Intelligence Terminal & Catalyst Engine" />'
+        '<meta property="og:image" content="https://p01--news-engine-service--dkhqtlpvx6bh.code.run/api/og-image.png" />'
+        '<meta property="og:image:width" content="1200" />'
+        '<meta property="og:image:height" content="630" />'
+        '<meta property="og:url" content="https://p01--news-engine-service--dkhqtlpvx6bh.code.run/" />'
+        '<meta property="og:type" content="website" />'
+        '<meta property="og:site_name" content="Global News and Calender" />'
+        '<meta name="twitter:card" content="summary_large_image" />'
+        '<meta name="twitter:title" content="Global News and Calender" />'
+        '<meta name="twitter:description" content="Institutional Real-Time Multi-Market Intelligence Terminal & Catalyst Engine" />'
+        '<meta name="twitter:image" content="https://p01--news-engine-service--dkhqtlpvx6bh.code.run/api/og-image.png" />'
         '<link rel="preconnect" href="https://fonts.googleapis.com">'
         '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
         '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">'

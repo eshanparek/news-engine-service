@@ -834,7 +834,7 @@ class NewsEngineWorker:
                     combined.append(it)
             # Sort strictly in descending chronological order (newest first)
             combined.sort(key=lambda x: parse_timestamp_to_epoch(x.get("timestamp")), reverse=True)
-            self.news_cache = combined[:100]
+            self.news_cache = combined[:60]
 
         if not self.is_initialized:
             for it in all_scraped:
@@ -861,6 +861,8 @@ class NewsEngineWorker:
                     threading.Thread(target=self.process_and_dispatch_single_item, args=(item,), daemon=True).start()
 
         self.last_fetch_time = datetime.now()
+        import gc
+        gc.collect()
 
     def get_adaptive_interval(self) -> float:
         """
