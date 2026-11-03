@@ -413,11 +413,43 @@ def generate_holiday_thumb(holiday_key: str, title: str = "") -> bytes:
 # 4. OFFICIAL REGULATOR & EXCHANGE LOGOS (240x240)
 # ─────────────────────────────────────────────────────────────────────────────
 
-@functools.lru_cache(maxsize=64)
+@functools.lru_cache(maxsize=128)
 def generate_regulator_logo(reg_code: str) -> bytes:
     """Renders authoritative, pixel-perfect official logos for financial authorities (SEBI, RBI, NSE, BSE, MCX, SEC, FED)."""
     w, h = 240, 240
     code = (reg_code or "").upper().strip()
+
+    # 0. Check authentic uploaded logo repository first (User Verified Logos)
+    logos_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "logos")
+    code_map = {
+        "RBI": "rbi.png",
+        "MCX": "mcx.png",
+        "NYSE": "nyse.png",
+        "FOMC": "fomc.png",
+        "FED": "fomc.png",
+        "US_GOVT": "us_govt.png",
+        "GOVT": "us_govt.png",
+        "WHITE HOUSE": "us_govt.png",
+        "POTUS": "us_govt.png"
+    }
+    for k, fn in code_map.items():
+        if k in code:
+            fp = os.path.join(logos_dir, fn)
+            if os.path.exists(fp):
+                try:
+                    src = Image.open(fp).convert("RGBA")
+                    max_w, max_h = 210, 210
+                    src.thumbnail((max_w, max_h), Image.Resampling.LANCZOS)
+                    canvas = Image.new("RGBA", (w, h), (255, 255, 255, 0))
+                    paste_x = (w - src.width) // 2
+                    paste_y = (h - src.height) // 2
+                    canvas.paste(src, (paste_x, paste_y), src)
+                    buf = io.BytesIO()
+                    canvas.save(buf, format="PNG")
+                    return buf.getvalue()
+                except Exception as ex:
+                    logger.debug(f"Failed loading authentic logo {fp}: {ex}")
+
     img = Image.new("RGB", (w, h), (255, 255, 255))
     d = ImageDraw.Draw(img)
 

@@ -316,6 +316,32 @@ async def change_admin_pin(req: ChangePinRequest):
     return JSONResponse({"ok": True, "message": "Master Security PIN updated successfully. Use your new PIN for future logins."})
 
 
+@app.post("/api/admin/logos/approve")
+async def save_approved_logos(req: Request):
+    """Saves user approval state for entity logos into config/approved_logos.json."""
+    try:
+        body = await req.json()
+        approved_dict = body.get("approved", {})
+        p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config", "approved_logos.json")
+        with open(p, "w", encoding="utf-8") as f:
+            json.dump(approved_dict, f, indent=2)
+        return JSONResponse({"ok": True, "message": f"Successfully saved {len(approved_dict)} logo approvals."})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+@app.get("/api/admin/logos/approved")
+async def get_approved_logos():
+    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config", "approved_logos.json")
+    if os.path.exists(p):
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                return JSONResponse(json.load(f))
+        except Exception:
+            pass
+    return JSONResponse({})
+
+
 @app.api_route("/api/story/{kind}/{idx}.png", methods=["GET", "HEAD"])
 async def serve_story_frame(kind: str, idx: int):
     """Renders a 1080x1920 Instagram Story flashcard (read-only preview / download)."""
@@ -1981,7 +2007,7 @@ def render_calendar_timeline_html(events: List[Dict]) -> str:
         cal_thumb_url = f"/api/calendar-thumb?sym={ev.get('symbol', '')}&mkt={country}&cat={reg}&t={html.escape(name[:16])}"
 
         parts.append(f"""
-        <div class="epm-tl-row {past}">
+        <div class="epm-tl-row {past}" data-mkt="{html.escape(country.upper())}" data-reg="{html.escape(reg.upper())}" data-date="{d}" data-entity="{html.escape(reg.upper())}">
             <div class="epm-tl-time">{html.escape(t_short)}</div>
             <div class="epm-tl-rail"><span class="epm-tl-dot tone-{sk}"></span></div>
             <div class="epm-tl-card tone-{sk}" onclick="window.epmToggleProgressive(this)">
@@ -2027,11 +2053,19 @@ def render_calendar_timeline_html(events: List[Dict]) -> str:
             <option value="upcoming">📅 Active Timers</option>
         </select>
         <select class="epm-news-scope-select mobile-select" id="epm-mob-cal-market" onchange="window.epmChangeCalMarket(this.value)" style="flex:1;">
-            <option value="ALL">🏛️ Reg: All</option>
-            <option value="NSE">🇮🇳 NSE</option>
-            <option value="BSE">🇮🇳 BSE</option>
-            <option value="MCX">⛽ MCX</option>
-            <option value="NYSE">🇺🇸 SEC/Fed</option>
+            <option value="ALL">🏛️ All Bodies / Regulators</option>
+            <option value="NSE">🇮🇳 NSE (National Stock Exchange)</option>
+            <option value="BSE">🇮🇳 BSE (Bombay Stock Exchange)</option>
+            <option value="MCX">⛽ MCX (Multi Commodity Exchange)</option>
+            <option value="RBI">🏦 RBI (Reserve Bank of India)</option>
+            <option value="SEBI">🛡️ SEBI (Securities Regulator)</option>
+            <option value="NYSE">🏛️ NYSE (New York Stock Exchange)</option>
+            <option value="NASDAQ">⚡ NASDAQ (Tech Exchange)</option>
+            <option value="DOWJONES">📊 DOW JONES (DJIA)</option>
+            <option value="FOMC">🇺🇸 FOMC / US Fed</option>
+            <option value="SEC">🇺🇸 US SEC</option>
+            <option value="WHO">🌐 WHO (World Health Org)</option>
+            <option value="CRYPTO">₿ CRYPTO (Digital Assets)</option>
         </select>
     </div>
     """
@@ -2070,14 +2104,26 @@ def render_mobile_circulars_feed_html(items: List[Dict]) -> str:
     <div class="epm-mobile-filter-bar">
         <select class="epm-news-scope-select mobile-select" id="epm-mob-circ-filter" onchange="window.epmFilterCircCards(this.value, this)">
             <option value="ALL">🏛️ All Regulators & SROs</option>
-            <option value="SEBI">🛡️ SEBI (Securities & Exchange Board)</option>
             <option value="RBI">🏦 RBI (Reserve Bank of India)</option>
+            <option value="SEBI">🛡️ SEBI (Securities & Exchange Board)</option>
             <option value="NSE">🇮🇳 NSE (National Stock Exchange)</option>
             <option value="BSE">🇮🇳 BSE (Bombay Stock Exchange)</option>
             <option value="MCX">⛽ MCX (Multi Commodity Exchange)</option>
+            <option value="NCDEX">🌾 NCDEX (Agri Derivatives)</option>
+            <option value="IFSCA">🌐 IFSCA (GIFT City Authority)</option>
             <option value="FINMIN">🏛️ Ministry of Finance (FinMin)</option>
-            <option value="FOMC">🇺🇸 US Federal Reserve (FOMC)</option>
-            <option value="NYSE">🇺🇸 US SEC / NYSE</option>
+            <option value="DGFT">🚢 DGFT (Directorate General of Foreign Trade)</option>
+            <option value="MoPNG">🛢️ MoPNG (Ministry of Petroleum)</option>
+            <option value="MCA">🏛️ MCA (Ministry of Corporate Affairs)</option>
+            <option value="WHO">🌐 WHO (World Health Organization)</option>
+            <option value="FOMC">🇺🇸 FOMC / US Federal Reserve</option>
+            <option value="SEC">🇺🇸 US SEC (Securities & Exchange Commission)</option>
+            <option value="CFTC">🇺🇸 CFTC (Commodity Futures)</option>
+            <option value="CME">⚡ CME Group Derivatives</option>
+            <option value="NYSE">🏛️ NYSE (New York Stock Exchange)</option>
+            <option value="NASDAQ">⚡ NASDAQ (Tech Securities Exchange)</option>
+            <option value="DOWJONES">📊 DOW JONES (S&P DJIA Indices)</option>
+            <option value="CRYPTO">₿ CRYPTO (Digital Asset Disclosures)</option>
         </select>
     </div>
     """
@@ -2794,12 +2840,19 @@ def render_desktop_calendar_html(events: List[Dict]) -> str:
                         <option value="upcoming">📅 Active Timers</option>
                     </select>
                     <select class="epm-cal-select-filter" id="epm-cal-market-select" onchange="window.epmChangeCalMarket(this.value)">
-                        <option value="ALL">🏛️ Select Regulators ▾</option>
-                        <option value="NSE">🇮🇳 NSE</option>
-                        <option value="BSE">🇮🇳 BSE</option>
-                        <option value="MCX">⛽ MCX</option>
-                        <option value="CRYPTO">₿ CRYPTO</option>
-                        <option value="NYSE">🇺🇸 SEC / NYSE</option>
+                        <option value="ALL">🏛️ All Bodies / Regulators</option>
+                        <option value="NSE">🇮🇳 NSE (National Stock Exchange)</option>
+                        <option value="BSE">🇮🇳 BSE (Bombay Stock Exchange)</option>
+                        <option value="MCX">⛽ MCX (Multi Commodity Exchange)</option>
+                        <option value="RBI">🏦 RBI (Reserve Bank of India)</option>
+                        <option value="SEBI">🛡️ SEBI (Securities Regulator)</option>
+                        <option value="NYSE">🏛️ NYSE (New York Stock Exchange)</option>
+                        <option value="NASDAQ">⚡ NASDAQ (Tech Exchange)</option>
+                        <option value="DOWJONES">📊 DOW JONES (DJIA)</option>
+                        <option value="FOMC">🇺🇸 FOMC / US Fed</option>
+                        <option value="SEC">🇺🇸 US SEC</option>
+                        <option value="WHO">🌐 WHO (World Health Org)</option>
+                        <option value="CRYPTO">₿ CRYPTO (Digital Assets)</option>
                     </select>
                 </div>
                 <div class="epm-news-filter-wrap">
@@ -2977,14 +3030,27 @@ def render_desktop_circulars_html(circulars: List[Dict]) -> str:
                 <div class="epm-circ-title-text" style="font-size:14px; font-weight:800; color:#0F172A;">OFFICIAL REGULATORY DIRECTIVES & CIRCULARS</div>
                 <div class="epm-news-filter-wrap">
                     <select class="epm-news-scope-select" id="epm-desk-circ-filter" onchange="window.epmFilterCircReg(this.value, this)">
-                        <option value="all">🏛️ All Regulators & SROs</option>
-                        <option value="sebi">🛡️ SEBI (Securities & Exchange Board)</option>
-                        <option value="rbi">🏦 RBI (Reserve Bank of India)</option>
-                        <option value="nse">🇮🇳 NSE (National Stock Exchange)</option>
-                        <option value="bse">🇮🇳 BSE (Bombay Stock Exchange)</option>
-                        <option value="mcx">⛽ MCX (Multi Commodity Exchange)</option>
-                        <option value="fomc">🇺🇸 US Federal Reserve (FOMC)</option>
-                        <option value="nyse">🇺🇸 US SEC / NYSE</option>
+                        <option value="ALL">🏛️ All Regulators & SROs</option>
+                        <option value="RBI">🏦 RBI (Reserve Bank of India)</option>
+                        <option value="SEBI">🛡️ SEBI (Securities & Exchange Board)</option>
+                        <option value="NSE">🇮🇳 NSE (National Stock Exchange)</option>
+                        <option value="BSE">🇮🇳 BSE (Bombay Stock Exchange)</option>
+                        <option value="MCX">⛽ MCX (Multi Commodity Exchange)</option>
+                        <option value="NCDEX">🌾 NCDEX (Agri Derivatives)</option>
+                        <option value="IFSCA">🌐 IFSCA (GIFT City Authority)</option>
+                        <option value="FINMIN">🏛️ Ministry of Finance (FinMin)</option>
+                        <option value="DGFT">🚢 DGFT (Directorate General of Foreign Trade)</option>
+                        <option value="MoPNG">🛢️ MoPNG (Ministry of Petroleum)</option>
+                        <option value="MCA">🏛️ MCA (Ministry of Corporate Affairs)</option>
+                        <option value="WHO">🌐 WHO (World Health Organization)</option>
+                        <option value="FOMC">🇺🇸 FOMC / US Federal Reserve</option>
+                        <option value="SEC">🇺🇸 US SEC (Securities & Exchange Commission)</option>
+                        <option value="CFTC">🇺🇸 CFTC (Commodity Futures)</option>
+                        <option value="CME">⚡ CME Group Derivatives</option>
+                        <option value="NYSE">🏛️ NYSE (New York Stock Exchange)</option>
+                        <option value="NASDAQ">⚡ NASDAQ (Tech Securities Exchange)</option>
+                        <option value="DOWJONES">📊 DOW JONES (S&P DJIA Indices)</option>
+                        <option value="CRYPTO">₿ CRYPTO (Digital Asset Disclosures)</option>
                     </select>
                 </div>
                 <div class="epm-circ-action-btns" style="display:flex; gap:8px;">
@@ -3221,9 +3287,36 @@ def render_settings_hub_html() -> str:
             </table>
         </div>'''
 
+    def _load_approved_logos() -> dict:
+        p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config", "approved_logos.json")
+        if os.path.exists(p):
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception:
+                pass
+        return {"RBI": True, "MCX": True, "NYSE": True, "FOMC": True, "US_GOVT": True}
+
     def _render_entities_taxonomy_html() -> str:
         groups = ENTITIES_TAXONOMY.get("groups", {})
-        html_blocks = []
+        approved = _load_approved_logos()
+
+        top_save_bar = """
+        <div class="epm-logo-approval-banner" style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:#F8FAFC;border:1px solid #CBD5E1;border-radius:10px;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+            <div>
+                <span style="font-weight:800;font-size:13.5px;color:#0F172A;">🖼️ Official Logo Review & Approval System</span>
+                <div style="font-size:11.5px;color:#64748B;margin-top:2px;">Review official emblems for all tracked bodies below. Check the verified ones and click Save. Unchecked ones will be flagged for refetching in the next update.</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+                <button type="button" class="epm-btn-save-logos" onclick="window.epmSaveApprovedLogos()" style="background:#0052FF;color:#fff;font-weight:700;font-size:12.5px;padding:8px 18px;border-radius:6px;border:none;cursor:pointer;box-shadow:0 1px 3px rgba(0,82,255,0.25);">
+                    💾 Save Approved Logos
+                </button>
+                <span id="epm-logo-save-status" style="font-size:12px;font-weight:700;"></span>
+            </div>
+        </div>
+        """
+
+        html_blocks = [top_save_bar]
         for gkey, ginfo in groups.items():
             glabel = html.escape(ginfo.get("label", gkey))
             gbadge = html.escape(ginfo.get("badge", gkey))
@@ -3235,7 +3328,19 @@ def render_settings_hub_html() -> str:
             e_rows = []
             for ent in entities:
                 l_code = ent.get('logo_code') or ent.get('short', '')
-                logo_tag = f'<img src="/api/entity-logo?code={html.escape(l_code)}" alt="{html.escape(l_code)}" style="width:28px;height:28px;object-fit:contain;border-radius:6px;border:1px solid #cbd5e1;background:#fff;vertical-align:middle;margin-right:8px;box-shadow:0 1px 2px rgba(0,0,0,0.06);" />'
+                is_approved = approved.get(l_code, False)
+                checked_str = "checked" if is_approved else ""
+                badge_bg = "#DCFCE7" if is_approved else "#FEF3C7"
+                badge_fg = "#166534" if is_approved else "#92400E"
+                badge_text = "Verified ✓" if is_approved else "Pending"
+                
+                logo_tag = f'<img src="/api/entity-logo?code={html.escape(l_code)}" alt="{html.escape(l_code)}" class="epm-entity-logo-thumb" style="width:32px;height:32px;object-fit:contain;border-radius:6px;border:1px solid #cbd5e1;background:#fff;vertical-align:middle;margin-right:8px;box-shadow:0 1px 2px rgba(0,0,0,0.06);" />'
+                check_cell = f'''
+                <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;font-weight:700;">
+                    <input type="checkbox" class="epm-logo-checkbox" data-code="{html.escape(l_code)}" {checked_str} />
+                    <span class="epm-logo-pill-{html.escape(l_code)}" style="background:{badge_bg};color:{badge_fg};padding:2px 7px;border-radius:4px;font-size:10px;">{badge_text}</span>
+                </label>'''
+
                 e_rows.append(f"""
                 <tr class="epm-dir-row">
                     <td class="col-dir-name" style="display:flex;align-items:center;">
@@ -3245,7 +3350,7 @@ def render_settings_hub_html() -> str:
                     <td class="col-dir-tier"><span class="epm-tier-badge tier-sovereign">{html.escape(ent.get('short', ''))}</span></td>
                     <td class="col-dir-jur"><span style="font-weight:700; color:#0052FF;">{html.escape(ent.get('jurisdiction', gcountry))}</span></td>
                     <td class="col-dir-scope">{html.escape(ent.get('category', gtype))}</td>
-                    <td class="col-dir-link"><span class="epm-inst-chip" style="font-size:10px;">{html.escape(gkey)}</span></td>
+                    <td class="col-dir-approval" style="text-align:center;">{check_cell}</td>
                 </tr>
                 """)
                 
@@ -3268,11 +3373,11 @@ def render_settings_hub_html() -> str:
                     <table class="epm-dir-table">
                         <thead>
                             <tr>
-                                <th style="width:38%;">OFFICIAL ENTITY / BODY & LOGO</th>
-                                <th style="width:14%;">CODE</th>
+                                <th style="width:36%;">OFFICIAL ENTITY / BODY & LOGO</th>
+                                <th style="width:12%;">CODE</th>
                                 <th style="width:18%;">COUNTRY / REGION</th>
-                                <th style="width:20%;">CLASSIFICATION TYPE</th>
-                                <th style="width:10%;">FILTER SCOPE</th>
+                                <th style="width:18%;">CLASSIFICATION TYPE</th>
+                                <th style="width:16%;text-align:center;">LOGO APPROVAL</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -9518,18 +9623,6 @@ TOP_NAVBAR_HTML = f"""
     </div>
 
     <div class="epm-side-drawer-body">
-        <div class="epm-side-section-label">SYSTEM & AUDIO CONTROLS</div>
-        <div class="epm-side-audio-card" onclick="window.epmToggleAudio()" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;margin-bottom:12px;cursor:pointer;">
-            <div style="display:flex;align-items:center;gap:10px;">
-                <span style="font-size:18px;">🔔</span>
-                <div>
-                    <div style="font-weight:700;font-size:12.5px;color:#0F172A;">Audio Alert Chime</div>
-                    <div style="font-size:10.5px;color:#64748B;">Audible sound on breaking catalysts</div>
-                </div>
-            </div>
-            <span id="epm-side-audio-status" class="epm-side-audio-badge" style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;background:#DCFCE7;color:#166534;border:1px solid #86EFAC;">Audio ON</span>
-        </div>
-
         <div class="epm-side-section-label">WORKSPACES & SCREENS</div>
         <div class="epm-side-nav-list">
             <!-- News Page with Submenu -->
@@ -9625,6 +9718,18 @@ TOP_NAVBAR_HTML = f"""
                 </div>
                 <span class="epm-side-item-tag">Tab 5</span>
             </div>
+        </div>
+
+        <div class="epm-side-section-label">SYSTEM & AUDIO CONTROLS</div>
+        <div class="epm-side-audio-card" onclick="window.epmToggleAudio()" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;margin-bottom:12px;cursor:pointer;">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <span style="font-size:18px;">🔔</span>
+                <div>
+                    <div style="font-weight:700;font-size:12.5px;color:#0F172A;">Audio Alert Chime</div>
+                    <div style="font-size:10.5px;color:#64748B;">Audible sound on breaking catalysts</div>
+                </div>
+            </div>
+            <span id="epm-side-audio-status" class="epm-side-audio-badge" style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;background:#DCFCE7;color:#166534;border:1px solid #86EFAC;">Audio ON</span>
         </div>
 
         <div class="epm-side-section-label">ACTIONS & UTILITIES</div>
@@ -10474,6 +10579,7 @@ TERMINAL_CLIENT_JS = r"""
     // 13c. Swipeable full-screen & desktop modal story viewer (Instagram web style)
     const EPM_STORY_MS = 6000;
     let epmStory = { items: [], idx: 0, timer: null, kind: 'news' };
+    window.epmStory = epmStory;
 
     function epmEnsureStoryViewer() {
         let v = document.getElementById('epm-story-viewer');
@@ -10524,8 +10630,6 @@ TERMINAL_CLIENT_JS = r"""
         v.addEventListener('click', e => { if (e.target === v) window.epmCloseStory(); });
         v.querySelector('#epm-sv-prev-btn').addEventListener('click', e => { e.stopPropagation(); epmStoryGo(epmStory.idx - 1); });
         v.querySelector('#epm-sv-next-btn').addEventListener('click', e => { e.stopPropagation(); epmStoryGo(epmStory.idx + 1); });
-        v.querySelector('.epm-sv-tap.left').addEventListener('click', () => epmStoryGo(epmStory.idx - 1));
-        v.querySelector('.epm-sv-tap.right').addEventListener('click', () => epmStoryGo(epmStory.idx + 1));
         
         const frame = v.querySelector('#epm-sv-frame');
         // Pause timer on mouse hover for desktop reading (Instagram web behavior)
@@ -10535,7 +10639,7 @@ TERMINAL_CLIENT_JS = r"""
             epmStory.timer = setTimeout(() => epmStoryGo(epmStory.idx + 1), EPM_STORY_MS);
         });
 
-        // Tap Left half or Right half to go Back / Next
+        // Tap Left half or Right half to go Back / Next (Strict 1-story step)
         frame.addEventListener('click', e => {
             if (e.target.closest('.epm-sv-close, .epm-sv-foot-actions, #epm-sv-dropdown-menu, a, button, input')) return;
             const rect = frame.getBoundingClientRect();
@@ -10549,35 +10653,27 @@ TERMINAL_CLIENT_JS = r"""
 
         let sx = 0, sy = 0, stTime = 0;
         frame.addEventListener('touchstart', e => {
-            sx = e.touches[0].clientX;
-            sy = e.touches[0].clientY;
-            stTime = Date.now();
+            if (e.touches && e.touches.length > 0) {
+                sx = e.touches[0].clientX;
+                sy = e.touches[0].clientY;
+                stTime = Date.now();
+            }
         }, { passive: true });
         frame.addEventListener('touchend', e => {
+            if (!e.changedTouches || !e.changedTouches.length) return;
             const dx = e.changedTouches[0].clientX - sx;
             const dy = e.changedTouches[0].clientY - sy;
-            const elapsed = Date.now() - stTime;
-            // Swipe horizontally
-            if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
+            // Horizontal swipe (> 45px): exactly 1 story move
+            if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)) {
                 epmStoryGo(epmStory.idx + (dx < 0 ? 1 : -1));
                 return;
             }
-            // Swipe down to dismiss
+            // Swipe down to dismiss (> 80px)
             if (dy > 80 && Math.abs(dy) > Math.abs(dx)) {
                 window.epmCloseStory();
                 return;
             }
-            // Tap on mobile (left half: back, right half: next)
-            if (Math.abs(dx) < 15 && Math.abs(dy) < 15 && elapsed < 350) {
-                if (e.target.closest('.epm-sv-close, .epm-sv-foot-actions, #epm-sv-dropdown-menu, a, button, input')) return;
-                const rect = frame.getBoundingClientRect();
-                const tapX = e.changedTouches[0].clientX - rect.left;
-                if (tapX < rect.width * 0.45) {
-                    epmStoryGo(epmStory.idx - 1);
-                } else {
-                    epmStoryGo(epmStory.idx + 1);
-                }
-            }
+            // (Taps on screen are cleanly handled by the frame click listener)
         }, { passive: true });
         document.addEventListener('keydown', e => {
             if (!v.classList.contains('is-open')) return;
@@ -10590,7 +10686,11 @@ TERMINAL_CLIENT_JS = r"""
 
     function epmEsc(t) { const d = document.createElement('div'); d.textContent = t == null ? '' : String(t); return d.innerHTML; }
 
+    let lastStoryNavTime = 0;
     function epmStoryGo(i) {
+        const now = Date.now();
+        if (now - lastStoryNavTime < 380) return; // Strict throttle: exactly 1 step per action
+        lastStoryNavTime = now;
         const n = epmStory.items.length;
         if (i < 0) i = 0;
         if (i >= n) { window.epmCloseStory(); return; }
@@ -11212,7 +11312,7 @@ TERMINAL_CLIENT_JS = r"""
         });
 
         // Mobile News Cards
-        document.querySelectorAll('.epm-pc-list .epm-pc-card').forEach(card => {
+        document.querySelectorAll('.epm-pc-list .epm-pc-card, #mobile_news_feed .epm-pc-card, .epm-mobile-feed .epm-pc-card').forEach(card => {
             const cardScope = card.getAttribute('data-scope') || 'local';
             const matches = (targetScope === 'all') || (cardScope === targetScope);
             if (matches) {
@@ -11231,7 +11331,7 @@ TERMINAL_CLIENT_JS = r"""
             if (deskSelect && deskSelect.value !== window.epmCurrentNewsFilter) deskSelect.value = window.epmCurrentNewsFilter;
             if (mobSelect && mobSelect.value !== window.epmCurrentNewsFilter) mobSelect.value = window.epmCurrentNewsFilter;
             
-            const visibleWrongCard = document.querySelector(`.epm-pc-list .epm-pc-card:not([data-scope="${window.epmCurrentNewsFilter}"]):not(.epm-filtered-hidden)`);
+            const visibleWrongCard = document.querySelector(`.epm-pc-card:not([data-scope="${window.epmCurrentNewsFilter}"]):not(.epm-filtered-hidden)`);
             if (visibleWrongCard) {
                 window.epmFilterNewsCategory(window.epmCurrentNewsFilter);
             }
@@ -11250,10 +11350,28 @@ TERMINAL_CLIENT_JS = r"""
         if (deskSel && deskSel.value !== period) deskSel.value = period;
         if (mobSel && mobSel.value !== period) mobSel.value = period;
 
-        const rows = document.querySelectorAll('#epm-cal-cards-list .epm-chron-row, #epm-cal-cards-list .epm-chron-item-group');
-        rows.forEach(r => {
-            r.classList.remove('epm-filtered-hidden');
+        const p = String(period || 'all').toLowerCase();
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+        const tomDate = new Date(now.getTime() + 86400000);
+        const tomStr = `${tomDate.getFullYear()}-${pad(tomDate.getMonth() + 1)}-${pad(tomDate.getDate())}`;
+        const weekDate = new Date(now.getTime() + 7 * 86400000);
+        const weekStr = `${weekDate.getFullYear()}-${pad(weekDate.getMonth() + 1)}-${pad(weekDate.getDate())}`;
+
+        // Filter both desktop and mobile rows
+        document.querySelectorAll('#epm-cal-cards-list .epm-chron-row, #epm-cal-cards-list .epm-chron-item-group, .epm-mobile-timeline .epm-tl-row').forEach(r => {
+            const rDate = r.getAttribute('data-date') || '';
+            let matches = true;
+            if (p === 'today') matches = (rDate === todayStr);
+            else if (p === 'tomorrow') matches = (rDate === tomStr);
+            else if (p === 'week') matches = (rDate >= todayStr && rDate <= weekStr);
+            else if (p === 'upcoming') matches = !r.classList.contains('is-past');
+
+            if (matches) r.classList.remove('epm-filtered-hidden');
+            else r.classList.add('epm-filtered-hidden');
         });
+
         const dd = document.querySelector('#cal_date_filter_dd select, #cal_date_filter_dd input');
         if (dd) {
             dd.value = period;
@@ -11267,16 +11385,34 @@ TERMINAL_CLIENT_JS = r"""
         if (deskSel && deskSel.value !== mkt) deskSel.value = mkt;
         if (mobSel && mobSel.value !== mkt) mobSel.value = mkt;
 
-        const rows = document.querySelectorAll('#epm-cal-cards-list .epm-chron-row, #epm-cal-cards-list .epm-chron-item-group');
-        rows.forEach(r => {
+        const target = String(mkt || 'ALL').toUpperCase();
+
+        // 1. Desktop calendar rows
+        document.querySelectorAll('#epm-cal-cards-list .epm-chron-row, #epm-cal-cards-list .epm-chron-item-group').forEach(r => {
             const rowMkt = (r.getAttribute('data-mkt') || '').toUpperCase();
-            const matches = (mkt === 'ALL' || rowMkt === mkt.toUpperCase() || (mkt === 'NYSE' && (rowMkt === 'SEC' || rowMkt === 'FOMC')));
-            if (matches) {
-                r.classList.remove('epm-filtered-hidden');
-            } else {
-                r.classList.add('epm-filtered-hidden');
-            }
+            const rowReg = (r.getAttribute('data-reg') || '').toUpperCase();
+            const rowTxt = (r.textContent || '').toUpperCase();
+            const matches = (target === 'ALL') || (rowMkt === target) || (rowReg === target) || rowTxt.includes(target) ||
+                            (target === 'NYSE' && (rowMkt === 'SEC' || rowMkt === 'FOMC' || rowMkt === 'US' || rowTxt.includes('NYSE'))) ||
+                            (target === 'FOMC' && (rowReg.includes('FED') || rowTxt.includes('FED') || rowTxt.includes('FOMC'))) ||
+                            (target === 'WHO' && (rowReg.includes('WHO') || rowTxt.includes('WHO')));
+            if (matches) r.classList.remove('epm-filtered-hidden');
+            else r.classList.add('epm-filtered-hidden');
         });
+
+        // 2. Mobile calendar rows
+        document.querySelectorAll('.epm-mobile-timeline .epm-tl-row').forEach(r => {
+            const rowMkt = (r.getAttribute('data-mkt') || '').toUpperCase();
+            const rowReg = (r.getAttribute('data-reg') || '').toUpperCase();
+            const rowTxt = (r.textContent || '').toUpperCase();
+            const matches = (target === 'ALL') || (rowMkt === target) || (rowReg === target) || rowTxt.includes(target) ||
+                            (target === 'NYSE' && (rowMkt === 'SEC' || rowMkt === 'FOMC' || rowMkt === 'US' || rowTxt.includes('NYSE'))) ||
+                            (target === 'FOMC' && (rowReg.includes('FED') || rowTxt.includes('FED') || rowTxt.includes('FOMC'))) ||
+                            (target === 'WHO' && (rowReg.includes('WHO') || rowTxt.includes('WHO')));
+            if (matches) r.classList.remove('epm-filtered-hidden');
+            else r.classList.add('epm-filtered-hidden');
+        });
+
         const dd = document.querySelector('#cal_reg_filter_dd select, #cal_reg_filter_dd input');
         if (dd) {
             dd.value = mkt;
@@ -11401,32 +11537,75 @@ TERMINAL_CLIENT_JS = r"""
     };
 
     window.epmFilterCircReg = function(reg, el) {
-        const val = String(reg || 'all').toLowerCase();
+        const val = String(reg || 'ALL').toUpperCase();
         const deskSel = document.getElementById('epm-desk-circ-filter');
         const mobSel = document.getElementById('epm-mob-circ-filter');
-        if (deskSel && deskSel.value.toLowerCase() !== val) deskSel.value = (val === 'all' ? 'all' : reg);
-        if (mobSel && mobSel.value.toLowerCase() !== val) mobSel.value = (val === 'all' ? 'ALL' : reg.toUpperCase());
+        if (deskSel) deskSel.value = (val === 'ALL' ? 'ALL' : reg);
+        if (mobSel) mobSel.value = (val === 'ALL' ? 'ALL' : reg.toUpperCase());
 
-        document.querySelectorAll('#epm-circ-cards-list .epm-circ-desk-card').forEach(c => {
-            const cReg = (c.getAttribute('data-reg') || '').toLowerCase();
-            if (val === 'all' || cReg === val) {
-                c.classList.remove('epm-filtered-hidden');
-            } else {
-                c.classList.add('epm-filtered-hidden');
-            }
+        // 1. Desktop circular items
+        document.querySelectorAll('#epm-circ-terminal-layout .epm-chron-item-group, #epm-circ-cards-list .epm-chron-row, #epm-circ-cards-list .epm-circ-desk-card').forEach(c => {
+            const cReg = (c.getAttribute('data-circ-reg') || c.getAttribute('data-reg') || '').toUpperCase();
+            const cText = (c.textContent || '').toUpperCase();
+            const matches = (val === 'ALL') || (cReg === val) || cText.includes(val);
+            if (matches) c.classList.remove('epm-filtered-hidden');
+            else c.classList.add('epm-filtered-hidden');
         });
 
-        document.querySelectorAll('#epm-circ-mobile-list .epm-pc-card, #mobile_circ_feed .epm-pc-card').forEach(card => {
-            const cardReg = (card.getAttribute('data-circ-reg') || '').toLowerCase();
-            if (val === 'all' || cardReg === val) {
-                card.classList.remove('epm-filtered-hidden');
-            } else {
-                card.classList.add('epm-filtered-hidden');
-            }
+        // 2. Mobile circular cards
+        document.querySelectorAll('#mobile_circ_feed .epm-pc-card, .epm-pc-card[data-circ-reg]').forEach(card => {
+            const cardReg = (card.getAttribute('data-circ-reg') || card.getAttribute('data-reg') || '').toUpperCase();
+            const cardText = (card.textContent || '').toUpperCase();
+            const matches = (val === 'ALL') || (cardReg === val) || cardText.includes(val);
+            if (matches) card.classList.remove('epm-filtered-hidden');
+            else card.classList.add('epm-filtered-hidden');
         });
     };
     window.epmFilterCircCards = function(reg, el) {
         window.epmFilterCircReg(reg, el);
+    };
+
+    window.epmSaveApprovedLogos = function() {
+        const checkboxes = document.querySelectorAll('.epm-logo-checkbox');
+        const approvedMap = {};
+        checkboxes.forEach(cb => {
+            const code = cb.getAttribute('data-code');
+            if (code) {
+                approvedMap[code] = cb.checked;
+                const pill = document.querySelector(`.epm-logo-pill-${code}`);
+                if (pill) {
+                    pill.textContent = cb.checked ? 'Verified ✓' : 'Pending';
+                    pill.style.background = cb.checked ? '#DCFCE7' : '#FEF3C7';
+                    pill.style.color = cb.checked ? '#166534' : '#92400E';
+                }
+            }
+        });
+
+        const statusEl = document.getElementById('epm-logo-save-status');
+        if (statusEl) {
+            statusEl.textContent = '⏳ Saving verification states...';
+            statusEl.style.color = '#0052FF';
+        }
+
+        fetch('/api/admin/logos/approve', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({approved: approvedMap})
+        })
+        .then(r => r.json())
+        .then(res => {
+            if (statusEl) {
+                statusEl.textContent = '✅ Logos verified & saved permanently!';
+                statusEl.style.color = '#16A34A';
+                setTimeout(() => { statusEl.textContent = ''; }, 4000);
+            }
+        })
+        .catch(err => {
+            if (statusEl) {
+                statusEl.textContent = '❌ Error saving logo approvals';
+                statusEl.style.color = '#DC2626';
+            }
+        });
     };
 
     window.epmShowSettingsPane = function(paneId, btn) {
