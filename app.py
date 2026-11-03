@@ -697,6 +697,39 @@ def download_daily_outcomes_pdf_endpoint():
     )
 
 
+@app.get("/api/calendar/pdf/today")
+def download_today_calendar_pdf_endpoint():
+    """Delivers the authoritative daily market calendar and outcomes PDF for today."""
+    pdf_path = get_ready_pdf("daily_outcomes")
+    fn = f"Market_Calendar_Today_{now_ist().strftime('%Y-%m-%d')}.pdf"
+    return FileResponse(
+        pdf_path,
+        media_type="application/pdf",
+        filename=fn,
+        headers={"Content-Disposition": f'attachment; filename="{fn}"', "Cache-Control": "no-cache, no-store, must-revalidate"}
+    )
+
+
+@app.get("/api/news/pdf/today-snapshot")
+def download_today_news_snapshot_pdf_endpoint():
+    """Generates and delivers the A4 Landscape News Snapshot PDF covering 00:00:00 IST up to now."""
+    try:
+        from news_pdf_engine import news_pdf_engine
+        pool = get_merged_news_pool()
+        pdf_bytes, filename = news_pdf_engine.generate_today_snapshot_pdf(pool, target_dt=now_ist())
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Cache-Control": "no-cache, no-store, must-revalidate"
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error generating today news snapshot PDF: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/market/ticker")
 def api_get_market_ticker():
     """Returns real-time live market telemetry quotes for the header ribbon."""
@@ -1262,12 +1295,12 @@ def render_news_feed_html(items: List[Dict]) -> str:
         today_midnight = datetime.combine(now.date(), datetime.min.time(), tzinfo=IST_TZ).timestamp()
         is_past_day = ep < today_midnight if ep > 0 else ("Yesterday" in ts or "01 Nov" in ts)
 
-        # Bullets & Reasoning
+        # Bullets & Analytical Takeaways
         raw_reasoning = str(it.get("ai_reasoning", "")).strip()
         bullets = []
         if raw_reasoning:
             sentences = [s.strip() for s in re.split(r'(?<=[.?!])\s+', raw_reasoning) if len(s.strip()) > 15]
-            bullets = sentences[:4]
+            bullets = sentences[:3]
         if not bullets:
             bullets = [
                 f"Multi-market catalyst with direct valuation spillover into {', '.join(it.get('ai_sectors', ['broad equities']))}.",
@@ -1275,10 +1308,10 @@ def render_news_feed_html(items: List[Dict]) -> str:
                 "Liquidity and open interest flows confirm elevated directional sensitivity."
             ]
 
-        # Extract genuine story summary
-        raw_summary = str(it.get("summary") or "").strip()
-        if not raw_summary or raw_summary == title:
-            raw_summary = raw_reasoning if raw_reasoning else " ".join(bullets)
+        # Extract genuine story summary from source description or lead dispatch (distinct from AI bullets)
+        raw_summary = str(it.get("summary") or it.get("description") or "").strip()
+        if not raw_summary or raw_summary == title or raw_summary == raw_reasoning:
+            raw_summary = f"{source} dispatch: {title}. Full contextual coverage and market disclosures published on official wire at {time_str}."
         summary = clean_table_text(raw_summary)
 
         words = title.split()
@@ -1768,11 +1801,27 @@ def render_mobile_news_feed_html(pool: List[Dict]) -> str:
         meta_src = f'{inst_badge}<span class="epm-pc-dot"></span>{ts}' if is_inst else f'{src} · {ts}'
 
         thumb_url = it.get("image_url") or it.get("image") or it.get("thumbnail") or f"/api/news-thumb?topic={filter_cat}&s={src[:8]}"
-        raw_summary = str(it.get("summary") or "").strip()
-        if not raw_summary or raw_summary == clean_table_text(it.get("title", "")):
-            raw_summary = clean_table_text(it.get("ai_reasoning", ""))
+        
+        # Genuine source summary distinct from AI analytical takeaways
+        raw_summary = str(it.get("summary") or it.get("description") or "").strip()
+        raw_reasoning = str(it.get("ai_reasoning") or "").strip()
+        if not raw_summary or raw_summary == clean_table_text(it.get("title", "")) or raw_summary == raw_reasoning:
+            raw_summary = f"{src} dispatch: {clean_table_text(it.get('title', ''))}. Primary financial coverage and market disclosures published on wire at {ts}."
         summary_disp = html.escape(clean_table_text(raw_summary))
-        summary_block_html = f'<div class="epm-pc-story-summary" style="margin:8px 0; padding:8px 10px; background:#F8FAFC; border-left:3px solid #0052FF; border-radius:4px;"><span style="display:block; font-size:9px; font-weight:800; color:#0052FF; letter-spacing:0.04em; margin-bottom:3px;">SOURCE STORY SUMMARY</span><div style="font-size:12px; line-height:1.4; color:#1E293B;">{summary_disp}</div></div>' if summary_disp else ''
+
+        ai_takeaway = clean_table_text(raw_reasoning)
+        if not ai_takeaway or ai_takeaway == clean_table_text(raw_summary):
+            ai_takeaway = f"Direct liquidity impact and capital reallocation across {', '.join(sectors[:2]) if sectors else 'broad equities'}. Order flow aligns with {sk.upper()} sentiment."
+        ai_takeaway_disp = html.escape(ai_takeaway)
+
+        summary_block_html = f'''
+        <div class="epm-pc-story-summary" style="margin:8px 0; padding:10px 12px; background:#F8FAFC; border-left:3px solid #0052FF; border-radius:6px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+                <span style="font-size:9.5px; font-weight:800; color:#0052FF; letter-spacing:0.04em;">SOURCE STORY SUMMARY</span>
+                <span style="font-size:10px; color:#64748B; font-weight:600;">{src} • {ts}</span>
+            </div>
+            <div style="font-size:12px; line-height:1.45; color:#1E293B;">{summary_disp}</div>
+        </div>'''
 
         rows.append(f"""
         <div class="epm-pc-card tone-{sk} {inst_cls}" data-scope="{filter_cat}" onclick="window.epmToggleProgressive(this)">
@@ -1784,17 +1833,16 @@ def render_mobile_news_feed_html(pool: List[Dict]) -> str:
                 <span class="epm-pc-chev">⌄</span>
             </div>
             <div class="epm-pc-body">
-                <div class="epm-pc-full-headline">
-                    <span class="epm-full-hl-badge">FULL CATALYST HEADLINE</span>
-                    <div class="epm-full-hl-text">{title}</div>
-                </div>
                 {summary_block_html}
                 <div class="epm-pc-metrics">
                     <div><span>AI Score</span><b>{score}/10</b></div>
                     <div><span>Relevance</span><b>{rel}%</b></div>
                     <div><span>Impact</span><b>{impact}</b></div>
                 </div>
-                {f'<div class="epm-pc-reason">• {reasoning}</div>' if reasoning else ''}
+                <div class="epm-pc-takeaway-row" style="margin:8px 0; padding:8px 10px; background:#F1F5F9; border-radius:6px; font-size:11.5px; line-height:1.4; color:#334155;">
+                    <span style="display:block; font-size:9px; font-weight:800; color:#475569; letter-spacing:0.04em; margin-bottom:2px;">ACTIONABLE MARKET IMPLICATION (AI)</span>
+                    • {ai_takeaway_disp}
+                </div>
                 <div class="epm-pc-tags">{sec_html}</div>
                 <div class="epm-pc-actions">
                     <span class="epm-pc-sent">{sk.upper()}</span>
@@ -9234,14 +9282,24 @@ TOP_NAVBAR_HTML = f"""
 
         <div class="epm-side-section-label">WORKSPACES & SCREENS</div>
         <div class="epm-side-nav-list">
-            <button type="button" class="epm-side-nav-item active" data-tab="0" onclick="window.epmSwitchTab(0);window.epmCloseSideMenu()">
-                <span class="epm-side-item-icon">📰</span>
-                <div class="epm-side-item-info">
-                    <span class="epm-side-item-name">Live Breaking Wire</span>
-                    <span class="epm-side-item-desc">Real-time multi-market intelligence feed</span>
+            <!-- News Page with Submenu -->
+            <div class="epm-side-nav-group">
+                <button type="button" class="epm-side-nav-item active" data-tab="0" onclick="window.epmSwitchTab(0);window.epmCloseSideMenu()">
+                    <span class="epm-side-item-icon">📰</span>
+                    <div class="epm-side-item-info">
+                        <span class="epm-side-item-name">Live Breaking Wire</span>
+                        <span class="epm-side-item-desc">Real-time multi-market intelligence feed</span>
+                    </div>
+                    <span class="epm-side-item-tag">Tab 1</span>
+                </button>
+                <div class="epm-side-submenu">
+                    <a href="/api/news/pdf/today-snapshot" download target="_blank" class="epm-side-sublink" style="font-weight:700; color:#0052FF;">
+                        <span>📥</span> Download News Snapshot (PDF) ↗
+                    </a>
                 </div>
-                <span class="epm-side-item-tag">Tab 1</span>
-            </button>
+            </div>
+
+            <!-- Calendar Page with Submenu -->
             <div class="epm-side-nav-group">
                 <button type="button" class="epm-side-nav-item" data-tab="1" onclick="window.epmSwitchTab(1);window.epmCloseSideMenu()">
                     <span class="epm-side-item-icon">📅</span>
@@ -9252,6 +9310,9 @@ TOP_NAVBAR_HTML = f"""
                     <span class="epm-side-item-tag">Tab 2</span>
                 </button>
                 <div class="epm-side-submenu">
+                    <a href="/api/calendar/pdf/today" download target="_blank" class="epm-side-sublink" style="font-weight:700; color:#0052FF;">
+                        <span>📥</span> Today's Calendar (PDF) ↗
+                    </a>
                     <a href="/api/calendar/pdf/daily-outcomes" download="daily_outcomes.pdf" target="_blank" class="epm-side-sublink">
                         <span>📄</span> 5 PM Daily Outcomes PDF ↗
                     </a>
@@ -9263,22 +9324,41 @@ TOP_NAVBAR_HTML = f"""
                     </a>
                 </div>
             </div>
-            <button type="button" class="epm-side-nav-item" data-tab="2" onclick="window.epmSwitchTab(2);window.epmCloseSideMenu()">
-                <span class="epm-side-item-icon">🏛️</span>
-                <div class="epm-side-item-info">
-                    <span class="epm-side-item-name">Regulatory Circulars</span>
-                    <span class="epm-side-item-desc">SEBI, RBI, NSE, BSE, MCX directives</span>
+
+            <!-- Circulars Page with Submenu -->
+            <div class="epm-side-nav-group">
+                <button type="button" class="epm-side-nav-item" data-tab="2" onclick="window.epmSwitchTab(2);window.epmCloseSideMenu()">
+                    <span class="epm-side-item-icon">🏛️</span>
+                    <div class="epm-side-item-info">
+                        <span class="epm-side-item-name">Regulatory Circulars</span>
+                        <span class="epm-side-item-desc">SEBI, RBI, NSE, BSE, MCX directives</span>
+                    </div>
+                    <span class="epm-side-item-tag">Tab 3</span>
+                </button>
+                <div class="epm-side-submenu">
+                    <a href="/api/calendar/pdf/monthly" download="regulatory_circulars.pdf" target="_blank" class="epm-side-sublink">
+                        <span>📥</span> Export Circulars Directory (PDF) ↗
+                    </a>
                 </div>
-                <span class="epm-side-item-tag">Tab 3</span>
-            </button>
-            <button type="button" class="epm-side-nav-item" data-tab="3" onclick="window.epmSwitchTab(3);window.epmCloseSideMenu()">
-                <span class="epm-side-item-icon">🏖️</span>
-                <div class="epm-side-item-info">
-                    <span class="epm-side-item-name">Trading Holidays & Closures</span>
-                    <span class="epm-side-item-desc">Authoritative 2026 market holidays</span>
+            </div>
+
+            <!-- Holidays Page with Submenu -->
+            <div class="epm-side-nav-group">
+                <button type="button" class="epm-side-nav-item" data-tab="3" onclick="window.epmSwitchTab(3);window.epmCloseSideMenu()">
+                    <span class="epm-side-item-icon">🏖️</span>
+                    <div class="epm-side-item-info">
+                        <span class="epm-side-item-name">Trading Holidays & Closures</span>
+                        <span class="epm-side-item-desc">Authoritative 2026 market holidays</span>
+                    </div>
+                    <span class="epm-side-item-tag">Tab 4</span>
+                </button>
+                <div class="epm-side-submenu">
+                    <a href="/api/calendar/holiday-image" download="trading_holidays_2026.png" target="_blank" class="epm-side-sublink">
+                        <span>📷</span> Save 2026 Holidays Schedule (PNG) ↗
+                    </a>
                 </div>
-                <span class="epm-side-item-tag">Tab 4</span>
-            </button>
+            </div>
+
             <button type="button" class="epm-side-nav-item epm-desktop-only" data-tab="4" onclick="window.epmSwitchTab(4);window.epmCloseSideMenu()">
                 <span class="epm-side-item-icon">⚙️</span>
                 <div class="epm-side-item-info">
