@@ -138,7 +138,7 @@ class TerminalSecurityAndMetaMiddleware(BaseHTTPMiddleware):
             
             # Replace default Gradio title
             html_text = re.sub(r'<title>.*?</title>', '<title>Global News and Calender</title>', html_text, count=1)
-            injected_head = f"{og_meta}\n<script src=\"/api/terminal-client.js?v=20261103_2300\"></script>\n"
+            injected_head = f"{og_meta}\n<script src=\"/api/terminal-client.js?v=20261103_2330\"></script>\n"
             if "<head>" in html_text:
                 html_text = html_text.replace("<head>", f"<head>\n{injected_head}", 1)
             else:
@@ -3450,6 +3450,30 @@ def render_settings_hub_html() -> str:
                 </div>
                 <button type="button" class="epm-lock-btn" onclick="window.epmLockAdmin()" title="Lock Admin Settings">🔒 Lock</button>
             </div>
+            
+            <!-- Mobile Dedicated Sub-Settings Selector -->
+            <div class="epm-settings-mob-selector-wrap" style="margin:10px 0 12px 0;">
+                <label for="epm-settings-mob-select" style="display:block;font-size:11px;font-weight:700;color:#64748B;margin-bottom:6px;">SETTINGS SUB-PANES:</label>
+                <select id="epm-settings-mob-select" class="epm-news-scope-select mobile-select" onchange="window.epmShowSettingsPane(this.value)" style="width:100%;font-weight:600;">
+                    <option value="pane_in_reg">🏛️ Indian Regulators & Govt</option>
+                    <option value="pane_in_mkt">📈 Indian Exchanges & SROs</option>
+                    <option value="pane_glob_reg">🌐 Global Regulators & Banks</option>
+                    <option value="pane_glob_mkt">🌍 Global Exchanges & CME</option>
+                    <option value="pane_media">📰 Commercial News Providers</option>
+                    <option value="pane_taxonomy">🗂️ Entities & Sources Taxonomy</option>
+                    <option value="pane_telegram">✈️ Telegram Channels & Bots</option>
+                    <option value="pane_pdf_sched">📑 Calendar & PDF Automation</option>
+                    <option value="pane_sec_google">📅 Google Calendar Integration</option>
+                    <option value="pane_sec_social">📸 Omnichannel Social Media</option>
+                    <option value="pane_sec_forwarding">🔔 Selective Forwarding Rules</option>
+                    <option value="pane_sec_stories_publisher">📸 Stories Flashcard Publisher</option>
+                    <option value="pane_sec_telegram_adv">🔧 Advanced Telegram Overrides</option>
+                    <option value="pane_system_health">🔒 System Status & Legal Notice</option>
+                    <option value="pane_security_pin">🔐 Security & Admin PIN</option>
+                    <option value="pane_visitors">👥 Live Visitor Telemetry</option>
+                </select>
+            </div>
+
             <div class="epm-settings-sb-nav">
                 <button type="button" class="epm-settings-nav-item active" data-pane="pane_in_reg" onclick="window.epmShowSettingsPane('pane_in_reg', this)">
                     <span class="icon">🏛️</span>
@@ -8913,6 +8937,9 @@ tbody tr:hover td {
     display: none;
     animation: epmFadeIn 0.2s ease-out;
 }
+.epm-settings-mob-selector-wrap {
+    display: none !important;
+}
 .epm-settings-pane.active {
     display: block !important;
 }
@@ -8926,16 +8953,23 @@ tbody tr:hover td {
         position: relative !important;
         top: 0 !important;
     }
+    .epm-settings-mob-selector-wrap {
+        display: block !important;
+        width: 100% !important;
+        margin: 8px 0 12px 0 !important;
+    }
     .epm-settings-sb-nav {
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-        overflow-x: auto !important;
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 6px !important;
+        overflow-x: visible !important;
         padding-bottom: 6px !important;
     }
     .epm-settings-nav-item {
-        white-space: nowrap !important;
-        flex-shrink: 0 !important;
-        padding: 7px 11px !important;
+        white-space: normal !important;
+        padding: 8px 10px !important;
+        font-size: 11px !important;
+        line-height: 1.3 !important;
     }
 }
 
@@ -9682,7 +9716,7 @@ TOP_NAVBAR_HTML = f"""
                 <div class="epm-side-nav-item active" data-tab="0" onclick="window.epmSwitchTab(0);window.epmCloseSideMenu()">
                     <span class="epm-side-item-icon">📰</span>
                     <div class="epm-side-item-info">
-                        <span class="epm-side-item-name">Live Breaking Wire</span>
+                        <span class="epm-side-item-name">Live Breaking News</span>
                         <span class="epm-side-item-desc">Real-time multi-market intelligence feed</span>
                     </div>
                     <button type="button" class="epm-sub-toggle-btn" onclick="event.stopPropagation(); window.epmToggleSubmenu(this);" title="Submenu Options">
@@ -9701,7 +9735,7 @@ TOP_NAVBAR_HTML = f"""
                 <div class="epm-side-nav-item" data-tab="1" onclick="window.epmSwitchTab(1);window.epmCloseSideMenu()">
                     <span class="epm-side-item-icon">📅</span>
                     <div class="epm-side-item-info">
-                        <span class="epm-side-item-name">Market Calendar & Outcomes</span>
+                        <span class="epm-side-item-name">Market Outlook</span>
                         <span class="epm-side-item-desc">5-market event dossier & timers</span>
                     </div>
                     <button type="button" class="epm-sub-toggle-btn" onclick="event.stopPropagation(); window.epmToggleSubmenu(this);" title="Submenu Options">
@@ -9765,8 +9799,7 @@ TOP_NAVBAR_HTML = f"""
             <div class="epm-side-nav-item" data-tab="4" onclick="window.epmSwitchTab(4);window.epmCloseSideMenu()">
                 <span class="epm-side-item-icon">⚙️</span>
                 <div class="epm-side-item-info">
-                    <span class="epm-side-item-name">Settings & Dispatches Hub</span>
-                    <span class="epm-side-item-desc">Telegram bots & calendar configuration</span>
+                    <span class="epm-side-item-name">Settings</span>
                 </div>
             </div>
         </div>
@@ -9980,11 +10013,11 @@ TERMINAL_CLIENT_JS = r"""
 
     // 2. Tab Navigation Sync & Active Tab Indicator
     const TAB_NAMES = [
-        "📰 LIVE FINANCIAL WIRE",
-        "📅 MARKET CALENDAR & OUTCOMES",
+        "📰 LIVE BREAKING NEWS",
+        "📅 MARKET OUTLOOK",
         "📜 REGULATORY CIRCULARS & PDFS",
         "🏖️ TRADING HOLIDAYS & CLOSURES",
-        "⚙️ PORTAL SETTINGS & INTEGRATIONS"
+        "⚙️ SETTINGS"
     ];
 
     window.epmSwitchTab = function(tabIdx, pillEl) {
@@ -9993,6 +10026,13 @@ TERMINAL_CLIENT_JS = r"""
             tabBtns[tabIdx].click();
             epmSyncActiveTab(tabIdx);
         }
+        localStorage.setItem('epm_active_tab', String(tabIdx));
+        let h = '#tab=' + tabIdx;
+        if (tabIdx === 4) {
+            const p = localStorage.getItem('epm_active_settings_pane') || 'pane_in_reg';
+            h += '&pane=' + p;
+        }
+        try { history.replaceState(null, '', h); } catch(e) { window.location.hash = h; }
     };
 
     function epmSyncActiveTab(tabIdx) {
@@ -10322,6 +10362,27 @@ TERMINAL_CLIENT_JS = r"""
         const activeSettingsPane = localStorage.getItem('epm_active_settings_pane') || 'pane_in_reg';
         if (window.epmShowSettingsPane) {
             window.epmShowSettingsPane(activeSettingsPane);
+        }
+
+        // Restore active tab on session reload across all devices
+        let activeTabIdx = 0;
+        const hashTabMatch = window.location.hash.match(/tab=(\d+)/);
+        if (hashTabMatch) {
+            activeTabIdx = parseInt(hashTabMatch[1], 10);
+        } else {
+            const savedTab = localStorage.getItem('epm_active_tab');
+            if (savedTab !== null && savedTab !== '') activeTabIdx = parseInt(savedTab, 10);
+        }
+
+        if (activeTabIdx > 0 && activeTabIdx < 5) {
+            setTimeout(() => {
+                window.epmSwitchTab(activeTabIdx);
+                if (activeTabIdx === 4) {
+                    const hashPaneMatch = window.location.hash.match(/pane=([a-zA-Z0-9_]+)/);
+                    const savedPane = (hashPaneMatch && hashPaneMatch[1]) || localStorage.getItem('epm_active_settings_pane') || 'pane_in_reg';
+                    if (window.epmShowSettingsPane) window.epmShowSettingsPane(savedPane);
+                }
+            }, 120);
         }
 
         const showPdfDrawer = localStorage.getItem('epm_show_pdf_drawer_menu');
@@ -11728,7 +11789,12 @@ TERMINAL_CLIENT_JS = r"""
         if (target) {
             target.style.setProperty('display', 'block', 'important');
         }
+        const mobSel = document.getElementById('epm-settings-mob-select');
+        if (mobSel && mobSel.value !== paneId) mobSel.value = paneId;
         localStorage.setItem('epm_active_settings_pane', paneId);
+        if (localStorage.getItem('epm_active_tab') === '4') {
+            try { history.replaceState(null, '', '#tab=4&pane=' + paneId); } catch(e) {}
+        }
         if (paneId === 'pane_visitors' && window.epmRefreshVisitorTelemetry) {
             window.epmRefreshVisitorTelemetry();
         }
@@ -12054,7 +12120,7 @@ with gr.Blocks(
         '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
         '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">'
         f"<style>{CUSTOM_CSS}</style>"
-        '<script src="/api/terminal-client.js?v=20261103_2300"></script>'
+        '<script src="/api/terminal-client.js?v=20261103_2330"></script>'
     )
 ) as demo:
     gr.HTML(f"<style>{CUSTOM_CSS}</style>{TOP_NAVBAR_HTML}")
@@ -12701,10 +12767,9 @@ with gr.Blocks(
 
 
     refresh_btn.click(manual_refresh, outputs=[status_box, top_news_visual, top_table, bottom_table, mobile_news_feed]).then(None, js="() => window.epmPlayChime(false)")
-    demo.load(get_dashboard_tables, outputs=[status_box, top_news_visual, top_table, bottom_table, mobile_news_feed])
-    demo.load(get_calendar_tables, inputs=[cal_filter, cal_market_filter], outputs=[cal_info_bar, calendar_visual_feed, calendar_table])
-    demo.load(get_circulars_view, inputs=[circ_reg_filter, circ_imp_filter, circ_search], outputs=[circ_info_bar, circ_visual_feed, circ_table, mobile_circ_feed])
-    demo.load(get_holidays_view, inputs=[hol_country_filter], outputs=[mobile_holidays_feed, holidays_table, desktop_holidays_feed])
+    # Note: Pre-computed states (init_*) are directly initialized into component values at launch.
+    # Redundant demo.load calls on all 4 tabs queued up WebSocket blocking & 160s+ spinners on mobile load.
+    # Live updates remain seamlessly powered by wire_timer and interactive filter callbacks!
 
     wire_timer = gr.Timer(30)
     wire_timer.tick(get_dashboard_tables, outputs=[status_box, top_news_visual, top_table, bottom_table, mobile_news_feed])
@@ -12759,7 +12824,7 @@ app = gr.mount_gradio_app(
         '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
         '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">'
         f"<style>{CUSTOM_CSS}</style>"
-        '<script src="/api/terminal-client.js?v=20261103_2300"></script>'
+        '<script src="/api/terminal-client.js?v=20261103_2330"></script>'
     ),
     js=TERMINAL_CLIENT_JS
 )

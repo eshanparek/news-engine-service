@@ -61,7 +61,9 @@ class CircularEngine:
         self._init_db()
 
     def _init_db(self):
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(self.db_path, timeout=30) as conn:
+            conn.execute("PRAGMA journal_mode = WAL;")
+            conn.execute("PRAGMA synchronous = NORMAL;")
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS circulars (
                     id TEXT PRIMARY KEY,
@@ -349,7 +351,8 @@ class CircularEngine:
             logger.info("CircularEngine worker thread launched.")
 
     def _run_loop(self):
-        # Initial poll immediately
+        # Wait 45s after container boots so web endpoints respond instantaneously with seeded records
+        time.sleep(45)
         self.poll_all_regulators()
         while self.running:
             try:
@@ -701,7 +704,7 @@ class CircularEngine:
         query += " ORDER BY timestamp DESC LIMIT 60"
 
         with self._lock:
-            with sqlite3.connect(self.db_path) as conn:
+            with sqlite3.connect(self.db_path, timeout=30) as conn:
                 conn.row_factory = sqlite3.Row
                 rows = conn.execute(query, params).fetchall()
                 results = []

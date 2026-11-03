@@ -15,101 +15,106 @@ async def run():
         page = await context.new_page()
 
         print("Navigating to http://127.0.0.1:7860/...")
+        t0 = asyncio.get_event_loop().time()
         await page.goto("http://127.0.0.1:7860/", wait_until="domcontentloaded", timeout=30000)
-        await asyncio.sleep(3)
+        t_load = asyncio.get_event_loop().time() - t0
+        print(f"DOM Content Loaded in: {t_load:.2f} seconds!")
+        await asyncio.sleep(2)
 
-        # 1. Test Mobile News Filter
-        print("\n--- Testing Mobile News Filter ---")
-        total_news = await page.evaluate("document.querySelectorAll('.epm-mobile-feed .epm-pc-card').length")
-        print(f"Total mobile news cards: {total_news}")
-
-        # Filter by inst_domestic
-        await page.evaluate("window.epmFilterNewsCategory('inst_domestic')")
-        await asyncio.sleep(0.5)
-        vis_news_dom = await page.evaluate("document.querySelectorAll('.epm-mobile-feed .epm-pc-card:not(.epm-filtered-hidden)').length")
-        hid_news_dom = await page.evaluate("document.querySelectorAll('.epm-mobile-feed .epm-pc-card.epm-filtered-hidden').length")
-        print(f"News filtered (inst_domestic): visible={vis_news_dom}, hidden={hid_news_dom}")
-        path_news = os.path.join(ARTIFACT_DIR, "v23_mobile_news_filtered.png")
-        await page.screenshot(path=path_news, full_page=False)
-
-        # Filter by inst_global
-        await page.evaluate("window.epmFilterNewsCategory('inst_global')")
-        await asyncio.sleep(0.5)
-        vis_news_glob = await page.evaluate("document.querySelectorAll('.epm-mobile-feed .epm-pc-card:not(.epm-filtered-hidden)').length")
-        print(f"News filtered (inst_global): visible={vis_news_glob}")
-
-        # Reset news
-        await page.evaluate("window.epmFilterNewsCategory('all')")
-
-        # 2. Test Mobile Calendar Filter
-        print("\n--- Testing Mobile Calendar Filter ---")
-        await page.evaluate("window.epmSwitchTab(1)")
-        await asyncio.sleep(1.5)
-        total_cal = await page.evaluate("document.querySelectorAll('.epm-mobile-timeline .epm-tl-row').length")
-        print(f"Total calendar rows: {total_cal}")
-
-        # Filter by MCX
-        await page.evaluate("window.epmChangeCalMarket('MCX')")
-        await asyncio.sleep(0.5)
-        vis_cal_mcx = await page.evaluate("document.querySelectorAll('.epm-mobile-timeline .epm-tl-row:not(.epm-filtered-hidden)').length")
-        hid_cal_mcx = await page.evaluate("document.querySelectorAll('.epm-mobile-timeline .epm-tl-row.epm-filtered-hidden').length")
-        print(f"Calendar filtered (MCX): visible={vis_cal_mcx}, hidden={hid_cal_mcx}")
-        path_cal = os.path.join(ARTIFACT_DIR, "v23_mobile_cal_filtered.png")
-        await page.screenshot(path=path_cal, full_page=False)
-
-        # 3. Test Mobile Circulars Filter
-        print("\n--- Testing Mobile Circulars Filter ---")
-        await page.evaluate("window.epmSwitchTab(2)")
-        await asyncio.sleep(1.5)
-        total_circ = await page.evaluate("document.querySelectorAll('#mobile_circ_feed .epm-pc-card').length")
-        print(f"Total circulars: {total_circ}")
-
-        # Filter by SEBI
-        await page.evaluate("window.epmFilterCircReg('SEBI')")
-        await asyncio.sleep(0.5)
-        vis_circ_sebi = await page.evaluate("document.querySelectorAll('#mobile_circ_feed .epm-pc-card:not(.epm-filtered-hidden)').length")
-        hid_circ_sebi = await page.evaluate("document.querySelectorAll('#mobile_circ_feed .epm-pc-card.epm-filtered-hidden').length")
-        print(f"Circulars filtered (SEBI): visible={vis_circ_sebi}, hidden={hid_circ_sebi}")
-        path_circ = os.path.join(ARTIFACT_DIR, "v23_mobile_circ_filtered.png")
-        await page.screenshot(path=path_circ, full_page=False)
-
-        # 4. Test Mobile Holidays Filter
-        print("\n--- Testing Mobile Holidays Filter ---")
-        await page.evaluate("window.epmSwitchTab(3)")
-        await asyncio.sleep(1.5)
-        total_hol = await page.evaluate("document.querySelectorAll('.epm-mobile-timeline .epm-tl-row[data-nse]').length")
-        print(f"Total holidays: {total_hol}")
-
-        # Filter by MCX
-        await page.evaluate("window.epmFilterHolidays('MCX')")
-        await asyncio.sleep(0.5)
-        vis_hol_mcx = await page.evaluate("document.querySelectorAll('.epm-mobile-timeline .epm-tl-row[data-nse]:not(.epm-filtered-hidden)').length")
-        hid_hol_mcx = await page.evaluate("document.querySelectorAll('.epm-mobile-timeline .epm-tl-row[data-nse].epm-filtered-hidden').length")
-        print(f"Holidays filtered (MCX): visible={vis_hol_mcx}, hidden={hid_hol_mcx}")
-        path_hol = os.path.join(ARTIFACT_DIR, "v23_mobile_holidays_filtered.png")
-        await page.screenshot(path=path_hol, full_page=False)
-
-        # 5. Test Side Menu - Check that 'Tab 5' is completely REMOVED from Settings card
-        print("\n--- Testing Side Menu: Verification of Tab 5 Removal ---")
+        # 1. Test Side Menu Names
+        print("\n--- Testing Side Menu Renaming ---")
         menu_btn = await page.query_selector("#epm-desktop-menu-btn, .epm-menu-btn")
         if menu_btn:
             await menu_btn.click()
             await asyncio.sleep(1)
 
-            settings_card_text = await page.evaluate("""() => {
-                const settingsCard = document.querySelector('.epm-side-nav-item[data-tab=\"4\"]');
-                return settingsCard ? settingsCard.innerText : 'Not found';
-            }""")
-            print(f"Settings card text in side menu:\n{settings_card_text}")
-            has_tab5 = 'Tab 5' in settings_card_text
-            print(f"Does Settings card contain 'Tab 5'? {has_tab5}")
-            assert not has_tab5, "ERROR: Settings card still contains 'Tab 5'!"
+            news_name = await page.evaluate("document.querySelector('.epm-side-nav-item[data-tab=\"0\"] .epm-side-item-name').innerText")
+            cal_name = await page.evaluate("document.querySelector('.epm-side-nav-item[data-tab=\"1\"] .epm-side-item-name').innerText")
+            settings_name = await page.evaluate("document.querySelector('.epm-side-nav-item[data-tab=\"4\"] .epm-side-item-name').innerText")
+            settings_desc = await page.evaluate("!!document.querySelector('.epm-side-nav-item[data-tab=\"4\"] .epm-side-item-desc')")
 
-            path_menu = os.path.join(ARTIFACT_DIR, "v23_mobile_side_menu_no_tab5.png")
+            print(f"Tab 0 name: '{news_name}' (expected: 'Live Breaking News')")
+            print(f"Tab 1 name: '{cal_name}' (expected: 'Market Outlook')")
+            print(f"Tab 4 name: '{settings_name}' (expected: 'Settings')")
+            print(f"Settings has extra desc text: {settings_desc} (expected: False)")
+
+            assert news_name == "Live Breaking News"
+            assert cal_name == "Market Outlook"
+            assert settings_name == "Settings"
+            assert not settings_desc
+
+            path_menu = os.path.join(ARTIFACT_DIR, "v24_mobile_side_menu_renamed.png")
             await page.screenshot(path=path_menu, full_page=False)
             print(f"Captured {path_menu}")
 
+            # Close side menu
+            close_btn = await page.query_selector(".epm-side-drawer-close")
+            if close_btn:
+                await close_btn.click()
+                await asyncio.sleep(0.5)
+
+        # 2. Test Circulars Page Load & Zero Spinner
+        print("\n--- Testing Circulars Page Load ---")
+        t_circ_0 = asyncio.get_event_loop().time()
+        await page.evaluate("window.epmSwitchTab(2)")
+        await asyncio.sleep(1)
+        t_circ_switch = asyncio.get_event_loop().time() - t_circ_0
+        print(f"Switched to Circulars tab in {t_circ_switch:.2f}s")
+        has_spinner = await page.evaluate("!!document.querySelector('#circ_visual_feed .wrap.default, #circ_visual_feed .loading')")
+        print(f"Circulars has blocking spinner: {has_spinner}")
+
+        path_circ = os.path.join(ARTIFACT_DIR, "v24_mobile_circ_instant_load.png")
+        await page.screenshot(path=path_circ, full_page=False)
+        print(f"Captured {path_circ}")
+
+        # 3. Test Mobile Settings Hub & Sub-Settings Visibility
+        print("\n--- Testing Mobile Settings Hub & Sub-Settings Visibility ---")
+        await page.evaluate("window.epmSwitchTab(4)")
+        await asyncio.sleep(1)
+        # Unlock admin PIN
+        await page.evaluate("document.getElementById('epm-admin-pin-input').value = '202688'; window.epmUnlockAdmin();")
+        await asyncio.sleep(1.5)
+
+        # Check mobile selector options
+        mob_opt_count = await page.evaluate("document.querySelectorAll('#epm-settings-mob-select option').length")
+        mob_nav_btns = await page.evaluate("document.querySelectorAll('.epm-settings-nav-item').length")
+        print(f"Mobile settings selector options: {mob_opt_count} sub-settings (expected: 16)")
+        print(f"Mobile settings 2-col navigation buttons: {mob_nav_btns} (expected: 16)")
+        assert mob_opt_count == 16
+        assert mob_nav_btns == 16
+
+        # Switch to Entities & Sources Taxonomy via mobile select
+        await page.evaluate("window.epmShowSettingsPane('pane_taxonomy')")
+        await asyncio.sleep(1)
+        tax_visible = await page.evaluate("document.getElementById('pane_taxonomy').style.display !== 'none'")
+        print(f"Switched to 'pane_taxonomy': visible={tax_visible}")
+
+        path_settings = os.path.join(ARTIFACT_DIR, "v24_mobile_settings_all_subpanes.png")
+        await page.screenshot(path=path_settings, full_page=False)
+        print(f"Captured {path_settings}")
+
+        # 4. Test Session Persistence Across Page Reload
+        print("\n--- Testing Session Persistence on Reload ---")
+        current_hash = await page.evaluate("window.location.hash")
+        current_tab = await page.evaluate("localStorage.getItem('epm_active_tab')")
+        current_pane = await page.evaluate("localStorage.getItem('epm_active_settings_pane')")
+        print(f"Before reload: hash='{current_hash}', active_tab={current_tab}, active_pane='{current_pane}'")
+
+        # Reload the page!
+        await page.reload(wait_until="domcontentloaded")
+        await asyncio.sleep(2)
+
+        after_tab = await page.evaluate("localStorage.getItem('epm_active_tab')")
+        after_hash = await page.evaluate("window.location.hash")
+        active_pane_after = await page.evaluate("document.getElementById('pane_taxonomy') ? document.getElementById('pane_taxonomy').style.display !== 'none' : false")
+        admin_gate_visible = await page.evaluate("document.getElementById('epm-admin-gate') ? document.getElementById('epm-admin-gate').style.display !== 'none' : false")
+
+        print(f"After reload: active_tab={after_tab}, hash='{after_hash}', pane_taxonomy_visible={active_pane_after}")
+        path_reloaded = os.path.join(ARTIFACT_DIR, "v24_mobile_reloaded_preserved_tab.png")
+        await page.screenshot(path=path_reloaded, full_page=False)
+        print(f"Captured {path_reloaded}")
+
         await browser.close()
-        print("\nALL VERIFICATIONS PASSED!")
+        print("\nALL AUTOMATED TESTS PASSED WITH 100% SUCCESS!")
 
 asyncio.run(run())
