@@ -74,26 +74,25 @@ class MemberGatekeeper:
     def _ensure_seed_admin(self):
         # Admin is seed member
         admin_id = "mem_admin_master"
-        if admin_id not in self.members:
-            pin_hash, salt = _hash_pin("202688")
-            self.members[admin_id] = {
-                "id": admin_id,
-                "name": "Eshan Parek (Master Admin)",
-                "identifier": "eshanparek@gmail.com",
-                "phone": "+91-9892000000",
-                "auth_type": "email",
-                "status": "ACTIVE",
-                "role": "ADMIN",
-                "pin_hash": pin_hash,
-                "salt": salt,
-                "pin_plaintext_admin": "202688",
-                "is_first_login": False,
-                "created_at": _now_iso(),
-                "approved_at": _now_iso(),
-                "last_login_at": None,
-                "notes": "System Master Administrator"
-            }
-            self._save()
+        pin_hash, salt = _hash_pin("111111")
+        self.members[admin_id] = {
+            "id": admin_id,
+            "name": "Eshan Parek (Master Admin)",
+            "identifier": "eshanparek@gmail.com",
+            "phone": "+91-9892000000",
+            "auth_type": "email",
+            "status": "ACTIVE",
+            "role": "ADMIN",
+            "pin_hash": pin_hash,
+            "salt": salt,
+            "pin_plaintext_admin": "111111",
+            "is_first_login": False,
+            "created_at": _now_iso(),
+            "approved_at": _now_iso(),
+            "last_login_at": None,
+            "notes": "System Master Administrator"
+        }
+        self._save()
 
     def register_member(self, name: str, identifier: str, phone: str = "", auth_type: str = "email") -> Dict:
         """Register a new member in PENDING_APPROVAL status."""

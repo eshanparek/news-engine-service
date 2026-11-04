@@ -320,5 +320,29 @@ class StockNewsEngine:
                 })
             return results
 
+
+    def fetch_stock_history(self, ticker: str, limit: int = 5) -> List[Dict]:
+        """Fetch chronological history (last 4-5 events) for a specific ticker."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT * FROM stock_disclosures 
+            WHERE UPPER(ticker) = ? 
+            ORDER BY timestamp DESC LIMIT ?
+            """, (ticker.upper().strip(), limit))
+            rows = cursor.fetchall()
+            results = []
+            for r in rows:
+                tags = []
+                try: tags = json.loads(r[5])
+                except Exception: tags = []
+                results.append({
+                    "id": r[0], "ticker": r[1], "company": r[2], "exchange": r[3],
+                    "market": r[4], "index_tags": tags, "sector": r[6], "title": r[7],
+                    "summary": r[8], "sentiment": r[9], "impact": r[10],
+                    "disclosure_type": r[11], "timestamp": r[12], "filing_url": r[13], "source": r[14]
+                })
+            return results
+
 # Global Singleton Instance
 stock_engine = StockNewsEngine()

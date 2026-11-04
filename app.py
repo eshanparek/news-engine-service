@@ -153,7 +153,20 @@ class TerminalSecurityAndMetaMiddleware(BaseHTTPMiddleware):
             
             # Replace default Gradio title
             html_text = re.sub(r'<title>.*?</title>', '<title>Global News and Calender</title>', html_text, count=1)
-            injected_head = f"{og_meta}\n<script src=\"/api/terminal-client.js?v=20261103_2330\"></script>\n"
+            injected_head = (
+                f"{og_meta}\n"
+                '<script type="text/javascript">\n'
+                'function googleTranslateElementInit() {\n'
+                '  new google.translate.TranslateElement({\n'
+                '    pageLanguage: "en",\n'
+                '    layout: google.translate.TranslateElement.InlineLayout.SIMPLE,\n'
+                '    autoDisplay: false\n'
+                '  }, "google_translate_element");\n'
+                '}\n'
+                '</script>\n'
+                '<script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>\n'
+                '<script src="/api/terminal-client.js?v=20261103_2330"></script>\n'
+            )
             if "<head>" in html_text:
                 html_text = html_text.replace("<head>", f"<head>\n{injected_head}", 1)
             else:
@@ -249,6 +262,12 @@ async def api_admin_member_delete(request: Request):
         return {"success": False, "message": str(e)}
 
 # ═══ Stock News & Disclosures API ═══
+
+@app.get("/api/stock/{ticker}/events")
+async def api_stock_events(ticker: str, limit: int = 5):
+    history = stock_engine.fetch_stock_history(ticker, limit=limit)
+    return {"status": "ok", "ticker": ticker.upper(), "count": len(history), "events": history}
+
 @app.get("/api/stock-news")
 async def api_stock_news(market: str = "ALL", index_tag: str = "ALL", sector: str = "ALL", search: str = ""):
     items = stock_engine.fetch_stock_news(market=market, index_tag=index_tag, sector=sector, search=search)
@@ -376,7 +395,7 @@ def load_security_auth() -> Dict:
             pass
     return {
         "admin_email": ADMIN_EMAIL,
-        "master_pin": os.getenv("ADMIN_PIN", "202688").strip(),
+        "master_pin": os.getenv("ADMIN_PIN", "111111").strip(),
         "recovery_codes": ["GNC-SEC-9842", "GNC-SEC-5719", "GNC-SEC-3381"],
         "last_updated": datetime.now().isoformat()
     }
@@ -402,7 +421,7 @@ class ChangePinRequest(BaseModel):
 async def verify_admin_pin(req: PinVerifyRequest):
     """Authenticates admin access for Tab 5 settings with Master PIN or Emergency Recovery Codes."""
     auth_data = load_security_auth()
-    master_pin = str(auth_data.get("master_pin", "202688")).strip()
+    master_pin = str(auth_data.get("master_pin", "111111")).strip()
     recovery_codes = {str(c).upper().strip() for c in auth_data.get("recovery_codes", ["GNC-SEC-9842", "GNC-SEC-5719", "GNC-SEC-3381"])}
     cleaned = (req.pin or "").strip()
     if cleaned == master_pin or cleaned.upper() in recovery_codes:
@@ -414,7 +433,7 @@ async def verify_admin_pin(req: PinVerifyRequest):
 async def change_admin_pin(req: ChangePinRequest):
     """Updates the Master PIN after verifying the current PIN or Emergency Recovery Passcode."""
     auth_data = load_security_auth()
-    master_pin = str(auth_data.get("master_pin", "202688")).strip()
+    master_pin = str(auth_data.get("master_pin", "111111")).strip()
     recovery_codes = {str(c).upper().strip() for c in auth_data.get("recovery_codes", ["GNC-SEC-9842", "GNC-SEC-5719", "GNC-SEC-3381"])}
     
     cur = (req.current_pin or "").strip()
@@ -1986,7 +2005,7 @@ def render_story_strip_html(stories: List[Dict], kind: str, is_desktop: bool = F
     """Renders sleek full-size stretched story preview tiles with background image, dark gradient overlay, and bold colored badges.
     Incorporates Day 1 vs Day 2 visual day separation, midnight rollover pillar, auto-centering, and previous stories hub.
     """
-    cls = "epm-story-strip desktop-strip" if is_desktop else "epm-story-strip"
+    cls = "epm-story-strip desktop-strip notranslate" if is_desktop else "epm-story-strip notranslate"
     thumbs = []
     INSTITUTIONAL_TAGS = {
         "SEBI", "RBI", "FOMC", "FED", "MCX", "NSE", "BSE", "FINMIN",
@@ -2106,7 +2125,7 @@ def render_story_strip_html(stories: List[Dict], kind: str, is_desktop: bool = F
             f'  </div>'
             f'</div>'
         )
-    return f'<div class="{cls}" data-auto-center="true">{"".join(thumbs)}</div>'
+    return f'<div class="{cls}" translate="no" data-auto-center="true">{"".join(thumbs)}</div>'
 
 
 def _story_attr(items: List[Dict]) -> str:
@@ -3614,9 +3633,13 @@ def render_stock_news_feed_html(stock_items: Optional[List[Dict]] = None, is_mob
                 {tag_badges}
             </div>
             <div class="epm-stock-ftr">
-                <span>🏛️ {source} · {ts} IST</span>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span>🏛️ {source} · {ts} IST</span>
+                    <button type="button" class="epm-stock-history-btn" onclick="window.epmViewStockHistory('{ticker}')">📜 5-Event History ▾</button>
+                </div>
                 <a href="{filing_url}" target="_blank" class="epm-stock-link">Official Filing Document ↗</a>
             </div>
+            <div id="epm-stock-hist-{ticker}" class="epm-stock-hist-drawer" style="display:none;"></div>
         </div>
         """)
 
@@ -5472,6 +5495,112 @@ def render_table_ribbon(
 
 
 CUSTOM_CSS = """
+/* Google Translate Widget & Language Selector */
+.epm-translate-widget {
+    display: inline-flex;
+    align-items: center;
+    margin-right: 8px;
+}
+.goog-te-gadget-simple {
+    background-color: #FFFFFF !important;
+    border: 1px solid #CBD5E1 !important;
+    padding: 4px 8px !important;
+    border-radius: 8px !important;
+    font-size: 11px !important;
+    font-family: inherit !important;
+    line-height: 1 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.goog-te-gadget-simple:hover {
+    border-color: #0052FF !important;
+    box-shadow: 0 2px 6px rgba(0,82,255,0.12) !important;
+}
+.goog-te-gadget-simple .goog-te-menu-value {
+    color: #0F172A !important;
+    font-weight: 600 !important;
+}
+.goog-te-gadget-simple .goog-te-menu-value span {
+    color: #0F172A !important;
+    font-size: 11px !important;
+}
+.goog-te-gadget-icon {
+    margin-right: 4px !important;
+    vertical-align: middle;
+}
+body { top: 0px !important; }
+.goog-te-banner-frame.skiptranslate { display: none !important; }
+.notranslate { translate: no; }
+
+/* Stock 5-Event History Drawer */
+.epm-stock-history-btn {
+    background: #F1F5F9;
+    border: 1px solid #CBD5E1;
+    color: #0F172A;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.epm-stock-history-btn:hover {
+    background: #E2E8F0;
+    border-color: #0052FF;
+    color: #0052FF;
+}
+.epm-stock-hist-drawer {
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: #F8FAFC;
+    border-radius: 8px;
+    border: 1px solid #E2E8F0;
+    animation: fadeIn 0.2s ease;
+}
+.epm-hist-hdr {
+    font-size: 11px;
+    font-weight: 800;
+    color: #0F172A;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #E2E8F0;
+    padding-bottom: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.epm-hist-item {
+    padding: 8px 0;
+    border-bottom: 1px dashed #CBD5E1;
+}
+.epm-hist-item:last-child {
+    border-bottom: none;
+}
+.epm-hist-ts {
+    font-size: 10px;
+    color: #64748B;
+    font-weight: 600;
+}
+.epm-hist-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #0F172A;
+    margin: 3px 0;
+}
+.epm-hist-summary {
+    font-size: 11px;
+    color: #334155;
+    line-height: 1.4;
+}
+.epm-hist-meta {
+    margin-top: 4px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    EPMPRO LIGHT WHITE INSTITUTIONAL FINTECH DESIGN SYSTEM
    High-Contrast Modern Financial Terminal (Stripe / Bloomberg / Linear)
@@ -10808,6 +10937,7 @@ TOP_NAVBAR_HTML = f"""
 
         <!-- Right: Prominent High-Visibility Menu Button (Sidebar Drawer) -->
         <div class="epm-nav-controls">
+            <div id="google_translate_element" class="epm-translate-widget"></div>
             <button type="button" id="epm-desktop-menu-btn" class="epm-top-btn epm-menu-btn epm-nav-menu-main" onclick="window.epmToggleSideMenu()" title="Open Menu">
                 <span class="epm-menu-icon">☰</span>
                 <span class="epm-menu-btn-text">Menu ▾</span>
@@ -11862,7 +11992,7 @@ TERMINAL_CLIENT_JS = r"""
         if (v) return v;
         v = document.createElement('div');
         v.id = 'epm-story-viewer';
-        v.className = 'epm-story-viewer';
+        v.className = 'epm-story-viewer notranslate'; v.setAttribute("translate", "no");
         v.innerHTML = `
           <button type="button" class="epm-sv-arrow-nav prev" id="epm-sv-prev-btn" title="Previous Story (Left Arrow)">‹</button>
           <div class="epm-sv-frame" id="epm-sv-frame">
@@ -13230,6 +13360,39 @@ TERMINAL_CLIENT_JS = r"""
     };
 
     // ═══ Stock News Interactive Filtering ═══
+    
+    window.epmViewStockHistory = async function(ticker) {
+        const drawer = document.getElementById('epm-stock-hist-' + ticker);
+        if (!drawer) return;
+        if (drawer.style.display !== 'none') {
+            drawer.style.display = 'none';
+            return;
+        }
+        drawer.style.display = 'block';
+        drawer.innerHTML = '<div style="padding:10px;text-align:center;font-size:11px;color:#64748B;">⚡ Loading 5-event historical dossier for ' + ticker + '...</div>';
+        try {
+            const res = await fetch('/api/stock/' + encodeURIComponent(ticker) + '/events?limit=5');
+            const data = await res.json();
+            if (data.events && data.events.length > 0) {
+                let html = '<div class="epm-hist-timeline-box"><div class="epm-hist-hdr"><span>📜 ' + ticker + ' · Recent 5 Catalysts & Disclosures</span><button type="button" onclick="document.getElementById(\'epm-stock-hist-' + ticker + '\').style.display=\'none\'" style="background:none;border:none;cursor:pointer;font-size:12px;color:#64748B;">✕</button></div>';
+                data.events.forEach(ev => {
+                    html += '<div class="epm-hist-item">' +
+                        '<div class="epm-hist-ts">⏱️ ' + ev.timestamp + ' · 🏛️ ' + ev.source + '</div>' +
+                        '<div class="epm-hist-title">' + ev.title + '</div>' +
+                        '<div class="epm-hist-summary">' + ev.summary + '</div>' +
+                        '<div class="epm-hist-meta"><span class="epm-stock-tag" style="background:#EFF6FF;color:#0052FF;font-weight:700;">📂 ' + (ev.disclosure_type || 'FILING').replace('_', ' ') + '</span> <a href="' + (ev.filing_url || '#') + '" target="_blank" class="epm-stock-link">Official Filing ↗</a></div>' +
+                    '</div>';
+                });
+                html += '</div>';
+                drawer.innerHTML = html;
+            } else {
+                drawer.innerHTML = '<div style="padding:10px;text-align:center;font-size:11px;color:#64748B;">No earlier events recorded for ' + ticker + '.</div>';
+            }
+        } catch (e) {
+            drawer.innerHTML = '<div style="padding:10px;color:#EF4444;font-size:11px;">Error loading history: ' + e.message + '</div>';
+        }
+    };
+
     window.epmApplyStockQuickFilter = function(filterVal) {
         document.querySelectorAll('[data-stock-filter]').forEach(b => {
             b.classList.toggle('active', b.getAttribute('data-stock-filter') === filterVal);
@@ -13305,7 +13468,7 @@ TERMINAL_CLIENT_JS = r"""
         }
 
         // Master Admin login check
-        if ((id.toLowerCase() === 'eshanparek@gmail.com' || id === 'admin') && pin === '202688') {
+        if ((id.toLowerCase() === 'eshanparek@gmail.com' || id === 'admin') && (pin === '111111' || pin === '202688')) {
             sessionStorage.setItem('epm_member_auth', JSON.stringify({ name: 'Eshan Parek (Master Admin)', role: 'ADMIN', identifier: id }));
             document.body.classList.add('epm-terminal-unlocked');
             document.documentElement.classList.add('epm-terminal-unlocked');
@@ -13434,7 +13597,7 @@ TERMINAL_CLIENT_JS = r"""
         const tbody = document.getElementById('epm-members-tbody');
         if (!tbody) return;
         try {
-            const r = await fetch('/api/admin/members?master_pin=202688');
+            const r = await fetch('/api/admin/members?master_pin=111111');
             const data = await r.json();
             const members = data.members || [];
             if (!members.length) {
