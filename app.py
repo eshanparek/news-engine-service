@@ -367,10 +367,18 @@ async def save_social_links_endpoint(req: Request):
     try:
         body = await req.json()
         p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config", "social_links.json")
+        def _clean_url(u: str, default: str) -> str:
+            u = str(u or "").strip()
+            if not u:
+                return default
+            if not u.startswith("http://") and not u.startswith("https://"):
+                u = "https://" + u
+            return u
+
         data = {
-            "facebook": str(body.get("facebook") or "https://www.facebook.com").strip(),
-            "instagram": str(body.get("instagram") or "https://www.instagram.com").strip(),
-            "twitter": str(body.get("twitter") or "https://x.com").strip()
+            "facebook": _clean_url(body.get("facebook"), "https://www.facebook.com"),
+            "instagram": _clean_url(body.get("instagram"), "https://www.instagram.com"),
+            "twitter": _clean_url(body.get("twitter"), "https://www.x.com")
         }
         with open(p, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
@@ -12013,17 +12021,27 @@ TERMINAL_CLIENT_JS = r"""
     };
 
     window.epmSaveSocialLinks = function() {
-        const fb = (document.getElementById('epm-social-input-fb') ? document.getElementById('epm-social-input-fb').value : '').trim();
-        const ig = (document.getElementById('epm-social-input-ig') ? document.getElementById('epm-social-input-ig').value : '').trim();
-        const tw = (document.getElementById('epm-social-input-tw') ? document.getElementById('epm-social-input-tw').value : '').trim();
+        const cleanUrl = (u, def) => {
+            u = (u || '').trim();
+            if (!u) return def;
+            if (!u.startsWith('http://') && !u.startsWith('https://')) return 'https://' + u;
+            return u;
+        };
+        const fbRaw = (document.getElementById('epm-social-input-fb') ? document.getElementById('epm-social-input-fb').value : '').trim();
+        const igRaw = (document.getElementById('epm-social-input-ig') ? document.getElementById('epm-social-input-ig').value : '').trim();
+        const twRaw = (document.getElementById('epm-social-input-tw') ? document.getElementById('epm-social-input-tw').value : '').trim();
+
+        const data = {
+            facebook: cleanUrl(fbRaw, 'https://www.facebook.com'),
+            instagram: cleanUrl(igRaw, 'https://www.instagram.com'),
+            twitter: cleanUrl(twRaw, 'https://www.x.com')
+        };
 
         const statusEl = document.getElementById('epm-social-save-status');
         if (statusEl) {
             statusEl.textContent = '⏳ Saving...';
             statusEl.style.color = '#0052FF';
         }
-
-        const data = { facebook: fb, instagram: ig, twitter: tw };
 
         fetch('/api/settings/social-links', {
             method: 'POST',
@@ -12037,7 +12055,11 @@ TERMINAL_CLIENT_JS = r"""
                 statusEl.style.color = '#16A34A';
                 setTimeout(() => { statusEl.textContent = ''; }, 4000);
             }
-            if (window.epmUpdateSideSocialLinks) {
+            if (res && res.links) {
+                if (window.epmUpdateSideSocialLinks) {
+                    window.epmUpdateSideSocialLinks(res.links);
+                }
+            } else if (window.epmUpdateSideSocialLinks) {
                 window.epmUpdateSideSocialLinks(data);
             }
         })
