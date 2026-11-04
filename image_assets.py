@@ -387,6 +387,107 @@ def generate_holiday_thumb(holiday_key: str, title: str = "") -> bytes:
         d.rectangle([114, 60, 126, 85], fill=(69, 26, 3))
         lbl = "THANKSGIVING (US)"
 
+    # 12. US INDEPENDENCE DAY (4th of July)
+    elif any(k in key_norm for k in ["independence day (us)", "4th of july", "july 4", "07-04"]):
+        img.paste((15, 23, 42), [0, 0, w, h])  # Deep Navy
+        d = ImageDraw.Draw(img)
+        # Red & White stripes ribbon at bottom
+        for si, sc in enumerate([(220, 38, 38), (255, 255, 255), (220, 38, 38), (255, 255, 255), (220, 38, 38)]):
+            d.rectangle([20, 130 + si * 10, w - 20, 140 + si * 10], fill=sc)
+        # Blue Canton Shield with Stars
+        d.rounded_rectangle([60, 30, 180, 125], radius=12, fill=(30, 58, 138), outline=(250, 204, 21), width=2)
+        # White Stars
+        for sx, sy in [(90, 55), (120, 55), (150, 55), (105, 85), (135, 85)]:
+            cx, cy, r_s = sx, sy, 8
+            pts = []
+            for i in range(10):
+                rad = r_s if i % 2 == 0 else r_s * 0.45
+                ang = math.radians(i * 36 - 90)
+                pts.append((cx + rad * math.cos(ang), cy + rad * math.sin(ang)))
+            d.polygon(pts, fill=(255, 255, 255))
+        lbl = "US INDEPENDENCE DAY 🇺🇸"
+
+    # 13. MAHASHIVRATRI (Feb/March)
+    elif any(k in key_norm for k in ["mahashivratri", "shivratri", "02-15", "03-08"]):
+        img.paste((24, 18, 43), [0, 0, w, h])  # Midnight Mystical Indigo
+        d = ImageDraw.Draw(img)
+        # Glowing Crescent Moon
+        d.ellipse([125, 35, 175, 85], fill=(254, 240, 138))
+        d.ellipse([140, 32, 185, 82], fill=(24, 18, 43))
+        # Golden Trishul (Trident)
+        cx, cy = 120, 115
+        d.line([cx, 45, cx, 180], fill=(250, 204, 21), width=5)
+        d.arc([cx - 40, cy - 60, cx + 40, cy + 10], start=0, end=180, fill=(250, 204, 21), width=4)
+        d.polygon([(cx - 40, cy - 60), (cx - 46, cy - 40), (cx - 34, cy - 40)], fill=(250, 204, 21))
+        d.polygon([(cx + 40, cy - 60), (cx + 34, cy - 40), (cx + 46, cy - 40)], fill=(250, 204, 21))
+        d.polygon([(cx, 40), (cx - 8, 60), (cx + 8, 60)], fill=(250, 204, 21))
+        # Sacred Damru in center
+        d.polygon([(cx - 20, cy), (cx + 20, cy), (cx, cy + 20)], fill=(217, 119, 6))
+        d.polygon([(cx - 20, cy + 40), (cx + 20, cy + 40), (cx, cy + 20)], fill=(217, 119, 6))
+        lbl = "MAHASHIVRATRI 🔱"
+
+    # 14. DR. B.R. AMBEDKAR JAYANTI (14 Apr)
+    elif any(k in key_norm for k in ["ambedkar", "04-14"]):
+        img.paste((30, 58, 138), [0, 0, w, h])  # Royal Blue 800
+        d = ImageDraw.Draw(img)
+        # Golden Constitution Book Motif
+        d.rounded_rectangle([50, 45, 190, 175], radius=10, fill=(255, 255, 255), outline=(250, 204, 21), width=3)
+        d.rounded_rectangle([58, 53, 182, 167], radius=8, fill=(239, 246, 255))
+        # Ashok Chakra Wheel
+        cx, cy, r_c = 120, 110, 30
+        d.ellipse([cx - r_c, cy - r_c, cx + r_c, cy + r_c], outline=(30, 58, 138), width=3)
+        for i in range(16):
+            ang = math.radians(i * (360 / 16))
+            d.line([cx, cy, cx + r_c * math.cos(ang), cy + r_c * math.sin(ang)], fill=(30, 58, 138), width=2)
+        lbl = "AMBEDKAR JAYANTI ⚖️"
+
+    # 15. MAHARASHTRA DAY (01 May)
+    elif any(k in key_norm for k in ["maharashtra", "05-01"]):
+        img.paste((234, 88, 12), [0, 0, w, h])  # Saffron Flame
+        d = ImageDraw.Draw(img)
+        # Shivaji Fort Bastion & Maratha Flag Motif
+        d.rounded_rectangle([40, 50, 200, 170], radius=12, fill=(255, 247, 237), outline=(250, 204, 21), width=3)
+        d.polygon([(60, 140), (80, 80), (120, 80), (140, 140)], fill=(194, 65, 12))
+        d.polygon([(110, 140), (130, 70), (170, 70), (190, 140)], fill=(194, 65, 12))
+        # Maratha Double-Pennant Flag
+        d.line([120, 60, 120, 150], fill=(120, 53, 15), width=3)
+        d.polygon([(120, 60), (175, 75), (150, 90), (175, 105), (120, 120)], fill=(234, 88, 12))
+        lbl = "MAHARASHTRA DAY 🚩"
+
+    # 16. GANESH CHATURTHI (Sept)
+    elif any(k in key_norm for k in ["ganesh", "vinayaka", "09-14", "09-15"]):
+        img.paste((185, 28, 28), [0, 0, w, h])  # Sacred Sindoor Red
+        d = ImageDraw.Draw(img)
+        # Golden Aura Ring
+        cx, cy, r_a = 120, 110, 65
+        d.ellipse([cx - r_a, cy - r_a, cx + r_a, cy + r_a], fill=(254, 240, 138), outline=(250, 204, 21), width=3)
+        # Modak Motif
+        d.polygon([(120, 65), (85, 140), (155, 140)], fill=(245, 158, 11))
+        d.ellipse([85, 130, 155, 155], fill=(245, 158, 11))
+        d.line([120, 70, 120, 145], fill=(217, 119, 6), width=2)
+        lbl = "GANESH CHATURTHI 🌺"
+
+    # 17. US CIVIC HOLIDAYS (MLK Day, Memorial Day, Juneteenth, Labor Day, Presidents Day)
+    elif any(k in key_norm for k in ["martin luther", "mlk", "memorial", "labor", "presidents", "juneteenth", "veterans"]):
+        img.paste((15, 23, 42), [0, 0, w, h])
+        d = ImageDraw.Draw(img)
+        # American Civic Shield
+        d.polygon([(120, 40), (190, 75), (190, 135), (120, 185), (50, 135), (50, 75)], fill=(30, 58, 138), outline=(250, 204, 21), width=3)
+        # Red and white stripes inside shield
+        for si, sc in enumerate([(220, 38, 38), (255, 255, 255), (220, 38, 38), (255, 255, 255)]):
+            d.rectangle([65 + si * 28, 100, 65 + (si + 1) * 28, 160], fill=sc)
+        d.polygon([(120, 48), (175, 75), (65, 75)], fill=(30, 58, 138))
+        # Top White Star
+        cx, cy, r_s = 120, 75, 12
+        pts = []
+        for i in range(10):
+            rad = r_s if i % 2 == 0 else r_s * 0.45
+            ang = math.radians(i * 36 - 90)
+            pts.append((cx + rad * math.cos(ang), cy + rad * math.sin(ang)))
+        d.polygon(pts, fill=(255, 255, 255))
+        c_name = "MEMORIAL DAY" if "memorial" in key_norm else ("LABOR DAY" if "labor" in key_norm else ("JUNETEENTH" if "juneteenth" in key_norm else "US CIVIC HOLIDAY"))
+        lbl = f"{c_name} 🇺🇸"
+
     # DEFAULT / OTHER HOLIDAYS (Elections, Maharashtra Day, Ambedkar Jayanti, etc.)
     else:
         img.paste((241, 245, 249), [0, 0, w, h])
@@ -660,6 +761,34 @@ def generate_regulator_logo(reg_code: str) -> bytes:
         d.text((64, 85), "COIN", font=_load_font(34, bold=True), fill=(24, 24, 27))
         d.text((64, 120), "DESK", font=_load_font(30, bold=True), fill=(24, 24, 27))
         d.text((54, 208), "CRYPTO & MACRO", font=f_sub, fill=(250, 204, 21))
+
+    elif "FT" in code or "FINANCIAL TIMES" in code:
+        # FT Signature Salmon Pink background
+        img.paste((255, 241, 229), [0, 0, w, h])
+        d = ImageDraw.Draw(img)
+        d.rounded_rectangle([30, 35, 210, 185], radius=12, fill=(255, 241, 229), outline=(15, 23, 42), width=3)
+        d.text((68, 65), "FT", font=_load_font(58, bold=True), fill=(15, 23, 42))
+        d.line([45, 145, 195, 145], fill=(15, 23, 42), width=2)
+        d.text((44, 155), "FINANCIAL TIMES", font=_load_font(13, bold=True), fill=(15, 23, 42))
+        d.text((52, 208), "GLOBAL FINANCIAL DAILY", font=f_sub, fill=(15, 23, 42))
+
+    elif "ECONOMIST" in code:
+        # The Economist Iconic Crimson Red
+        img.paste((227, 18, 11), [0, 0, w, h])
+        d = ImageDraw.Draw(img)
+        d.rounded_rectangle([30, 40, 210, 180], radius=10, fill=(255, 255, 255))
+        d.text((52, 60), "The", font=_load_font(28, bold=True), fill=(227, 18, 11))
+        d.text((45, 95), "Economist", font=_load_font(32, bold=True), fill=(227, 18, 11))
+        d.text((44, 208), "GLOBAL INTELLIGENCE", font=_load_font(12, bold=True), fill=(255, 255, 255))
+
+    elif "CNN" in code:
+        # CNN Signature Red
+        img.paste((204, 0, 0), [0, 0, w, h])
+        d = ImageDraw.Draw(img)
+        d.rounded_rectangle([30, 45, 210, 175], radius=16, fill=(255, 255, 255))
+        d.text((52, 72), "CNN", font=_load_font(54, bold=True), fill=(204, 0, 0))
+        d.line([45, 140, 195, 140], fill=(204, 0, 0), width=3)
+        d.text((46, 208), "GLOBAL NEWS NETWORK", font=f_sub, fill=(255, 255, 255))
 
     # 13. Multilateral: IMF, ECB, BOE, BOJ, OPEC, IFSCA, FINMIN
     elif "IMF" in code:

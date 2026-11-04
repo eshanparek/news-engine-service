@@ -94,13 +94,17 @@
         "REUTERS", "BLOOMBERG", "MARKETWATCH", "WALL STREET JOURNAL", "WSJ", 
         "NEW YORK TIMES", "NYT", "CNBC", "COINDESK", "COINTELEGRAPH", 
         "BINANCE", "BITCOIN", "CRYPTO", "NASDAQ", "DOW JONES", "S&P 500", 
-        "APPLE", "MICROSOFT", "TESLA", "ALPHABET", "NORTH KOREA", "MIDTERM"
+        "APPLE", "MICROSOFT", "TESLA", "ALPHABET", "NORTH KOREA", "MIDTERM",
+        "FINANCIAL TIMES", "FT", "THE ECONOMIST", "ECONOMIST", "CNN", "CNN BUSINESS"
       ],
       "entities": [
         {"name": "Reuters Financial Wire", "short": "Reuters", "category": "Global News Agency", "jurisdiction": "Global / UK / US", "logo_code": "REUTERS", "logo_url": "/api/entity-logo?code=REUTERS"},
         {"name": "Bloomberg Markets", "short": "Bloomberg", "category": "Financial News & Terminal", "jurisdiction": "Global / US", "logo_code": "BLOOMBERG", "logo_url": "/api/entity-logo?code=BLOOMBERG"},
         {"name": "MarketWatch (Dow Jones)", "short": "MarketWatch", "category": "Financial Media", "jurisdiction": "United States", "logo_code": "MARKETWATCH", "logo_url": "/api/entity-logo?code=MARKETWATCH"},
         {"name": "The Wall Street Journal", "short": "WSJ", "category": "Financial Newspaper", "jurisdiction": "United States", "logo_code": "WSJ", "logo_url": "/api/entity-logo?code=WSJ"},
+        {"name": "Financial Times (FT)", "short": "FT", "category": "International Financial Daily", "jurisdiction": "United Kingdom / Global", "logo_code": "FT", "logo_url": "/api/entity-logo?code=FT"},
+        {"name": "The Economist", "short": "The Economist", "category": "Economic & Geopolitical Weekly", "jurisdiction": "United Kingdom / Global", "logo_code": "ECONOMIST", "logo_url": "/api/entity-logo?code=ECONOMIST"},
+        {"name": "CNN Business", "short": "CNN", "category": "Global News & Business", "jurisdiction": "United States / Global", "logo_code": "CNN", "logo_url": "/api/entity-logo?code=CNN"},
         {"name": "CNBC International", "short": "CNBC", "category": "Business TV & Web", "jurisdiction": "United States", "logo_code": "CNBC", "logo_url": "/api/entity-logo?code=CNBC"},
         {"name": "CoinDesk Crypto & Macro", "short": "CoinDesk", "category": "Digital Asset Wire", "jurisdiction": "Global", "logo_code": "COINDESK", "logo_url": "/api/entity-logo?code=COINDESK"}
       ]

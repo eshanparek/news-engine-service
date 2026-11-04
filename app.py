@@ -9,6 +9,7 @@ import json
 import threading
 import glob
 import logging
+import urllib.parse
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta, timezone
 import email.utils
@@ -317,20 +318,24 @@ async def change_admin_pin(req: ChangePinRequest):
 
 
 @app.post("/api/admin/logos/approve")
+@app.post("/api/admin/approve-logos")
 async def save_approved_logos(req: Request):
     """Saves user approval state for entity logos into config/approved_logos.json."""
     try:
         body = await req.json()
-        approved_dict = body.get("approved", {})
+        approved_dict = body.get("approved") if isinstance(body, dict) and "approved" in body else body
+        if not isinstance(approved_dict, dict):
+            approved_dict = {}
         p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config", "approved_logos.json")
         with open(p, "w", encoding="utf-8") as f:
             json.dump(approved_dict, f, indent=2)
-        return JSONResponse({"ok": True, "message": f"Successfully saved {len(approved_dict)} logo approvals."})
+        return JSONResponse({"ok": True, "message": f"Successfully saved {len(approved_dict)} logo approvals.", "approved": approved_dict})
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
 
 @app.get("/api/admin/logos/approved")
+@app.get("/api/admin/approved-logos")
 async def get_approved_logos():
     p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config", "approved_logos.json")
     if os.path.exists(p):
@@ -340,6 +345,38 @@ async def get_approved_logos():
         except Exception:
             pass
     return JSONResponse({})
+
+
+@app.get("/api/settings/social-links")
+async def get_social_links_endpoint():
+    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config", "social_links.json")
+    links = {"facebook": "https://www.facebook.com", "instagram": "https://www.instagram.com", "twitter": "https://x.com"}
+    if os.path.exists(p):
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    links.update(data)
+        except Exception:
+            pass
+    return JSONResponse(links)
+
+
+@app.post("/api/settings/social-links")
+async def save_social_links_endpoint(req: Request):
+    try:
+        body = await req.json()
+        p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config", "social_links.json")
+        data = {
+            "facebook": str(body.get("facebook") or "https://www.facebook.com").strip(),
+            "instagram": str(body.get("instagram") or "https://www.instagram.com").strip(),
+            "twitter": str(body.get("twitter") or "https://x.com").strip()
+        }
+        with open(p, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+        return JSONResponse({"ok": True, "message": "Social media links updated successfully.", "links": data})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
 
 @app.api_route("/api/story/{kind}/{idx}.png", methods=["GET", "HEAD"])
@@ -1314,6 +1351,10 @@ def classify_news_filter(source: str, title: str) -> str:
     inst_glob_kw = groups.get("inst_global", {}).get("keywords", [
         "FOMC", "FED", "FEDERAL RESERVE", "JEROME POWELL", "US FED", "US TREASURY", 
         "SEC", "SECURITIES AND EXCHANGE COMMISSION", "CFTC", "COMMODITY FUTURES", 
+        "WHO", "WORLD HEALTH ORGANIZATION", "GLOBAL HEALTH", 
+        "NYSE", "NEW YORK STOCK EXCHANGE", "WALL STREET", 
+        "NASDAQ", "TECH EXCHANGE", 
+        "DOW JONES", "DJIA", "S&P DOW JONES", 
         "ECB", "EUROPEAN CENTRAL BANK", "CHRISTINE LAGARDE", 
         "BOE", "BANK OF ENGLAND", "BOJ", "BANK OF JAPAN", 
         "PBOC", "PEOPLE'S BANK OF CHINA", "IMF", "INTERNATIONAL MONETARY FUND", 
@@ -1327,7 +1368,8 @@ def classify_news_filter(source: str, title: str) -> str:
         "REUTERS", "BLOOMBERG", "MARKETWATCH", "WALL STREET JOURNAL", "WSJ", 
         "NEW YORK TIMES", "NYT", "CNBC", "COINDESK", "COINTELEGRAPH", 
         "BINANCE", "BITCOIN", "CRYPTO", "NASDAQ", "DOW JONES", "S&P 500", 
-        "APPLE", "MICROSOFT", "TESLA", "ALPHABET", "NORTH KOREA", "MIDTERM"
+        "APPLE", "MICROSOFT", "TESLA", "ALPHABET", "NORTH KOREA", "MIDTERM",
+        "FINANCIAL TIMES", "FT", "THE ECONOMIST", "ECONOMIST", "CNN", "CNN BUSINESS"
     ])
     if any(k in text for k in glob_kw):
         return "global"
@@ -2257,11 +2299,16 @@ def render_mobile_holidays_timeline_html(holidays: List[Dict]) -> str:
             <div class="epm-tl-time" style="font-size:11px; font-weight:700; color:#475569;">{html.escape(d[5:])}</div>
             <div class="epm-tl-rail"><span class="epm-tl-dot tone-neutral"></span></div>
             <div class="epm-tl-card tone-neutral" onclick="window.epmToggleProgressive(this)">
-                <div class="epm-tl-card-top">
-                    <span class="epm-tl-country">🏖️ {html.escape(lbl)}</span>
-                    <span class="epm-tl-reg">2026</span>
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+                    <img src="/api/holiday-thumb/{d}?title={urllib.parse.quote(desc)}" alt="{html.escape(desc)}" style="width:48px;height:48px;border-radius:10px;object-fit:cover;flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,0.1);border:1px solid #CBD5E1;" />
+                    <div style="flex:1;min-width:0;">
+                        <div class="epm-tl-card-top" style="margin-bottom:2px;">
+                            <span class="epm-tl-country">🏖️ {html.escape(lbl)}</span>
+                            <span class="epm-tl-reg">2026</span>
+                        </div>
+                        <div class="epm-tl-name" style="font-size:13px;font-weight:800;color:#0F172A;line-height:1.25;">{html.escape(desc)}</div>
+                    </div>
                 </div>
-                <div class="epm-tl-name">{html.escape(desc)}</div>
                 <div class="epm-pc-body">
                     <div class="epm-pc-metrics" style="grid-template-columns:1fr 1fr; margin-bottom:8px;">
                         <div><span>🇮🇳 NSE / BSE</span><b>{html.escape(nse)}</b></div>
@@ -3153,6 +3200,7 @@ def render_desktop_holidays_html(holidays: List[Dict]) -> str:
                 <span class="epm-hol-rail-date">{d}</span>
                 <span class="epm-hol-rail-day">{day}</span>
             </div>
+            <img src="/api/holiday-thumb/{d}?title={urllib.parse.quote(desc)}" alt="{html.escape(desc)}" class="epm-hol-card-thumb" style="width:58px;height:58px;border-radius:10px;object-fit:cover;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,0.08);border:1px solid #CBD5E1;margin:0 14px 0 6px;" />
             <div class="epm-hol-content">
                 <div style="display:flex;align-items:center;gap:10px;justify-content:space-between;">
                     <div class="epm-hol-title">{desc}</div>
@@ -3163,8 +3211,8 @@ def render_desktop_holidays_html(holidays: List[Dict]) -> str:
                 </div>
             </div>
             <div class="epm-hol-actions">
-                <a href="/api/calendar/holiday-image" download="trading_holidays_2026.png" class="epm-chron-analyze-btn" style="text-decoration:none;">
-                    Save Holiday 📷
+                <a href="/api/holiday-thumb/{d}?title={urllib.parse.quote(desc)}" download="holiday_{d}.png" class="epm-chron-analyze-btn" style="text-decoration:none;">
+                    Save Card 📷
                 </a>
             </div>
         </div>
@@ -3212,12 +3260,16 @@ INSTITUTIONAL_DIRECTORY = [
     {"name": "U.S. Commodity Futures Trading Commission (CFTC)", "code": "CFTC", "cat": "regulator", "tier": "Tier-1 Sovereign", "jurisdiction": "🇺🇸 United States", "scope": "Commodity futures, options, and swap markets surveillance, Commitments of Traders (COT) report oversight.", "url": "https://www.cftc.gov"},
     {"name": "Bank of England (BoE)", "code": "BOE", "cat": "regulator", "tier": "Tier-1 Sovereign", "jurisdiction": "🇬🇧 United Kingdom", "scope": "Monetary Policy Committee Bank Rate, quantitative easing/tightening, sterling liquidity facilities.", "url": "https://www.bankofengland.co.uk"},
     {"name": "European Central Bank (ECB)", "code": "ECB", "cat": "regulator", "tier": "Tier-1 Sovereign", "jurisdiction": "🇪🇺 Eurozone", "scope": "Governing Council monetary decisions, Main Refinancing Operations (MRO), deposit facility rates.", "url": "https://www.ecb.europa.eu"},
+    {"name": "World Health Organization (WHO)", "code": "WHO", "cat": "regulator", "tier": "Supranational Authority", "jurisdiction": "🌐 Global / UN", "scope": "Global public health emergencies, pandemic declarations, healthcare supply chain alerts, and pharmaceutical guidelines.", "url": "https://www.who.int"},
 
     # Exchanges & Clearing Houses
     {"name": "National Stock Exchange of India (NSE)", "code": "NSE", "cat": "exchange", "tier": "Exchange & SRO", "jurisdiction": "🇮🇳 India", "scope": "Leading equities and derivatives exchange, Nifty 50 benchmark indices, weekly/monthly index option expiries.", "url": "https://www.nseindia.com"},
     {"name": "BSE Limited (BSE)", "code": "BSE", "cat": "exchange", "tier": "Exchange & SRO", "jurisdiction": "🇮🇳 India", "scope": "Asia's oldest exchange, Sensex index contracts, corporate filing disseminations, cash market equity listings.", "url": "https://www.bseindia.com"},
     {"name": "Multi Commodity Exchange of India (MCX)", "code": "MCX", "cat": "exchange", "tier": "Exchange & SRO", "jurisdiction": "🇮🇳 India", "scope": "Primary commodity futures & options exchange: Crude Oil, Natural Gas, Gold, Silver, Base Metals.", "url": "https://www.mcxindia.com"},
     {"name": "National Commodity & Derivatives Exchange (NCDEX)", "code": "NCDEX", "cat": "exchange", "tier": "Exchange & SRO", "jurisdiction": "🇮🇳 India", "scope": "Agricultural commodity derivatives, delivery mechanisms for farm produce and agricultural indices.", "url": "https://www.ncdex.com"},
+    {"name": "New York Stock Exchange (NYSE)", "code": "NYSE", "cat": "exchange", "tier": "Exchange & SRO", "jurisdiction": "🇺🇸 United States", "scope": "World's largest equities exchange by market cap, opening/closing bells, auction imbalance feeds, and blue-chip listings.", "url": "https://www.nyse.com"},
+    {"name": "Nasdaq Stock Market (NASDAQ)", "code": "NASDAQ", "cat": "exchange", "tier": "Exchange & SRO", "jurisdiction": "🇺🇸 United States", "scope": "Global tech-heavy electronic securities exchange, Nasdaq-100 index futures, market makers, and IPO listings.", "url": "https://www.nasdaq.com"},
+    {"name": "S&P Dow Jones Indices (DJIA)", "code": "DOWJONES", "cat": "exchange", "tier": "Exchange & SRO", "jurisdiction": "🇺🇸 United States", "scope": "Authoritative index provider for the Dow Jones Industrial Average (DJIA) and S&P 500 benchmark indices.", "url": "https://www.spglobal.com/spdji"},
     {"name": "CME Group (Chicago Mercantile Exchange)", "code": "CME", "cat": "exchange", "tier": "Exchange & SRO", "jurisdiction": "🇺🇸 United States", "scope": "Global financial derivatives exchange: SOFR interest rate futures, WTI Light Sweet Crude, S&P 500 E-mini contracts.", "url": "https://www.cmegroup.com"},
     {"name": "Intercontinental Exchange (ICE)", "code": "ICE", "cat": "exchange", "tier": "Exchange & SRO", "jurisdiction": "🌐 Global", "scope": "Benchmark Brent Crude oil futures, global energy contracts, Title Transfer Facility (TTF) natural gas.", "url": "https://www.theice.com"},
 
@@ -3237,8 +3289,12 @@ INSTITUTIONAL_DIRECTORY = [
     {"name": "President of the United States (POTUS)", "code": "POTUS", "cat": "person", "tier": "Sovereign Official", "jurisdiction": "🇺🇸 United States", "scope": "Executive economic orders, tariff announcements, trade policy determinations, sovereign emergency actions.", "url": "https://www.whitehouse.gov"},
 
     # Commercial News Media (Segregated for Market Sentiment)
+    {"name": "Financial Times (FT)", "code": "FT", "cat": "media", "tier": "Secondary Media", "jurisdiction": "🇬🇧 UK / Global", "scope": "International daily financial journalism, global macro policy, forex commentary, and capital market intelligence.", "url": "https://www.ft.com"},
+    {"name": "The Economist", "code": "ECONOMIST", "cat": "media", "tier": "Secondary Media", "jurisdiction": "🇬🇧 UK / Global", "scope": "Weekly geopolitical analysis, international trade economics, central bank critiques, and global macro forecasting.", "url": "https://www.economist.com"},
+    {"name": "CNN Business", "code": "CNN", "cat": "media", "tier": "Secondary Media", "jurisdiction": "🇺🇸 US / Global", "scope": "Global television and digital business news, corporate earnings, consumer trends, and economic policy broadcasts.", "url": "https://www.cnn.com/business"},
     {"name": "Reuters News Agency", "code": "REUTERS", "cat": "media", "tier": "Secondary Media", "jurisdiction": "🌐 Global", "scope": "Commercial international news wire providing global macro reporting, forex commentary, and market developments.", "url": "https://www.reuters.com"},
     {"name": "Bloomberg Markets", "code": "BLOOMBERG", "cat": "media", "tier": "Secondary Media", "jurisdiction": "🌐 Global", "scope": "Commercial financial journalism, corporate news, equity analyst consensus, and credit market coverage.", "url": "https://www.bloomberg.com"},
+    {"name": "The Wall Street Journal (WSJ)", "code": "WSJ", "cat": "media", "tier": "Secondary Media", "jurisdiction": "🇺🇸 United States", "scope": "Authoritative financial newspaper covering markets, business, macroeconomics, and global finance.", "url": "https://www.wsj.com"},
     {"name": "Livemint (HT Media)", "code": "LIVEMINT", "cat": "media", "tier": "Secondary Media", "jurisdiction": "🇮🇳 India", "scope": "Indian commercial financial news covering corporate earnings, D-Street trading, and economic updates.", "url": "https://www.livemint.com"},
     {"name": "Moneycontrol (Network18)", "code": "MONEYCONTROL", "cat": "media", "tier": "Secondary Media", "jurisdiction": "🇮🇳 India", "scope": "Domestic retail and institutional financial reporting, brokerage target prices, and derivatives sentiment.", "url": "https://www.moneycontrol.com"},
     {"name": "CNBC-TV18", "code": "CNBC-TV18", "cat": "media", "tier": "Secondary Media", "jurisdiction": "🇮🇳 India", "scope": "Indian business broadcasting network, corporate executive interviews, and market open commentary.", "url": "https://www.cnbctv18.com"},
@@ -3277,42 +3333,16 @@ def render_settings_hub_html() -> str:
     trig_out = "checked" if telegram_notifier.alert_on_outcome else ""
     trig_link = "checked" if telegram_notifier.alert_on_linked_news else ""
 
-    def _render_dir_table(items: List[Dict]) -> str:
-        rows = []
-        for d in items:
-            tier_class = "tier-sovereign" if "Sovereign" in d.get("tier", "") else ("tier-exchange" if "Exchange" in d.get("tier", "") else ("tier-media" if "Media" in d.get("tier", "") else "tier-govt"))
-            rows.append(f'''
-            <tr class="epm-dir-row">
-                <td class="col-dir-name">
-                    <b>{html.escape(d['name'])}</b>
-                    <span class="epm-dir-code">{html.escape(d['code'])}</span>
-                </td>
-                <td class="col-dir-tier">
-                    <span class="epm-tier-badge {tier_class}">{html.escape(d['tier'])}</span>
-                </td>
-                <td class="col-dir-jur">{html.escape(d['jurisdiction'])}</td>
-                <td class="col-dir-scope">{html.escape(d['scope'])}</td>
-                <td class="col-dir-link">
-                    <a href="{html.escape(d['url'])}" target="_blank" rel="noopener" class="epm-dir-portal-btn">Portal ↗</a>
-                </td>
-            </tr>''')
-        return f'''
-        <div class="epm-dir-table-wrap">
-            <table class="epm-dir-table">
-                <thead>
-                    <tr>
-                        <th style="width: 26%;">AUTHORITY / ENTITY</th>
-                        <th style="width: 14%;">CLASSIFICATION</th>
-                        <th style="width: 12%;">JURISDICTION</th>
-                        <th style="width: 38%;">STATUTORY SCOPE & SURVEILLANCE</th>
-                        <th style="width: 10%;">PORTAL</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {''.join(rows)}
-                </tbody>
-            </table>
-        </div>'''
+    soc_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config", "social_links.json")
+    social_links = {"facebook": "https://www.facebook.com", "instagram": "https://www.instagram.com", "twitter": "https://x.com"}
+    if os.path.exists(soc_file):
+        try:
+            with open(soc_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    social_links.update(data)
+        except Exception:
+            pass
 
     def _load_approved_logos() -> dict:
         p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config", "approved_logos.json")
@@ -3323,6 +3353,80 @@ def render_settings_hub_html() -> str:
             except Exception:
                 pass
         return {"RBI": True, "MCX": True, "NYSE": True, "FOMC": True, "US_GOVT": True}
+
+    def _render_dir_table(items: List[Dict]) -> str:
+        approved = _load_approved_logos()
+        rows = []
+        for d in items:
+            code = d.get('code', '')
+            tier_class = "tier-sovereign" if "Sovereign" in d.get("tier", "") else ("tier-exchange" if "Exchange" in d.get("tier", "") else ("tier-media" if "Media" in d.get("tier", "") else "tier-govt"))
+            is_approved = approved.get(code, False) or approved.get(code.upper(), False)
+            checked_str = "checked" if is_approved else ""
+            badge_bg = "#DCFCE7" if is_approved else "#FEF3C7"
+            badge_fg = "#166534" if is_approved else "#92400E"
+            badge_text = "Verified ✓" if is_approved else "Pending"
+            
+            logo_img = f'<img src="/api/entity-logo?code={html.escape(code)}" alt="{html.escape(code)}" class="epm-entity-logo-thumb" style="width:36px;height:36px;object-fit:contain;border-radius:6px;border:1px solid #CBD5E1;background:#fff;margin-right:10px;vertical-align:middle;box-shadow:0 1px 3px rgba(0,0,0,0.06);flex-shrink:0;" />'
+            
+            check_box = f'''
+            <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;font-weight:700;">
+                <input type="checkbox" class="epm-logo-checkbox" data-code="{html.escape(code)}" {checked_str} />
+                <span class="epm-logo-pill-{html.escape(code)}" style="background:{badge_bg};color:{badge_fg};padding:2px 7px;border-radius:4px;font-size:10px;">{badge_text}</span>
+            </label>'''
+
+            rows.append(f'''
+            <tr class="epm-dir-row">
+                <td class="col-dir-name" style="display:flex;align-items:center;">
+                    {logo_img}
+                    <div>
+                        <b>{html.escape(d['name'])}</b>
+                        <span class="epm-dir-code">{html.escape(code)}</span>
+                    </div>
+                </td>
+                <td class="col-dir-tier">
+                    <span class="epm-tier-badge {tier_class}">{html.escape(d['tier'])}</span>
+                </td>
+                <td class="col-dir-jur">{html.escape(d['jurisdiction'])}</td>
+                <td class="col-dir-scope">{html.escape(d['scope'])}</td>
+                <td class="col-dir-approval" style="text-align:center;">{check_box}</td>
+                <td class="col-dir-link">
+                    <a href="{html.escape(d['url'])}" target="_blank" rel="noopener" class="epm-dir-portal-btn">Portal ↗</a>
+                </td>
+            </tr>''')
+
+        top_save_banner = '''
+        <div class="epm-logo-approval-banner" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#F8FAFC;border:1px solid #CBD5E1;border-radius:10px;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+            <div>
+                <span style="font-weight:800;font-size:13px;color:#0F172A;">🖼️ Official Logo Review & Verification</span>
+                <div style="font-size:11px;color:#64748B;margin-top:2px;">Review official emblems for this category. Check the verified ones and save. Unchecked logos will be flagged for refetching in the next update.</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+                <button type="button" class="epm-btn-save-logos" onclick="window.epmSaveApprovedLogos()" style="background:#0052FF;color:#fff;font-weight:700;font-size:12px;padding:7px 16px;border-radius:6px;border:none;cursor:pointer;box-shadow:0 1px 3px rgba(0,82,255,0.25);">
+                    💾 Save Approved Logos
+                </button>
+                <span class="epm-logo-save-status-msg" style="font-size:11.5px;font-weight:700;"></span>
+            </div>
+        </div>'''
+
+        return f'''
+        {top_save_banner}
+        <div class="epm-dir-table-wrap">
+            <table class="epm-dir-table">
+                <thead>
+                    <tr>
+                        <th style="width: 28%;">AUTHORITY / ENTITY & LOGO</th>
+                        <th style="width: 14%;">CLASSIFICATION</th>
+                        <th style="width: 12%;">JURISDICTION</th>
+                        <th style="width: 30%;">STATUTORY SCOPE & SURVEILLANCE</th>
+                        <th style="width: 8%; text-align:center;">REVIEW</th>
+                        <th style="width: 8%;">PORTAL</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {''.join(rows)}
+                </tbody>
+            </table>
+        </div>'''
 
     def _render_entities_taxonomy_html() -> str:
         groups = ENTITIES_TAXONOMY.get("groups", {})
@@ -3460,6 +3564,7 @@ def render_settings_hub_html() -> str:
                     <option value="pane_glob_reg">🌐 Global Regulators & Banks</option>
                     <option value="pane_glob_mkt">🌍 Global Exchanges & CME</option>
                     <option value="pane_media">📰 Commercial News Providers</option>
+                    <option value="pane_social">🌐 Public Social Accounts</option>
                     <option value="pane_taxonomy">🗂️ Entities & Sources Taxonomy</option>
                     <option value="pane_telegram">✈️ Telegram Channels & Bots</option>
                     <option value="pane_pdf_sched">📑 Calendar & PDF Automation</option>
@@ -3494,6 +3599,10 @@ def render_settings_hub_html() -> str:
                 <button type="button" class="epm-settings-nav-item" data-pane="pane_media" onclick="window.epmShowSettingsPane('pane_media', this)">
                     <span class="icon">📰</span>
                     <span class="text">Commercial News Providers</span>
+                </button>
+                <button type="button" class="epm-settings-nav-item" data-pane="pane_social" onclick="window.epmShowSettingsPane('pane_social', this)">
+                    <span class="icon">🌐</span>
+                    <span class="text">Public Social Accounts</span>
                 </button>
                 <button type="button" class="epm-settings-nav-item" data-pane="pane_taxonomy" onclick="window.epmShowSettingsPane('pane_taxonomy', this)">
                     <span class="icon">🗂️</span>
@@ -3623,6 +3732,41 @@ def render_settings_hub_html() -> str:
                     <p><b>Strict Segregation:</b> Commercial media outlets (publishers, wire services, and news broadcasters) are tracked purely for market sentiment, earnings gossip, and journalistic reports. They do NOT possess regulatory authority.</p>
                 </div>
                 {_render_dir_table(media_items)}
+            </div>
+
+            <!-- Pane Social: Public Social Media Routing -->
+            <div class="epm-settings-pane" id="pane_social">
+                <div class="epm-card-hdr">
+                    <div class="epm-card-hdr-left">
+                        <span class="epm-card-hdr-icon">🌐</span>
+                        <span class="epm-card-hdr-title">OFFICIAL SOCIAL MEDIA ACCOUNTS & PUBLIC ROUTING</span>
+                    </div>
+                    <span class="epm-card-hdr-tag">Side Menu Routing</span>
+                </div>
+                <div class="epm-segregation-banner" style="background:#F0FDF4;border-color:#BBF7D0;">
+                    <span class="epm-segregation-badge" style="background:#166534;">COMMUNITY & SOCIAL CHANNELS</span>
+                    <p>Enter the direct URLs for your official social media channels. These accounts are accessible directly by readers from the Side Menu Drawer under the Audio Alert Chime. Provide and update your actual handles anytime below.</p>
+                </div>
+                <div style="background:#FFFFFF;border:1px solid #CBD5E1;border-radius:10px;padding:20px;max-width:700px;margin-top:16px;">
+                    <div style="margin-bottom:16px;">
+                        <label style="display:block;font-weight:700;font-size:12px;color:#0F172A;margin-bottom:6px;">📘 Facebook Official Page URL</label>
+                        <input type="url" id="epm-social-input-fb" value="{html.escape(social_links.get('facebook', 'https://www.facebook.com'))}" placeholder="https://www.facebook.com/yourhandle" style="width:100%;padding:10px 14px;border:1px solid #CBD5E1;border-radius:6px;font-size:13px;box-sizing:border-box;" />
+                    </div>
+                    <div style="margin-bottom:16px;">
+                        <label style="display:block;font-weight:700;font-size:12px;color:#0F172A;margin-bottom:6px;">📸 Instagram Official Profile URL</label>
+                        <input type="url" id="epm-social-input-ig" value="{html.escape(social_links.get('instagram', 'https://www.instagram.com'))}" placeholder="https://www.instagram.com/yourhandle" style="width:100%;padding:10px 14px;border:1px solid #CBD5E1;border-radius:6px;font-size:13px;box-sizing:border-box;" />
+                    </div>
+                    <div style="margin-bottom:20px;">
+                        <label style="display:block;font-weight:700;font-size:12px;color:#0F172A;margin-bottom:6px;">🐦 Twitter / X Official Handle URL</label>
+                        <input type="url" id="epm-social-input-tw" value="{html.escape(social_links.get('twitter', 'https://x.com'))}" placeholder="https://x.com/yourhandle" style="width:100%;padding:10px 14px;border:1px solid #CBD5E1;border-radius:6px;font-size:13px;box-sizing:border-box;" />
+                    </div>
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <button type="button" onclick="window.epmSaveSocialLinks()" style="background:#0052FF;color:#ffffff;font-weight:700;font-size:13px;padding:9px 22px;border-radius:6px;border:none;cursor:pointer;box-shadow:0 1px 3px rgba(0,82,255,0.3);">
+                            💾 Save Social Media Links
+                        </button>
+                        <span id="epm-social-save-status" style="font-size:12px;font-weight:700;"></span>
+                    </div>
+                </div>
             </div>
 
             <!-- Pane Taxonomy: Country & Type Institutional Classification Registry -->
@@ -9667,6 +9811,23 @@ div.epm-tl-row.epm-filtered-hidden {
 """
 
 
+def get_persisted_social_links() -> dict:
+    soc_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config", "social_links.json")
+    defaults = {"facebook": "https://www.facebook.com", "instagram": "https://www.instagram.com", "twitter": "https://x.com"}
+    if os.path.exists(soc_file):
+        try:
+            with open(soc_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    defaults.update(data)
+        except Exception:
+            pass
+    return defaults
+
+
+_initial_social_links = get_persisted_social_links()
+
+
 TOP_NAVBAR_HTML = f"""
 <div id="epm-top-navbar" class="epm-top-navbar">
     <div class="epm-nav-single-row">
@@ -9814,6 +9975,22 @@ TOP_NAVBAR_HTML = f"""
                 </div>
             </div>
             <span id="epm-side-audio-status" class="epm-side-audio-badge" style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;background:#DCFCE7;color:#166534;border:1px solid #86EFAC;">Audio ON</span>
+        </div>
+
+        <div class="epm-side-section-label">COMMUNITY & SOCIAL CHANNELS</div>
+        <div class="epm-side-social-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;">
+            <a id="epm-side-social-fb" href="{_initial_social_links.get('facebook', 'https://www.facebook.com')}" target="_blank" rel="noopener noreferrer" class="epm-side-social-btn" style="display:flex;align-items:center;justify-content:center;gap:5px;padding:9px 4px;background:#1877F2;color:#ffffff;border-radius:8px;text-decoration:none;font-size:11px;font-weight:700;box-shadow:0 1px 3px rgba(24,119,242,0.3);">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                <span>Facebook</span>
+            </a>
+            <a id="epm-side-social-ig" href="{_initial_social_links.get('instagram', 'https://www.instagram.com')}" target="_blank" rel="noopener noreferrer" class="epm-side-social-btn" style="display:flex;align-items:center;justify-content:center;gap:5px;padding:9px 4px;background:linear-gradient(45deg,#f09433 0%,#e6683c 25%,#dc2743 50%,#cc2366 75%,#bc1888 100%);color:#ffffff;border-radius:8px;text-decoration:none;font-size:11px;font-weight:700;box-shadow:0 1px 3px rgba(220,39,67,0.3);">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+                <span>Instagram</span>
+            </a>
+            <a id="epm-side-social-tw" href="{_initial_social_links.get('twitter', 'https://x.com')}" target="_blank" rel="noopener noreferrer" class="epm-side-social-btn" style="display:flex;align-items:center;justify-content:center;gap:5px;padding:9px 4px;background:#0F1419;color:#ffffff;border-radius:8px;text-decoration:none;font-size:11px;font-weight:700;box-shadow:0 1px 3px rgba(15,20,25,0.3);">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                <span>Twitter (X)</span>
+            </a>
         </div>
 
         <div class="epm-side-section-label">ACTIONS & UTILITIES</div>
@@ -11736,20 +11913,19 @@ TERMINAL_CLIENT_JS = r"""
             const code = cb.getAttribute('data-code');
             if (code) {
                 approvedMap[code] = cb.checked;
-                const pill = document.querySelector(`.epm-logo-pill-${code}`);
-                if (pill) {
+                document.querySelectorAll(`.epm-logo-pill-${code}`).forEach(pill => {
                     pill.textContent = cb.checked ? 'Verified ✓' : 'Pending';
                     pill.style.background = cb.checked ? '#DCFCE7' : '#FEF3C7';
                     pill.style.color = cb.checked ? '#166534' : '#92400E';
-                }
+                });
             }
         });
 
-        const statusEl = document.getElementById('epm-logo-save-status');
-        if (statusEl) {
-            statusEl.textContent = '⏳ Saving verification states...';
-            statusEl.style.color = '#0052FF';
-        }
+        const statusEls = document.querySelectorAll('.epm-logo-save-status-msg, #epm-logo-save-status');
+        statusEls.forEach(el => {
+            el.textContent = '⏳ Saving...';
+            el.style.color = '#0052FF';
+        });
 
         fetch('/api/admin/logos/approve', {
             method: 'POST',
@@ -11758,18 +11934,65 @@ TERMINAL_CLIENT_JS = r"""
         })
         .then(r => r.json())
         .then(res => {
+            statusEls.forEach(el => {
+                el.textContent = '✅ Logos verified & saved!';
+                el.style.color = '#16A34A';
+                setTimeout(() => { el.textContent = ''; }, 4000);
+            });
+        })
+        .catch(err => {
+            statusEls.forEach(el => {
+                el.textContent = '❌ Error saving logo approvals';
+                el.style.color = '#DC2626';
+            });
+        });
+    };
+
+    window.epmSaveSocialLinks = function() {
+        const fb = (document.getElementById('epm-social-input-fb') ? document.getElementById('epm-social-input-fb').value : '').trim();
+        const ig = (document.getElementById('epm-social-input-ig') ? document.getElementById('epm-social-input-ig').value : '').trim();
+        const tw = (document.getElementById('epm-social-input-tw') ? document.getElementById('epm-social-input-tw').value : '').trim();
+
+        const statusEl = document.getElementById('epm-social-save-status');
+        if (statusEl) {
+            statusEl.textContent = '⏳ Saving...';
+            statusEl.style.color = '#0052FF';
+        }
+
+        const data = { facebook: fb, instagram: ig, twitter: tw };
+
+        fetch('/api/settings/social-links', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        })
+        .then(r => r.json())
+        .then(res => {
             if (statusEl) {
-                statusEl.textContent = '✅ Logos verified & saved permanently!';
+                statusEl.textContent = '✅ Social accounts saved & updated!';
                 statusEl.style.color = '#16A34A';
                 setTimeout(() => { statusEl.textContent = ''; }, 4000);
+            }
+            if (window.epmUpdateSideSocialLinks) {
+                window.epmUpdateSideSocialLinks(data);
             }
         })
         .catch(err => {
             if (statusEl) {
-                statusEl.textContent = '❌ Error saving logo approvals';
+                statusEl.textContent = '❌ Failed to save social links';
                 statusEl.style.color = '#DC2626';
             }
         });
+    };
+
+    window.epmUpdateSideSocialLinks = function(data) {
+        if (!data) return;
+        const fbEl = document.getElementById('epm-side-social-fb');
+        const igEl = document.getElementById('epm-side-social-ig');
+        const twEl = document.getElementById('epm-side-social-tw');
+        if (fbEl && data.facebook) fbEl.href = data.facebook;
+        if (igEl && data.instagram) igEl.href = data.instagram;
+        if (twEl && data.twitter) twEl.href = data.twitter;
     };
 
     window.epmShowSettingsPane = function(paneId, btn) {
