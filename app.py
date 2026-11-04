@@ -3757,7 +3757,7 @@ def render_settings_hub_html() -> str:
                         <input type="url" id="epm-social-input-ig" value="{html.escape(social_links.get('instagram', 'https://www.instagram.com'))}" placeholder="https://www.instagram.com/yourhandle" style="width:100%;padding:10px 14px;border:1px solid #CBD5E1;border-radius:6px;font-size:13px;box-sizing:border-box;" />
                     </div>
                     <div style="margin-bottom:20px;">
-                        <label style="display:block;font-weight:700;font-size:12px;color:#0F172A;margin-bottom:6px;">🐦 Twitter / X Official Handle URL</label>
+                        <label style="display:block;font-weight:700;font-size:12px;color:#0F172A;margin-bottom:6px;">𝕏 Official Handle URL (Twitter)</label>
                         <input type="url" id="epm-social-input-tw" value="{html.escape(social_links.get('twitter', 'https://x.com'))}" placeholder="https://x.com/yourhandle" style="width:100%;padding:10px 14px;border:1px solid #CBD5E1;border-radius:6px;font-size:13px;box-sizing:border-box;" />
                     </div>
                     <div style="display:flex;align-items:center;gap:12px;">
@@ -8109,6 +8109,70 @@ tbody tr:hover td {
     background: #EFF6FF !important;
     color: #0052FF !important;
 }
+
+/* Community & Social Channels - Realistic, Light & Official Brand Badges */
+.epm-side-social-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr 1fr !important;
+    gap: 8px !important;
+    margin-bottom: 14px !important;
+}
+.epm-side-social-btn {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    padding: 8px 4px !important;
+    border-radius: 9px !important;
+    text-decoration: none !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+    transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    border: 1px solid transparent !important;
+    box-sizing: border-box !important;
+}
+.epm-side-social-btn:hover {
+    transform: translateY(-1.5px) !important;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08) !important;
+}
+.epm-side-social-btn:active {
+    transform: translateY(0px) !important;
+}
+/* Facebook - Light Soft Ice-Blue with Official Meta Blue Emblem */
+.epm-side-social-btn.epm-social-fb {
+    background: #F0F6FF !important;
+    border-color: #BFDBFE !important;
+    color: #1877F2 !important;
+}
+.epm-side-social-btn.epm-social-fb:hover {
+    background: #E0EFFF !important;
+    border-color: #93C5FD !important;
+    color: #0C5FD6 !important;
+}
+/* Instagram - Light Soft Rose/Blush with Official Gradient Camera */
+.epm-side-social-btn.epm-social-ig {
+    background: #FFF1F5 !important;
+    border-color: #FECDD3 !important;
+    color: #E1306C !important;
+}
+.epm-side-social-btn.epm-social-ig:hover {
+    background: #FFE4EC !important;
+    border-color: #FDA4AF !important;
+    color: #C1275B !important;
+}
+/* Twitter / X - Light Clean Slate with Sharp Official 𝕏 */
+.epm-side-social-btn.epm-social-tw {
+    background: #F8FAFC !important;
+    border-color: #E2E8F0 !important;
+    color: #0F172A !important;
+}
+.epm-side-social-btn.epm-social-tw:hover {
+    background: #F1F5F9 !important;
+    border-color: #CBD5E1 !important;
+    color: #000000 !important;
+}
+
 .epm-side-drawer-footer, .epm-drawer-footer {
     padding: 10px 14px !important;
     border-top: 1px solid #E2E8F0 !important;
@@ -9978,18 +10042,18 @@ TOP_NAVBAR_HTML = f"""
         </div>
 
         <div class="epm-side-section-label">COMMUNITY & SOCIAL CHANNELS</div>
-        <div class="epm-side-social-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;">
-            <a id="epm-side-social-fb" href="{_initial_social_links.get('facebook', 'https://www.facebook.com')}" target="_blank" rel="noopener noreferrer" class="epm-side-social-btn" style="display:flex;align-items:center;justify-content:center;gap:5px;padding:9px 4px;background:#1877F2;color:#ffffff;border-radius:8px;text-decoration:none;font-size:11px;font-weight:700;box-shadow:0 1px 3px rgba(24,119,242,0.3);">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+        <div class="epm-side-social-grid">
+            <a id="epm-side-social-fb" href="{_initial_social_links.get('facebook', 'https://www.facebook.com')}" target="_blank" rel="noopener noreferrer" class="epm-side-social-btn epm-social-fb" title="Official Facebook Page">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="12" fill="#1877F2"/><path d="M15.5 12h-2.5v7h-3v-7h-1.5v-2.5h1.5v-1.8c0-2.1 1.2-3.2 3.1-3.2.9 0 1.7.1 1.9.1v2.2h-1.3c-1 0-1.2.5-1.2 1.2v1.5h2.5l-.5 2.5z" fill="#ffffff"/></svg>
                 <span>Facebook</span>
             </a>
-            <a id="epm-side-social-ig" href="{_initial_social_links.get('instagram', 'https://www.instagram.com')}" target="_blank" rel="noopener noreferrer" class="epm-side-social-btn" style="display:flex;align-items:center;justify-content:center;gap:5px;padding:9px 4px;background:linear-gradient(45deg,#f09433 0%,#e6683c 25%,#dc2743 50%,#cc2366 75%,#bc1888 100%);color:#ffffff;border-radius:8px;text-decoration:none;font-size:11px;font-weight:700;box-shadow:0 1px 3px rgba(220,39,67,0.3);">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+            <a id="epm-side-social-ig" href="{_initial_social_links.get('instagram', 'https://www.instagram.com')}" target="_blank" rel="noopener noreferrer" class="epm-side-social-btn epm-social-ig" title="Official Instagram Handle">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><defs><linearGradient id="epm-ig-grad-btn" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#FFD600"/><stop offset="35%" stop-color="#FF0069"/><stop offset="70%" stop-color="#D300C5"/><stop offset="100%" stop-color="#7638FA"/></linearGradient></defs><rect width="24" height="24" rx="6.5" fill="url(#epm-ig-grad-btn)"/><rect x="5.5" y="5.5" width="13" height="13" rx="3.5" stroke="#ffffff" stroke-width="1.8"/><circle cx="12" cy="12" r="3.2" stroke="#ffffff" stroke-width="1.8"/><circle cx="15.8" cy="8.2" r="1" fill="#ffffff"/></svg>
                 <span>Instagram</span>
             </a>
-            <a id="epm-side-social-tw" href="{_initial_social_links.get('twitter', 'https://x.com')}" target="_blank" rel="noopener noreferrer" class="epm-side-social-btn" style="display:flex;align-items:center;justify-content:center;gap:5px;padding:9px 4px;background:#0F1419;color:#ffffff;border-radius:8px;text-decoration:none;font-size:11px;font-weight:700;box-shadow:0 1px 3px rgba(15,20,25,0.3);">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-                <span>Twitter (X)</span>
+            <a id="epm-side-social-tw" href="{_initial_social_links.get('twitter', 'https://x.com')}" target="_blank" rel="noopener noreferrer" class="epm-side-social-btn epm-social-tw" title="Official 𝕏 / Twitter Handle">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="5" fill="#0F172A"/><path d="M16.5 5.5h2.2l-4.8 5.5 5.6 7.5h-4.4l-3.5-4.6-4 4.6H5.4l5.2-6-5.4-7h4.5l3.2 4.2 3.6-4.2zm-.8 11.7h1.2L8.4 6.7H7.1l8.6 10.5z" fill="#ffffff"/></svg>
+                <span>𝕏 (Twitter)</span>
             </a>
         </div>
 
