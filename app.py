@@ -283,6 +283,15 @@ async def serve_media(filename: str):
     return PlainTextResponse("Media card not found", status_code=404)
 
 
+
+@app.api_route("/api/translate-logo", methods=["GET", "HEAD"])
+async def serve_translate_logo():
+    """Serves the official Google Translate emblem."""
+    logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "google_translate_logo.png")
+    if os.path.exists(logo_path):
+        return FileResponse(logo_path, media_type="image/png")
+    return PlainTextResponse("Translate logo not found", status_code=404)
+
 @app.api_route("/api/logo", methods=["GET", "HEAD"])
 async def serve_logo():
     """Serves the official GNC brand broadcast emblem."""
@@ -5495,76 +5504,75 @@ def render_table_ribbon(
 
 
 CUSTOM_CSS = """
-/* Google Translate Widget & Sleek Single-Row Institutional Button */
-.epm-translate-widget {
+/* Google Translate Minimal Logo Button */
+.epm-translate-btn-wrapper {
+    position: relative !important;
     display: inline-flex !important;
     align-items: center !important;
-    margin: 0 !important;
-    padding: 0 !important;
+    justify-content: center !important;
+    width: 32px !important;
+    height: 28px !important;
     flex-shrink: 0 !important;
-    height: 28px !important;
-}
-.goog-te-gadget {
-    font-size: 0px !important;
-    line-height: 1 !important;
-    display: inline-flex !important;
-    align-items: center !important;
-}
-.goog-te-gadget-simple {
-    background-color: #F8FAFC !important;
-    border: 1px solid #CBD5E1 !important;
-    padding: 0 7px !important;
     border-radius: 6px !important;
-    font-size: 10.5px !important;
-    font-family: inherit !important;
-    height: 28px !important;
-    line-height: 28px !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    white-space: nowrap !important;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
+    background: #FFFFFF !important;
+    border: 1px solid #CBD5E1 !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
     cursor: pointer !important;
+    overflow: hidden !important;
     box-sizing: border-box !important;
     transition: all 0.15s ease !important;
 }
-.goog-te-gadget-simple:hover {
-    background-color: #FFFFFF !important;
+.epm-translate-btn-wrapper:hover {
     border-color: #0052FF !important;
-    box-shadow: 0 2px 5px rgba(0,82,255,0.12) !important;
+    box-shadow: 0 2px 6px rgba(0,82,255,0.18) !important;
+    transform: translateY(-1px) !important;
 }
-.goog-te-gadget-simple .goog-te-menu-value {
-    color: #1E293B !important;
-    font-weight: 700 !important;
-    font-size: 10.5px !important;
-    display: inline-flex !important;
+.epm-translate-icon-btn {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: flex !important;
     align-items: center !important;
-    gap: 3px !important;
-    text-decoration: none !important;
-    white-space: nowrap !important;
+    justify-content: center !important;
+    width: 100% !important;
+    height: 100% !important;
+    cursor: pointer !important;
 }
-.goog-te-gadget-simple .goog-te-menu-value span {
-    color: #1E293B !important;
-    font-size: 10.5px !important;
-    font-weight: 700 !important;
-    white-space: nowrap !important;
+.epm-translate-img-icon {
+    width: 20px !important;
+    height: 20px !important;
+    object-fit: contain !important;
+    display: block !important;
+    pointer-events: none !important;
 }
-.goog-te-gadget-icon {
-    width: 14px !important;
-    height: 14px !important;
-    margin-right: 4px !important;
-    vertical-align: middle !important;
-    display: inline-block !important;
+.epm-translate-overlay {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    opacity: 0.001 !important;
+    overflow: hidden !important;
+    cursor: pointer !important;
+    z-index: 10 !important;
 }
-.goog-te-menu-value span:nth-child(3),
-.goog-te-menu-value span:nth-child(5) {
-    display: inline-block !important;
-    font-size: 8px !important;
-    margin-left: 2px !important;
-    color: #64748B !important;
+.epm-translate-overlay * {
+    cursor: pointer !important;
+    width: 100% !important;
+    height: 100% !important;
+}
+.goog-te-gadget-simple {
+    width: 100% !important;
+    height: 100% !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
 }
 body { top: 0px !important; }
 .goog-te-banner-frame.skiptranslate { display: none !important; }
 .notranslate { translate: no; }
+
 
 /* Stock 5-Event History Drawer */
 .epm-stock-history-btn {
@@ -10992,9 +11000,14 @@ TOP_NAVBAR_HTML = f"""
             </div>
         </div>
 
-        <!-- Right: Prominent High-Visibility Menu Button (Sidebar Drawer) -->
+        <!-- Right: Google Translate Logo Button + Prominent Menu Button -->
         <div class="epm-nav-controls">
-            <div id="google_translate_element" class="epm-translate-widget"></div>
+            <div class="epm-translate-btn-wrapper" title="Google Translate">
+                <button type="button" class="epm-translate-icon-btn" aria-label="Google Translate">
+                    <img src="/api/translate-logo" class="epm-translate-img-icon" alt="Google Translate" />
+                </button>
+                <div id="google_translate_element" class="epm-translate-overlay"></div>
+            </div>
             <button type="button" id="epm-desktop-menu-btn" class="epm-top-btn epm-menu-btn epm-nav-menu-main" onclick="window.epmToggleSideMenu()" title="Open Menu">
                 <span class="epm-menu-icon">☰</span>
                 <span class="epm-menu-btn-text">Menu ▾</span>
