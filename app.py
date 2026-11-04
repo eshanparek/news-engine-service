@@ -5495,41 +5495,72 @@ def render_table_ribbon(
 
 
 CUSTOM_CSS = """
-/* Google Translate Widget & Language Selector */
+/* Google Translate Widget & Sleek Single-Row Institutional Button */
 .epm-translate-widget {
-    display: inline-flex;
-    align-items: center;
-    margin-right: 8px;
+    display: inline-flex !important;
+    align-items: center !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    flex-shrink: 0 !important;
+    height: 28px !important;
 }
-.goog-te-gadget-simple {
-    background-color: #FFFFFF !important;
-    border: 1px solid #CBD5E1 !important;
-    padding: 4px 8px !important;
-    border-radius: 8px !important;
-    font-size: 11px !important;
-    font-family: inherit !important;
+.goog-te-gadget {
+    font-size: 0px !important;
     line-height: 1 !important;
     display: inline-flex !important;
     align-items: center !important;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
-    cursor: pointer;
-    transition: all 0.2s ease;
+}
+.goog-te-gadget-simple {
+    background-color: #F8FAFC !important;
+    border: 1px solid #CBD5E1 !important;
+    padding: 0 7px !important;
+    border-radius: 6px !important;
+    font-size: 10.5px !important;
+    font-family: inherit !important;
+    height: 28px !important;
+    line-height: 28px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    white-space: nowrap !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
+    cursor: pointer !important;
+    box-sizing: border-box !important;
+    transition: all 0.15s ease !important;
 }
 .goog-te-gadget-simple:hover {
+    background-color: #FFFFFF !important;
     border-color: #0052FF !important;
-    box-shadow: 0 2px 6px rgba(0,82,255,0.12) !important;
+    box-shadow: 0 2px 5px rgba(0,82,255,0.12) !important;
 }
 .goog-te-gadget-simple .goog-te-menu-value {
-    color: #0F172A !important;
-    font-weight: 600 !important;
+    color: #1E293B !important;
+    font-weight: 700 !important;
+    font-size: 10.5px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 3px !important;
+    text-decoration: none !important;
+    white-space: nowrap !important;
 }
 .goog-te-gadget-simple .goog-te-menu-value span {
-    color: #0F172A !important;
-    font-size: 11px !important;
+    color: #1E293B !important;
+    font-size: 10.5px !important;
+    font-weight: 700 !important;
+    white-space: nowrap !important;
 }
 .goog-te-gadget-icon {
+    width: 14px !important;
+    height: 14px !important;
     margin-right: 4px !important;
-    vertical-align: middle;
+    vertical-align: middle !important;
+    display: inline-block !important;
+}
+.goog-te-menu-value span:nth-child(3),
+.goog-te-menu-value span:nth-child(5) {
+    display: inline-block !important;
+    font-size: 8px !important;
+    margin-left: 2px !important;
+    color: #64748B !important;
 }
 body { top: 0px !important; }
 .goog-te-banner-frame.skiptranslate { display: none !important; }
@@ -9095,11 +9126,39 @@ tbody tr:hover td {
         margin-right: 0 !important;
     }
     .epm-nav-single-row {
+        display: flex !important;
         flex-wrap: wrap !important;
-        gap: 6px !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 4px 6px !important;
+        min-height: unset !important;
     }
     .epm-nav-brand-cluster {
+        order: 1 !important;
         gap: 5px !important;
+        flex-shrink: 0 !important;
+    }
+    .epm-nav-brand-cluster .epm-nav-logo {
+        height: 24px !important;
+        width: auto !important;
+    }
+    .epm-nav-brand-cluster .epm-brand-mobile {
+        font-size: 14px !important;
+        font-weight: 800 !important;
+    }
+    .epm-nav-controls {
+        order: 2 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        margin-left: auto !important;
+        flex-shrink: 0 !important;
+        white-space: nowrap !important;
+    }
+    .epm-nav-controls #epm-desktop-menu-btn {
+        height: 28px !important;
+        padding: 0 10px !important;
+        font-size: 11px !important;
     }
     .epm-nav-telemetry {
         display: none !important;
@@ -9107,15 +9166,13 @@ tbody tr:hover td {
     #epm-telemetry-ticker {
         order: 3 !important;
         width: 100% !important;
+        flex-basis: 100% !important;
         margin-top: 4px !important;
         padding: 4px 0 !important;
         border-left: none !important;
         border-right: none !important;
         border-top: 1px solid #E2E8F0 !important;
         overflow: hidden !important;
-    }
-    .epm-nav-controls {
-        gap: 4px !important;
     }
 
     /* Mobile: single clean feed per page — hide desktop grids & secondary panels */
@@ -13361,6 +13418,16 @@ TERMINAL_CLIENT_JS = r"""
 
     // ═══ Stock News Interactive Filtering ═══
     
+    
+    // Automatically label the Google Translate button cleanly as "Google Translate"
+    function epmFormatGoogleTranslateBtn() {
+        const valSpan = document.querySelector('.goog-te-gadget-simple .goog-te-menu-value span:first-child');
+        if (valSpan && (valSpan.textContent === 'Select Language' || valSpan.textContent.trim() === 'Language' || valSpan.textContent.trim() === '')) {
+            valSpan.textContent = 'Google Translate';
+        }
+    }
+    setInterval(epmFormatGoogleTranslateBtn, 400);
+
     window.epmViewStockHistory = async function(ticker) {
         const drawer = document.getElementById('epm-stock-hist-' + ticker);
         if (!drawer) return;
