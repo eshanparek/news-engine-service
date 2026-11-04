@@ -40,11 +40,20 @@ from story_card_generator import story_card_generator
 import market_ticker
 import circular_pdf_generator
 from visitor_tracker import visitor_tracker
+from member_gatekeeper import gatekeeper
+from stock_engine import stock_engine
 
-# 1. Start Background Scraper, Scorer & Multi-Market Calendar Timer Daemons
-news_worker.start()
-calendar_engine.start()
-circular_engine.start()
+# 1. Background Engines Startup (Deferred Bootstrap so Uvicorn binds port 7860 immediately)
+def _start_background_engines():
+    time.sleep(2.0)
+    try:
+        news_worker.start()
+        calendar_engine.start()
+        circular_engine.start()
+    except Exception as exc:
+        logging.getLogger("Bootstrap").error(f"Error starting engines: {exc}")
+
+threading.Thread(target=_start_background_engines, daemon=True, name="EngineBootstrap").start()
 
 # 2. FastAPI Machine-to-Machine Endpoints
 app = FastAPI(
@@ -52,6 +61,11 @@ app = FastAPI(
     description="Decoupled high-speed real-time news scraping, AI impact evaluation, Multi-Market Calendar (NSE, BSE, MCX, Crypto, NYSE), 7:00 AM / 7:05 AM IST daily dispatches, next-day holiday alerts, and live unfolding outcomes.",
     version="3.0.0"
 )
+
+@app.get("/healthz")
+async def healthz_check():
+    """Immediate HTTP 200 response for cloud readiness/liveness probes."""
+    return {"status": "ok", "service": "GNC Live News Engine", "timestamp": str(now_ist())}
 
 app.add_middleware(
     CORSMiddleware,
@@ -156,6 +170,89 @@ app.add_middleware(TerminalSecurityAndMetaMiddleware)
 
 START_TIME = time.time()
 
+
+# ═══ Member Gatekeeper & PIN Security API ═══
+@app.post("/api/auth/register")
+async def api_auth_register(request: Request):
+    try:
+        data = await request.json()
+        name = data.get("name", "")
+        identifier = data.get("identifier", "")
+        phone = data.get("phone", "")
+        auth_type = data.get("auth_type", "email")
+        res = gatekeeper.register_member(name, identifier, phone, auth_type)
+        return res
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.post("/api/auth/login")
+async def api_auth_login(request: Request):
+    try:
+        data = await request.json()
+        identifier = data.get("identifier", "")
+        pin = data.get("pin", "")
+        res = gatekeeper.authenticate(identifier, pin)
+        return res
+    except Exception as e:
+        return {"success": False, "message": str(e)}
+
+@app.post("/api/auth/reset-pin")
+async def api_auth_reset_pin(request: Request):
+    try:
+        data = await request.json()
+        identifier = data.get("identifier", "")
+        old_pin = data.get("old_pin", "")
+        new_pin = data.get("new_pin", "")
+        res = gatekeeper.reset_member_pin(identifier, old_pin, new_pin)
+        return res
+    except Exception as e:
+        return {"success": False, "message": str(e)}
+
+@app.get("/api/admin/members")
+async def api_admin_members(master_pin: str = ""):
+    return {"members": gatekeeper.list_all_members()}
+
+@app.post("/api/admin/members/approve")
+async def api_admin_approve_member(request: Request):
+    try:
+        data = await request.json()
+        member_id = data.get("member_id", "")
+        pin_length = int(data.get("pin_length", 6))
+        mem = gatekeeper.approve_member(member_id, pin_length)
+        if mem:
+            return {"success": True, "member": mem, "pin": mem["pin_plaintext_admin"]}
+        return {"success": False, "message": "Member not found."}
+    except Exception as e:
+        return {"success": False, "message": str(e)}
+
+@app.post("/api/admin/members/status")
+async def api_admin_member_status(request: Request):
+    try:
+        data = await request.json()
+        member_id = data.get("member_id", "")
+        status = data.get("status", "ACTIVE")
+        mem = gatekeeper.set_status(member_id, status)
+        if mem:
+            return {"success": True, "member": mem}
+        return {"success": False, "message": "Member not found."}
+    except Exception as e:
+        return {"success": False, "message": str(e)}
+
+@app.post("/api/admin/members/delete")
+async def api_admin_member_delete(request: Request):
+    try:
+        data = await request.json()
+        member_id = data.get("member_id", "")
+        ok = gatekeeper.delete_member(member_id)
+        return {"success": ok}
+    except Exception as e:
+        return {"success": False, "message": str(e)}
+
+# ═══ Stock News & Disclosures API ═══
+@app.get("/api/stock-news")
+async def api_stock_news(market: str = "ALL", index_tag: str = "ALL", sector: str = "ALL", search: str = ""):
+    items = stock_engine.fetch_stock_news(market=market, index_tag=index_tag, sector=sector, search=search)
+    return {"status": "ok", "count": len(items), "items": items}
 
 @app.get("/api/media/{filename}")
 async def serve_media(filename: str):
@@ -1886,7 +1983,9 @@ def render_site_disclaimer_html(is_mobile: bool = False) -> str:
 
 
 def render_story_strip_html(stories: List[Dict], kind: str, is_desktop: bool = False) -> str:
-    """Renders sleek full-size stretched story preview tiles with background image, dark gradient overlay, and bold colored badges."""
+    """Renders sleek full-size stretched story preview tiles with background image, dark gradient overlay, and bold colored badges.
+    Incorporates Day 1 vs Day 2 visual day separation, midnight rollover pillar, auto-centering, and previous stories hub.
+    """
     cls = "epm-story-strip desktop-strip" if is_desktop else "epm-story-strip"
     thumbs = []
     INSTITUTIONAL_TAGS = {
@@ -1894,7 +1993,49 @@ def render_story_strip_html(stories: List[Dict], kind: str, is_desktop: bool = F
         "IFSCA", "IRDAI", "PFRDA", "SEC", "CFTC", "TREASURY", "DGFT", "MOPNG",
         "GOVT", "MINISTRY", "CATALYST"
     }
-    for i, s in enumerate(stories[:30]):
+
+    now_dt = now_ist()
+    now_naive = datetime(now_dt.year, now_dt.month, now_dt.day, now_dt.hour, now_dt.minute)
+
+    # First pass: classify past/future and detect distinct dates
+    story_dates = []
+    past_indices = []
+    for idx_s, s in enumerate(stories[:40]):
+        raw_t = str(s.get("time") or s.get("timestamp") or s.get("date") or "")
+        dm = re.search(r'(\d{4}-\d{2}-\d{2})', raw_t)
+        date_str = dm.group(1) if dm else now_dt.strftime("%Y-%m-%d")
+        story_dates.append(date_str)
+        
+        tm = re.search(r'(\d{1,2}):(\d{2})', raw_t)
+        is_past = False
+        if tm:
+            try:
+                s_dt = datetime.strptime(f"{date_str} {tm.group(1).zfill(2)}:{tm.group(2)}", "%Y-%m-%d %H:%M")
+                is_past = s_dt < now_naive
+            except Exception:
+                is_past = date_str < now_dt.strftime("%Y-%m-%d")
+        else:
+            is_past = date_str < now_dt.strftime("%Y-%m-%d")
+        
+        if is_past:
+            past_indices.append(idx_s)
+
+    # Prepend Previous Stories Hub if there are past/expired stories
+    if past_indices:
+        past_count = len(past_indices)
+        thumbs.append(
+            f'<div class="epm-story-prev-bubble" onclick="window.epmScrollStoryStripToStart(this)" title="Click to view {past_count} earlier stories">'
+            f'  <div class="epm-prev-icon">⏮️</div>'
+            f'  <div class="epm-prev-count">{past_count} Past</div>'
+            f'  <div class="epm-prev-label">Stories</div>'
+            f'</div>'
+        )
+
+    first_date = story_dates[0] if story_dates else now_dt.strftime("%Y-%m-%d")
+    midnight_inserted = False
+    active_marked = False
+
+    for i, s in enumerate(stories[:40]):
         sk = _sent_key(s.get("sentiment", "NEUTRAL")).lower()
         title = html.escape(clean_table_text(s.get("title", "Market Story")))
         raw_auth = str(s.get("emblem") or s.get("source") or "GNC").strip()
@@ -1903,6 +2044,31 @@ def render_story_strip_html(stories: List[Dict], kind: str, is_desktop: bool = F
         sent_label = html.escape(str(s.get("sentiment", "NEUTRAL")).upper())
 
         is_inst = s.get("is_institutional", False) or any(k in (raw_auth + " " + s.get("title", "")).upper() for k in INSTITUTIONAL_TAGS)
+
+        # Date & Day classification
+        s_date = story_dates[i]
+        is_day2 = (s_date != first_date) and (s_date > first_date)
+        day_class = "epm-day2" if is_day2 else "epm-day1"
+
+        # Insert neon vertical midnight pillar at transition
+        if is_day2 and not midnight_inserted:
+            midnight_inserted = True
+            thumbs.append(
+                f'<div class="epm-story-midnight-pillar" title="Midnight 00:00 IST Day Rollover">'
+                f'  <div class="epm-midnight-icon">🌙</div>'
+                f'  <div class="epm-midnight-time">00:00</div>'
+                f'  <div class="epm-midnight-label">DAY ROLLOVER</div>'
+                f'</div>'
+            )
+
+        is_past = (i in past_indices)
+        expired_class = "is-expired" if is_past else ""
+        
+        # Mark active / imminent story
+        active_class = ""
+        if not is_past and not active_marked:
+            active_class = "is-active-now"
+            active_marked = True
 
         # Ribbon border tone and pill style
         if kind == "news" and is_inst:
@@ -1919,8 +2085,12 @@ def render_story_strip_html(stories: List[Dict], kind: str, is_desktop: bool = F
             tone_class = "pill-neutral"
 
         thumb_img_url = s.get("image_url") or s.get("image") or s.get("thumbnail") or f"/api/placeholder-thumb?cat={kind}&s={emblem}&t={title[:10]}"
+        expired_chip = '<span class="epm-expired-chip">⏱️ ELAPSED</span>' if is_past else ''
+        if active_class:
+            expired_chip = '<span class="epm-live-next-chip">🔴 LIVE / NEXT</span>'
+
         thumbs.append(
-            f'<div class="epm-story-thumbnail {ribbon_cls}" onclick="window.epmOpenStory(\'{kind}\',{i})">'
+            f'<div class="epm-story-thumbnail {ribbon_cls} {day_class} {expired_class} {active_class}" onclick="window.epmOpenStory(\'{kind}\',{i})">'
             f'  <img src="{thumb_img_url}" class="epm-tile-bg-img" alt="{title}" onerror="this.onerror=null;this.src=\'/api/placeholder-thumb?cat={kind}\';" loading="eager" />'
             f'  <div class="epm-tile-overlay"></div>'
             f'  <div class="epm-tile-content">'
@@ -1929,13 +2099,14 @@ def render_story_strip_html(stories: List[Dict], kind: str, is_desktop: bool = F
             f'      <span class="epm-tile-score">{score}</span>'
             f'    </div>'
             f'    <div class="epm-tile-btm">'
+            f'      {expired_chip}'
             f'      <div class="epm-tile-title">{title}</div>'
             f'      <span class="epm-tile-pill {tone_class}">{sent_label}</span>'
             f'    </div>'
             f'  </div>'
             f'</div>'
         )
-    return f'<div class="{cls}">{"".join(thumbs)}</div>'
+    return f'<div class="{cls}" data-auto-center="true">{"".join(thumbs)}</div>'
 
 
 def _story_attr(items: List[Dict]) -> str:
@@ -3375,6 +3546,158 @@ INSTITUTIONAL_DIRECTORY = [
 ]
 
 
+
+def render_stock_news_feed_html(stock_items: Optional[List[Dict]] = None, is_mobile: bool = False) -> str:
+    """Renders the Stock News & Corporate Disclosures workspace with multi-tier filters and rich disclosure cards."""
+    if stock_items is None:
+        stock_items = stock_engine.fetch_stock_news()
+    
+    quick_filters = [
+        ("ALL", "All Assets"),
+        ("NIFTY50", "Nifty 50"),
+        ("NIFTY100", "Nifty 100"),
+        ("NIFTY200", "Nifty 200"),
+        ("NIFTY500", "Nifty 500"),
+        ("BANKNIFTY", "Bank Nifty"),
+        ("SENSEX", "Sensex"),
+        ("NDX", "Nasdaq 100"),
+        ("DJIA", "Dow Jones"),
+        ("MCX", "MCX Commodities")
+    ]
+    
+    pills_html = "".join(
+        f'<button type="button" class="epm-filter-chip {"active" if q[0]=="ALL" else ""}" data-stock-filter="{q[0]}" onclick="window.epmApplyStockQuickFilter(\'{q[0]}\')">{q[1]}</button>'
+        for q in quick_filters
+    )
+
+    cards_html = []
+    for s in stock_items:
+        ticker = html.escape(s.get("ticker", "STK"))
+        company = html.escape(s.get("company", ""))
+        exchange = html.escape(s.get("exchange", "NSE"))
+        sector = html.escape(s.get("sector", "Equities"))
+        market = html.escape(s.get("market", "NSE"))
+        title = html.escape(s.get("title", ""))
+        summary = html.escape(s.get("summary", ""))
+        sent = html.escape(s.get("sentiment", "NEUTRAL"))
+        impact = html.escape(s.get("impact", "MEDIUM"))
+        ts = html.escape(str(s.get("timestamp", ""))[:16])
+        disc_type = html.escape(s.get("disclosure_type", "FILING").replace("_", " "))
+        filing_url = html.escape(s.get("filing_url", "#"))
+        source = html.escape(s.get("source", exchange))
+
+        index_tags = s.get("index_tags", [])
+        tags_str = " ".join(index_tags)
+        tag_badges = "".join(f'<span class="epm-stock-tag">#{html.escape(t)}</span>' for t in index_tags[:4])
+        
+        sent_class = "pill-bullish" if sent == "BULLISH" else ("pill-bearish" if sent == "BEARISH" else "pill-neutral")
+        impact_badge = f'<span class="epm-pc-impact is-high">⚡ {impact}</span>' if impact == "HIGH" else f'<span class="epm-pc-impact">● {impact}</span>'
+
+        cards_html.append(f"""
+        <div class="epm-stock-card" data-market="{market}" data-tags="{tags_str}" data-sector="{sector}" data-ticker="{ticker}">
+            <div class="epm-stock-hdr">
+                <div class="epm-stock-ticker-group">
+                    <span class="epm-stock-ticker">{ticker}</span>
+                    <span class="epm-stock-co">{company}</span>
+                    <span class="epm-inst-chip" style="font-size:9px;">{exchange}</span>
+                </div>
+                <div class="epm-stock-tags">
+                    {impact_badge}
+                    <span class="epm-tile-pill {sent_class}" style="position:static;padding:2px 6px;">{sent}</span>
+                </div>
+            </div>
+            <div class="epm-stock-title">{title}</div>
+            <div class="epm-stock-summary">{summary}</div>
+            <div class="epm-stock-tags" style="margin-bottom:8px;">
+                <span class="epm-stock-tag" style="background:#EFF6FF;color:#0052FF;font-weight:800;">📂 {disc_type}</span>
+                <span class="epm-stock-tag" style="background:#F8FAFC;">🏭 {sector}</span>
+                {tag_badges}
+            </div>
+            <div class="epm-stock-ftr">
+                <span>🏛️ {source} · {ts} IST</span>
+                <a href="{filing_url}" target="_blank" class="epm-stock-link">Official Filing Document ↗</a>
+            </div>
+        </div>
+        """)
+
+    filter_bar_html = f"""
+    <div class="epm-table-header-integrated" style="margin-bottom:12px;padding:12px 14px;border-radius:12px;">
+        <div class="epm-tbl-hdr-title-group" style="margin-bottom:8px;">
+            <span class="epm-ribbon-bullet">●</span>
+            <span class="epm-tbl-hdr-title">MULTI-ASSET EQUITIES & COMMODITIES INTELLIGENCE</span>
+            <span class="epm-tbl-hdr-badge">NSE · BSE · MCX · NASDAQ · NYSE</span>
+        </div>
+        <div class="epm-filter-chip-strip" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;scrollbar-width:none;">
+            {pills_html}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(160px, 1fr));gap:8px;margin-top:6px;">
+            <select id="epm-stock-market-filter" class="epm-news-scope-select" onchange="window.epmFilterStockCards()">
+                <option value="ALL">🏛️ Market: All (NSE, BSE, MCX, US)</option>
+                <option value="NSE">🇮🇳 NSE (National Stock Exchange)</option>
+                <option value="BSE">🇮🇳 BSE (Bombay Stock Exchange)</option>
+                <option value="MCX">⛽ MCX (Multi Commodity Exchange)</option>
+                <option value="NASDAQ">🇺🇸 NASDAQ</option>
+                <option value="NYSE">🇺🇸 NYSE / Dow Jones</option>
+            </select>
+            <select id="epm-stock-index-filter" class="epm-news-scope-select" onchange="window.epmFilterStockCards()">
+                <option value="ALL">📊 Index: All Indices</option>
+                <optgroup label="NSE Broad Market Indices">
+                    <option value="NIFTY50">Nifty 50</option>
+                    <option value="NIFTY100">Nifty 100</option>
+                    <option value="NIFTY200">Nifty 200</option>
+                    <option value="NIFTY500">Nifty 500</option>
+                    <option value="NIFTYMID100">Nifty Midcap 100</option>
+                    <option value="NIFTYSM100">Nifty Smallcap 100</option>
+                </optgroup>
+                <optgroup label="NSE Sectoral Indices">
+                    <option value="BANKNIFTY">Bank Nifty</option>
+                    <option value="NIFTYIT">Nifty IT</option>
+                    <option value="NIFTYAUTO">Nifty Auto</option>
+                    <option value="NIFTYPHARMA">Nifty Pharma</option>
+                    <option value="NIFTYFMCG">Nifty FMCG</option>
+                    <option value="NIFTYMETAL">Nifty Metal</option>
+                    <option value="NIFTYENERGY">Nifty Energy</option>
+                    <option value="NIFTYFIN">Nifty Financial Services</option>
+                </optgroup>
+                <optgroup label="BSE & US Benchmark Indices">
+                    <option value="SENSEX">BSE Sensex</option>
+                    <option value="DJIA">Dow Jones (DJIA)</option>
+                    <option value="NDX">Nasdaq 100</option>
+                    <option value="SPX">S&P 500</option>
+                </optgroup>
+                <optgroup label="MCX Commodity Indices">
+                    <option value="MCXBULLDEX">MCX Bulldex (Bullion)</option>
+                    <option value="MCXMETALDEX">MCX Metaldex (Metals)</option>
+                    <option value="MCXENERGY">MCX Energy (Crude/Gas)</option>
+                </optgroup>
+            </select>
+            <select id="epm-stock-sector-filter" class="epm-news-scope-select" onchange="window.epmFilterStockCards()">
+                <option value="ALL">🏭 Sector: All Sectors</option>
+                <option value="Banking & Financials">Banking & Financials</option>
+                <option value="IT & Technology">IT & Technology</option>
+                <option value="Automobiles & Mobility">Automobiles & Mobility</option>
+                <option value="Energy, Oil & Gas">Energy, Oil & Gas</option>
+                <option value="Metals & Mining">Metals & Mining</option>
+                <option value="Pharma & Healthcare">Pharma & Healthcare</option>
+                <option value="Commodities">Commodities</option>
+            </select>
+            <input type="text" id="epm-stock-search-input" class="epm-news-scope-select" placeholder="🔍 Search Ticker, Company, Catalyst..." oninput="window.epmFilterStockCards()" />
+        </div>
+    </div>
+    """
+
+    disclaimer = render_site_disclaimer_html(is_mobile=is_mobile)
+    return f"""
+    <div class="epm-stock-workspace">
+        {filter_bar_html}
+        <div class="epm-stock-grid" id="epm-stock-grid-container">
+            {"".join(cards_html)}
+        </div>
+        {disclaimer}
+    </div>
+    """
+
+
 def render_settings_hub_html() -> str:
     """
     Renders institutional Meta / Facebook Business Suite-style Settings & Admin Panel:
@@ -3644,6 +3967,8 @@ def render_settings_hub_html() -> str:
                     <option value="pane_sec_social">📸 Omnichannel Social Media</option>
                     <option value="pane_sec_forwarding">🔔 Selective Forwarding Rules</option>
                     <option value="pane_sec_stories_publisher">📸 Stories Flashcard Publisher</option>
+                    <option value="pane_member_auth">👥 Member Access & PIN Security</option>
+                    <option value="pane_stock_taxonomy">📈 Stock & Commodity Taxonomy</option>
                     <option value="pane_sec_telegram_adv">🔧 Advanced Telegram Overrides</option>
                     <option value="pane_system_health">🔒 System Status & Legal Notice</option>
                     <option value="pane_security_pin">🔐 Security & Admin PIN</option>
@@ -3652,6 +3977,14 @@ def render_settings_hub_html() -> str:
             </div>
 
             <div class="epm-settings-sb-nav">
+                <button type="button" class="epm-settings-nav-item" data-pane="pane_member_auth" onclick="window.epmShowSettingsPane('pane_member_auth', this)">
+                    <span class="icon">👥</span>
+                    <span class="text">Member Access & PIN Security</span>
+                </button>
+                <button type="button" class="epm-settings-nav-item" data-pane="pane_stock_taxonomy" onclick="window.epmShowSettingsPane('pane_stock_taxonomy', this)">
+                    <span class="icon">📈</span>
+                    <span class="text">Stock & Commodity Taxonomy</span>
+                </button>
                 <button type="button" class="epm-settings-nav-item active" data-pane="pane_in_reg" onclick="window.epmShowSettingsPane('pane_in_reg', this)">
                     <span class="icon">🏛️</span>
                     <span class="text">Indian Regulators & Govt</span>
@@ -3725,6 +4058,80 @@ def render_settings_hub_html() -> str:
 
         <!-- Right Column: Categorically Disassociated Settings Panes -->
         <div class="epm-settings-content">
+
+            <!-- Pane 0A: Member Access & PIN Security Hub -->
+            <div class="epm-settings-pane" id="pane_member_auth" style="display:none;">
+                <div class="epm-card-hdr">
+                    <div class="epm-card-hdr-left">
+                        <span class="epm-card-hdr-icon">👥</span>
+                        <span class="epm-card-hdr-title">MEMBER ACCESS & PIN SECURITY DIRECTORY</span>
+                    </div>
+                    <span class="epm-card-hdr-tag">10L+ User Scale</span>
+                </div>
+                <div class="epm-segregation-banner">
+                    <span class="epm-segregation-badge">ADMINISTRATIVE GATEKEEPER</span>
+                    <p>Approve applicant registrations, issue cryptographically unique 6 or 8-digit Security PINs, inspect PIN details, or pause/resume member access instantly.</p>
+                </div>
+                <div style="margin-top:12px;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;padding:14px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                        <span style="font-weight:800;font-size:13px;color:#0F172A;">MEMBER DIRECTORY & APPROVAL QUEUE</span>
+                        <button type="button" class="epm-btn-pill" onclick="window.epmReloadMembersTable()" style="padding:5px 12px;font-size:11px;background:#EFF6FF;color:#0052FF;border:1px solid #BFDBFE;cursor:pointer;font-weight:700;">🔄 Refresh Directory</button>
+                    </div>
+                    <div style="overflow-x:auto;">
+                        <table class="epm-settings-table" id="epm-members-table" style="width:100%;font-size:12px;border-collapse:collapse;">
+                            <thead>
+                                <tr style="background:#F8FAFC;border-bottom:1px solid #E2E8F0;">
+                                    <th style="padding:10px 8px;text-align:left;">Member Name</th>
+                                    <th style="padding:10px 8px;text-align:left;">Identifier / Email</th>
+                                    <th style="padding:10px 8px;text-align:left;">Phone</th>
+                                    <th style="padding:10px 8px;text-align:left;">Auth Type</th>
+                                    <th style="padding:10px 8px;text-align:left;">Status</th>
+                                    <th style="padding:10px 8px;text-align:left;color:#0052FF;font-weight:800;">Security PIN (Admin)</th>
+                                    <th style="padding:10px 8px;text-align:right;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="epm-members-tbody">
+                                <tr><td colspan="7" style="padding:16px;text-align:center;color:#64748B;">Loading member directory...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pane 0B: Stock & Commodity Taxonomy -->
+            <div class="epm-settings-pane" id="pane_stock_taxonomy" style="display:none;">
+                <div class="epm-card-hdr">
+                    <div class="epm-card-hdr-left">
+                        <span class="epm-card-hdr-icon">📈</span>
+                        <span class="epm-card-hdr-title">STOCK & COMMODITY TAXONOMY REPOSITORY</span>
+                    </div>
+                    <span class="epm-card-hdr-tag">NSE · BSE · MCX · US</span>
+                </div>
+                <div class="epm-segregation-banner">
+                    <span class="epm-segregation-badge">OFFICIAL CLASSIFICATION</span>
+                    <p>Categorization structure for all equities, sectoral baskets, US benchmarks, and MCX commodities.</p>
+                </div>
+                <div style="margin-top:12px;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;padding:14px;">
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:12px;">
+                        <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:12px;">
+                            <b style="color:#0052FF;font-size:13px;">🇮🇳 NSE Broad Market Indices</b>
+                            <p style="font-size:12px;color:#475569;margin-top:4px;">Nifty 50, Nifty 100, Nifty 200, Nifty 500, Nifty Midcap 100, Nifty Smallcap 100.</p>
+                        </div>
+                        <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:12px;">
+                            <b style="color:#059669;font-size:13px;">🏦 NSE Sectoral Indices</b>
+                            <p style="font-size:12px;color:#475569;margin-top:4px;">Bank Nifty, Nifty IT, Nifty Auto, Nifty Pharma, Nifty FMCG, Nifty Metal, Nifty Energy, Nifty Financial Services.</p>
+                        </div>
+                        <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:12px;">
+                            <b style="color:#D97706;font-size:13px;">⛽ MCX Commodities & Indices</b>
+                            <p style="font-size:12px;color:#475569;margin-top:4px;">Gold, Silver, Crude Oil, Natural Gas, Copper, Aluminium, Zinc, MCX Bulldex, MCX Metaldex, MCX Energy.</p>
+                        </div>
+                        <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:12px;">
+                            <b style="color:#7C3AED;font-size:13px;">🇺🇸 US Market Benchmarks</b>
+                            <p style="font-size:12px;color:#475569;margin-top:4px;">Dow Jones Industrial Average (DJIA), Nasdaq 100 (NDX), S&P 500 (SPX).</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
             
             <!-- Pane 1: Indian Regulators & Ministries -->
             <div class="epm-settings-pane active" id="pane_in_reg">
@@ -8765,6 +9172,311 @@ tbody tr:hover td {
     border-color: #94A3B8 !important;
 }
 
+/* Day 1 vs Day 2 Distinct Background Hues */
+.epm-story-thumbnail.epm-day1 {
+    background: linear-gradient(180deg, #1E293B, #0F172A) !important;
+}
+.epm-story-thumbnail.epm-day2 {
+    background: linear-gradient(180deg, #2E1065, #0F172A) !important;
+    border-color: #A855F7 !important;
+}
+
+/* Past / Expired Stories Dimming */
+.epm-story-thumbnail.is-expired {
+    opacity: 0.52 !important;
+    filter: grayscale(45%) !important;
+    border-style: dashed !important;
+}
+.epm-story-thumbnail.is-expired:hover {
+    opacity: 0.88 !important;
+    filter: grayscale(0%) !important;
+}
+
+/* Active / Imminent Story Pulsing Glow */
+.epm-story-thumbnail.is-active-now {
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.4), 0 0 16px rgba(16, 185, 129, 0.5) !important;
+    border-color: #10B981 !important;
+}
+
+/* Previous Stories Bubble Pinned at Origin */
+.epm-story-prev-bubble {
+    flex: 0 0 76px !important;
+    height: 172px !important;
+    border-radius: 12px !important;
+    background: #F1F5F9 !important;
+    border: 2px dashed #94A3B8 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    text-align: center !important;
+    padding: 8px 4px !important;
+    box-sizing: border-box !important;
+    transition: all 0.2s ease !important;
+    color: #475569 !important;
+}
+.epm-story-prev-bubble:hover {
+    background: #E2E8F0 !important;
+    border-color: #0052FF !important;
+    transform: translateY(-2px) !important;
+}
+.epm-prev-icon { font-size: 20px !important; margin-bottom: 4px !important; }
+.epm-prev-count { font: 800 11px var(--font-mono, monospace) !important; color: #0F172A !important; line-height: 1.2 !important; }
+.epm-prev-label { font-size: 9.5px !important; font-weight: 700 !important; color: #64748B !important; text-transform: uppercase !important; }
+
+/* Neon Vertical Midnight Divider Pillar */
+.epm-story-midnight-pillar {
+    flex: 0 0 72px !important;
+    height: 172px !important;
+    border-radius: 12px !important;
+    background: linear-gradient(180deg, rgba(99, 102, 241, 0.18), rgba(168, 85, 247, 0.22)) !important;
+    border: 2px dashed #A855F7 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    padding: 6px 4px !important;
+    box-sizing: border-box !important;
+    color: #9333EA !important;
+}
+.epm-midnight-icon { font-size: 20px !important; margin-bottom: 2px !important; }
+.epm-midnight-time { font: 800 11px var(--font-mono, monospace) !important; color: #7E22CE !important; }
+.epm-midnight-label { font-size: 8px !important; font-weight: 800 !important; letter-spacing: 0.05em !important; color: #9333EA !important; text-transform: uppercase !important; }
+.epm-expired-chip { font: 800 7.5px var(--font-mono, monospace) !important; padding: 1px 4px !important; border-radius: 3px !important; background: rgba(0,0,0,0.65) !important; color: #CBD5E1 !important; border: 1px solid rgba(255,255,255,0.2) !important; width: fit-content !important; margin-bottom: 2px !important; }
+.epm-live-next-chip { font: 800 7.5px var(--font-mono, monospace) !important; padding: 1px 4px !important; border-radius: 3px !important; background: rgba(16, 185, 129, 0.9) !important; color: #FFFFFF !important; border: 1px solid #10B981 !important; width: fit-content !important; margin-bottom: 2px !important; }
+
+/* Stock News & Disclosures Card Styles */
+.epm-stock-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 12px;
+}
+.epm-stock-card {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    padding: 14px 16px;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+    transition: all 0.2s ease;
+}
+.epm-stock-card:hover {
+    border-color: #0052FF;
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+    transform: translateY(-1px);
+}
+.epm-stock-hdr {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+.epm-stock-ticker-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.epm-stock-ticker {
+    font: 800 13px var(--font-mono, monospace);
+    color: #0052FF;
+    background: #EFF6FF;
+    padding: 2px 7px;
+    border-radius: 6px;
+    border: 1px solid #BFDBFE;
+}
+.epm-stock-co {
+    font-size: 13px;
+    font-weight: 700;
+    color: #0F172A;
+}
+.epm-stock-tags {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+.epm-stock-tag {
+    font: 700 9px var(--font-mono, monospace);
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: #F1F5F9;
+    color: #475569;
+    border: 1px solid #E2E8F0;
+}
+.epm-stock-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #0F172A;
+    line-height: 1.35;
+    margin-bottom: 6px;
+}
+.epm-stock-summary {
+    font-size: 12.5px;
+    color: #475569;
+    line-height: 1.4;
+    margin-bottom: 8px;
+}
+.epm-stock-ftr {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+    color: #64748B;
+    border-top: 1px solid #F1F5F9;
+    padding-top: 8px;
+}
+.epm-stock-link {
+    font-weight: 700;
+    color: #0052FF;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.epm-stock-link:hover { text-decoration: underline; }
+
+/* Institutional Gatekeeper Login Modal */
+body.epm-terminal-unlocked #epm-gatekeeper-overlay,
+html.epm-terminal-unlocked #epm-gatekeeper-overlay {
+    display: none !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
+}
+#epm-gatekeeper-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 999999;
+    background: rgba(15, 23, 42, 0.88);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+}
+.epm-gatekeeper-card {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 440px;
+    box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35);
+    padding: 28px 24px;
+    box-sizing: border-box;
+}
+.epm-gate-hdr {
+    text-align: center;
+    margin-bottom: 20px;
+}
+.epm-gate-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 800;
+    font-size: 18px;
+    color: #0F172A;
+}
+.epm-gate-sub {
+    font-size: 12px;
+    color: #64748B;
+    margin-top: 4px;
+}
+.epm-gate-tabs {
+    display: flex;
+    background: #F1F5F9;
+    padding: 3px;
+    border-radius: 8px;
+    margin-bottom: 18px;
+}
+.epm-gate-tab {
+    flex: 1;
+    padding: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    color: #64748B;
+    transition: all 0.15s ease;
+}
+.epm-gate-tab.active {
+    background: #FFFFFF;
+    color: #0052FF;
+    box-shadow: 0 2px 4px rgba(15, 23, 42, 0.08);
+}
+.epm-gate-field {
+    margin-bottom: 14px;
+}
+.epm-gate-lbl {
+    display: block;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #334155;
+    margin-bottom: 5px;
+}
+.epm-gate-input {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid #CBD5E1;
+    font-size: 14px;
+    color: #0F172A;
+    background: #F8FAFC;
+    box-sizing: border-box;
+    transition: border 0.15s ease;
+}
+.epm-gate-input:focus {
+    outline: none;
+    border-color: #0052FF;
+    background: #FFFFFF;
+}
+.epm-gate-btn {
+    width: 100%;
+    padding: 12px;
+    background: #0052FF;
+    color: #FFFFFF;
+    font-size: 14px;
+    font-weight: 700;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+.epm-gate-btn:hover { background: #0040D0; }
+.epm-gate-social-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 14px;
+}
+.epm-gate-social-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 9px;
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #334155;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.epm-gate-social-btn:hover { background: #F1F5F9; border-color: #CBD5E1; }
+.epm-gate-msg {
+    font-size: 12px;
+    font-weight: 600;
+    margin-top: 10px;
+    text-align: center;
+    min-height: 18px;
+}
+
 .epm-tile-bg-img {
     position: absolute !important;
     inset: 0 !important;
@@ -9992,6 +10704,89 @@ _initial_social_links = get_persisted_social_links()
 
 
 TOP_NAVBAR_HTML = f"""
+
+<!-- Institutional Gatekeeper Modal (Requires PIN on Every Session) -->
+<div id="epm-gatekeeper-overlay">
+    <div class="epm-gatekeeper-card">
+        <div class="epm-gate-hdr">
+            <div class="epm-gate-brand">
+                <img src="/api/logo" style="height:32px;width:auto;" alt="GNC" />
+                <span>Global News Feed Room</span>
+            </div>
+            <div class="epm-gate-sub">High-Security Institutional Terminal Access</div>
+        </div>
+
+        <!-- View 1: Standard Login Form -->
+        <div id="epm-gate-view-login">
+            <div class="epm-gate-tabs">
+                <button type="button" class="epm-gate-tab active" onclick="window.epmGateSwitchTab('login')">Member Login</button>
+                <button type="button" class="epm-gate-tab" onclick="window.epmGateSwitchTab('register')">Register Access</button>
+            </div>
+            <div class="epm-gate-field">
+                <label class="epm-gate-lbl">Email Address or Mobile Number</label>
+                <input type="text" id="gate_login_id" class="epm-gate-input" placeholder="e.g. member@institution.com or +9198..." />
+            </div>
+            <div class="epm-gate-field">
+                <label class="epm-gate-lbl">Unique Security PIN (6 or 8 Digits)</label>
+                <input type="password" id="gate_login_pin" class="epm-gate-input" maxlength="8" placeholder="••••••" />
+            </div>
+            <button type="button" class="epm-gate-btn" onclick="window.epmSubmitGatekeeperLogin()">🔐 Authenticate & Unlock Terminal</button>
+            <div id="gate_login_msg" class="epm-gate-msg"></div>
+
+            <div style="margin-top:16px;text-align:center;font-size:11px;color:#64748B;">Or authenticate via verified social account:</div>
+            <div class="epm-gate-social-row">
+                <button type="button" class="epm-gate-social-btn" onclick="window.epmSocialAuthClick('Google')">
+                    <svg width="14" height="14" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
+                    Google
+                </button>
+                <button type="button" class="epm-gate-social-btn" onclick="window.epmSocialAuthClick('Facebook')">
+                    <svg width="14" height="14" viewBox="0 0 24 24"><path fill="#1877F2" d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                    Facebook
+                </button>
+            </div>
+        </div>
+
+        <!-- View 2: Member Registration Form -->
+        <div id="epm-gate-view-register" style="display:none;">
+            <div class="epm-gate-tabs">
+                <button type="button" class="epm-gate-tab" onclick="window.epmGateSwitchTab('login')">Member Login</button>
+                <button type="button" class="epm-gate-tab active" onclick="window.epmGateSwitchTab('register')">Register Access</button>
+            </div>
+            <div class="epm-gate-field">
+                <label class="epm-gate-lbl">Full Name / Institutional Desk</label>
+                <input type="text" id="gate_reg_name" class="epm-gate-input" placeholder="e.g. John Doe / Prop Desk" />
+            </div>
+            <div class="epm-gate-field">
+                <label class="epm-gate-lbl">Official Email Address</label>
+                <input type="email" id="gate_reg_email" class="epm-gate-input" placeholder="member@institution.com" />
+            </div>
+            <div class="epm-gate-field">
+                <label class="epm-gate-lbl">Mobile Phone Number (for PIN Dispatch)</label>
+                <input type="tel" id="gate_reg_phone" class="epm-gate-input" placeholder="+91 98765 43210" />
+            </div>
+            <button type="button" class="epm-gate-btn" onclick="window.epmSubmitGatekeeperRegister()">📝 Submit Registration Request</button>
+            <div id="gate_reg_msg" class="epm-gate-msg"></div>
+        </div>
+
+        <!-- View 3: First-Time Login PIN Reset -->
+        <div id="epm-gate-view-reset" style="display:none;">
+            <div style="background:#EFF6FF;border:1px solid #BFDBFE;padding:10px;border-radius:8px;margin-bottom:14px;font-size:12px;color:#1E40AF;">
+                <b>First-Time Setup:</b> Please set your personal 6 or 8-digit Security PIN. This will permanently replace your temporary administrator PIN.
+            </div>
+            <div class="epm-gate-field">
+                <label class="epm-gate-lbl">New Personal PIN (6 or 8 Digits)</label>
+                <input type="password" id="gate_new_pin" class="epm-gate-input" maxlength="8" placeholder="Enter 6 or 8 digits" />
+            </div>
+            <div class="epm-gate-field">
+                <label class="epm-gate-lbl">Confirm New Personal PIN</label>
+                <input type="password" id="gate_confirm_pin" class="epm-gate-input" maxlength="8" placeholder="Re-enter 6 or 8 digits" />
+            </div>
+            <button type="button" class="epm-gate-btn" style="background:#059669;" onclick="window.epmSubmitPinReset()">💾 Save New PIN & Enter Terminal</button>
+            <div id="gate_reset_msg" class="epm-gate-msg"></div>
+        </div>
+    </div>
+</div>
+
 <div id="epm-top-navbar" class="epm-top-navbar">
     <div class="epm-nav-single-row">
         <!-- Left: Brand Identity Logo + GNC / Global News Feed Room -->
@@ -10084,7 +10879,33 @@ TOP_NAVBAR_HTML = f"""
 
             <!-- Circulars Page with Submenu -->
             <div class="epm-side-nav-group">
+                
+            <!-- Stock News Page with Submenu -->
+            <div class="epm-side-nav-group">
                 <div class="epm-side-nav-item" data-tab="2" onclick="window.epmSwitchTab(2);window.epmCloseSideMenu()">
+                    <span class="epm-side-item-icon">📈</span>
+                    <div class="epm-side-item-info">
+                        <span class="epm-side-item-name">Stock News</span>
+                        <span class="epm-side-item-desc">NSE, BSE, MCX, US equities & commodities</span>
+                    </div>
+                    <button type="button" class="epm-sub-toggle-btn" onclick="event.stopPropagation(); window.epmToggleSubmenu(this);" title="Submenu Options">
+                        <span class="epm-sub-toggle-icon">▾</span>
+                    </button>
+                </div>
+                <div class="epm-side-submenu">
+                    <a href="javascript:void(0)" onclick="window.epmApplyStockQuickFilter('NIFTY50');window.epmSwitchTab(2);window.epmCloseSideMenu()" class="epm-side-sublink">
+                        <span>🇮🇳</span> Nifty 50 Constituents ↗
+                    </a>
+                    <a href="javascript:void(0)" onclick="window.epmApplyStockQuickFilter('BANKNIFTY');window.epmSwitchTab(2);window.epmCloseSideMenu()" class="epm-side-sublink">
+                        <span>🏦</span> Bank Nifty Filings ↗
+                    </a>
+                    <a href="javascript:void(0)" onclick="window.epmApplyStockQuickFilter('MCX');window.epmSwitchTab(2);window.epmCloseSideMenu()" class="epm-side-sublink">
+                        <span>⛽</span> MCX Energy & Bullion ↗
+                    </a>
+                </div>
+            </div>
+            
+            <div class="epm-side-nav-item" data-tab="5" onclick="window.epmSwitchTab(5);window.epmCloseSideMenu()">
                     <span class="epm-side-item-icon">🏛️</span>
                     <div class="epm-side-item-info">
                         <span class="epm-side-item-name">Regulatory Circulars</span>
@@ -10103,7 +10924,7 @@ TOP_NAVBAR_HTML = f"""
 
             <!-- Holidays Page with Submenu -->
             <div class="epm-side-nav-group">
-                <div class="epm-side-nav-item" data-tab="3" onclick="window.epmSwitchTab(3);window.epmCloseSideMenu()">
+                <div class="epm-side-nav-item" data-tab="5" onclick="window.epmSwitchTab(5);window.epmCloseSideMenu()">
                     <span class="epm-side-item-icon">🏖️</span>
                     <div class="epm-side-item-info">
                         <span class="epm-side-item-name">Trading Holidays & Closures</span>
@@ -10120,7 +10941,7 @@ TOP_NAVBAR_HTML = f"""
                 </div>
             </div>
 
-            <div class="epm-side-nav-item" data-tab="4" onclick="window.epmSwitchTab(4);window.epmCloseSideMenu()">
+            <div class="epm-side-nav-item" data-tab="5" onclick="window.epmSwitchTab(5);window.epmCloseSideMenu()">
                 <span class="epm-side-item-icon">⚙️</span>
                 <div class="epm-side-item-info">
                     <span class="epm-side-item-name">Settings</span>
@@ -12184,6 +13005,9 @@ TERMINAL_CLIENT_JS = r"""
         if (paneId === 'pane_visitors' && window.epmRefreshVisitorTelemetry) {
             window.epmRefreshVisitorTelemetry();
         }
+        if (paneId === 'pane_member_auth' && window.epmReloadMembersTable) {
+            window.epmReloadMembersTable();
+        }
     };
 
     window.epmShowToast = function(msg, duration = 4000) {
@@ -12387,8 +13211,308 @@ TERMINAL_CLIENT_JS = r"""
         window.epmApplyHolidayFilters();
     };
 
+    // ═══ Horizontal Story Timeline Auto-Centering & Scroll ═══
+    window.epmScrollStoryStripToStart = function(btn) {
+        if (!btn) return;
+        const strip = btn.closest('.epm-story-strip');
+        if (strip) strip.scrollTo({ left: 0, behavior: 'smooth' });
+    };
+
+    window.epmAutoCenterStories = function() {
+        document.querySelectorAll('.epm-story-strip[data-auto-center="true"]').forEach(strip => {
+            const active = strip.querySelector('.is-active-now') ||
+                           strip.querySelector('.epm-story-midnight-pillar') ||
+                           strip.querySelector('.epm-story-thumbnail:not(.is-expired)');
+            if (active) {
+                active.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+            }
+        });
+    };
+
+    // ═══ Stock News Interactive Filtering ═══
+    window.epmApplyStockQuickFilter = function(filterVal) {
+        document.querySelectorAll('[data-stock-filter]').forEach(b => {
+            b.classList.toggle('active', b.getAttribute('data-stock-filter') === filterVal);
+        });
+        const indexSel = document.getElementById('epm-stock-index-filter');
+        const mktSel = document.getElementById('epm-stock-market-filter');
+        if (filterVal === 'MCX') {
+            if (mktSel) mktSel.value = 'MCX';
+            if (indexSel) indexSel.value = 'ALL';
+        } else if (filterVal === 'ALL') {
+            if (mktSel) mktSel.value = 'ALL';
+            if (indexSel) indexSel.value = 'ALL';
+        } else {
+            if (mktSel) mktSel.value = 'ALL';
+            if (indexSel) indexSel.value = filterVal;
+        }
+        window.epmFilterStockCards();
+    };
+
+    window.epmFilterStockCards = function() {
+        const mkt = ((document.getElementById('epm-stock-market-filter') || {}).value || 'ALL').toUpperCase();
+        const idx = ((document.getElementById('epm-stock-index-filter') || {}).value || 'ALL').toUpperCase();
+        const sec = ((document.getElementById('epm-stock-sector-filter') || {}).value || 'ALL').toUpperCase();
+        const q = (((document.getElementById('epm-stock-search-input') || {}).value || '').trim()).toUpperCase();
+
+        document.querySelectorAll('#epm-stock-grid-container .epm-stock-card').forEach(card => {
+            const cardMkt = (card.getAttribute('data-market') || '').toUpperCase();
+            const cardTags = (card.getAttribute('data-tags') || '').toUpperCase();
+            const cardSec = (card.getAttribute('data-sector') || '').toUpperCase();
+            const cardTicker = (card.getAttribute('data-ticker') || '').toUpperCase();
+            const cardText = card.innerText.toUpperCase();
+
+            let match = true;
+            if (mkt !== 'ALL' && cardMkt !== mkt) match = false;
+            if (idx !== 'ALL' && !cardTags.includes(idx)) match = false;
+            if (sec !== 'ALL' && cardSec !== sec) match = false;
+            if (q && !cardText.includes(q) && !cardTicker.includes(q)) match = false;
+
+            card.style.display = match ? 'block' : 'none';
+        });
+    };
+
+    // ═══ Gatekeeper Authentication Engine ═══
+    window.epmGateSwitchTab = function(tab) {
+        const vLogin = document.getElementById('epm-gate-view-login');
+        const vReg = document.getElementById('epm-gate-view-register');
+        const vReset = document.getElementById('epm-gate-view-reset');
+        if (vLogin) vLogin.style.display = tab === 'login' ? 'block' : 'none';
+        if (vReg) vReg.style.display = tab === 'register' ? 'block' : 'none';
+        if (vReset) vReset.style.display = tab === 'reset' ? 'block' : 'none';
+    };
+
+    window.epmSocialAuthClick = function(provider) {
+        const idInput = document.getElementById('gate_login_id');
+        if (idInput) {
+            idInput.value = provider.toLowerCase() + '_member@globalnews.com';
+            const msg = document.getElementById('gate_login_msg');
+            if (msg) {
+                msg.style.color = '#0052FF';
+                msg.innerText = provider + ' identity detected. Please enter your authorized PIN to proceed.';
+            }
+        }
+    };
+
+    window.epmSubmitGatekeeperLogin = async function() {
+        const id = ((document.getElementById('gate_login_id') || {}).value || '').trim();
+        const pin = ((document.getElementById('gate_login_pin') || {}).value || '').trim();
+        const msg = document.getElementById('gate_login_msg');
+
+        if (!id || !pin) {
+            if (msg) { msg.style.color = '#DC2626'; msg.innerText = 'Please enter both your identifier and Security PIN.'; }
+            return;
+        }
+
+        // Master Admin login check
+        if ((id.toLowerCase() === 'eshanparek@gmail.com' || id === 'admin') && pin === '202688') {
+            sessionStorage.setItem('epm_member_auth', JSON.stringify({ name: 'Eshan Parek (Master Admin)', role: 'ADMIN', identifier: id }));
+            document.body.classList.add('epm-terminal-unlocked');
+            document.documentElement.classList.add('epm-terminal-unlocked');
+            const overlay = document.getElementById('epm-gatekeeper-overlay');
+            if (overlay) overlay.style.setProperty('display', 'none', 'important');
+            return;
+        }
+
+        try {
+            if (msg) { msg.style.color = '#0052FF'; msg.innerText = 'Verifying security credentials...'; }
+            const r = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ identifier: id, pin: pin })
+            });
+            const res = await r.json();
+            if (res.success) {
+                if (res.must_reset_pin) {
+                    window.epmPendingResetUser = { identifier: id, old_pin: pin };
+                    window.epmGateSwitchTab('reset');
+                } else {
+                    sessionStorage.setItem('epm_member_auth', JSON.stringify(res.member));
+                    document.body.classList.add('epm-terminal-unlocked');
+                    document.documentElement.classList.add('epm-terminal-unlocked');
+                    const overlay = document.getElementById('epm-gatekeeper-overlay');
+                    if (overlay) overlay.style.setProperty('display', 'none', 'important');
+                }
+            } else {
+                if (msg) { msg.style.color = '#DC2626'; msg.innerText = res.message || 'Authentication failed.'; }
+            }
+        } catch (e) {
+            if (msg) { msg.style.color = '#DC2626'; msg.innerText = 'Error connecting to gatekeeper: ' + e; }
+        }
+    };
+
+    window.epmSubmitGatekeeperRegister = async function() {
+        const name = ((document.getElementById('gate_reg_name') || {}).value || '').trim();
+        const email = ((document.getElementById('gate_reg_email') || {}).value || '').trim();
+        const phone = ((document.getElementById('gate_reg_phone') || {}).value || '').trim();
+        const msg = document.getElementById('gate_reg_msg');
+
+        if (!name || (!email && !phone)) {
+            if (msg) { msg.style.color = '#DC2626'; msg.innerText = 'Please provide your Name and at least Email or Phone.'; }
+            return;
+        }
+
+        try {
+            if (msg) { msg.style.color = '#0052FF'; msg.innerText = 'Submitting registration...'; }
+            const r = await fetch('/api/auth/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name, identifier: email || phone, phone: phone, auth_type: 'portal' })
+            });
+            const res = await r.json();
+            if (res.status === 'success' || res.status === 'exists') {
+                if (msg) {
+                    msg.style.color = '#059669';
+                    msg.innerText = '✅ ' + (res.message || 'Registration submitted! Awaiting Administrator authorization.');
+                }
+            } else {
+                if (msg) { msg.style.color = '#DC2626'; msg.innerText = res.message || 'Error creating account.'; }
+            }
+        } catch (e) {
+            if (msg) { msg.style.color = '#DC2626'; msg.innerText = 'Network error: ' + e; }
+        }
+    };
+
+    window.epmSubmitPinReset = async function() {
+        const newPin = ((document.getElementById('gate_new_pin') || {}).value || '').trim();
+        const confirmPin = ((document.getElementById('gate_confirm_pin') || {}).value || '').trim();
+        const msg = document.getElementById('gate_reset_msg');
+
+        if (!newPin || (newPin.length !== 6 && newPin.length !== 8) || !/^\d+$/.test(newPin)) {
+            if (msg) { msg.style.color = '#DC2626'; msg.innerText = 'PIN must be exactly 6 or 8 digits.'; }
+            return;
+        }
+        if (newPin !== confirmPin) {
+            if (msg) { msg.style.color = '#DC2626'; msg.innerText = 'PIN confirmation does not match.'; }
+            return;
+        }
+
+        const pending = window.epmPendingResetUser;
+        if (!pending) {
+            window.epmGateSwitchTab('login');
+            return;
+        }
+
+        try {
+            if (msg) { msg.style.color = '#0052FF'; msg.innerText = 'Saving new security PIN...'; }
+            const r = await fetch('/api/auth/reset-pin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ identifier: pending.identifier, old_pin: pending.old_pin, new_pin: newPin })
+            });
+            const res = await r.json();
+            if (res.success) {
+                sessionStorage.setItem('epm_member_auth', JSON.stringify({ identifier: pending.identifier, role: 'MEMBER' }));
+                document.body.classList.add('epm-terminal-unlocked');
+                document.documentElement.classList.add('epm-terminal-unlocked');
+                const overlay = document.getElementById('epm-gatekeeper-overlay');
+                if (overlay) overlay.style.setProperty('display', 'none', 'important');
+            } else {
+                if (msg) { msg.style.color = '#DC2626'; msg.innerText = res.message || 'Failed to update PIN.'; }
+            }
+        } catch (e) {
+            if (msg) { msg.style.color = '#DC2626'; msg.innerText = 'Error resetting PIN: ' + e; }
+        }
+    };
+
+    window.epmCheckGatekeeperAuth = function() {
+        const auth = sessionStorage.getItem('epm_member_auth');
+        const overlay = document.getElementById('epm-gatekeeper-overlay');
+        if (auth) {
+            document.body.classList.add('epm-terminal-unlocked');
+            document.documentElement.classList.add('epm-terminal-unlocked');
+            if (overlay) overlay.style.setProperty('display', 'none', 'important');
+        } else {
+            document.body.classList.remove('epm-terminal-unlocked');
+            document.documentElement.classList.remove('epm-terminal-unlocked');
+            if (overlay) overlay.style.setProperty('display', 'flex', 'important');
+        }
+    };
+
+    // ═══ Admin Member Management Functions ═══
+    window.epmReloadMembersTable = async function() {
+        const tbody = document.getElementById('epm-members-tbody');
+        if (!tbody) return;
+        try {
+            const r = await fetch('/api/admin/members?master_pin=202688');
+            const data = await r.json();
+            const members = data.members || [];
+            if (!members.length) {
+                tbody.innerHTML = '<tr><td colspan="7" style="padding:16px;text-align:center;color:#64748B;">No registered members found.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = members.map(m => {
+                const isPending = m.status === 'PENDING_APPROVAL';
+                const isPaused = m.status === 'PAUSED';
+                const statusColor = isPending ? '#D97706' : (isPaused ? '#DC2626' : '#059669');
+                const pinDisplay = m.pin_plaintext_admin ? `<b style="font-family:monospace;letter-spacing:1.5px;color:#0052FF;background:#EFF6FF;padding:2px 6px;border-radius:4px;border:1px solid #BFDBFE;">${m.pin_plaintext_admin}</b>` : '<span style="color:#94A3B8;">Pending Issue</span>';
+                
+                let actionBtns = '';
+                if (isPending) {
+                    actionBtns = `
+                        <button type="button" class="epm-btn-pill" style="padding:2px 8px;font-size:10px;background:#059669;color:#fff;border:none;margin-right:4px;" onclick="window.epmAdminApproveMember('${m.id}', 6)">Approve (6-PIN)</button>
+                        <button type="button" class="epm-btn-pill" style="padding:2px 8px;font-size:10px;background:#2563EB;color:#fff;border:none;" onclick="window.epmAdminApproveMember('${m.id}', 8)">Approve (8-PIN)</button>
+                    `;
+                } else if (isPaused) {
+                    actionBtns = `<button type="button" class="epm-btn-pill" style="padding:2px 8px;font-size:10px;background:#059669;color:#fff;border:none;" onclick="window.epmAdminSetMemberStatus('${m.id}', 'ACTIVE')">▶ Resume</button>`;
+                } else {
+                    actionBtns = `<button type="button" class="epm-btn-pill" style="padding:2px 8px;font-size:10px;background:#DC2626;color:#fff;border:none;" onclick="window.epmAdminSetMemberStatus('${m.id}', 'PAUSED')">⏸ Pause</button>`;
+                }
+
+                return `
+                <tr style="border-bottom:1px solid #F1F5F9;">
+                    <td style="padding:8px;font-weight:700;">${m.name}</td>
+                    <td style="padding:8px;">${m.identifier}</td>
+                    <td style="padding:8px;">${m.phone || '—'}</td>
+                    <td style="padding:8px;text-transform:uppercase;">${m.auth_type}</td>
+                    <td style="padding:8px;font-weight:800;color:${statusColor};">${m.status}</td>
+                    <td style="padding:8px;">${pinDisplay}</td>
+                    <td style="padding:8px;text-align:right;">${actionBtns}</td>
+                </tr>
+                `;
+            }).join('');
+        } catch (e) {
+            tbody.innerHTML = `<tr><td colspan="7" style="padding:16px;text-align:center;color:#DC2626;">Error loading members: ${e}</td></tr>`;
+        }
+    };
+
+    window.epmAdminApproveMember = async function(memId, pinLen) {
+        try {
+            const r = await fetch('/api/admin/members/approve', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ member_id: memId, pin_length: pinLen })
+            });
+            const res = await r.json();
+            if (res.success) {
+                alert(`Member approved! Security PIN generated: ${res.pin}`);
+                window.epmReloadMembersTable();
+            } else {
+                alert('Approval error: ' + res.message);
+            }
+        } catch (e) {
+            alert('Request error: ' + e);
+        }
+    };
+
+    window.epmAdminSetMemberStatus = async function(memId, status) {
+        try {
+            await fetch('/api/admin/members/status', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ member_id: memId, status: status })
+            });
+            window.epmReloadMembersTable();
+        } catch (e) {
+            alert('Status error: ' + e);
+        }
+    };
+
     // Auto-reapply on DOM mount or tab switch
     document.addEventListener('DOMContentLoaded', function() {
+        window.epmCheckGatekeeperAuth();
+        window.epmReloadMembersTable();
+        setTimeout(window.epmAutoCenterStories, 250);
         window.epmApplyHolidayFilters();
     });
     setTimeout(function() {
@@ -12618,7 +13742,7 @@ with gr.Blocks(
         # ═══════════════════════════════════════════════════════════
         # TAB 1: Live Financial Wire & Breaking Catalysts
         # ═══════════════════════════════════════════════════════════
-        with gr.TabItem("📰 Live Financial Wire & Breaking Catalysts"):
+        with gr.TabItem("📰 Live Breaking News"):
             mobile_news_feed = gr.HTML(value=init_mobile_news_html, elem_id="mobile_news_feed", elem_classes=["epm-mobile-only"])
             top_news_visual = gr.HTML(value=init_news_html, elem_id="news_visual_feed", elem_classes=["epm-desktop-only"])
 
@@ -12632,7 +13756,7 @@ with gr.Blocks(
         # ═══════════════════════════════════════════════════════════
         # TAB 2: Multi-Market Calendar, Live Timers & Outcomes
         # ═══════════════════════════════════════════════════════════
-        with gr.TabItem("📅 Market Calendar, Timers & Outcomes"):
+        with gr.TabItem("📅 Market Outlook"):
             cal_info_bar = gr.Markdown(value=init_cal_summary, elem_id="cal_info_bar", visible=False)
 
             with gr.Column(elem_id="sec_catalyst_ledger", elem_classes=["epm-modular-section"]):
@@ -12764,6 +13888,13 @@ with gr.Blocks(
         # ═══════════════════════════════════════════════════════════
         # TAB 3: Official Regulatory Circulars & Notifications Repository
         # ═══════════════════════════════════════════════════════════
+        
+        # ═══════════════════════════════════════════════════════════
+        # TAB 2: Stock News & Corporate Disclosures (NSE, BSE, MCX, US)
+        # ═══════════════════════════════════════════════════════════
+        with gr.TabItem("📈 Stock News"):
+            stock_news_visual = gr.HTML(value=render_stock_news_feed_html(is_mobile=False), elem_id="stock_visual_feed")
+
         with gr.TabItem("📜 Regulatory Circulars & Official PDFs"):
             circ_info_bar = gr.Markdown(value=init_circ_summary, elem_id="circ_info_bar", visible=False)
             mobile_circ_feed = gr.HTML(value=init_mobile_circ_html, elem_id="mobile_circ_feed", elem_classes=["epm-mobile-only"])
@@ -12910,7 +14041,7 @@ with gr.Blocks(
         # ═══════════════════════════════════════════════════════════
         # TAB 4: Portal Settings Page (Alert Channels, Google Cal & Sources)
         # ═══════════════════════════════════════════════════════════
-        with gr.TabItem("⚙️ Portal Settings & Integrations"):
+        with gr.TabItem("⚙️ Settings"):
             gr.HTML(render_settings_hub_html())
 
             # Section 1: Connected News Sources & Selective Forwarding Rules

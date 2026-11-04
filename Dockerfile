@@ -20,6 +20,8 @@ USER user
 ENV HOME=/home/user \
     PATH=/home/user/.local/bin:$PATH \
     PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    MALLOC_TRIM_THRESHOLD_=131072 \
     PORT=7860
 
 WORKDIR $HOME/app

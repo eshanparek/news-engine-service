@@ -1,0 +1,214 @@
+{
+  "broad_indices": [
+    {
+      "id": "NIFTY50",
+      "name": "Nifty 50",
+      "exchange": "NSE",
+      "description": "Top 50 large-cap blue-chips"
+    },
+    {
+      "id": "NIFTY100",
+      "name": "Nifty 100",
+      "exchange": "NSE",
+      "description": "Top 100 companies representing 76% market cap"
+    },
+    {
+      "id": "NIFTY200",
+      "name": "Nifty 200",
+      "exchange": "NSE",
+      "description": "Top 200 companies (Large and Mid cap)"
+    },
+    {
+      "id": "NIFTY500",
+      "name": "Nifty 500",
+      "exchange": "NSE",
+      "description": "Top 500 companies representing 96% market cap"
+    },
+    {
+      "id": "NIFTYMID100",
+      "name": "Nifty Midcap 100",
+      "exchange": "NSE",
+      "description": "Key 100 mid-cap growth enterprises"
+    },
+    {
+      "id": "NIFTYSM100",
+      "name": "Nifty Smallcap 100",
+      "exchange": "NSE",
+      "description": "High-growth small-cap enterprises"
+    },
+    {
+      "id": "SENSEX",
+      "name": "BSE Sensex 30",
+      "exchange": "BSE",
+      "description": "Benchmark 30 established blue-chips"
+    }
+  ],
+  "sectoral_indices": [
+    {
+      "id": "BANKNIFTY",
+      "name": "Bank Nifty",
+      "exchange": "NSE",
+      "sector": "Banking & Financials"
+    },
+    {
+      "id": "NIFTYFIN",
+      "name": "Nifty Financial Services",
+      "exchange": "NSE",
+      "sector": "Banking & Financials"
+    },
+    {
+      "id": "NIFTYIT",
+      "name": "Nifty IT",
+      "exchange": "NSE",
+      "sector": "IT & Technology"
+    },
+    {
+      "id": "NIFTYAUTO",
+      "name": "Nifty Auto",
+      "exchange": "NSE",
+      "sector": "Automobiles & Mobility"
+    },
+    {
+      "id": "NIFTYPHARMA",
+      "name": "Nifty Pharma",
+      "exchange": "NSE",
+      "sector": "Pharma & Healthcare"
+    },
+    {
+      "id": "NIFTYFMCG",
+      "name": "Nifty FMCG",
+      "exchange": "NSE",
+      "sector": "FMCG & Consumer Goods"
+    },
+    {
+      "id": "NIFTYMETAL",
+      "name": "Nifty Metal",
+      "exchange": "NSE",
+      "sector": "Metals & Mining"
+    },
+    {
+      "id": "NIFTYENERGY",
+      "name": "Nifty Energy",
+      "exchange": "NSE",
+      "sector": "Energy, Oil & Gas"
+    },
+    {
+      "id": "NIFTYOILGAS",
+      "name": "Nifty Oil & Gas",
+      "exchange": "NSE",
+      "sector": "Energy, Oil & Gas"
+    },
+    {
+      "id": "NIFTYREALTY",
+      "name": "Nifty Realty",
+      "exchange": "NSE",
+      "sector": "Real Estate & Infra"
+    },
+    {
+      "id": "NIFTYMEDIA",
+      "name": "Nifty Media",
+      "exchange": "NSE",
+      "sector": "Media & Entertainment"
+    },
+    {
+      "id": "NIFTYHEALTH",
+      "name": "Nifty Healthcare",
+      "exchange": "NSE",
+      "sector": "Pharma & Healthcare"
+    }
+  ],
+  "us_indices": [
+    {
+      "id": "DJIA",
+      "name": "Dow Jones Industrial Average (DJIA)",
+      "exchange": "NYSE",
+      "description": "30 Prominent US Blue-chips"
+    },
+    {
+      "id": "NDX",
+      "name": "Nasdaq 100",
+      "exchange": "NASDAQ",
+      "description": "Top 100 Global Tech & Non-financial Giants"
+    },
+    {
+      "id": "SPX",
+      "name": "S&P 500",
+      "exchange": "US",
+      "description": "500 Leading US Large-Cap Enterprises"
+    }
+  ],
+  "mcx_commodities": [
+    {
+      "id": "GOLD",
+      "name": "MCX Gold (1kg / Mini)",
+      "category": "Bullion",
+      "symbol": "GOLD"
+    },
+    {
+      "id": "SILVER",
+      "name": "MCX Silver (30kg / Mini)",
+      "category": "Bullion",
+      "symbol": "SILVER"
+    },
+    {
+      "id": "CRUDEOIL",
+      "name": "MCX Crude Oil",
+      "category": "Energy",
+      "symbol": "CRUDEOIL"
+    },
+    {
+      "id": "NATGAS",
+      "name": "MCX Natural Gas",
+      "category": "Energy",
+      "symbol": "NATURALGAS"
+    },
+    {
+      "id": "COPPER",
+      "name": "MCX Copper",
+      "category": "Base Metals",
+      "symbol": "COPPER"
+    },
+    {
+      "id": "ALUMINIUM",
+      "name": "MCX Aluminium",
+      "category": "Base Metals",
+      "symbol": "ALUMINIUM"
+    },
+    {
+      "id": "ZINC",
+      "name": "MCX Zinc",
+      "category": "Base Metals",
+      "symbol": "ZINC"
+    },
+    {
+      "id": "LEAD",
+      "name": "MCX Lead",
+      "category": "Base Metals",
+      "symbol": "LEAD"
+    },
+    {
+      "id": "NICKEL",
+      "name": "MCX Nickel",
+      "category": "Base Metals",
+      "symbol": "NICKEL"
+    },
+    {
+      "id": "MCXBULLDEX",
+      "name": "MCX Bulldex Index",
+      "category": "Indices",
+      "symbol": "MCXBULLDEX"
+    },
+    {
+      "id": "MCXMETALDEX",
+      "name": "MCX Metaldex Index",
+      "category": "Indices",
+      "symbol": "MCXMETALDEX"
+    },
+    {
+      "id": "MCXENERGY",
+      "name": "MCX Energy Index",
+      "category": "Indices",
+      "symbol": "MCXENERGY"
+    }
+  ]
+}

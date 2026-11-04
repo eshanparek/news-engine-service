@@ -551,6 +551,7 @@ class NewsEngineWorker:
         self.enable_ai = os.getenv("ENABLE_AI_SCORING", "true").lower() == "true"
         self.min_forward_score = 0 # 0 = forward all, 7 = high impact only
         self.lock = threading.Lock()
+        self.dispatch_executor = concurrent.futures.ThreadPoolExecutor(max_workers=2, thread_name_prefix="NewsDispatch")
         self.etags: Dict[str, str] = {}
         self.last_modified: Dict[str, str] = {}
         
@@ -901,7 +902,7 @@ class NewsEngineWorker:
         else:
             if newly_arrived:
                 for item in newly_arrived:
-                    threading.Thread(target=self.process_and_dispatch_single_item, args=(item,), daemon=True).start()
+                    self.dispatch_executor.submit(self.process_and_dispatch_single_item, item)
 
         self.last_fetch_time = datetime.now()
         import gc
