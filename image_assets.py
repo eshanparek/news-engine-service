@@ -188,6 +188,46 @@ def generate_holiday_thumb(holiday_key: str, title: str = "") -> bytes:
     w, h = 240, 240
     key_norm = (holiday_key + " " + title).lower()
     
+    # 0. Check authentic user-uploaded / extracted high-res holiday illustrations
+    hol_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "holidays")
+    d_clean = re.sub(r'[^0-9\-]', '', holiday_key)[:10]
+    
+    # Check direct thumb match by date (e.g. thumb_2026-11-08.png)
+    if d_clean:
+        cand_thumb = os.path.join(hol_dir, f"thumb_{d_clean}.png")
+        if os.path.exists(cand_thumb):
+            try:
+                src = Image.open(cand_thumb).convert("RGBA")
+                src = src.resize((w, h), Image.Resampling.LANCZOS)
+                buf = io.BytesIO()
+                src.convert("RGB").save(buf, format="PNG")
+                return buf.getvalue()
+            except Exception:
+                pass
+
+    # Check keyword mappings to authentic thumb assets
+    kw_to_thumb = [
+        (["diwali", "laxmi", "muhurat", "11-08"], "thumb_2026-11-08.png"),
+        (["balipratipada", "bali", "11-10"], "thumb_2026-11-10.png"),
+        (["gurpurb", "guru nanak", "prakash", "11-24"], "thumb_2026-11-24.png"),
+        (["thanksgiving", "11-26"], "thumb_2026-11-26.png"),
+        (["black friday", "day after", "11-27"], "thumb_2026-11-27.png"),
+        (["christmas eve", "12-24"], "thumb_2026-12-24.png"),
+        (["christmas", "xmas", "12-25"], "thumb_2026-12-25.png"),
+    ]
+    for kws, fn in kw_to_thumb:
+        if any(k in key_norm for k in kws):
+            fp = os.path.join(hol_dir, fn)
+            if os.path.exists(fp):
+                try:
+                    src = Image.open(fp).convert("RGBA")
+                    src = src.resize((w, h), Image.Resampling.LANCZOS)
+                    buf = io.BytesIO()
+                    src.convert("RGB").save(buf, format="PNG")
+                    return buf.getvalue()
+                except Exception:
+                    pass
+
     img = Image.new("RGB", (w, h), (15, 23, 42))
     d = ImageDraw.Draw(img)
 

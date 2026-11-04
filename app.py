@@ -204,8 +204,30 @@ async def serve_holidays_image():
 
 
 @app.api_route("/api/holiday-thumb/{holiday_key}", methods=["GET", "HEAD"])
-async def serve_holiday_thumb(holiday_key: str, title: str = ""):
-    """Renders and serves high-contrast festive, seasonal, and holiday picture thumbnails."""
+async def serve_holiday_thumb(holiday_key: str, title: str = "", download: str = ""):
+    """Renders and serves high-contrast festive, seasonal, and holiday picture thumbnails, or full card posters."""
+    if download == "full":
+        hol_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "holidays")
+        d_clean = re.sub(r'[^0-9\-]', '', holiday_key)[:10]
+        if os.path.exists(hol_dir):
+            for fn in sorted(os.listdir(hol_dir)):
+                if fn.startswith(f"card_{d_clean}") and fn.endswith(".png"):
+                    full_p = os.path.join(hol_dir, fn)
+                    try:
+                        with open(full_p, "rb") as f:
+                            data = f.read()
+                        from fastapi.responses import Response
+                        return Response(
+                            content=data,
+                            media_type="image/png",
+                            headers={
+                                "Content-Disposition": f'attachment; filename="holiday_card_{d_clean}.png"',
+                                "Cache-Control": "public, max-age=86400"
+                            }
+                        )
+                    except Exception:
+                        pass
+
     png = generate_holiday_thumb(holiday_key, title=title)
     from fastapi.responses import Response
     return Response(content=png, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
@@ -1765,12 +1787,22 @@ def build_story_items(kind: str = "news", limit: int = 100) -> List[Dict]:
             snap = calendar_engine.get_holiday_snapshot().get("comparison", [])
         except Exception:
             snap = []
-        for h in snap[:limit]:
+        now_dt = now_ist().strftime("%Y-%m-%d")
+        upcoming = [h for h in snap if str(h.get("date", "")) >= now_dt]
+        hol_list = upcoming if upcoming else snap
+        for h in hol_list[:limit]:
             d = h.get("date", "")
             day = h.get("day", "")
             desc = h.get("description", "")
             nse = h.get("nse_status", "")
+            bse = h.get("bse_status", "")
+            mcx = h.get("mcx_status", "")
             nyse = h.get("nyse_status", "")
+            crypto = h.get("crypto_status", "Open 24/7")
+
+            is_closed = "Closed" in nse or "Closed" in nyse or "Closed" in mcx
+            status_summary = "Market Closed" if is_closed else ("Special Muhurat Session" if "Muhurat" in nse else "Trading Active")
+
             out.append({
                 "kind": "holidays",
                 "title": desc,
@@ -1778,16 +1810,21 @@ def build_story_items(kind: str = "news", limit: int = 100) -> List[Dict]:
                 "sentiment": "NEUTRAL",
                 "score": 5.0,
                 "metric1": d,
-                "metric1_label": "Date",
-                "metric2": "Closed" if "Closed" in nse or "Closed" in nyse else "Open",
-                "metric2_label": "Trading Status",
-                "impact": "Market Holiday",
-                "bullets": [f"National Stock Exchange (NSE): {nse}", f"New York Stock Exchange (NYSE): {nyse}"],
-                "takeaway": f"Settlement cycles and trading sessions deferred across affected exchange venues.",
+                "metric1_label": "Holiday Date",
+                "metric2": status_summary,
+                "metric2_label": "Exchange Status",
+                "impact": "Authoritative Market Closure" if is_closed else "Special Festive Window",
+                "bullets": [
+                    f"NSE & BSE: {nse}",
+                    f"MCX (Commodity): {mcx}",
+                    f"NYSE (Wall Street): {nyse}",
+                    f"Digital Assets: {crypto}"
+                ],
+                "takeaway": f"Settlement cycles and trading sessions deferred across affected exchange venues in observance of {desc}.",
                 "source": "Holiday Calendar",
                 "time": d,
                 "link": "",
-                "image_url": f"/api/holiday-thumb/{d}?title={desc}",
+                "image_url": f"/api/holiday-thumb/{d}?title={urllib.parse.quote(desc)}",
             })
     else:
         for it in get_merged_news_pool()[:limit]:
@@ -2284,6 +2321,7 @@ def render_mobile_holidays_timeline_html(holidays: List[Dict]) -> str:
         for i, s in enumerate(stories)
     )
 
+    today_str = now_ist().strftime("%Y-%m-%d")
     parts = []
     for i, h in enumerate(holidays):
         d = clean_table_text(h.get("date", ""))
@@ -2295,6 +2333,19 @@ def render_mobile_holidays_timeline_html(holidays: List[Dict]) -> str:
         nyse = clean_table_text(h.get("nyse_status", "Open"))
         crypto = clean_table_text(h.get("crypto_status", "Open 24/7"))
 
+        is_india = "Closed" in nse or "Closed" in bse or "Closed" in mcx or "FULL HOLIDAY" in mcx.upper() or "MUHURAT" in nse.upper()
+        is_usa = "Closed" in nyse or "Early Close" in nyse
+        c_tag = "ALL"
+        if is_india and not is_usa:
+            c_tag = "INDIA"
+        elif is_usa and not is_india:
+            c_tag = "USA"
+        elif is_india and is_usa:
+            c_tag = "BOTH"
+
+        is_past = (d < today_str)
+        past_cls = "is-past-holiday epm-past-holiday-hidden" if is_past else "is-upcoming-holiday"
+
         try:
             lbl = datetime.strptime(d, "%Y-%m-%d").strftime("%a, %d %b %Y")
         except Exception:
@@ -2303,7 +2354,7 @@ def render_mobile_holidays_timeline_html(holidays: List[Dict]) -> str:
         story_btn = f'<button type="button" class="epm-pc-story-btn" onclick="event.stopPropagation();window.epmOpenStory(\'holidays\',{i})">▶ Story</button>' if i < len(stories) else ""
 
         parts.append(f"""
-        <div class="epm-tl-row" data-nse="{html.escape(nse.upper())}" data-bse="{html.escape(bse.upper())}" data-mcx="{html.escape(mcx.upper())}" data-nyse="{html.escape(nyse.upper())}" data-crypto="{html.escape(crypto.upper())}">
+        <div class="epm-tl-row {past_cls}" data-country="{c_tag}" data-date="{d}" data-nse="{html.escape(nse.upper())}" data-bse="{html.escape(bse.upper())}" data-mcx="{html.escape(mcx.upper())}" data-nyse="{html.escape(nyse.upper())}" data-crypto="{html.escape(crypto.upper())}">
             <div class="epm-tl-time" style="font-size:11px; font-weight:700; color:#475569;">{html.escape(d[5:])}</div>
             <div class="epm-tl-rail"><span class="epm-tl-dot tone-neutral"></span></div>
             <div class="epm-tl-card tone-neutral" onclick="window.epmToggleProgressive(this)">
@@ -2337,13 +2388,15 @@ def render_mobile_holidays_timeline_html(holidays: List[Dict]) -> str:
     disclaimer_html = render_site_disclaimer_html(is_mobile=True)
 
     filter_html = """
-    <div class="epm-mobile-filter-bar">
+    <div class="epm-mobile-filter-bar" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">
         <select class="epm-news-scope-select mobile-select" id="epm-mob-hol-filter" oninput="window.epmFilterHolidays(this.value)" onchange="window.epmFilterHolidays(this.value)">
             <option value="ALL">🏛️ All 2026 Holidays (All Markets)</option>
-            <option value="NSE">🇮🇳 NSE / BSE Holidays (Closed)</option>
-            <option value="MCX">⛽ MCX Holidays (Closed)</option>
-            <option value="NYSE">🇺🇸 US NYSE Holidays (Closed)</option>
+            <option value="INDIA">🇮🇳 Indian Markets (NSE, BSE, MCX)</option>
+            <option value="USA">🇺🇸 US Markets (NYSE)</option>
         </select>
+        <button type="button" id="epm-mob-hol-past-toggle-btn" class="epm-hol-toggle-btn" onclick="window.epmTogglePastHolidays(this)" style="justify-content:center;width:100%;padding:8px 12px;font-size:12px;">
+            <span>👁️</span> <span id="epm-mob-hol-past-toggle-txt">View All 2026 Holidays (Include Past)</span>
+        </button>
     </div>
     """
 
@@ -3159,6 +3212,7 @@ def render_desktop_holidays_html(holidays: List[Dict]) -> str:
     if not holidays:
         return '<div class="epm-empty-state"><div class="epm-empty-title">No holidays recorded</div></div>'
 
+    today_str = now_ist().strftime("%Y-%m-%d")
     rows_html = []
     for h in holidays:
         d = clean_table_text(h.get("date", ""))
@@ -3170,8 +3224,8 @@ def render_desktop_holidays_html(holidays: List[Dict]) -> str:
         nyse = clean_table_text(h.get("nyse_status", "Open"))
         crypto = clean_table_text(h.get("crypto_status", "Open 24/7 (Holiday)"))
 
-        is_india = "Closed" in nse or "Closed" in bse or "Closed" in mcx or "FULL HOLIDAY" in mcx.upper()
-        is_usa = "Closed" in nyse
+        is_india = "Closed" in nse or "Closed" in bse or "Closed" in mcx or "FULL HOLIDAY" in mcx.upper() or "MUHURAT" in nse.upper()
+        is_usa = "Closed" in nyse or "Early Close" in nyse
         c_tag = "ALL"
         if is_india and not is_usa:
             c_tag = "INDIA"
@@ -3180,12 +3234,19 @@ def render_desktop_holidays_html(holidays: List[Dict]) -> str:
         elif is_india and is_usa:
             c_tag = "BOTH"
 
+        is_past = (d < today_str)
+        past_cls = "is-past-holiday epm-past-holiday-hidden" if is_past else "is-upcoming-holiday"
+
         def _hol_badge(label: str, st: str) -> str:
             st_u = st.upper()
             if "CLOSED" in st_u or "FULL" in st_u:
                 return f'<span class="epm-hol-badge closed">🔴 {label}: Closed</span>'
             elif "MORN: CLOSED" in st_u:
                 return f'<span class="epm-hol-badge split">🟡 {label}: Eve Open (17:00 IST)</span>'
+            elif "MUHURAT" in st_u:
+                return f'<span class="epm-hol-badge split" style="background:#FEF3C7;color:#B45309;border-color:#FDE68A;">✨ {label}: Muhurat Window</span>'
+            elif "EARLY" in st_u:
+                return f'<span class="epm-hol-badge split" style="background:#FEF3C7;color:#B45309;border-color:#FDE68A;">⏱️ {label}: Early Close</span>'
             elif "24/7" in st_u:
                 return f'<span class="epm-hol-badge open">🟢 {label}: 24/7 Open</span>'
             elif "OPEN" in st_u:
@@ -3200,10 +3261,10 @@ def render_desktop_holidays_html(holidays: List[Dict]) -> str:
             _hol_badge("Crypto", crypto)
         ])
 
-        cat_tag = "🇮🇳 Indian Sovereign Holiday" if is_india else ("🇺🇸 US Federal Holiday" if is_usa else "🌐 Global Holiday")
+        cat_tag = "🇮🇳 Indian Sovereign Holiday" if is_india and not is_usa else ("🇺🇸 US Federal Holiday" if is_usa and not is_india else ("🌐 Synchronized Global Holiday" if is_india and is_usa else "🌐 Global Holiday"))
 
         rows_html.append(f'''
-        <div class="epm-hol-chron-row" data-country="{c_tag}">
+        <div class="epm-hol-chron-row {past_cls}" data-country="{c_tag}" data-date="{d}">
             <div class="epm-hol-rail">
                 <span class="epm-hol-rail-date">{d}</span>
                 <span class="epm-hol-rail-day">{day}</span>
@@ -3219,7 +3280,7 @@ def render_desktop_holidays_html(holidays: List[Dict]) -> str:
                 </div>
             </div>
             <div class="epm-hol-actions">
-                <a href="/api/holiday-thumb/{d}?title={urllib.parse.quote(desc)}" download="holiday_{d}.png" class="epm-chron-analyze-btn" style="text-decoration:none;">
+                <a href="/api/holiday-thumb/{d}?title={urllib.parse.quote(desc)}&download=full" download="holiday_{d}.png" class="epm-chron-analyze-btn" style="text-decoration:none;" title="Download High-Resolution Festive Card">
                     Save Card 📷
                 </a>
             </div>
@@ -3238,6 +3299,9 @@ def render_desktop_holidays_html(holidays: List[Dict]) -> str:
                     <button type="button" class="epm-hol-pill-btn" onclick="window.epmFilterHolidays('INDIA', this)">Indian Markets (NSE, BSE, MCX)</button>
                     <button type="button" class="epm-hol-pill-btn" onclick="window.epmFilterHolidays('USA', this)">US Markets (NYSE)</button>
                 </div>
+                <button type="button" id="epm-hol-past-toggle-btn" class="epm-hol-toggle-btn" onclick="window.epmTogglePastHolidays(this)" title="Toggle view of past holidays that have already occurred in the year">
+                    <span>👁️</span> <span id="epm-hol-past-toggle-txt">View All 2026 Holidays (Include Past)</span>
+                </button>
                 <div class="epm-hol-actions" style="display:flex;align-items:center;gap:8px;">
                     <a href="/api/calendar/holiday-image" download="trading_holidays_2026.png" class="epm-cal-hdr-btn" style="text-decoration:none;" title="Download 2026 Holidays Schedule as Image">
                         Save Calendar 📷
@@ -6853,6 +6917,33 @@ tbody tr:hover td {
     align-items: center !important;
     gap: 8px !important;
 }
+.epm-hol-toggle-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    padding: 5px 12px !important;
+    border-radius: 7px !important;
+    background: #F8FAFC !important;
+    border: 1px solid #CBD5E1 !important;
+    color: #334155 !important;
+    font-size: 11.5px !important;
+    font-weight: 700 !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
+}
+.epm-hol-toggle-btn:hover {
+    background: #EFF6FF !important;
+    border-color: #93C5FD !important;
+    color: #0052FF !important;
+}
+.epm-hol-toggle-btn.is-active {
+    background: #EFF6FF !important;
+    border-color: #3B82F6 !important;
+    color: #1D4ED8 !important;
+}
+.epm-past-holiday-hidden {
+    display: none !important;
+}
 .epm-hol-dispatch-btn {
     background: #FFFFFF !important;
     border: 1px solid #CBD5E1 !important;
@@ -10282,6 +10373,9 @@ TERMINAL_CLIENT_JS = r"""
             h += '&pane=' + p;
         }
         try { history.replaceState(null, '', h); } catch(e) { window.location.hash = h; }
+        if (tabIdx === 3 && window.epmApplyHolidayFilters) {
+            setTimeout(window.epmApplyHolidayFilters, 50);
+        }
     };
 
     function epmSyncActiveTab(tabIdx) {
@@ -11961,23 +12055,6 @@ TERMINAL_CLIENT_JS = r"""
         window.epmFilterCircReg(reg, el);
     };
 
-    window.epmFilterHolidays = function(mkt) {
-        const val = String(mkt || 'ALL').toUpperCase();
-        document.querySelectorAll('.epm-mobile-timeline .epm-tl-row[data-nse]').forEach(r => {
-            let matches = true;
-            if (val === 'NSE') matches = (r.getAttribute('data-nse') || '').includes('CLOSED') || (r.getAttribute('data-bse') || '').includes('CLOSED');
-            else if (val === 'MCX') matches = (r.getAttribute('data-mcx') || '').includes('CLOSED');
-            else if (val === 'NYSE') matches = (r.getAttribute('data-nyse') || '').includes('CLOSED');
-            if (matches) {
-                r.style.removeProperty('display');
-                r.classList.remove('epm-filtered-hidden');
-            } else {
-                r.style.setProperty('display', 'none', 'important');
-                r.classList.add('epm-filtered-hidden');
-            }
-        });
-    };
-
     window.epmSaveApprovedLogos = function() {
         const checkboxes = document.querySelectorAll('.epm-logo-checkbox');
         const approvedMap = {};
@@ -12202,19 +12279,121 @@ TERMINAL_CLIENT_JS = r"""
         alert(`Dispatched ${kind} report to Telegram channel!`);
     };
 
-    // Holidays Filter
-    window.epmFilterHolidays = function(country, btn) {
-        document.querySelectorAll('.epm-hol-pill-btn').forEach(b => b.classList.remove('active'));
-        if (btn) btn.classList.add('active');
-        document.querySelectorAll('#epm-hol-table tbody tr').forEach(row => {
-            const c = row.getAttribute('data-country') || 'ALL';
-            if (country === 'ALL' || c === country || c === 'BOTH') {
-                row.style.display = '';
+    // ═══════════════════════════════════════════════════════════════════
+    // 2026 AUTHORITATIVE TRADING HOLIDAYS & CLOSURES CONTROLLER (UNIFIED)
+    // ═══════════════════════════════════════════════════════════════════
+    window.epmCurrentHolidayMarket = 'ALL';
+    window.epmShowPastHolidays = false;
+
+    window.epmApplyHolidayFilters = function() {
+        const mkt = String(window.epmCurrentHolidayMarket || 'ALL').toUpperCase();
+        const showPast = Boolean(window.epmShowPastHolidays);
+
+        // 1. Desktop Wide Time-Rail Cards (#epm-hol-cards-list .epm-hol-chron-row)
+        document.querySelectorAll('#epm-hol-cards-list .epm-hol-chron-row').forEach(row => {
+            const c = (row.getAttribute('data-country') || 'ALL').toUpperCase();
+            const isPast = row.classList.contains('is-past-holiday');
+
+            let mktMatch = (mkt === 'ALL') || (c === mkt) || (c === 'BOTH');
+            if (mkt === 'INDIA') mktMatch = (c === 'INDIA' || c === 'BOTH');
+            else if (mkt === 'USA') mktMatch = (c === 'USA' || c === 'BOTH');
+
+            let pastMatch = showPast || !isPast;
+
+            if (mktMatch && pastMatch) {
+                row.style.removeProperty('display');
+                row.classList.remove('epm-filtered-hidden', 'epm-past-holiday-hidden');
             } else {
-                row.style.display = 'none';
+                row.style.setProperty('display', 'none', 'important');
+                row.classList.add('epm-filtered-hidden');
             }
         });
+
+        // 2. Mobile Chronological Timeline Rows (.epm-mobile-timeline .epm-tl-row)
+        document.querySelectorAll('.epm-mobile-timeline .epm-tl-row').forEach(row => {
+            const c = (row.getAttribute('data-country') || 'ALL').toUpperCase();
+            const isPast = row.classList.contains('is-past-holiday');
+
+            let mktMatch = (mkt === 'ALL') || (c === mkt) || (c === 'BOTH');
+            if (mkt === 'INDIA' || mkt === 'NSE') {
+                const nse = ((row.getAttribute('data-nse') || '') + ' ' + (row.getAttribute('data-bse') || '') + ' ' + (row.getAttribute('data-mcx') || '')).toUpperCase();
+                mktMatch = (c === 'INDIA' || c === 'BOTH') || nse.includes('CLOSED') || nse.includes('MUHURAT');
+            } else if (mkt === 'USA' || mkt === 'NYSE') {
+                const nyse = (row.getAttribute('data-nyse') || '').toUpperCase();
+                mktMatch = (c === 'USA' || c === 'BOTH') || nyse.includes('CLOSED') || nyse.includes('EARLY');
+            }
+
+            let pastMatch = showPast || !isPast;
+
+            if (mktMatch && pastMatch) {
+                row.style.removeProperty('display');
+                row.classList.remove('epm-filtered-hidden', 'epm-past-holiday-hidden');
+            } else {
+                row.style.setProperty('display', 'none', 'important');
+                row.classList.add('epm-filtered-hidden');
+            }
+        });
+
+        // 3. Fallback table rows if any
+        document.querySelectorAll('#epm-hol-table tbody tr').forEach(row => {
+            const c = (row.getAttribute('data-country') || 'ALL').toUpperCase();
+            const isPast = row.classList.contains('is-past-holiday');
+            let mktMatch = (mkt === 'ALL') || (c === mkt) || (c === 'BOTH');
+            let pastMatch = showPast || !isPast;
+            if (mktMatch && pastMatch) {
+                row.style.removeProperty('display');
+                row.classList.remove('epm-filtered-hidden');
+            } else {
+                row.style.setProperty('display', 'none', 'important');
+                row.classList.add('epm-filtered-hidden');
+            }
+        });
+
+        // Sync Desktop Pills UI
+        document.querySelectorAll('.epm-hol-pill-btn').forEach(b => {
+            const onclickAttr = b.getAttribute('onclick') || '';
+            if (onclickAttr.includes(`'${mkt}'`)) b.classList.add('active');
+            else b.classList.remove('active');
+        });
+
+        // Sync Mobile Select UI
+        const mobSel = document.getElementById('epm-mob-hol-filter');
+        if (mobSel && mobSel.value !== mkt) mobSel.value = mkt;
+
+        // Sync Toggle Button UI
+        const toggleBtnDesk = document.getElementById('epm-hol-past-toggle-btn');
+        const toggleTxtDesk = document.getElementById('epm-hol-past-toggle-txt');
+        const toggleBtnMob = document.getElementById('epm-mob-hol-past-toggle-btn');
+        const toggleTxtMob = document.getElementById('epm-mob-hol-past-toggle-txt');
+
+        const btnLabel = showPast ? 'Showing All (Tap to Hide Past)' : 'View All 2026 Holidays (Include Past)';
+
+        if (toggleTxtDesk) toggleTxtDesk.textContent = btnLabel;
+        if (toggleBtnDesk) {
+            toggleBtnDesk.classList.toggle('is-active', showPast);
+            toggleBtnDesk.title = showPast ? 'Showing all holidays of 2026' : 'Showing only pending/upcoming holidays';
+        }
+        if (toggleTxtMob) toggleTxtMob.textContent = btnLabel;
+        if (toggleBtnMob) toggleBtnMob.classList.toggle('is-active', showPast);
     };
+
+    window.epmFilterHolidays = function(country, btn) {
+        window.epmCurrentHolidayMarket = country || 'ALL';
+        window.epmApplyHolidayFilters();
+    };
+
+    window.epmTogglePastHolidays = function(btn) {
+        window.epmShowPastHolidays = !window.epmShowPastHolidays;
+        window.epmApplyHolidayFilters();
+    };
+
+    // Auto-reapply on DOM mount or tab switch
+    document.addEventListener('DOMContentLoaded', function() {
+        window.epmApplyHolidayFilters();
+    });
+    setTimeout(function() {
+        window.epmApplyHolidayFilters();
+    }, 800);
 
     window.epmDispatchHolidayAlert = function() {
         alert('Dispatched 2026 authoritative holiday alert check to Telegram channel!');
