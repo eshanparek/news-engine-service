@@ -6162,20 +6162,22 @@ div[class*="gradio-container"],
     background: transparent !important;
 }
 
-/* Hide Redundant Gradio Tab Bar Off-Screen */
+/* Hide Redundant Gradio Tab Bar Off-Screen while keeping full width so Gradio never overflows tabs on mobile */
 div[role="tablist"],
 .tab-nav,
 .tabs > .tab-nav,
 .tabitem > div[role="tablist"],
 .gradio-container .tab-wrapper {
-    position: absolute !important;
+    position: fixed !important;
     left: -9999px !important;
-    top: -9999px !important;
-    height: 0 !important;
-    width: 0 !important;
-    overflow: hidden !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
+    top: 0px !important;
+    height: 1px !important;
+    width: 2400px !important;
+    min-width: 2400px !important;
+    overflow: visible !important;
+    opacity: 0.001 !important;
+    pointer-events: auto !important;
+    visibility: visible !important;
 }
 
 /* Flatten Nested Container Padding across entire site */
@@ -11621,6 +11623,15 @@ TOP_NAVBAR_HTML = f"""
                     </button>
                 </div>
                 <div class="epm-side-submenu">
+                    <a href="javascript:void(0)" onclick="window.epmSwitchTab(3);window.epmCloseSideMenu();window.epmFilterCircCards('ALL')" class="epm-side-sublink">
+                        <span>📜</span> All Official Circulars ↗
+                    </a>
+                    <a href="javascript:void(0)" onclick="window.epmSwitchTab(3);window.epmCloseSideMenu();window.epmFilterCircCards('SEBI')" class="epm-side-sublink">
+                        <span>🛡️</span> SEBI Directives ↗
+                    </a>
+                    <a href="javascript:void(0)" onclick="window.epmSwitchTab(3);window.epmCloseSideMenu();window.epmFilterCircCards('RBI')" class="epm-side-sublink">
+                        <span>🏦</span> RBI Notifications ↗
+                    </a>
                     <a href="/api/calendar/pdf/monthly" download="regulatory_circulars.pdf" target="_blank" class="epm-side-sublink">
                         <span>📥</span> Export Circulars Directory (PDF) ↗
                     </a>
@@ -11640,6 +11651,15 @@ TOP_NAVBAR_HTML = f"""
                     </button>
                 </div>
                 <div class="epm-side-submenu">
+                    <a href="javascript:void(0)" onclick="window.epmSwitchTab(4);window.epmCloseSideMenu();window.epmFilterHolidays('ALL')" class="epm-side-sublink">
+                        <span>🏖️</span> All 2026 Market Holidays ↗
+                    </a>
+                    <a href="javascript:void(0)" onclick="window.epmSwitchTab(4);window.epmCloseSideMenu();window.epmFilterHolidays('INDIA')" class="epm-side-sublink">
+                        <span>🇮🇳</span> Indian Market Holidays (NSE/BSE/MCX) ↗
+                    </a>
+                    <a href="javascript:void(0)" onclick="window.epmSwitchTab(4);window.epmCloseSideMenu();window.epmFilterHolidays('USA')" class="epm-side-sublink">
+                        <span>🇺🇸</span> US Market Holidays (NYSE) ↗
+                    </a>
                     <a href="/api/calendar/holiday-image" download="trading_holidays_2026.png" target="_blank" class="epm-side-sublink">
                         <span>📷</span> Save 2026 Holidays Schedule (PNG) ↗
                     </a>
@@ -11888,9 +11908,17 @@ TERMINAL_CLIENT_JS = r"""
     ];
 
     window.epmSwitchTab = function(tabIdx, pillEl) {
-        const tabBtns = document.querySelectorAll('button[role="tab"]');
+        tabIdx = parseInt(tabIdx, 10);
+        if (isNaN(tabIdx) || tabIdx < 0 || tabIdx > 5) tabIdx = 0;
+
+        let tabBtns = document.querySelectorAll('.tab-container:not(.visually-hidden) button[role="tab"]');
+        if (!tabBtns || tabBtns.length < 6) {
+            tabBtns = document.querySelectorAll('button[role="tab"]');
+        }
         if (tabBtns && tabBtns[tabIdx]) {
             tabBtns[tabIdx].click();
+            epmSyncActiveTab(tabIdx);
+        } else {
             epmSyncActiveTab(tabIdx);
         }
         localStorage.setItem('epm_active_tab', String(tabIdx));
@@ -11900,8 +11928,27 @@ TERMINAL_CLIENT_JS = r"""
             h += '&pane=' + p;
         }
         try { history.replaceState(null, '', h); } catch(e) { window.location.hash = h; }
-        if (tabIdx === 4 && window.epmApplyHolidayFilters) {
-            setTimeout(window.epmApplyHolidayFilters, 50);
+        try { window.scrollTo({ top: 0, behavior: 'instant' }); } catch(e) { window.scrollTo(0, 0); }
+
+        if (tabIdx === 3) {
+            setTimeout(() => {
+                if (window.innerWidth <= 820) {
+                    const mCirc = document.getElementById('mobile_circ_feed');
+                    if (mCirc) mCirc.style.setProperty('display', 'block', 'important');
+                }
+            }, 60);
+        }
+        if (tabIdx === 4) {
+            setTimeout(() => {
+                if (window.innerWidth <= 820) {
+                    const mHol = document.getElementById('mobile_holidays_feed');
+                    if (mHol) mHol.style.setProperty('display', 'block', 'important');
+                }
+                if (window.epmApplyHolidayFilters) window.epmApplyHolidayFilters();
+            }, 60);
+            setTimeout(() => {
+                if (window.epmApplyHolidayFilters) window.epmApplyHolidayFilters();
+            }, 250);
         }
     };
 
@@ -12188,6 +12235,12 @@ TERMINAL_CLIENT_JS = r"""
 
     // 10. Initialization & Observer
     function epmInitTerminal() {
+        if (window._epmTerminalInitialized && document.querySelectorAll('button[role="tab"]').length >= 6) {
+            return;
+        }
+        if (document.querySelectorAll('button[role="tab"]').length >= 6) {
+            window._epmTerminalInitialized = true;
+        }
         epmUpdateAudioUI();
         updateISTClock();
         syncTelemetryFromStatusBox();
@@ -12199,21 +12252,27 @@ TERMINAL_CLIENT_JS = r"""
         function hideGradioTabs() {
             const defaultTabs = document.querySelectorAll('.tab-wrapper, div[role="tablist"], .tab-container:not(.visually-hidden), .tab-nav');
             defaultTabs.forEach(el => {
-                el.style.setProperty('height', '0px', 'important');
-                el.style.setProperty('max-height', '0px', 'important');
-                el.style.setProperty('min-height', '0px', 'important');
+                el.style.setProperty('position', 'fixed', 'important');
+                el.style.setProperty('left', '-9999px', 'important');
+                el.style.setProperty('top', '0px', 'important');
+                el.style.setProperty('width', '2400px', 'important');
+                el.style.setProperty('min-width', '2400px', 'important');
+                el.style.setProperty('height', '1px', 'important');
                 el.style.setProperty('padding', '0', 'important');
                 el.style.setProperty('margin', '0', 'important');
-                el.style.setProperty('opacity', '0', 'important');
-                el.style.setProperty('pointer-events', 'none', 'important');
-                el.style.setProperty('visibility', 'hidden', 'important');
-                el.style.setProperty('overflow', 'hidden', 'important');
+                el.style.setProperty('opacity', '0.001', 'important');
+                el.style.setProperty('pointer-events', 'auto', 'important');
+                el.style.setProperty('visibility', 'visible', 'important');
+                el.style.setProperty('overflow', 'visible', 'important');
                 el.style.setProperty('border', 'none', 'important');
             });
         }
         hideGradioTabs();
 
-        const tabBtns = document.querySelectorAll('button[role="tab"]');
+        let tabBtns = document.querySelectorAll('.tab-container:not(.visually-hidden) button[role="tab"]');
+        if (!tabBtns || tabBtns.length < 6) {
+            tabBtns = document.querySelectorAll('button[role="tab"]');
+        }
         tabBtns.forEach((btn, idx) => {
             btn.addEventListener("click", () => {
                 epmSyncActiveTab(idx);
@@ -12234,7 +12293,7 @@ TERMINAL_CLIENT_JS = r"""
             window.epmShowSettingsPane(activeSettingsPane);
         }
 
-        // Restore active tab on session reload across all devices
+        // Restore active tab on session reload across all devices (never trap mobile users on Tab 5 Settings PIN lock on reload)
         let activeTabIdx = 0;
         const hashTabMatch = window.location.hash.match(/tab=(\d+)/);
         if (hashTabMatch) {
@@ -12243,15 +12302,15 @@ TERMINAL_CLIENT_JS = r"""
             const savedTab = localStorage.getItem('epm_active_tab');
             if (savedTab !== null && savedTab !== '') activeTabIdx = parseInt(savedTab, 10);
         }
+        if (activeTabIdx === 5) {
+            activeTabIdx = 0;
+            localStorage.setItem('epm_active_tab', '0');
+            try { history.replaceState(null, '', '#tab=0'); } catch(e) {}
+        }
 
-        if (activeTabIdx > 0 && activeTabIdx < 6) {
+        if (activeTabIdx > 0 && activeTabIdx < 5) {
             setTimeout(() => {
                 window.epmSwitchTab(activeTabIdx);
-                if (activeTabIdx === 5) {
-                    const hashPaneMatch = window.location.hash.match(/pane=([a-zA-Z0-9_]+)/);
-                    const savedPane = (hashPaneMatch && hashPaneMatch[1]) || localStorage.getItem('epm_active_settings_pane') || 'pane_in_reg';
-                    if (window.epmShowSettingsPane) window.epmShowSettingsPane(savedPane);
-                }
             }, 120);
         }
 
@@ -13359,8 +13418,8 @@ TERMINAL_CLIENT_JS = r"""
         const weekDate = new Date(now.getTime() + 7 * 86400000);
         const weekStr = `${weekDate.getFullYear()}-${pad(weekDate.getMonth() + 1)}-${pad(weekDate.getDate())}`;
 
-        // Filter both desktop and mobile rows
-        document.querySelectorAll('#epm-cal-cards-list .epm-chron-row, #epm-cal-cards-list .epm-chron-item-group, .epm-mobile-timeline .epm-tl-row').forEach(r => {
+        // Filter both desktop and mobile calendar rows (scoped to calendar container so Holidays rows are untouched)
+        document.querySelectorAll('#epm-cal-cards-list .epm-chron-row, #epm-cal-cards-list .epm-chron-item-group, #mobile_cal_feed .epm-mobile-timeline .epm-tl-row').forEach(r => {
             const rDate = r.getAttribute('data-date') || '';
             let matches = true;
             if (p === 'today') matches = (rDate === todayStr);
@@ -13410,8 +13469,8 @@ TERMINAL_CLIENT_JS = r"""
             }
         });
 
-        // 2. Mobile calendar rows
-        document.querySelectorAll('.epm-mobile-timeline .epm-tl-row').forEach(r => {
+        // 2. Mobile calendar rows (scoped to #mobile_cal_feed)
+        document.querySelectorAll('#mobile_cal_feed .epm-mobile-timeline .epm-tl-row').forEach(r => {
             const rowMkt = (r.getAttribute('data-mkt') || '').toUpperCase();
             const rowReg = (r.getAttribute('data-reg') || '').toUpperCase();
             const rowTxt = (r.textContent || '').toUpperCase();
@@ -13713,8 +13772,8 @@ TERMINAL_CLIENT_JS = r"""
         const mobSel = document.getElementById('epm-settings-mob-select');
         if (mobSel && mobSel.value !== paneId) mobSel.value = paneId;
         localStorage.setItem('epm_active_settings_pane', paneId);
-        if (localStorage.getItem('epm_active_tab') === '4') {
-            try { history.replaceState(null, '', '#tab=4&pane=' + paneId); } catch(e) {}
+        if (localStorage.getItem('epm_active_tab') === '5') {
+            try { history.replaceState(null, '', '#tab=5&pane=' + paneId); } catch(e) {}
         }
         if (paneId === 'pane_visitors' && window.epmRefreshVisitorTelemetry) {
             window.epmRefreshVisitorTelemetry();
@@ -13847,8 +13906,8 @@ TERMINAL_CLIENT_JS = r"""
             }
         });
 
-        // 2. Mobile Chronological Timeline Rows (.epm-mobile-timeline .epm-tl-row)
-        document.querySelectorAll('.epm-mobile-timeline .epm-tl-row').forEach(row => {
+        // 2. Mobile Chronological Timeline Rows (#mobile_holidays_feed .epm-mobile-timeline .epm-tl-row)
+        document.querySelectorAll('#mobile_holidays_feed .epm-mobile-timeline .epm-tl-row').forEach(row => {
             const c = (row.getAttribute('data-country') || 'ALL').toUpperCase();
             const isPast = row.classList.contains('is-past-holiday');
 
@@ -15394,7 +15453,7 @@ app = gr.mount_gradio_app(
         '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
         '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">'
         f"<style>{CUSTOM_CSS}</style>"
-        '<script src="/api/terminal-client.js?v=20261103_2330"></script>'
+        '<script src="/api/terminal-client.js?v=20261105_v38"></script>'
     ),
     js=TERMINAL_CLIENT_JS
 )
