@@ -1698,7 +1698,7 @@ def render_news_feed_html(items: List[Dict]) -> str:
         return f'''
         <div class="epm-chron-item-group" id="epm-chron-group-{i}" data-scope="{it['scope']}">
             <div class="epm-chron-row {'is-institutional' if is_inst else ''}" data-idx="{i}" data-scope="{it['scope']}" onclick="window.epmToggleDeskRowExpand({i})">
-                <div class="epm-chron-left-rail" style="min-width:98px;max-width:110px;">
+                <div class="epm-chron-left-rail">
                     <span class="epm-chron-time">{it['time_str']}</span>
                     <span class="epm-chron-dot {dot_class}"></span>
                 </div>
@@ -10986,6 +10986,19 @@ html.epm-terminal-unlocked #epm-gatekeeper-overlay {
 .epm-chron-feed {
     position: relative;
     padding-left: 215px;
+}
+/* Tight 12px gap between time rail dot and News cards on News Page (#epm-chron-feed) */
+@media (min-width: 769px) {
+    #epm-chron-feed {
+        padding-left: 112px !important;
+    }
+    #epm-chron-feed .epm-chron-left-rail {
+        left: -112px !important;
+        width: 104px !important;
+    }
+    #epm-chron-feed .epm-chron-day-divider {
+        margin-left: -112px !important;
+    }
 }
 .epm-chron-feed::before {
     content: '';
