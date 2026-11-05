@@ -192,8 +192,17 @@ async def api_auth_register(request: Request):
         name = data.get("name", "")
         identifier = data.get("identifier", "")
         phone = data.get("phone", "")
-        auth_type = data.get("auth_type", "email")
-        res = gatekeeper.register_member(name, identifier, phone, auth_type)
+        auth_type = data.get("auth_type", "portal")
+        pin = data.get("pin", "")
+        preferred_language = data.get("preferred_language", "en")
+        res = gatekeeper.register_member(
+            name=name,
+            identifier=identifier,
+            phone=phone,
+            auth_type=auth_type,
+            pin=pin,
+            preferred_language=preferred_language
+        )
         return res
     except Exception as e:
         return {"status": "error", "message": str(e)}
@@ -205,6 +214,17 @@ async def api_auth_login(request: Request):
         identifier = data.get("identifier", "")
         pin = data.get("pin", "")
         res = gatekeeper.authenticate(identifier, pin)
+        return res
+    except Exception as e:
+        return {"success": False, "message": str(e)}
+
+@app.post("/api/auth/language")
+async def api_auth_update_language(request: Request):
+    try:
+        data = await request.json()
+        identifier = data.get("identifier", "")
+        preferred_language = data.get("preferred_language", "en")
+        res = gatekeeper.update_member_language(identifier, preferred_language)
         return res
     except Exception as e:
         return {"success": False, "message": str(e)}
@@ -230,10 +250,11 @@ async def api_admin_approve_member(request: Request):
     try:
         data = await request.json()
         member_id = data.get("member_id", "")
-        pin_length = int(data.get("pin_length", 6))
+        raw_pin_len = data.get("pin_length", None)
+        pin_length = int(raw_pin_len) if raw_pin_len is not None else None
         mem = gatekeeper.approve_member(member_id, pin_length)
         if mem:
-            return {"success": True, "member": mem, "pin": mem["pin_plaintext_admin"]}
+            return {"success": True, "member": mem, "pin": mem.get("pin_plaintext_admin", "")}
         return {"success": False, "message": "Member not found."}
     except Exception as e:
         return {"success": False, "message": str(e)}
@@ -3717,12 +3738,9 @@ def render_stock_news_feed_html(stock_items: Optional[List[Dict]] = None, is_mob
             <span class="epm-tbl-hdr-title">MULTI-ASSET EQUITIES, REGULATED SECTORS & COMMODITIES INTELLIGENCE</span>
             <span class="epm-tbl-hdr-badge">NSE · BSE · MCX iCOMDEX · S&amp;P / DJIA · RUSSELL · NASDAQ · 11 GICS</span>
         </div>
-        <div class="epm-filter-chip-strip" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;scrollbar-width:none;">
-            {pills_html}
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(175px, 1fr));gap:8px;margin-top:6px;">
-            <select id="epm-stock-market-filter" class="epm-news-scope-select" onchange="window.epmFilterStockCards()">
-                <option value="ALL">🏛️ Market / Regulator: All (India &amp; US)</option>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(135px, 1fr));gap:8px;margin-top:4px;align-items:center;">
+            <select id="epm-stock-market-filter" class="epm-news-scope-select" style="padding:7px 10px;font-size:12px;font-weight:700;" onchange="window.epmFilterStockCards()">
+                <option value="ALL">🏛️ Markets</option>
                 <option value="NSE">🇮🇳 NSE (National Stock Exchange - SEBI)</option>
                 <option value="BSE">🇮🇳 BSE (Bombay Stock Exchange - SEBI)</option>
                 <option value="MCX">⛽ MCX (Multi Commodity Exchange - iCOMDEX)</option>
@@ -3730,8 +3748,8 @@ def render_stock_news_feed_html(stock_items: Optional[List[Dict]] = None, is_mob
                 <option value="NASDAQ">🇺🇸 NASDAQ Stock Market (SEC)</option>
                 <option value="US">🇺🇸 All US Capital Markets (NYSE + NASDAQ)</option>
             </select>
-            <select id="epm-stock-index-filter" class="epm-news-scope-select" onchange="window.epmFilterStockCards()">
-                <option value="ALL">📊 Index / Basket: All Global Indices</option>
+            <select id="epm-stock-index-filter" class="epm-news-scope-select" style="padding:7px 10px;font-size:12px;font-weight:700;" onchange="window.epmFilterStockCards()">
+                <option value="ALL">📊 Indexs</option>
                 <optgroup label="🇮🇳 NSE Flagship Benchmark Indices">
                     <option value="NIFTY50">Nifty 50 (NIFTY)</option>
                     <option value="NIFTYNEXT50">Nifty Next 50</option>
@@ -3773,6 +3791,7 @@ def render_stock_news_feed_html(stock_items: Optional[List[Dict]] = None, is_mob
                     <option value="BSEPSU">BSE Thematic (Bharat 22, PSU, CPSE, Infra, IPO)</option>
                 </optgroup>
                 <optgroup label="⛽ MCX iCOMDEX Commodity Indices &amp; Contracts">
+                    <option value="MCX">MCX iCOMDEX (All Commodities)</option>
                     <option value="MCXCOMPDEX">MCX iCOMDEX Composite Index (MCXCOMPDEX)</option>
                     <option value="BULLDEX">MCX iCOMDEX Bullion Index (BULLDEX)</option>
                     <option value="METLDEX">MCX iCOMDEX Base Metal Index (METLDEX)</option>
@@ -3783,7 +3802,7 @@ def render_stock_news_feed_html(stock_items: Optional[List[Dict]] = None, is_mob
                 </optgroup>
                 <optgroup label="🇺🇸 US Broad Market (S&amp;P Dow Jones &amp; FTSE Russell)">
                     <option value="SPX">S&amp;P 500 (SPX / ES Futures)</option>
-                    <option value="DJIA">Dow Jones Industrial Average (DJIA / DJI)</option>
+                    <option value="DJIA">Dow Jones 30 Industrial Average (DJIA / DJI)</option>
                     <option value="SP1500">S&amp;P MidCap 400, SmallCap 600 &amp; Composite 1500</option>
                     <option value="RUT">Russell 2000 Small-Cap (RUT / RTY) &amp; Russell 1000/3000</option>
                 </optgroup>
@@ -3803,13 +3822,13 @@ def render_stock_news_feed_html(stock_items: Optional[List[Dict]] = None, is_mob
                 <optgroup label="🇺🇸 Nasdaq Flagship &amp; Sector Indices">
                     <option value="COMP">Nasdaq Composite (COMP)</option>
                     <option value="NDX">Nasdaq-100 (NDX / NQ Futures) &amp; Next Gen 100</option>
-                    <option value="SOX">PHLX Semiconductor Sector Index (SOX)</option>
+                    <option value="SOX">PHLX Semis / Semiconductor Sector Index (SOX)</option>
                     <option value="NBI">Nasdaq Biotechnology Index (NBI)</option>
                     <option value="CELS">Nasdaq Clean Edge Green Energy (CELS) &amp; Fin-100</option>
                 </optgroup>
             </select>
-            <select id="epm-stock-sector-filter" class="epm-news-scope-select" onchange="window.epmFilterStockCards()">
-                <option value="ALL">🏭 Regulated Sector / GICS: All Sectors</option>
+            <select id="epm-stock-sector-filter" class="epm-news-scope-select" style="padding:7px 10px;font-size:12px;font-weight:700;" onchange="window.epmFilterStockCards()">
+                <option value="ALL">🏭 Sectors</option>
                 <option value="IT & Technology">💻 IT, Software &amp; Semiconductors (Nifty IT / XLK / SOX)</option>
                 <option value="Banking & Financials">🏦 Banking &amp; Financial Services (Bank Nifty / FINNIFTY / XLF)</option>
                 <option value="Pharma & Healthcare">🧬 Pharma, Biotech &amp; Healthcare (Nifty Pharma / XLV / NBI)</option>
@@ -3823,7 +3842,7 @@ def render_stock_news_feed_html(stock_items: Optional[List[Dict]] = None, is_mob
                 <option value="Utilities & Clean Energy">🌱 Utilities, Power Grid &amp; Clean Energy (XLU / CELS)</option>
                 <option value="Real Estate & REITs">🏢 Real Estate &amp; Data Center REITs (Nifty Realty / XLRE)</option>
             </select>
-            <input type="text" id="epm-stock-search-input" class="epm-news-scope-select" placeholder="🔍 Search Ticker, Company, Sector, Index..." oninput="window.epmFilterStockCards()" />
+            <input type="text" id="epm-stock-search-input" class="epm-news-scope-select" style="padding:7px 10px;font-size:12px;" placeholder="🔍 Search Ticker, Company, Sector, Index..." oninput="window.epmFilterStockCards()" />
         </div>
     </div>
     """
@@ -4226,9 +4245,9 @@ def render_settings_hub_html() -> str:
                                     <th style="padding:10px 8px;text-align:left;">Member Name</th>
                                     <th style="padding:10px 8px;text-align:left;">Identifier / Email</th>
                                     <th style="padding:10px 8px;text-align:left;">Phone</th>
-                                    <th style="padding:10px 8px;text-align:left;">Auth Type</th>
+                                    <th style="padding:10px 8px;text-align:left;">Default Lang</th>
                                     <th style="padding:10px 8px;text-align:left;">Status</th>
-                                    <th style="padding:10px 8px;text-align:left;color:#0052FF;font-weight:800;">Security PIN (Admin)</th>
+                                    <th style="padding:10px 8px;text-align:left;color:#0052FF;font-weight:800;">Password / PIN (Admin)</th>
                                     <th style="padding:10px 8px;text-align:right;">Actions</th>
                                 </tr>
                             </thead>
@@ -11301,26 +11320,25 @@ TOP_NAVBAR_HTML = f"""
         <div class="epm-gate-hdr">
             <div class="epm-gate-brand">
                 <img src="/api/logo" style="height:32px;width:auto;" alt="GNC" />
-                <span>Global News Feed Room</span>
+                <span>GNC Global New &amp; Calenders</span>
             </div>
-            <div class="epm-gate-sub">High-Security Institutional Terminal Access</div>
         </div>
 
         <!-- View 1: Standard Login Form -->
         <div id="epm-gate-view-login">
             <div class="epm-gate-tabs">
                 <button type="button" class="epm-gate-tab active" onclick="window.epmGateSwitchTab('login')">Member Login</button>
-                <button type="button" class="epm-gate-tab" onclick="window.epmGateSwitchTab('register')">Register Access</button>
+                <button type="button" class="epm-gate-tab" onclick="window.epmGateSwitchTab('register')">Create Member Profile</button>
             </div>
             <div class="epm-gate-field">
                 <label class="epm-gate-lbl">Email Address or Mobile Number</label>
                 <input type="text" id="gate_login_id" class="epm-gate-input" placeholder="e.g. member@institution.com or +9198..." />
             </div>
             <div class="epm-gate-field">
-                <label class="epm-gate-lbl">Unique Security PIN (6 or 8 Digits)</label>
-                <input type="password" id="gate_login_pin" class="epm-gate-input" maxlength="8" placeholder="••••••" />
+                <label class="epm-gate-lbl">Password / Security PIN</label>
+                <input type="password" id="gate_login_pin" class="epm-gate-input" maxlength="32" placeholder="••••••" />
             </div>
-            <button type="button" class="epm-gate-btn" onclick="window.epmSubmitGatekeeperLogin()">🔐 Authenticate & Unlock Terminal</button>
+            <button type="button" class="epm-gate-btn" onclick="window.epmSubmitGatekeeperLogin()">🔐 Authenticate &amp; Unlock Terminal</button>
             <div id="gate_login_msg" class="epm-gate-msg"></div>
 
             <div style="margin-top:16px;text-align:center;font-size:11px;color:#64748B;">Or authenticate via verified social account:</div>
@@ -11336,25 +11354,50 @@ TOP_NAVBAR_HTML = f"""
             </div>
         </div>
 
-        <!-- View 2: Member Registration Form -->
+        <!-- View 2: Member Registration Form (Email, Phone Number, Password/PIN & Default Language) -->
         <div id="epm-gate-view-register" style="display:none;">
             <div class="epm-gate-tabs">
                 <button type="button" class="epm-gate-tab" onclick="window.epmGateSwitchTab('login')">Member Login</button>
-                <button type="button" class="epm-gate-tab active" onclick="window.epmGateSwitchTab('register')">Register Access</button>
+                <button type="button" class="epm-gate-tab active" onclick="window.epmGateSwitchTab('register')">Create Member Profile</button>
             </div>
             <div class="epm-gate-field">
-                <label class="epm-gate-lbl">Full Name / Institutional Desk</label>
-                <input type="text" id="gate_reg_name" class="epm-gate-input" placeholder="e.g. John Doe / Prop Desk" />
+                <label class="epm-gate-lbl">1. Email Address</label>
+                <input type="email" id="gate_reg_email" class="epm-gate-input" placeholder="e.g. member@institution.com" />
             </div>
             <div class="epm-gate-field">
-                <label class="epm-gate-lbl">Official Email Address</label>
-                <input type="email" id="gate_reg_email" class="epm-gate-input" placeholder="member@institution.com" />
+                <label class="epm-gate-lbl">2. Mobile Phone Number</label>
+                <input type="tel" id="gate_reg_phone" class="epm-gate-input" placeholder="e.g. +91 98765 43210" />
             </div>
             <div class="epm-gate-field">
-                <label class="epm-gate-lbl">Mobile Phone Number (for PIN Dispatch)</label>
-                <input type="tel" id="gate_reg_phone" class="epm-gate-input" placeholder="+91 98765 43210" />
+                <label class="epm-gate-lbl">3. Create Password / Security PIN</label>
+                <input type="password" id="gate_reg_pin" class="epm-gate-input" maxlength="32" placeholder="Set your login Password or 6/8-digit PIN" />
             </div>
-            <button type="button" class="epm-gate-btn" onclick="window.epmSubmitGatekeeperRegister()">📝 Submit Registration Request</button>
+            <div class="epm-gate-field">
+                <label class="epm-gate-lbl">4. Preferred Default Site Language</label>
+                <select id="gate_reg_lang" class="epm-gate-input" style="cursor:pointer;">
+                    <option value="en">🇬🇧 English (Original)</option>
+                    <option value="hi">🇮🇳 हिन्दी (Hindi)</option>
+                    <option value="gu">🇮🇳 ગુજરાતી (Gujarati)</option>
+                    <option value="mr">🇮🇳 मराठी (Marathi)</option>
+                    <option value="ta">🇮🇳 தமிழ் (Tamil)</option>
+                    <option value="te">🇮🇳 తెలుగు (Telugu)</option>
+                    <option value="bn">🇮🇳 বাংলা (Bengali)</option>
+                    <option value="kn">🇮🇳 ಕನ್ನಡ (Kannada)</option>
+                    <option value="pa">🇮🇳 ਪੰਜਾਬੀ (Punjabi)</option>
+                    <option value="es">🇪🇸 Español (Spanish)</option>
+                    <option value="fr">🇫🇷 Français (French)</option>
+                    <option value="de">🇩🇪 Deutsch (German)</option>
+                    <option value="ar">🇸🇦 العربية (Arabic)</option>
+                    <option value="zh-CN">🇨🇳 简体中文 (Chinese)</option>
+                    <option value="ja">🇯🇵 日本語 (Japanese)</option>
+                    <option value="ru">🇷🇺 Русский (Russian)</option>
+                </select>
+            </div>
+            <div class="epm-gate-field" style="margin-bottom:10px;">
+                <label class="epm-gate-lbl">Full Name / Profile Label (Optional)</label>
+                <input type="text" id="gate_reg_name" class="epm-gate-input" placeholder="e.g. John Doe" />
+            </div>
+            <button type="button" class="epm-gate-btn" onclick="window.epmSubmitGatekeeperRegister()">📝 Sign Up &amp; Request Admin Approval</button>
             <div id="gate_reg_msg" class="epm-gate-msg"></div>
         </div>
 
@@ -11447,9 +11490,15 @@ TOP_NAVBAR_HTML = f"""
         <button type="button" class="epm-lang-opt" onclick="window.epmSelectLanguage('ja')"><span>🇯🇵</span> <span>日本語 (Japanese)</span></button>
         <button type="button" class="epm-lang-opt" onclick="window.epmSelectLanguage('ru')"><span>🇷🇺</span> <span>Русский (Russian)</span></button>
     </div>
-    <div style="padding:10px 14px;background:#F8FAFC;border-top:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center;">
-        <span style="font-size:11px;color:#64748B;">Active: <strong id="epm-active-lang-display" style="color:#0052FF;">EN</strong></span>
-        <button type="button" onclick="window.epmSelectLanguage('en')" style="background:none;border:none;color:#0052FF;font-weight:700;font-size:11px;cursor:pointer;">↺ Reset to English</button>
+    <div style="padding:10px 14px;background:#F8FAFC;border-top:1px solid #E2E8F0;display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span style="font-size:11px;color:#64748B;">Active Default: <strong id="epm-active-lang-display" style="color:#0052FF;">EN</strong></span>
+            <div style="display:flex;align-items:center;gap:8px;">
+                <button type="button" onclick="window.epmSavePreferredLanguageDefault()" style="background:#0052FF;color:#FFFFFF;border:none;border-radius:6px;padding:5px 10px;font-weight:700;font-size:11px;cursor:pointer;box-shadow:0 1px 2px rgba(0,82,255,0.2);">💾 Save as Default Preference</button>
+                <button type="button" onclick="window.epmSelectLanguage('en')" style="background:none;border:none;color:#0052FF;font-weight:700;font-size:11px;cursor:pointer;">↺ Reset to English</button>
+            </div>
+        </div>
+        <div id="epm-lang-save-msg" style="font-size:11px;font-weight:700;color:#059669;display:none;"></div>
     </div>
 </div>
 
@@ -13894,9 +13943,17 @@ TERMINAL_CLIENT_JS = r"""
             b.style.display = 'block';
             b.style.pointerEvents = 'auto';
         }
-        const cur = localStorage.getItem('epm_selected_lang') || 'en';
+        let cur = localStorage.getItem('epm_selected_lang') || 'en';
+        try {
+            const authObj = JSON.parse(sessionStorage.getItem('epm_member_auth') || '{}');
+            if (authObj && authObj.preferred_language) {
+                cur = authObj.preferred_language;
+            }
+        } catch (e) {}
         const disp = document.getElementById('epm-active-lang-display');
         if (disp) disp.innerText = cur.toUpperCase();
+        const saveMsg = document.getElementById('epm-lang-save-msg');
+        if (saveMsg) saveMsg.style.display = 'none';
     };
 
     window.epmCloseLanguageModal = function() {
@@ -13906,8 +13963,8 @@ TERMINAL_CLIENT_JS = r"""
         if (b) b.style.display = 'none';
     };
 
-    window.epmSelectLanguage = function(langCode) {
-        window.epmCloseLanguageModal();
+    window.epmApplyPreferredLanguage = function(langCode, skipReload) {
+        if (!langCode) return;
         const host = window.location.hostname;
         document.cookie = 'googtrans=/en/' + langCode + '; path=/;';
         if (host) {
@@ -13918,13 +13975,65 @@ TERMINAL_CLIENT_JS = r"""
             }
         }
         localStorage.setItem('epm_selected_lang', langCode);
+        const disp = document.getElementById('epm-active-lang-display');
+        if (disp) disp.innerText = langCode.toUpperCase();
 
         const combo = document.querySelector('.goog-te-combo');
         if (combo) {
-            combo.value = langCode;
-            combo.dispatchEvent(new Event('change'));
-        } else {
+            if (combo.value !== langCode) {
+                combo.value = langCode;
+                combo.dispatchEvent(new Event('change'));
+            }
+        } else if (!skipReload && langCode !== 'en') {
             window.location.reload();
+        }
+    };
+
+    window.epmPersistMemberLanguage = async function(langCode) {
+        try {
+            const authRaw = sessionStorage.getItem('epm_member_auth');
+            if (!authRaw) return null;
+            const authObj = JSON.parse(authRaw);
+            const id = authObj.identifier || authObj.phone || authObj.id;
+            if (!id) return null;
+            const r = await fetch('/api/auth/language', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ identifier: id, preferred_language: langCode })
+            });
+            const res = await r.json();
+            if (res && res.success) {
+                authObj.preferred_language = langCode;
+                sessionStorage.setItem('epm_member_auth', JSON.stringify(authObj));
+            }
+            return res;
+        } catch (e) {
+            return null;
+        }
+    };
+
+    window.epmSelectLanguage = async function(langCode) {
+        localStorage.setItem('epm_selected_lang', langCode);
+        const disp = document.getElementById('epm-active-lang-display');
+        if (disp) disp.innerText = langCode.toUpperCase();
+        await window.epmPersistMemberLanguage(langCode);
+        window.epmCloseLanguageModal();
+        window.epmApplyPreferredLanguage(langCode, false);
+    };
+
+    window.epmSavePreferredLanguageDefault = async function() {
+        const cur = localStorage.getItem('epm_selected_lang') || 'en';
+        const saveMsg = document.getElementById('epm-lang-save-msg');
+        const res = await window.epmPersistMemberLanguage(cur);
+        if (saveMsg) {
+            saveMsg.style.display = 'block';
+            if (res && res.success) {
+                saveMsg.style.color = '#059669';
+                saveMsg.innerText = '✅ Saved ' + cur.toUpperCase() + ' permanently to your member profile (' + (res.member.identifier || '') + ').';
+            } else {
+                saveMsg.style.color = '#059669';
+                saveMsg.innerText = '✅ Saved ' + cur.toUpperCase() + ' as default language preference for this browser & profile.';
+            }
         }
     };
 
@@ -14040,7 +14149,9 @@ TERMINAL_CLIENT_JS = r"""
                 }
             }
             if (idx !== 'ALL') {
-                if (!cardTags.includes(idx) && !(idx.startsWith('NIFTY') && cardMkt === 'NSE' && cardTags.includes('NIFTY500')) && !(idx.startsWith('BSE') && cardTags.includes('SENSEX'))) {
+                if (idx === 'MCX') {
+                    if (cardMkt !== 'MCX' && !cardTags.includes('MCX')) match = false;
+                } else if (!cardTags.includes(idx) && !(idx.startsWith('NIFTY') && cardMkt === 'NSE' && cardTags.includes('NIFTY500')) && !(idx.startsWith('BSE') && cardTags.includes('SENSEX'))) {
                     match = false;
                 }
             }
@@ -14079,17 +14190,7 @@ TERMINAL_CLIENT_JS = r"""
         const msg = document.getElementById('gate_login_msg');
 
         if (!id || !pin) {
-            if (msg) { msg.style.color = '#DC2626'; msg.innerText = 'Please enter both your identifier and Security PIN.'; }
-            return;
-        }
-
-        // Master Admin login check
-        if ((id.toLowerCase() === 'eshanparek@gmail.com' || id === 'admin') && (pin === '111111' || pin === '202688')) {
-            sessionStorage.setItem('epm_member_auth', JSON.stringify({ name: 'Eshan Parek (Master Admin)', role: 'ADMIN', identifier: id }));
-            document.body.classList.add('epm-terminal-unlocked');
-            document.documentElement.classList.add('epm-terminal-unlocked');
-            const overlay = document.getElementById('epm-gatekeeper-overlay');
-            if (overlay) overlay.style.setProperty('display', 'none', 'important');
+            if (msg) { msg.style.color = '#DC2626'; msg.innerText = 'Please enter both your Email / Mobile Number and Password / PIN.'; }
             return;
         }
 
@@ -14106,13 +14207,27 @@ TERMINAL_CLIENT_JS = r"""
                     window.epmPendingResetUser = { identifier: id, old_pin: pin };
                     window.epmGateSwitchTab('reset');
                 } else {
-                    sessionStorage.setItem('epm_member_auth', JSON.stringify(res.member));
+                    const mem = res.member || { name: id, role: 'MEMBER', identifier: id, preferred_language: res.preferred_language || 'en' };
+                    sessionStorage.setItem('epm_member_auth', JSON.stringify(mem));
                     document.body.classList.add('epm-terminal-unlocked');
                     document.documentElement.classList.add('epm-terminal-unlocked');
                     const overlay = document.getElementById('epm-gatekeeper-overlay');
                     if (overlay) overlay.style.setProperty('display', 'none', 'important');
+                    if (mem.preferred_language) {
+                        window.epmApplyPreferredLanguage(mem.preferred_language, true);
+                    }
                 }
             } else {
+                // Fallback Master Admin check if needed
+                if ((id.toLowerCase() === 'eshanparek@gmail.com' || id === 'admin') && (pin === '111111' || pin === '202688')) {
+                    const adminMem = { name: 'Eshan Parek (Master Admin)', role: 'ADMIN', identifier: id, preferred_language: localStorage.getItem('epm_selected_lang') || 'en' };
+                    sessionStorage.setItem('epm_member_auth', JSON.stringify(adminMem));
+                    document.body.classList.add('epm-terminal-unlocked');
+                    document.documentElement.classList.add('epm-terminal-unlocked');
+                    const overlay = document.getElementById('epm-gatekeeper-overlay');
+                    if (overlay) overlay.style.setProperty('display', 'none', 'important');
+                    return;
+                }
                 if (msg) { msg.style.color = '#DC2626'; msg.innerText = res.message || 'Authentication failed.'; }
             }
         } catch (e) {
@@ -14124,25 +14239,45 @@ TERMINAL_CLIENT_JS = r"""
         const name = ((document.getElementById('gate_reg_name') || {}).value || '').trim();
         const email = ((document.getElementById('gate_reg_email') || {}).value || '').trim();
         const phone = ((document.getElementById('gate_reg_phone') || {}).value || '').trim();
+        const pin = ((document.getElementById('gate_reg_pin') || {}).value || '').trim();
+        const prefLang = ((document.getElementById('gate_reg_lang') || {}).value || 'en').trim();
         const msg = document.getElementById('gate_reg_msg');
 
-        if (!name || (!email && !phone)) {
-            if (msg) { msg.style.color = '#DC2626'; msg.innerText = 'Please provide your Name and at least Email or Phone.'; }
+        if (!email || !phone || !pin) {
+            if (msg) {
+                msg.style.color = '#DC2626';
+                msg.innerText = 'Please enter all 3 details: Email Address, Mobile Phone Number, and Password / PIN.';
+            }
+            return;
+        }
+        if (pin.length < 4) {
+            if (msg) {
+                msg.style.color = '#DC2626';
+                msg.innerText = 'Password / Security PIN must be at least 4 characters (or 6/8 digits).';
+            }
             return;
         }
 
         try {
-            if (msg) { msg.style.color = '#0052FF'; msg.innerText = 'Submitting registration...'; }
+            if (msg) { msg.style.color = '#0052FF'; msg.innerText = 'Creating member profile & saving preferences...'; }
             const r = await fetch('/api/auth/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: name, identifier: email || phone, phone: phone, auth_type: 'portal' })
+                body: JSON.stringify({
+                    name: name || email.split('@')[0],
+                    identifier: email,
+                    phone: phone,
+                    pin: pin,
+                    preferred_language: prefLang,
+                    auth_type: 'portal'
+                })
             });
             const res = await r.json();
             if (res.status === 'success' || res.status === 'exists') {
+                localStorage.setItem('epm_selected_lang', prefLang);
                 if (msg) {
                     msg.style.color = '#059669';
-                    msg.innerText = '✅ ' + (res.message || 'Registration submitted! Awaiting Administrator authorization.');
+                    msg.innerText = '✅ ' + (res.message || 'Member profile created! Once approved by Admin in Site Settings, you can sign in using the Email/Phone & Password/PIN you just entered.');
                 }
             } else {
                 if (msg) { msg.style.color = '#DC2626'; msg.innerText = res.message || 'Error creating account.'; }
@@ -14157,8 +14292,8 @@ TERMINAL_CLIENT_JS = r"""
         const confirmPin = ((document.getElementById('gate_confirm_pin') || {}).value || '').trim();
         const msg = document.getElementById('gate_reset_msg');
 
-        if (!newPin || (newPin.length !== 6 && newPin.length !== 8) || !/^\d+$/.test(newPin)) {
-            if (msg) { msg.style.color = '#DC2626'; msg.innerText = 'PIN must be exactly 6 or 8 digits.'; }
+        if (!newPin || newPin.length < 4) {
+            if (msg) { msg.style.color = '#DC2626'; msg.innerText = 'Password / PIN must be at least 4 characters (or 6/8 digits).'; }
             return;
         }
         if (newPin !== confirmPin) {
@@ -14181,7 +14316,7 @@ TERMINAL_CLIENT_JS = r"""
             });
             const res = await r.json();
             if (res.success) {
-                sessionStorage.setItem('epm_member_auth', JSON.stringify({ identifier: pending.identifier, role: 'MEMBER' }));
+                sessionStorage.setItem('epm_member_auth', JSON.stringify(res.member || { identifier: pending.identifier, role: 'MEMBER' }));
                 document.body.classList.add('epm-terminal-unlocked');
                 document.documentElement.classList.add('epm-terminal-unlocked');
                 const overlay = document.getElementById('epm-gatekeeper-overlay');
@@ -14201,6 +14336,12 @@ TERMINAL_CLIENT_JS = r"""
             document.body.classList.add('epm-terminal-unlocked');
             document.documentElement.classList.add('epm-terminal-unlocked');
             if (overlay) overlay.style.setProperty('display', 'none', 'important');
+            try {
+                const mem = JSON.parse(auth);
+                if (mem && mem.preferred_language) {
+                    window.epmApplyPreferredLanguage(mem.preferred_language, true);
+                }
+            } catch (e) {}
         } else {
             document.body.classList.remove('epm-terminal-unlocked');
             document.documentElement.classList.remove('epm-terminal-unlocked');
@@ -14224,14 +14365,25 @@ TERMINAL_CLIENT_JS = r"""
                 const isPending = m.status === 'PENDING_APPROVAL';
                 const isPaused = m.status === 'PAUSED';
                 const statusColor = isPending ? '#D97706' : (isPaused ? '#DC2626' : '#059669');
-                const pinDisplay = m.pin_plaintext_admin ? `<b style="font-family:monospace;letter-spacing:1.5px;color:#0052FF;background:#EFF6FF;padding:2px 6px;border-radius:4px;border:1px solid #BFDBFE;">${m.pin_plaintext_admin}</b>` : '<span style="color:#94A3B8;">Pending Issue</span>';
+                const hasUserPin = Boolean(m.pin_plaintext_admin);
+                const pinDisplay = hasUserPin
+                    ? `<b style="font-family:monospace;letter-spacing:1.2px;color:#0052FF;background:#EFF6FF;padding:2px 6px;border-radius:4px;border:1px solid #BFDBFE;">${m.pin_plaintext_admin}</b>`
+                    : '<span style="color:#94A3B8;">Pending Issue</span>';
+                const langDisplay = `<span style="background:#F1F5F9;color:#0F172A;padding:2px 6px;border-radius:4px;font-weight:700;font-size:11px;text-transform:uppercase;">🌐 ${m.preferred_language || 'en'}</span>`;
                 
                 let actionBtns = '';
                 if (isPending) {
-                    actionBtns = `
-                        <button type="button" class="epm-btn-pill" style="padding:2px 8px;font-size:10px;background:#059669;color:#fff;border:none;margin-right:4px;" onclick="window.epmAdminApproveMember('${m.id}', 6)">Approve (6-PIN)</button>
-                        <button type="button" class="epm-btn-pill" style="padding:2px 8px;font-size:10px;background:#2563EB;color:#fff;border:none;" onclick="window.epmAdminApproveMember('${m.id}', 8)">Approve (8-PIN)</button>
-                    `;
+                    if (hasUserPin) {
+                        actionBtns = `
+                            <button type="button" class="epm-btn-pill" style="padding:3px 9px;font-size:10px;background:#059669;color:#fff;border:none;margin-right:4px;font-weight:700;" onclick="window.epmAdminApproveMember('${m.id}', null)">✓ Approve Member Credentials</button>
+                            <button type="button" class="epm-btn-pill" style="padding:2px 7px;font-size:10px;background:#2563EB;color:#fff;border:none;" onclick="window.epmAdminApproveMember('${m.id}', 6)" title="Override with random 6-digit PIN">Gen 6-PIN</button>
+                        `;
+                    } else {
+                        actionBtns = `
+                            <button type="button" class="epm-btn-pill" style="padding:2px 8px;font-size:10px;background:#059669;color:#fff;border:none;margin-right:4px;" onclick="window.epmAdminApproveMember('${m.id}', 6)">Approve (6-PIN)</button>
+                            <button type="button" class="epm-btn-pill" style="padding:2px 8px;font-size:10px;background:#2563EB;color:#fff;border:none;" onclick="window.epmAdminApproveMember('${m.id}', 8)">Approve (8-PIN)</button>
+                        `;
+                    }
                 } else if (isPaused) {
                     actionBtns = `<button type="button" class="epm-btn-pill" style="padding:2px 8px;font-size:10px;background:#059669;color:#fff;border:none;" onclick="window.epmAdminSetMemberStatus('${m.id}', 'ACTIVE')">▶ Resume</button>`;
                 } else {
@@ -14243,7 +14395,7 @@ TERMINAL_CLIENT_JS = r"""
                     <td style="padding:8px;font-weight:700;">${m.name}</td>
                     <td style="padding:8px;">${m.identifier}</td>
                     <td style="padding:8px;">${m.phone || '—'}</td>
-                    <td style="padding:8px;text-transform:uppercase;">${m.auth_type}</td>
+                    <td style="padding:8px;">${langDisplay}</td>
                     <td style="padding:8px;font-weight:800;color:${statusColor};">${m.status}</td>
                     <td style="padding:8px;">${pinDisplay}</td>
                     <td style="padding:8px;text-align:right;">${actionBtns}</td>
@@ -14264,7 +14416,7 @@ TERMINAL_CLIENT_JS = r"""
             });
             const res = await r.json();
             if (res.success) {
-                alert(`Member approved! Security PIN generated: ${res.pin}`);
+                alert(`Member approved! Active Password / PIN: ${res.pin} (Preferred Language: ${(res.member && res.member.preferred_language || 'en').toUpperCase()})`);
                 window.epmReloadMembersTable();
             } else {
                 alert('Approval error: ' + res.message);
