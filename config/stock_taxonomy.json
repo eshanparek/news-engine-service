@@ -1,10 +1,814 @@
 {
+  "version": "2.0",
+  "nse_flagship": [
+    {
+      "id": "NIFTY50",
+      "name": "Nifty 50",
+      "exchange": "NSE",
+      "symbol": "NIFTY",
+      "description": "Top 50 large-cap Indian blue-chips"
+    },
+    {
+      "id": "NIFTYNEXT50",
+      "name": "Nifty Next 50",
+      "exchange": "NSE",
+      "symbol": "NIFTYJR",
+      "description": "Next 50 large-cap leaders after Nifty 50"
+    },
+    {
+      "id": "NIFTY100",
+      "name": "Nifty 100",
+      "exchange": "NSE",
+      "symbol": "CNX100",
+      "description": "Combined Nifty 50 + Nifty Next 50"
+    },
+    {
+      "id": "NIFTY200",
+      "name": "Nifty 200",
+      "exchange": "NSE",
+      "symbol": "CNX200",
+      "description": "Top 200 large and mid-cap companies"
+    },
+    {
+      "id": "NIFTY500",
+      "name": "Nifty 500",
+      "exchange": "NSE",
+      "symbol": "CNX500",
+      "description": "Top 500 companies (~96% NSE free-float market cap)"
+    },
+    {
+      "id": "NIFTYMID50",
+      "name": "Nifty Midcap 50",
+      "exchange": "NSE",
+      "symbol": "NIFTYMID50",
+      "description": "Top 50 liquid mid-cap stocks"
+    },
+    {
+      "id": "NIFTYMID100",
+      "name": "Nifty Midcap 100",
+      "exchange": "NSE",
+      "symbol": "CNXMIDCAP",
+      "description": "100 benchmark mid-cap growth enterprises"
+    },
+    {
+      "id": "NIFTYMID150",
+      "name": "Nifty Midcap 150",
+      "exchange": "NSE",
+      "symbol": "NIFTYMID150",
+      "description": "Ranks 101-250 by full market capitalization"
+    },
+    {
+      "id": "NIFTYSM50",
+      "name": "Nifty Smallcap 50",
+      "exchange": "NSE",
+      "symbol": "NIFTYSML50",
+      "description": "Top 50 liquid small-cap stocks"
+    },
+    {
+      "id": "NIFTYSM100",
+      "name": "Nifty Smallcap 100",
+      "exchange": "NSE",
+      "symbol": "CNXSMALLCAP",
+      "description": "100 high-growth small-cap enterprises"
+    },
+    {
+      "id": "NIFTYSM250",
+      "name": "Nifty Smallcap 250",
+      "exchange": "NSE",
+      "symbol": "NIFTYSML250",
+      "description": "Ranks 251-500 in Nifty 500"
+    },
+    {
+      "id": "NIFTYMICRO250",
+      "name": "Nifty Microcap 250",
+      "exchange": "NSE",
+      "symbol": "NIFTYMICRO",
+      "description": "Top 250 companies beyond Nifty 500"
+    },
+    {
+      "id": "NIFTYTOTAL",
+      "name": "Nifty Total Market",
+      "exchange": "NSE",
+      "symbol": "NIFTYTOTAL",
+      "description": "750 stocks covering Nifty 500 + Microcap 250"
+    }
+  ],
+  "nse_sectoral": [
+    {
+      "id": "BANKNIFTY",
+      "name": "Nifty Bank",
+      "exchange": "NSE",
+      "sector": "Banking & Financials"
+    },
+    {
+      "id": "NIFTYPVTBANK",
+      "name": "Nifty Private Bank",
+      "exchange": "NSE",
+      "sector": "Banking & Financials"
+    },
+    {
+      "id": "NIFTYPSUBANK",
+      "name": "Nifty PSU Bank",
+      "exchange": "NSE",
+      "sector": "Banking & Financials"
+    },
+    {
+      "id": "FINNIFTY",
+      "name": "Nifty Financial Services (FINNIFTY)",
+      "exchange": "NSE",
+      "sector": "Banking & Financials"
+    },
+    {
+      "id": "FINNIFTY2550",
+      "name": "Nifty Financial Services 25/50",
+      "exchange": "NSE",
+      "sector": "Banking & Financials"
+    },
+    {
+      "id": "NIFTYIT",
+      "name": "Nifty IT",
+      "exchange": "NSE",
+      "sector": "IT & Technology"
+    },
+    {
+      "id": "NIFTYAUTO",
+      "name": "Nifty Auto",
+      "exchange": "NSE",
+      "sector": "Automobiles & Mobility"
+    },
+    {
+      "id": "NIFTYFMCG",
+      "name": "Nifty FMCG",
+      "exchange": "NSE",
+      "sector": "FMCG & Consumer Staples"
+    },
+    {
+      "id": "NIFTYPHARMA",
+      "name": "Nifty Pharma",
+      "exchange": "NSE",
+      "sector": "Pharma & Healthcare"
+    },
+    {
+      "id": "NIFTYHEALTH",
+      "name": "Nifty Healthcare",
+      "exchange": "NSE",
+      "sector": "Pharma & Healthcare"
+    },
+    {
+      "id": "NIFTYMETAL",
+      "name": "Nifty Metal",
+      "exchange": "NSE",
+      "sector": "Metals, Mining & Materials"
+    },
+    {
+      "id": "NIFTYREALTY",
+      "name": "Nifty Realty",
+      "exchange": "NSE",
+      "sector": "Real Estate & REITs"
+    },
+    {
+      "id": "NIFTYENERGY",
+      "name": "Nifty Energy",
+      "exchange": "NSE",
+      "sector": "Energy, Oil, Gas & Power"
+    },
+    {
+      "id": "NIFTYOILGAS",
+      "name": "Nifty Oil & Gas",
+      "exchange": "NSE",
+      "sector": "Energy, Oil, Gas & Power"
+    },
+    {
+      "id": "NIFTYCONSDUR",
+      "name": "Nifty Consumer Durables",
+      "exchange": "NSE",
+      "sector": "Consumer Discretionary & Retail"
+    },
+    {
+      "id": "NIFTYMEDIA",
+      "name": "Nifty Media",
+      "exchange": "NSE",
+      "sector": "Communication, Media & Telecom"
+    },
+    {
+      "id": "NIFTYCAPGOODS",
+      "name": "Nifty Capital Goods",
+      "exchange": "NSE",
+      "sector": "Industrials, Capital Goods & Defense"
+    },
+    {
+      "id": "NIFTYCHEM",
+      "name": "Nifty Chemicals",
+      "exchange": "NSE",
+      "sector": "Metals, Mining & Materials"
+    },
+    {
+      "id": "NIFTYCONST",
+      "name": "Nifty Construction",
+      "exchange": "NSE",
+      "sector": "Industrials, Capital Goods & Defense"
+    }
+  ],
+  "nse_thematic": [
+    {
+      "id": "NIFTYCONSUMP",
+      "name": "Nifty India Consumption",
+      "exchange": "NSE",
+      "theme": "Domestic Consumption"
+    },
+    {
+      "id": "NIFTYINFRA",
+      "name": "Nifty Infrastructure",
+      "exchange": "NSE",
+      "theme": "Infrastructure & Capex"
+    },
+    {
+      "id": "NIFTYCPSE",
+      "name": "Nifty CPSE",
+      "exchange": "NSE",
+      "theme": "Central Public Sector Enterprises"
+    },
+    {
+      "id": "NIFTYPSE",
+      "name": "Nifty PSE",
+      "exchange": "NSE",
+      "theme": "Public Sector Enterprises"
+    },
+    {
+      "id": "NIFTYMNC",
+      "name": "Nifty MNC",
+      "exchange": "NSE",
+      "theme": "Multinational Corporations"
+    },
+    {
+      "id": "NIFTYMFG",
+      "name": "Nifty India Manufacturing",
+      "exchange": "NSE",
+      "theme": "Make in India & Industrial Mfg"
+    },
+    {
+      "id": "NIFTYDEFENCE",
+      "name": "Nifty India Defence",
+      "exchange": "NSE",
+      "theme": "Aerospace & Defense"
+    },
+    {
+      "id": "NIFTYCOMMODITIES",
+      "name": "Nifty Commodities",
+      "exchange": "NSE",
+      "theme": "Metals, Energy & Cement"
+    },
+    {
+      "id": "NIFTYMOBILITY",
+      "name": "Nifty Mobility",
+      "exchange": "NSE",
+      "theme": "EV, Auto & Transport Logistics"
+    },
+    {
+      "id": "NIFTYHIGHBETA50",
+      "name": "Nifty High Beta 50",
+      "exchange": "NSE",
+      "theme": "Strategy / High Beta"
+    },
+    {
+      "id": "NIFTYLOWVOL50",
+      "name": "Nifty Low Volatility 50",
+      "exchange": "NSE",
+      "theme": "Strategy / Low Volatility"
+    },
+    {
+      "id": "NIFTYALPHA50",
+      "name": "Nifty Alpha 50",
+      "exchange": "NSE",
+      "theme": "Strategy / High Alpha"
+    },
+    {
+      "id": "NIFTYDIVOPPS50",
+      "name": "Nifty Dividend Opportunities 50",
+      "exchange": "NSE",
+      "theme": "Strategy / High Dividend Yield"
+    }
+  ],
+  "bse_flagship": [
+    {
+      "id": "SENSEX",
+      "name": "S&P BSE SENSEX",
+      "exchange": "BSE",
+      "symbol": "SENSEX",
+      "description": "30 flagship blue-chips on BSE"
+    },
+    {
+      "id": "SENSEX50",
+      "name": "S&P BSE SENSEX 50",
+      "exchange": "BSE",
+      "symbol": "SENSEX50",
+      "description": "Top 50 large-cap BSE leaders"
+    },
+    {
+      "id": "BSE100",
+      "name": "BSE 100",
+      "exchange": "BSE",
+      "symbol": "BSE100",
+      "description": "Top 100 BSE stocks"
+    },
+    {
+      "id": "BSE200",
+      "name": "BSE 200",
+      "exchange": "BSE",
+      "symbol": "BSE200",
+      "description": "Top 200 BSE stocks"
+    },
+    {
+      "id": "BSE500",
+      "name": "BSE 500",
+      "exchange": "BSE",
+      "symbol": "BSE500",
+      "description": "Top 500 BSE stocks"
+    },
+    {
+      "id": "BSEALLCAP",
+      "name": "BSE AllCap",
+      "exchange": "BSE",
+      "symbol": "BSEALLCAP",
+      "description": "Comprehensive BSE all-cap index"
+    },
+    {
+      "id": "BSELARGECAP",
+      "name": "BSE LargeCap",
+      "exchange": "BSE",
+      "symbol": "BSELARGE",
+      "description": "BSE LargeCap universe"
+    },
+    {
+      "id": "BSEMIDCAP",
+      "name": "BSE MidCap",
+      "exchange": "BSE",
+      "symbol": "BSEMID",
+      "description": "BSE MidCap growth universe"
+    },
+    {
+      "id": "BSESMALLCAP",
+      "name": "BSE SmallCap",
+      "exchange": "BSE",
+      "symbol": "BSESMALL",
+      "description": "BSE SmallCap universe"
+    },
+    {
+      "id": "BSEMICROCAP",
+      "name": "BSE MicroCap",
+      "exchange": "BSE",
+      "symbol": "BSEMICRO",
+      "description": "BSE MicroCap universe"
+    }
+  ],
+  "bse_sectoral": [
+    {
+      "id": "BANKEX",
+      "name": "BSE Bankex",
+      "exchange": "BSE",
+      "sector": "Banking & Financials"
+    },
+    {
+      "id": "BSEFIN",
+      "name": "BSE Finance",
+      "exchange": "BSE",
+      "sector": "Banking & Financials"
+    },
+    {
+      "id": "BSEIT",
+      "name": "BSE Information Technology (BSE IT)",
+      "exchange": "BSE",
+      "sector": "IT & Technology"
+    },
+    {
+      "id": "BSETECK",
+      "name": "BSE TECk (Tech, Media & Telecom)",
+      "exchange": "BSE",
+      "sector": "IT & Technology"
+    },
+    {
+      "id": "BSEAUTO",
+      "name": "BSE Auto",
+      "exchange": "BSE",
+      "sector": "Automobiles & Mobility"
+    },
+    {
+      "id": "BSEFMCG",
+      "name": "BSE FMCG",
+      "exchange": "BSE",
+      "sector": "FMCG & Consumer Staples"
+    },
+    {
+      "id": "BSEHC",
+      "name": "BSE Healthcare",
+      "exchange": "BSE",
+      "sector": "Pharma & Healthcare"
+    },
+    {
+      "id": "BSEMETAL",
+      "name": "BSE Metal",
+      "exchange": "BSE",
+      "sector": "Metals, Mining & Materials"
+    },
+    {
+      "id": "BSEREALTY",
+      "name": "BSE Realty",
+      "exchange": "BSE",
+      "sector": "Real Estate & REITs"
+    },
+    {
+      "id": "BSEOILGAS",
+      "name": "BSE Oil & Gas",
+      "exchange": "BSE",
+      "sector": "Energy, Oil, Gas & Power"
+    },
+    {
+      "id": "BSEPOWER",
+      "name": "BSE Power",
+      "exchange": "BSE",
+      "sector": "Utilities & Clean Energy"
+    },
+    {
+      "id": "BSEENERGY",
+      "name": "BSE Energy",
+      "exchange": "BSE",
+      "sector": "Energy, Oil, Gas & Power"
+    },
+    {
+      "id": "BSECG",
+      "name": "BSE Capital Goods",
+      "exchange": "BSE",
+      "sector": "Industrials, Capital Goods & Defense"
+    },
+    {
+      "id": "BSECD",
+      "name": "BSE Consumer Durables",
+      "exchange": "BSE",
+      "sector": "Consumer Discretionary & Retail"
+    },
+    {
+      "id": "BSEIND",
+      "name": "BSE Industrials",
+      "exchange": "BSE",
+      "sector": "Industrials, Capital Goods & Defense"
+    },
+    {
+      "id": "BSEBM",
+      "name": "BSE Basic Materials",
+      "exchange": "BSE",
+      "sector": "Metals, Mining & Materials"
+    },
+    {
+      "id": "BSEUTIL",
+      "name": "BSE Utilities",
+      "exchange": "BSE",
+      "sector": "Utilities & Clean Energy"
+    },
+    {
+      "id": "BSETELECOM",
+      "name": "BSE Telecom",
+      "exchange": "BSE",
+      "sector": "Communication, Media & Telecom"
+    }
+  ],
+  "bse_thematic": [
+    {
+      "id": "BSEINFRA",
+      "name": "BSE India Infrastructure",
+      "exchange": "BSE",
+      "theme": "Infrastructure"
+    },
+    {
+      "id": "BSEPSU",
+      "name": "BSE PSU",
+      "exchange": "BSE",
+      "theme": "Public Sector Undertakings"
+    },
+    {
+      "id": "BSECPSE",
+      "name": "BSE CPSE",
+      "exchange": "BSE",
+      "theme": "Central PSEs"
+    },
+    {
+      "id": "BHARAT22",
+      "name": "BSE Bharat 22",
+      "exchange": "BSE",
+      "theme": "Disinvestment ETF Basket"
+    },
+    {
+      "id": "BSEIPO",
+      "name": "BSE IPO",
+      "exchange": "BSE",
+      "theme": "Mainboard New Listings"
+    },
+    {
+      "id": "BSESMEIPO",
+      "name": "BSE SME IPO",
+      "exchange": "BSE",
+      "theme": "SME Platform Listings"
+    }
+  ],
+  "mcx_icomdex": [
+    {
+      "id": "MCXCOMPDEX",
+      "name": "MCX iCOMDEX Composite Index",
+      "category": "Composite Benchmark",
+      "symbol": "MCXCOMPDEX",
+      "description": "Diversified energy, base metals & bullion contracts"
+    },
+    {
+      "id": "BULLDEX",
+      "name": "MCX iCOMDEX Bullion Index (BULLDEX)",
+      "category": "Sectoral Basket",
+      "symbol": "MCXBULLDEX",
+      "description": "Gold & Silver futures"
+    },
+    {
+      "id": "METLDEX",
+      "name": "MCX iCOMDEX Base Metal Index (METLDEX)",
+      "category": "Sectoral Basket",
+      "symbol": "MCXMETLDEX",
+      "description": "Copper, Zinc, Aluminium, Lead, Nickel"
+    },
+    {
+      "id": "ENRGDEX",
+      "name": "MCX iCOMDEX Energy Index (ENRGDEX)",
+      "category": "Sectoral Basket",
+      "symbol": "ENRGDEX",
+      "description": "Crude Oil & Natural Gas futures"
+    },
+    {
+      "id": "GOLD",
+      "name": "MCX Gold Index & Futures",
+      "category": "Single Commodity",
+      "symbol": "GOLD",
+      "description": "MCX Gold 1kg / Mini"
+    },
+    {
+      "id": "SILVER",
+      "name": "MCX Silver Index & Futures",
+      "category": "Single Commodity",
+      "symbol": "SILVER",
+      "description": "MCX Silver 30kg / Mini"
+    },
+    {
+      "id": "CRUDEOIL",
+      "name": "MCX Crude Oil Index & Futures",
+      "category": "Single Commodity",
+      "symbol": "CRUDEOIL",
+      "description": "MCX Crude Oil"
+    },
+    {
+      "id": "COPPER",
+      "name": "MCX Copper Index & Futures",
+      "category": "Single Commodity",
+      "symbol": "COPPER",
+      "description": "MCX Copper"
+    },
+    {
+      "id": "NATGAS",
+      "name": "MCX Natural Gas Futures",
+      "category": "Single Commodity",
+      "symbol": "NATURALGAS",
+      "description": "MCX Natural Gas"
+    },
+    {
+      "id": "ALUMINIUM",
+      "name": "MCX Aluminium Futures",
+      "category": "Single Commodity",
+      "symbol": "ALUMINIUM",
+      "description": "MCX Aluminium"
+    },
+    {
+      "id": "ZINC",
+      "name": "MCX Zinc Futures",
+      "category": "Single Commodity",
+      "symbol": "ZINC",
+      "description": "MCX Zinc"
+    }
+  ],
+  "us_broad_indices": [
+    {
+      "id": "SPX",
+      "name": "S&P 500 (SPX / ES)",
+      "exchange": "S&P Dow Jones",
+      "symbol": "SPX",
+      "description": "500 leading large-cap US companies"
+    },
+    {
+      "id": "DJIA",
+      "name": "Dow Jones Industrial Average (DJIA 30)",
+      "exchange": "S&P Dow Jones",
+      "symbol": "DJI",
+      "description": "30 prominent blue-chip US industrial & corporate leaders"
+    },
+    {
+      "id": "SP400",
+      "name": "S&P MidCap 400",
+      "exchange": "S&P Dow Jones",
+      "symbol": "MID",
+      "description": "400 US mid-cap companies"
+    },
+    {
+      "id": "SP600",
+      "name": "S&P SmallCap 600",
+      "exchange": "S&P Dow Jones",
+      "symbol": "SML",
+      "description": "600 US small-cap companies"
+    },
+    {
+      "id": "SP1500",
+      "name": "S&P Composite 1500",
+      "exchange": "S&P Dow Jones",
+      "symbol": "SPSUPX",
+      "description": "Combines S&P 500, MidCap 400, and SmallCap 600"
+    },
+    {
+      "id": "RUT",
+      "name": "Russell 2000 (Small-Cap Benchmark)",
+      "exchange": "FTSE Russell",
+      "symbol": "RUT",
+      "description": "Standard benchmark for US small-cap equities (RTY Futures)"
+    },
+    {
+      "id": "RUI",
+      "name": "Russell 1000 (Large-Cap)",
+      "exchange": "FTSE Russell",
+      "symbol": "RUI",
+      "description": "Top 1,000 US companies by market cap"
+    },
+    {
+      "id": "RUA",
+      "name": "Russell 3000 (Broad Total US Market)",
+      "exchange": "FTSE Russell",
+      "symbol": "RUA",
+      "description": "Broad US equity market benchmark"
+    },
+    {
+      "id": "RUTVAL",
+      "name": "Russell 2000 Value & Growth / Midcap / Microcap",
+      "exchange": "FTSE Russell",
+      "symbol": "RUJ/RUO",
+      "description": "Russell style, Top 200, Midcap & Microcap sub-indices"
+    }
+  ],
+  "us_gics_sectors": [
+    {
+      "id": "XLK",
+      "name": "Information Technology (XLK)",
+      "spdr": "XLK",
+      "sector": "IT & Technology",
+      "focus": "Enterprise software, cloud infrastructure, semiconductors, IT consulting, hardware"
+    },
+    {
+      "id": "XLF",
+      "name": "Financials (XLF)",
+      "spdr": "XLF",
+      "sector": "Banking & Financials",
+      "focus": "Diversified banks, investment banking, asset management, brokerage, insurance"
+    },
+    {
+      "id": "XLV",
+      "name": "Health Care (XLV)",
+      "spdr": "XLV",
+      "sector": "Pharma & Healthcare",
+      "focus": "Pharmaceuticals, medical devices, healthcare providers, biotechnology, life sciences"
+    },
+    {
+      "id": "XLY",
+      "name": "Consumer Discretionary (XLY)",
+      "spdr": "XLY",
+      "sector": "Consumer Discretionary & Retail",
+      "focus": "E-commerce, automotive, retail, hotel & leisure chains, apparel, homebuilding"
+    },
+    {
+      "id": "XLC",
+      "name": "Communication Services (XLC)",
+      "spdr": "XLC",
+      "sector": "Communication, Media & Telecom",
+      "focus": "Interactive media, search/social platforms, telecom, cable, streaming, gaming"
+    },
+    {
+      "id": "XLI",
+      "name": "Industrials (XLI)",
+      "spdr": "XLI",
+      "sector": "Industrials, Capital Goods & Defense",
+      "focus": "Aerospace & defense, industrial machinery, railroads, freight logistics, engineering"
+    },
+    {
+      "id": "XLP",
+      "name": "Consumer Staples (XLP)",
+      "spdr": "XLP",
+      "sector": "FMCG & Consumer Staples",
+      "focus": "Packaged food & beverages, household products, hypermarkets, personal care"
+    },
+    {
+      "id": "XLE",
+      "name": "Energy (XLE)",
+      "spdr": "XLE",
+      "sector": "Energy, Oil, Gas & Power",
+      "focus": "Upstream oil & gas exploration, oilfield services, refining, pipeline transport"
+    },
+    {
+      "id": "XLB",
+      "name": "Materials (XLB)",
+      "spdr": "XLB",
+      "sector": "Metals, Mining & Materials",
+      "focus": "Specialty chemicals, metals & mining, packaging, construction materials"
+    },
+    {
+      "id": "XLRE",
+      "name": "Real Estate (XLRE)",
+      "spdr": "XLRE",
+      "sector": "Real Estate & REITs",
+      "focus": "Commercial REITs, data center REITs, industrial warehouses, residential REITs"
+    },
+    {
+      "id": "XLU",
+      "name": "Utilities (XLU)",
+      "spdr": "XLU",
+      "sector": "Utilities & Clean Energy",
+      "focus": "Electric power generation, regulated gas utilities, renewable infrastructure, water"
+    }
+  ],
+  "nasdaq_indices": [
+    {
+      "id": "COMP",
+      "name": "Nasdaq Composite (COMP)",
+      "exchange": "NASDAQ",
+      "symbol": "COMP",
+      "description": ">3,000 common equities listed on Nasdaq"
+    },
+    {
+      "id": "NDX",
+      "name": "Nasdaq-100 (NDX / NQ)",
+      "exchange": "NASDAQ",
+      "symbol": "NDX",
+      "description": "Top 100 largest non-financial companies on Nasdaq"
+    },
+    {
+      "id": "NGX",
+      "name": "Nasdaq Next Generation 100 (NGX)",
+      "exchange": "NASDAQ",
+      "symbol": "NGX",
+      "description": "Next 100 largest non-financial companies outside NDX"
+    },
+    {
+      "id": "SOX",
+      "name": "PHLX Semiconductor Sector Index (SOX)",
+      "exchange": "NASDAQ",
+      "symbol": "SOX",
+      "description": "Global benchmark for semiconductor design & fabrication"
+    },
+    {
+      "id": "NBI",
+      "name": "Nasdaq Biotechnology Index (NBI)",
+      "exchange": "NASDAQ",
+      "symbol": "NBI",
+      "description": "Biotech and pharmaceutical companies on Nasdaq"
+    },
+    {
+      "id": "IXF",
+      "name": "Nasdaq Financial-100 (IXF)",
+      "exchange": "NASDAQ",
+      "symbol": "IXF",
+      "description": "Top 100 financial services firms on Nasdaq"
+    },
+    {
+      "id": "NASDBANK",
+      "name": "Nasdaq Bank Index (BANK)",
+      "exchange": "NASDAQ",
+      "symbol": "BANK",
+      "description": "Regional and national commercial banks on Nasdaq"
+    },
+    {
+      "id": "IXCO",
+      "name": "Nasdaq Computer & Telecom Indices (IXCO / IXTC)",
+      "exchange": "NASDAQ",
+      "symbol": "IXCO",
+      "description": "Hardware, software infrastructure & telecom network operators"
+    },
+    {
+      "id": "CELS",
+      "name": "Nasdaq Clean Edge Green Energy Index (CELS)",
+      "exchange": "NASDAQ",
+      "symbol": "CELS",
+      "description": "Solar, clean energy & EV infrastructure leaders"
+    }
+  ],
   "broad_indices": [
     {
       "id": "NIFTY50",
       "name": "Nifty 50",
       "exchange": "NSE",
       "description": "Top 50 large-cap blue-chips"
+    },
+    {
+      "id": "NIFTYNEXT50",
+      "name": "Nifty Next 50",
+      "exchange": "NSE",
+      "description": "Next 50 large-cap blue-chips"
     },
     {
       "id": "NIFTY100",
@@ -26,98 +830,98 @@
     },
     {
       "id": "NIFTYMID100",
-      "name": "Nifty Midcap 100",
+      "name": "Nifty Midcap 50/100/150",
       "exchange": "NSE",
-      "description": "Key 100 mid-cap growth enterprises"
+      "description": "Key mid-cap growth enterprises"
     },
     {
       "id": "NIFTYSM100",
-      "name": "Nifty Smallcap 100",
+      "name": "Nifty Smallcap 50/100/250",
       "exchange": "NSE",
       "description": "High-growth small-cap enterprises"
     },
     {
+      "id": "NIFTYMICRO250",
+      "name": "Nifty Microcap 250",
+      "exchange": "NSE",
+      "description": "Emerging micro-cap companies"
+    },
+    {
       "id": "SENSEX",
-      "name": "BSE Sensex 30",
+      "name": "S&P BSE SENSEX / BSE 500",
       "exchange": "BSE",
-      "description": "Benchmark 30 established blue-chips"
+      "description": "Benchmark BSE blue-chips"
     }
   ],
   "sectoral_indices": [
     {
       "id": "BANKNIFTY",
-      "name": "Bank Nifty",
-      "exchange": "NSE",
+      "name": "Nifty Bank / BSE Bankex",
+      "exchange": "NSE/BSE",
       "sector": "Banking & Financials"
     },
     {
-      "id": "NIFTYFIN",
-      "name": "Nifty Financial Services",
+      "id": "FINNIFTY",
+      "name": "Nifty Fin Services (FINNIFTY)",
       "exchange": "NSE",
       "sector": "Banking & Financials"
     },
     {
       "id": "NIFTYIT",
-      "name": "Nifty IT",
-      "exchange": "NSE",
+      "name": "Nifty IT / BSE TECk",
+      "exchange": "NSE/BSE",
       "sector": "IT & Technology"
     },
     {
       "id": "NIFTYAUTO",
-      "name": "Nifty Auto",
-      "exchange": "NSE",
+      "name": "Nifty Auto / Mobility",
+      "exchange": "NSE/BSE",
       "sector": "Automobiles & Mobility"
     },
     {
       "id": "NIFTYPHARMA",
-      "name": "Nifty Pharma",
-      "exchange": "NSE",
+      "name": "Nifty Pharma & Healthcare",
+      "exchange": "NSE/BSE",
       "sector": "Pharma & Healthcare"
     },
     {
       "id": "NIFTYFMCG",
-      "name": "Nifty FMCG",
-      "exchange": "NSE",
-      "sector": "FMCG & Consumer Goods"
+      "name": "Nifty FMCG & Consumption",
+      "exchange": "NSE/BSE",
+      "sector": "FMCG & Consumer Staples"
     },
     {
       "id": "NIFTYMETAL",
-      "name": "Nifty Metal",
-      "exchange": "NSE",
-      "sector": "Metals & Mining"
+      "name": "Nifty Metal & Commodities",
+      "exchange": "NSE/BSE",
+      "sector": "Metals, Mining & Materials"
     },
     {
       "id": "NIFTYENERGY",
-      "name": "Nifty Energy",
-      "exchange": "NSE",
-      "sector": "Energy, Oil & Gas"
+      "name": "Nifty Energy, Oil & Gas",
+      "exchange": "NSE/BSE",
+      "sector": "Energy, Oil, Gas & Power"
     },
     {
-      "id": "NIFTYOILGAS",
-      "name": "Nifty Oil & Gas",
-      "exchange": "NSE",
-      "sector": "Energy, Oil & Gas"
+      "id": "NIFTYDEFENCE",
+      "name": "Nifty Defence, Infra & Cap Goods",
+      "exchange": "NSE/BSE",
+      "sector": "Industrials, Capital Goods & Defense"
     },
     {
       "id": "NIFTYREALTY",
-      "name": "Nifty Realty",
-      "exchange": "NSE",
-      "sector": "Real Estate & Infra"
-    },
-    {
-      "id": "NIFTYMEDIA",
-      "name": "Nifty Media",
-      "exchange": "NSE",
-      "sector": "Media & Entertainment"
-    },
-    {
-      "id": "NIFTYHEALTH",
-      "name": "Nifty Healthcare",
-      "exchange": "NSE",
-      "sector": "Pharma & Healthcare"
+      "name": "Nifty Realty & Construction",
+      "exchange": "NSE/BSE",
+      "sector": "Real Estate & REITs"
     }
   ],
   "us_indices": [
+    {
+      "id": "SPX",
+      "name": "S&P 500 (SPX)",
+      "exchange": "US",
+      "description": "500 Leading US Large-Cap Enterprises"
+    },
     {
       "id": "DJIA",
       "name": "Dow Jones Industrial Average (DJIA)",
@@ -126,35 +930,77 @@
     },
     {
       "id": "NDX",
-      "name": "Nasdaq 100",
+      "name": "Nasdaq-100 (NDX) & Composite",
       "exchange": "NASDAQ",
-      "description": "Top 100 Global Tech & Non-financial Giants"
+      "description": "Top 100 Global Tech & Growth Giants"
     },
     {
-      "id": "SPX",
-      "name": "S&P 500",
+      "id": "RUT",
+      "name": "Russell 2000 / 1000 / 3000",
       "exchange": "US",
-      "description": "500 Leading US Large-Cap Enterprises"
+      "description": "FTSE Russell Small & Total Cap Benchmarks"
+    },
+    {
+      "id": "SOX",
+      "name": "PHLX Semiconductor (SOX)",
+      "exchange": "NASDAQ",
+      "description": "Global Semiconductor Design & Foundry Leaders"
+    },
+    {
+      "id": "NBI",
+      "name": "Nasdaq Biotech (NBI) & Green Energy (CELS)",
+      "exchange": "NASDAQ",
+      "description": "Biotechnology & Clean Energy Sub-Indices"
     }
   ],
   "mcx_commodities": [
     {
+      "id": "MCXCOMPDEX",
+      "name": "MCX iCOMDEX Composite",
+      "category": "Composite",
+      "symbol": "MCXCOMPDEX"
+    },
+    {
+      "id": "BULLDEX",
+      "name": "MCX BULLDEX (Gold/Silver)",
+      "category": "Bullion Basket",
+      "symbol": "MCXBULLDEX"
+    },
+    {
+      "id": "METLDEX",
+      "name": "MCX METLDEX (Base Metals)",
+      "category": "Metal Basket",
+      "symbol": "MCXMETLDEX"
+    },
+    {
+      "id": "ENRGDEX",
+      "name": "MCX ENRGDEX (Crude/NatGas)",
+      "category": "Energy Basket",
+      "symbol": "ENRGDEX"
+    },
+    {
       "id": "GOLD",
-      "name": "MCX Gold (1kg / Mini)",
+      "name": "MCX Gold Index",
       "category": "Bullion",
       "symbol": "GOLD"
     },
     {
       "id": "SILVER",
-      "name": "MCX Silver (30kg / Mini)",
+      "name": "MCX Silver Index",
       "category": "Bullion",
       "symbol": "SILVER"
     },
     {
       "id": "CRUDEOIL",
-      "name": "MCX Crude Oil",
+      "name": "MCX Crude Oil Index",
       "category": "Energy",
       "symbol": "CRUDEOIL"
+    },
+    {
+      "id": "COPPER",
+      "name": "MCX Copper Index",
+      "category": "Base Metals",
+      "symbol": "COPPER"
     },
     {
       "id": "NATGAS",
@@ -163,52 +1009,10 @@
       "symbol": "NATURALGAS"
     },
     {
-      "id": "COPPER",
-      "name": "MCX Copper",
-      "category": "Base Metals",
-      "symbol": "COPPER"
-    },
-    {
       "id": "ALUMINIUM",
       "name": "MCX Aluminium",
       "category": "Base Metals",
       "symbol": "ALUMINIUM"
-    },
-    {
-      "id": "ZINC",
-      "name": "MCX Zinc",
-      "category": "Base Metals",
-      "symbol": "ZINC"
-    },
-    {
-      "id": "LEAD",
-      "name": "MCX Lead",
-      "category": "Base Metals",
-      "symbol": "LEAD"
-    },
-    {
-      "id": "NICKEL",
-      "name": "MCX Nickel",
-      "category": "Base Metals",
-      "symbol": "NICKEL"
-    },
-    {
-      "id": "MCXBULLDEX",
-      "name": "MCX Bulldex Index",
-      "category": "Indices",
-      "symbol": "MCXBULLDEX"
-    },
-    {
-      "id": "MCXMETALDEX",
-      "name": "MCX Metaldex Index",
-      "category": "Indices",
-      "symbol": "MCXMETALDEX"
-    },
-    {
-      "id": "MCXENERGY",
-      "name": "MCX Energy Index",
-      "category": "Indices",
-      "symbol": "MCXENERGY"
     }
   ]
 }

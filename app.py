@@ -1485,7 +1485,8 @@ def extract_clean_time_str(raw_ts: str, fallback_dt: Optional[datetime] = None) 
 
 def classify_news_filter(source: str, title: str) -> str:
     """
-    Classifies a news article into one of 4 discrete categories based on country and entity type:
+    Classifies a news article into discrete categories based on country, entity type, and force majeure / disaster alerts:
+    - 'disaster': Disaster management, severe weather, war & aerospace anomaly alerts (India NDMA/IMD/INCOIS, US FEMA/NOAA/USGS/DoD AARO, Global GDACS/UNDRR/WMO: Tsunami, Flooding, Cyclones, Landslides, Fire, Heavy Rain, War, Alien Intrusion/UAP)
     - 'inst_global': Sovereign/central bank/regulator outside India (FOMC, FED, SEC, CFTC, TREASURY, ECB, BOE, BOJ, IMF, OPEC, etc.)
     - 'inst_domestic': Sovereign/market regulator in India (SEBI, RBI, VRRR, LAF, REPO, MCX, NSE, BSE, FINMIN, MINISTRY, GOVT, DGFT, IFSCA, IRDAI, PFRDA, PIB)
     - 'global': Global financial media & crypto (Reuters, Bloomberg, MarketWatch, WSJ, NYT, CNBC, CoinDesk, Binance, Bitcoin, etc.)
@@ -1493,6 +1494,19 @@ def classify_news_filter(source: str, title: str) -> str:
     """
     text = (str(source) + " " + str(title)).upper()
     groups = ENTITIES_TAXONOMY.get("groups", {})
+
+    # 0. Disaster Management, Severe Weather, War & Aerospace Anomaly Catalysts (India, US & Global)
+    disaster_kw = [
+        "TSUNAMI", "FLOOD", "FLOODING", "CYCLONE", "HURRICANE", "TYPHOON", "LANDSLIDE",
+        "EARTHQUAKE", "SEISMIC", "WILDFIRE", "FOREST FIRE", "EXTREME RAIN", "CLOUDBURST",
+        "CLOUD BURST", "MONSOON ALERT", "RED ALERT", "WAR ", "WAR:", "WARFARE", "MISSILE",
+        "AIRSTRIKE", "MILITARY STRIKE", "DEFCON", "GEOPOLITICAL ESCALATION", "ALIEN",
+        "UAP", "UFO", "AEROSPACE ANOMALY", "EXTRATERRESTRIAL", "NON-HUMAN", "NDMA",
+        "IMD", "INCOIS", "FEMA", "NOAA", "USGS", "NHC", "GDACS", "UNDRR", "AARO",
+        "FORCE MAJEURE", "DISASTER MANAGEMENT", "EVACUATION", "RICHTER"
+    ]
+    if any(k in text for k in disaster_kw):
+        return "disaster"
     
     # 1. Institutional Domestic Regulators, Central Bank (RBI, VRRR, LAF) & SROs
     inst_dom_kw = groups.get("inst_domestic", {}).get("keywords", [
@@ -1607,9 +1621,9 @@ def render_news_feed_html(items: List[Dict]) -> str:
         horizon = "Medium-Term" if sentiment == "BEARISH" else "Short-Term"
 
         filter_category = classify_news_filter(source, title)
-        is_inst = filter_category in ("inst_domestic", "inst_global")
+        is_inst = filter_category in ("inst_domestic", "inst_global", "disaster")
         scope = filter_category
-        source_type = "Regulatory Document" if "SEBI" in (source + " " + title).upper() else ("Market Authority" if any(m in (source + " " + title).upper() for m in ["MCX", "NSE", "BSE"]) else "Outbound Link")
+        source_type = "Disaster / Force Majeure Alert" if filter_category == "disaster" else ("Regulatory Document" if "SEBI" in (source + " " + title).upper() else ("Market Authority" if any(m in (source + " " + title).upper() for m in ["MCX", "NSE", "BSE"]) else "Outbound Link"))
         thumb_url = it.get("image_url") or it.get("image") or it.get("thumbnail") or f"/api/news-thumb?topic={filter_category}&s={source[:8]}&title={html.escape(topic[:14])}"
         sectors = it.get("ai_sectors") or []
 
@@ -1749,6 +1763,7 @@ def render_news_feed_html(items: List[Dict]) -> str:
                     <div class="epm-news-filter-wrap">
                         <select class="epm-news-scope-select" id="epm-desk-news-filter" onchange="window.epmFilterNewsCategory(this.value)">
                             <option value="all">🌐 All News</option>
+                            <option value="disaster">🚨 Disaster, War &amp; Force Majeure Alerts (India / US / Global)</option>
                             <option value="inst_global">🏛️ Institutional News (Global)</option>
                             <option value="inst_domestic">🏛️ Institutional News (Domestic)</option>
                             <option value="local">🇮🇳 Local Market News</option>
@@ -2147,19 +2162,39 @@ def _story_attr(items: List[Dict]) -> str:
 
 
 def render_mobile_news_feed_html(pool: List[Dict]) -> str:
-    """Mobile-only progressive (tap-to-expand) news cards with an Instagram-style stories strip and institutional highlights."""
+    """Mobile-only progressive (tap-to-expand) news cards with an Instagram-style stories strip, explicit IST timestamps, and institutional/disaster highlights."""
     stories = build_story_items("news", limit=len(pool))
     rows = []
+    now_dt = now_ist()
     INSTITUTIONAL_KEYWORDS = {
         "SEBI", "RBI", "FOMC", "FED", "MCX", "NSE", "BSE", "FINMIN",
         "IFSCA", "IRDAI", "PFRDA", "SEC", "CFTC", "TREASURY", "DGFT", "MOPNG",
-        "GOVT", "MINISTRY", "CATALYST", "REGULATORY"
+        "GOVT", "MINISTRY", "CATALYST", "REGULATORY", "NDMA", "IMD", "FEMA", "NOAA", "USGS", "GDACS"
     }
     for i, it in enumerate(pool[:40]):
         sk = _sent_key(it.get("ai_sentiment"))
         title = html.escape(clean_table_text(it.get("title", "")))
         src = html.escape(clean_table_text(it.get("source", "Wire")))
-        ts = html.escape(clean_table_text(str(it.get("timestamp", ""))[:16]))
+        raw_ts = str(it.get("timestamp", "")).strip()
+        time_only = extract_clean_time_str(raw_ts, fallback_dt=now_dt - timedelta(minutes=i * 3))
+        if "IST" not in time_only.upper():
+            time_only_disp = f"{time_only} IST"
+        else:
+            time_only_disp = time_only
+
+        # Extract date portion cleanly without losing time
+        ep = parse_timestamp_to_epoch(raw_ts)
+        if ep > 0:
+            date_disp = datetime.fromtimestamp(ep, tz=IST_TZ).strftime("%a, %d %b %Y")
+        else:
+            date_disp = now_dt.strftime("%a, %d %b %Y")
+
+        ts = f"{time_only_disp} • {date_disp}"
+        time_pill_html = (
+            f'<span class="epm-mob-time-pill" style="display:inline-flex;align-items:center;gap:3px;'
+            f'background:#EFF6FF;color:#0052FF;font-weight:800;padding:1.5px 6px;border-radius:4px;'
+            f'font-size:10.5px;border:1px solid #BFDBFE;">🕒 {html.escape(time_only_disp)}</span>'
+        )
         score = it.get("ai_score", 5)
         rel = it.get("relevance", 0)
         impact = html.escape(str(it.get("ai_impact", "MEDIUM")).upper())
@@ -2172,10 +2207,16 @@ def render_mobile_news_feed_html(pool: List[Dict]) -> str:
         story_btn = f'<button type="button" class="epm-pc-story-btn" onclick="event.stopPropagation();window.epmOpenStory(\'news\',{i})">▶ Story</button>' if i < len(stories) else ""
 
         filter_cat = classify_news_filter(src, title)
-        is_inst = filter_cat in ("inst_domestic", "inst_global") or any(k in (src + " " + title).upper() for k in INSTITUTIONAL_KEYWORDS)
+        is_disaster = (filter_cat == "disaster")
+        is_inst = is_disaster or filter_cat in ("inst_domestic", "inst_global") or any(k in (src + " " + title).upper() for k in INSTITUTIONAL_KEYWORDS)
         inst_cls = "is-institutional" if is_inst else ""
-        inst_badge = f'<span class="epm-inst-chip">🏛️ {src[:12]}</span>' if is_inst else ""
-        meta_src = f'{inst_badge}<span class="epm-pc-dot"></span>{ts}' if is_inst else f'{src} · {ts}'
+        if is_disaster:
+            inst_badge = f'<span class="epm-inst-chip" style="background:#FEF2F2;color:#DC2626;border-color:#FECACA;">🚨 {src[:14]}</span>'
+        elif is_inst:
+            inst_badge = f'<span class="epm-inst-chip">🏛️ {src[:12]}</span>'
+        else:
+            inst_badge = f'<span style="font-weight:700;color:#334155;">{src[:14]}</span>'
+        meta_src = f'{inst_badge}<span class="epm-pc-dot"></span>{time_pill_html} <span style="color:#64748B;font-size:10.5px;">• {html.escape(date_disp)}</span>'
 
         thumb_url = it.get("image_url") or it.get("image") or it.get("thumbnail") or f"/api/news-thumb?topic={filter_cat}&s={src[:8]}"
         
@@ -2238,6 +2279,7 @@ def render_mobile_news_feed_html(pool: List[Dict]) -> str:
     <div class="epm-mobile-filter-bar">
         <select class="epm-news-scope-select mobile-select" id="epm-mob-news-filter" oninput="window.epmFilterNewsCategory(this.value)" onchange="window.epmFilterNewsCategory(this.value)">
             <option value="all">🌐 All News</option>
+            <option value="disaster">🚨 Disaster, War &amp; Force Majeure Alerts (India / US / Global)</option>
             <option value="inst_global">🏛️ Institutional News (Global)</option>
             <option value="inst_domestic">🏛️ Institutional News (Domestic)</option>
             <option value="local">🇮🇳 Local Market News</option>
@@ -3575,6 +3617,13 @@ INSTITUTIONAL_DIRECTORY = [
     {"name": "CNBC-TV18", "code": "CNBC-TV18", "cat": "media", "tier": "Secondary Media", "jurisdiction": "🇮🇳 India", "scope": "Indian business broadcasting network, corporate executive interviews, and market open commentary.", "url": "https://www.cnbctv18.com"},
     {"name": "The Economic Times (Times Group)", "code": "ECON-TIMES", "cat": "media", "tier": "Secondary Media", "jurisdiction": "🇮🇳 India", "scope": "Indian financial newspaper covering corporate deals, policy commentary, and sectoral movements.", "url": "https://economictimes.indiatimes.com"},
     {"name": "MarketWatch (Dow Jones)", "code": "MARKETWATCH", "cat": "media", "tier": "Secondary Media", "jurisdiction": "🇺🇸 United States", "scope": "U.S. financial media covering Wall Street trading sessions, retail investor flows, and treasury rate trends.", "url": "https://www.marketwatch.com"},
+
+    # Disaster Management, Severe Weather & Force Majeure Authorities (India, US & Global)
+    {"name": "National Disaster Management Authority (NDMA India)", "code": "NDMA", "cat": "regulator", "tier": "Tier-1 Sovereign", "jurisdiction": "🇮🇳 India", "scope": "Apex Indian statutory authority for disaster management: cyclones, floods, landslides, earthquakes, and industrial force majeure alerts.", "url": "https://ndma.gov.in"},
+    {"name": "India Meteorological Department (IMD) & INCOIS Tsunami Center", "code": "IMD", "cat": "regulator", "tier": "Tier-1 Sovereign", "jurisdiction": "🇮🇳 India", "scope": "Red-alert monsoon extremes, cyclone tracks, tsunami early warnings (INCOIS), heatwaves, and agricultural/power demand impact.", "url": "https://mausam.imd.gov.in"},
+    {"name": "Federal Emergency Management Agency (FEMA) & NOAA / NHC", "code": "FEMA", "cat": "regulator", "tier": "Tier-1 Sovereign", "jurisdiction": "🇺🇸 United States", "scope": "US federal disaster declarations, Gulf Coast hurricane shut-in alerts (NHC), severe flooding, wildfires, and energy infrastructure alerts.", "url": "https://www.fema.gov"},
+    {"name": "U.S. Geological Survey (USGS) & DoD Aerospace Anomaly Office (AARO)", "code": "USGS", "cat": "regulator", "tier": "Tier-1 Sovereign", "jurisdiction": "🇺🇸 United States", "scope": "Global seismic/earthquake monitoring, Pacific tsunami warnings, and DoD unidentified anomalous phenomena (UAP / airspace security) alerts.", "url": "https://www.usgs.gov"},
+    {"name": "Global Disaster Alert and Coordination System (GDACS / UNDRR / WMO)", "code": "GDACS", "cat": "regulator", "tier": "Supranational Authority", "jurisdiction": "🌐 Global / UN", "scope": "UN/EC global real-time alerts for tsunamis, cyclones, earthquakes, floods, volcanic eruptions, and geopolitical supply-chain disruptions.", "url": "https://www.gdacs.org"},
 ]
 
 
@@ -3587,14 +3636,19 @@ def render_stock_news_feed_html(stock_items: Optional[List[Dict]] = None, is_mob
     quick_filters = [
         ("ALL", "All Assets"),
         ("NIFTY50", "Nifty 50"),
+        ("NIFTYNEXT50", "Nifty Next 50"),
         ("NIFTY100", "Nifty 100"),
         ("NIFTY200", "Nifty 200"),
         ("NIFTY500", "Nifty 500"),
-        ("BANKNIFTY", "Bank Nifty"),
-        ("SENSEX", "Sensex"),
-        ("NDX", "Nasdaq 100"),
-        ("DJIA", "Dow Jones"),
-        ("MCX", "MCX Commodities")
+        ("BANKNIFTY", "Nifty Bank"),
+        ("FINNIFTY", "FINNIFTY"),
+        ("SENSEX", "S&P BSE SENSEX"),
+        ("SPX", "S&P 500"),
+        ("DJIA", "Dow Jones 30"),
+        ("NDX", "Nasdaq-100"),
+        ("RUT", "Russell 2000"),
+        ("SOX", "PHLX Semis (SOX)"),
+        ("MCX", "MCX iCOMDEX")
     ]
     
     pills_html = "".join(
@@ -3620,7 +3674,7 @@ def render_stock_news_feed_html(stock_items: Optional[List[Dict]] = None, is_mob
 
         index_tags = s.get("index_tags", [])
         tags_str = " ".join(index_tags)
-        tag_badges = "".join(f'<span class="epm-stock-tag">#{html.escape(t)}</span>' for t in index_tags[:4])
+        tag_badges = "".join(f'<span class="epm-stock-tag">#{html.escape(t)}</span>' for t in index_tags[:6])
         
         sent_class = "pill-bullish" if sent == "BULLISH" else ("pill-bearish" if sent == "BEARISH" else "pill-neutral")
         impact_badge = f'<span class="epm-pc-impact is-high">⚡ {impact}</span>' if impact == "HIGH" else f'<span class="epm-pc-impact">● {impact}</span>'
@@ -3660,64 +3714,116 @@ def render_stock_news_feed_html(stock_items: Optional[List[Dict]] = None, is_mob
     <div class="epm-table-header-integrated" style="margin-bottom:12px;padding:12px 14px;border-radius:12px;">
         <div class="epm-tbl-hdr-title-group" style="margin-bottom:8px;">
             <span class="epm-ribbon-bullet">●</span>
-            <span class="epm-tbl-hdr-title">MULTI-ASSET EQUITIES & COMMODITIES INTELLIGENCE</span>
-            <span class="epm-tbl-hdr-badge">NSE · BSE · MCX · NASDAQ · NYSE</span>
+            <span class="epm-tbl-hdr-title">MULTI-ASSET EQUITIES, REGULATED SECTORS & COMMODITIES INTELLIGENCE</span>
+            <span class="epm-tbl-hdr-badge">NSE · BSE · MCX iCOMDEX · S&amp;P / DJIA · RUSSELL · NASDAQ · 11 GICS</span>
         </div>
         <div class="epm-filter-chip-strip" style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;scrollbar-width:none;">
             {pills_html}
         </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(160px, 1fr));gap:8px;margin-top:6px;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(175px, 1fr));gap:8px;margin-top:6px;">
             <select id="epm-stock-market-filter" class="epm-news-scope-select" onchange="window.epmFilterStockCards()">
-                <option value="ALL">🏛️ Market: All (NSE, BSE, MCX, US)</option>
-                <option value="NSE">🇮🇳 NSE (National Stock Exchange)</option>
-                <option value="BSE">🇮🇳 BSE (Bombay Stock Exchange)</option>
-                <option value="MCX">⛽ MCX (Multi Commodity Exchange)</option>
-                <option value="NASDAQ">🇺🇸 NASDAQ</option>
-                <option value="NYSE">🇺🇸 NYSE / Dow Jones</option>
+                <option value="ALL">🏛️ Market / Regulator: All (India &amp; US)</option>
+                <option value="NSE">🇮🇳 NSE (National Stock Exchange - SEBI)</option>
+                <option value="BSE">🇮🇳 BSE (Bombay Stock Exchange - SEBI)</option>
+                <option value="MCX">⛽ MCX (Multi Commodity Exchange - iCOMDEX)</option>
+                <option value="NYSE">🇺🇸 NYSE / S&amp;P Dow Jones / FTSE Russell (SEC)</option>
+                <option value="NASDAQ">🇺🇸 NASDAQ Stock Market (SEC)</option>
+                <option value="US">🇺🇸 All US Capital Markets (NYSE + NASDAQ)</option>
             </select>
             <select id="epm-stock-index-filter" class="epm-news-scope-select" onchange="window.epmFilterStockCards()">
-                <option value="ALL">📊 Index: All Indices</option>
-                <optgroup label="NSE Broad Market Indices">
-                    <option value="NIFTY50">Nifty 50</option>
+                <option value="ALL">📊 Index / Basket: All Global Indices</option>
+                <optgroup label="🇮🇳 NSE Flagship Benchmark Indices">
+                    <option value="NIFTY50">Nifty 50 (NIFTY)</option>
+                    <option value="NIFTYNEXT50">Nifty Next 50</option>
                     <option value="NIFTY100">Nifty 100</option>
                     <option value="NIFTY200">Nifty 200</option>
                     <option value="NIFTY500">Nifty 500</option>
-                    <option value="NIFTYMID100">Nifty Midcap 100</option>
-                    <option value="NIFTYSM100">Nifty Smallcap 100</option>
+                    <option value="NIFTYMID">Nifty Midcap 50 / 100 / 150</option>
+                    <option value="NIFTYSM">Nifty Smallcap 50 / 100 / 250</option>
+                    <option value="NIFTYMICRO250">Nifty Microcap 250 &amp; Total Market</option>
                 </optgroup>
-                <optgroup label="NSE Sectoral Indices">
-                    <option value="BANKNIFTY">Bank Nifty</option>
+                <optgroup label="🇮🇳 NSE Key Sectoral Indices">
+                    <option value="BANKNIFTY">Nifty Bank (BANKNIFTY)</option>
+                    <option value="NIFTYPVTBANK">Nifty Private Bank</option>
+                    <option value="NIFTYPSUBANK">Nifty PSU Bank</option>
+                    <option value="FINNIFTY">Nifty Financial Services (FINNIFTY &amp; 25/50)</option>
                     <option value="NIFTYIT">Nifty IT</option>
                     <option value="NIFTYAUTO">Nifty Auto</option>
-                    <option value="NIFTYPHARMA">Nifty Pharma</option>
                     <option value="NIFTYFMCG">Nifty FMCG</option>
+                    <option value="NIFTYPHARMA">Nifty Pharma &amp; Nifty Healthcare</option>
                     <option value="NIFTYMETAL">Nifty Metal</option>
-                    <option value="NIFTYENERGY">Nifty Energy</option>
-                    <option value="NIFTYFIN">Nifty Financial Services</option>
+                    <option value="NIFTYREALTY">Nifty Realty</option>
+                    <option value="NIFTYENERGY">Nifty Energy &amp; Nifty Oil &amp; Gas</option>
+                    <option value="NIFTYCONSDUR">Nifty Consumer Durables &amp; Media</option>
+                    <option value="NIFTYCAPGOODS">Nifty Capital Goods, Chemicals &amp; Construction</option>
                 </optgroup>
-                <optgroup label="BSE & US Benchmark Indices">
-                    <option value="SENSEX">BSE Sensex</option>
-                    <option value="DJIA">Dow Jones (DJIA)</option>
-                    <option value="NDX">Nasdaq 100</option>
-                    <option value="SPX">S&P 500</option>
+                <optgroup label="🇮🇳 NSE Thematic &amp; Strategy Indices">
+                    <option value="NIFTYDEFENCE">Nifty India Defence &amp; Manufacturing</option>
+                    <option value="NIFTYINFRA">Nifty Infrastructure &amp; Consumption</option>
+                    <option value="NIFTYCPSE">Nifty CPSE, PSE &amp; MNC</option>
+                    <option value="NIFTYCOMMODITIES">Nifty Commodities &amp; Mobility</option>
+                    <option value="NIFTYDIVOPPS50">Nifty Strategy (Alpha 50 / Low Vol / High Beta / Div Opps)</option>
                 </optgroup>
-                <optgroup label="MCX Commodity Indices">
-                    <option value="MCXBULLDEX">MCX Bulldex (Bullion)</option>
-                    <option value="MCXMETALDEX">MCX Metaldex (Metals)</option>
-                    <option value="MCXENERGY">MCX Energy (Crude/Gas)</option>
+                <optgroup label="🇮🇳 BSE Flagship, Sectoral &amp; Thematic Indices">
+                    <option value="SENSEX">S&amp;P BSE SENSEX &amp; SENSEX 50</option>
+                    <option value="BSE500">BSE 100 / 200 / 500 / AllCap / Mid / Small</option>
+                    <option value="BANKEX">BSE Bankex &amp; BSE Finance</option>
+                    <option value="BSEIT">BSE IT &amp; BSE TECk (Tech, Media, Telecom)</option>
+                    <option value="BSECG">BSE Capital Goods, Industrials, Power &amp; Energy</option>
+                    <option value="BSEPSU">BSE Thematic (Bharat 22, PSU, CPSE, Infra, IPO)</option>
+                </optgroup>
+                <optgroup label="⛽ MCX iCOMDEX Commodity Indices &amp; Contracts">
+                    <option value="MCXCOMPDEX">MCX iCOMDEX Composite Index (MCXCOMPDEX)</option>
+                    <option value="BULLDEX">MCX iCOMDEX Bullion Index (BULLDEX)</option>
+                    <option value="METLDEX">MCX iCOMDEX Base Metal Index (METLDEX)</option>
+                    <option value="ENRGDEX">MCX iCOMDEX Energy Index (ENRGDEX)</option>
+                    <option value="GOLD">MCX Gold &amp; Silver Sub-Indices</option>
+                    <option value="CRUDEOIL">MCX Crude Oil &amp; Natural Gas</option>
+                    <option value="COPPER">MCX Copper, Aluminium, Zinc, Lead, Nickel</option>
+                </optgroup>
+                <optgroup label="🇺🇸 US Broad Market (S&amp;P Dow Jones &amp; FTSE Russell)">
+                    <option value="SPX">S&amp;P 500 (SPX / ES Futures)</option>
+                    <option value="DJIA">Dow Jones Industrial Average (DJIA / DJI)</option>
+                    <option value="SP1500">S&amp;P MidCap 400, SmallCap 600 &amp; Composite 1500</option>
+                    <option value="RUT">Russell 2000 Small-Cap (RUT / RTY) &amp; Russell 1000/3000</option>
+                </optgroup>
+                <optgroup label="🇺🇸 US 11 Official GICS Select Sector SPDRs">
+                    <option value="XLK">XLK — Information Technology</option>
+                    <option value="XLF">XLF — Financials</option>
+                    <option value="XLV">XLV — Health Care</option>
+                    <option value="XLY">XLY — Consumer Discretionary</option>
+                    <option value="XLC">XLC — Communication Services</option>
+                    <option value="XLI">XLI — Industrials</option>
+                    <option value="XLP">XLP — Consumer Staples</option>
+                    <option value="XLE">XLE — Energy</option>
+                    <option value="XLB">XLB — Materials</option>
+                    <option value="XLRE">XLRE — Real Estate</option>
+                    <option value="XLU">XLU — Utilities</option>
+                </optgroup>
+                <optgroup label="🇺🇸 Nasdaq Flagship &amp; Sector Indices">
+                    <option value="COMP">Nasdaq Composite (COMP)</option>
+                    <option value="NDX">Nasdaq-100 (NDX / NQ Futures) &amp; Next Gen 100</option>
+                    <option value="SOX">PHLX Semiconductor Sector Index (SOX)</option>
+                    <option value="NBI">Nasdaq Biotechnology Index (NBI)</option>
+                    <option value="CELS">Nasdaq Clean Edge Green Energy (CELS) &amp; Fin-100</option>
                 </optgroup>
             </select>
             <select id="epm-stock-sector-filter" class="epm-news-scope-select" onchange="window.epmFilterStockCards()">
-                <option value="ALL">🏭 Sector: All Sectors</option>
-                <option value="Banking & Financials">Banking & Financials</option>
-                <option value="IT & Technology">IT & Technology</option>
-                <option value="Automobiles & Mobility">Automobiles & Mobility</option>
-                <option value="Energy, Oil & Gas">Energy, Oil & Gas</option>
-                <option value="Metals & Mining">Metals & Mining</option>
-                <option value="Pharma & Healthcare">Pharma & Healthcare</option>
-                <option value="Commodities">Commodities</option>
+                <option value="ALL">🏭 Regulated Sector / GICS: All Sectors</option>
+                <option value="IT & Technology">💻 IT, Software &amp; Semiconductors (Nifty IT / XLK / SOX)</option>
+                <option value="Banking & Financials">🏦 Banking &amp; Financial Services (Bank Nifty / FINNIFTY / XLF)</option>
+                <option value="Pharma & Healthcare">🧬 Pharma, Biotech &amp; Healthcare (Nifty Pharma / XLV / NBI)</option>
+                <option value="Automobiles & Mobility">🚗 Automobiles, EV &amp; Mobility (Nifty Auto / XLY)</option>
+                <option value="Consumer Discretionary & Retail">🛍️ Consumer Discretionary &amp; Durables (XLY)</option>
+                <option value="FMCG & Consumer Staples">🛒 FMCG &amp; Consumer Staples (Nifty FMCG / XLP)</option>
+                <option value="Industrials, Capital Goods & Defense">🛡️ Industrials, Capital Goods, Infra &amp; Defence (XLI)</option>
+                <option value="Energy, Oil, Gas & Power">⚡ Energy, Oil, Gas &amp; Refineries (Nifty Energy / XLE / ENRGDEX)</option>
+                <option value="Metals, Mining & Materials">⛏️ Metals, Mining, Bullion &amp; Chemicals (Nifty Metal / XLB / BULLDEX)</option>
+                <option value="Communication, Media & Telecom">📡 Communication Services, Media &amp; Telecom (XLC)</option>
+                <option value="Utilities & Clean Energy">🌱 Utilities, Power Grid &amp; Clean Energy (XLU / CELS)</option>
+                <option value="Real Estate & REITs">🏢 Real Estate &amp; Data Center REITs (Nifty Realty / XLRE)</option>
             </select>
-            <input type="text" id="epm-stock-search-input" class="epm-news-scope-select" placeholder="🔍 Search Ticker, Company, Catalyst..." oninput="window.epmFilterStockCards()" />
+            <input type="text" id="epm-stock-search-input" class="epm-news-scope-select" placeholder="🔍 Search Ticker, Company, Sector, Index..." oninput="window.epmFilterStockCards()" />
         </div>
     </div>
     """
@@ -4134,38 +4240,187 @@ def render_settings_hub_html() -> str:
                 </div>
             </div>
 
-            <!-- Pane 0B: Stock & Commodity Taxonomy -->
+            <!-- Pane 0B: Stock & Commodity Taxonomy (Global Financial Markets Index Directory) -->
             <div class="epm-settings-pane" id="pane_stock_taxonomy" style="display:none;">
                 <div class="epm-card-hdr">
                     <div class="epm-card-hdr-left">
                         <span class="epm-card-hdr-icon">📈</span>
-                        <span class="epm-card-hdr-title">STOCK & COMMODITY TAXONOMY REPOSITORY</span>
+                        <span class="epm-card-hdr-title">GLOBAL INDICES, REGULATED SECTORS & COMMODITY DIRECTORY</span>
                     </div>
-                    <span class="epm-card-hdr-tag">NSE · BSE · MCX · US</span>
+                    <span class="epm-card-hdr-tag">NSE · BSE · MCX iCOMDEX · S&amp;P / DJIA · RUSSELL · NASDAQ · 11 GICS</span>
                 </div>
                 <div class="epm-segregation-banner">
-                    <span class="epm-segregation-badge">OFFICIAL CLASSIFICATION</span>
-                    <p>Categorization structure for all equities, sectoral baskets, US benchmarks, and MCX commodities.</p>
+                    <span class="epm-segregation-badge">MARKET DATA ARCHITECTURE REFERENCE</span>
+                    <p>Structured classification of flagship benchmark indices, regulated sectoral families, thematic baskets, 11 Official US GICS Sectors, and MCX iCOMDEX commodity contracts across Indian and US capital markets.</p>
                 </div>
-                <div style="margin-top:12px;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;padding:14px;">
-                    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:12px;">
+
+                <!-- 0. Quick Comparison Matrix (Matching User Reference Matrix) -->
+                <div style="margin-top:14px;background:#FFFFFF;border:1px solid #CBD5E1;border-radius:12px;padding:16px;">
+                    <div style="font-weight:800;font-size:13.5px;color:#0F172A;margin-bottom:10px;">⚡ Quick Comparison Matrix (Indian &amp; US Exchanges)</div>
+                    <div style="overflow-x:auto;">
+                        <table class="epm-dir-table" style="width:100%;font-size:12px;border-collapse:collapse;">
+                            <thead>
+                                <tr style="background:#F8FAFC;border-bottom:1px solid #CBD5E1;">
+                                    <th style="padding:9px 10px;text-align:left;">Market / Exchange</th>
+                                    <th style="padding:9px 10px;text-align:left;">Primary Benchmark</th>
+                                    <th style="padding:9px 10px;text-align:left;">Top Sectoral / Thematic Indices</th>
+                                    <th style="padding:9px 10px;text-align:left;">Common Data / Futures Symbols</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr style="border-bottom:1px solid #E2E8F0;">
+                                    <td style="padding:9px 10px;font-weight:800;color:#0F172A;">🇮🇳 NSE (India)</td>
+                                    <td style="padding:9px 10px;">Nifty 50</td>
+                                    <td style="padding:9px 10px;">Nifty Bank, Nifty IT, Nifty Auto, Nifty Fin Services (FINNIFTY)</td>
+                                    <td style="padding:9px 10px;"><code>NIFTY</code>, <code>BANKNIFTY</code>, <code>FINNIFTY</code></td>
+                                </tr>
+                                <tr style="border-bottom:1px solid #E2E8F0;">
+                                    <td style="padding:9px 10px;font-weight:800;color:#0F172A;">🇮🇳 BSE (India)</td>
+                                    <td style="padding:9px 10px;">S&amp;P BSE SENSEX</td>
+                                    <td style="padding:9px 10px;">BSE Bankex, BSE IT, BSE Capital Goods, BSE Healthcare</td>
+                                    <td style="padding:9px 10px;"><code>SENSEX</code>, <code>BANKEX</code>, <code>BSE500</code></td>
+                                </tr>
+                                <tr style="border-bottom:1px solid #E2E8F0;">
+                                    <td style="padding:9px 10px;font-weight:800;color:#0F172A;">⛽ MCX (India)</td>
+                                    <td style="padding:9px 10px;">iCOMDEX Composite</td>
+                                    <td style="padding:9px 10px;">BULLDEX (Gold/Silver), METLDEX (Base Metals), ENRGDEX</td>
+                                    <td style="padding:9px 10px;"><code>MCXCOMPDEX</code>, <code>MCXMETLDEX</code>, <code>MCXBULLDEX</code>, <code>ENRGDEX</code></td>
+                                </tr>
+                                <tr style="border-bottom:1px solid #E2E8F0;">
+                                    <td style="padding:9px 10px;font-weight:800;color:#0F172A;">🇺🇸 S&amp;P / DJIA / Russell (US)</td>
+                                    <td style="padding:9px 10px;">S&amp;P 500, Dow 30, Russell 2000</td>
+                                    <td style="padding:9px 10px;">11 GICS Select Sectors (<code>XLK</code>, <code>XLF</code>, <code>XLV</code>, <code>XLE</code>, etc.)</td>
+                                    <td style="padding:9px 10px;"><code>SPX</code>, <code>DJI</code>, <code>ES</code> (Futures), <code>RUT</code> / <code>RTY</code></td>
+                                </tr>
+                                <tr>
+                                    <td style="padding:9px 10px;font-weight:800;color:#0F172A;">🇺🇸 Nasdaq (US)</td>
+                                    <td style="padding:9px 10px;">Nasdaq Composite</td>
+                                    <td style="padding:9px 10px;">Nasdaq-100 (<code>NDX</code>), PHLX Semiconductor (<code>SOX</code>), Biotech (<code>NBI</code>)</td>
+                                    <td style="padding:9px 10px;"><code>COMP</code>, <code>NDX</code>, <code>NQ</code> (Futures), <code>SOX</code>, <code>NBI</code></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 1. Indian Capital & Commodity Markets (NSE, BSE, MCX) -->
+                <div style="margin-top:14px;background:#FFFFFF;border:1px solid #CBD5E1;border-radius:12px;padding:16px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                        <span style="font-weight:800;font-size:13.5px;color:#0052FF;">1. 🇮🇳 Indian Equity &amp; Commodity Markets (NSE • BSE • MCX — Regulated by SEBI &amp; RBI)</span>
+                        <span class="epm-tier-badge tier-sovereign">09:15–15:30 IST (Equities) • Up to 23:30 IST (MCX)</span>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:12px;">
                         <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:12px;">
-                            <b style="color:#0052FF;font-size:13px;">🇮🇳 NSE Broad Market Indices</b>
-                            <p style="font-size:12px;color:#475569;margin-top:4px;">Nifty 50, Nifty 100, Nifty 200, Nifty 500, Nifty Midcap 100, Nifty Smallcap 100.</p>
+                            <b style="color:#0052FF;font-size:12.5px;">🏛️ National Stock Exchange of India (NSE)</b>
+                            <div style="font-size:11.5px;color:#334155;margin-top:6px;line-height:1.5;">
+                                <b>• Flagship Benchmark Indices:</b> Nifty 50, Nifty Next 50, Nifty 100, Nifty 200, Nifty 500, Nifty Midcap 50, Nifty Midcap 100, Nifty Midcap 150, Nifty Smallcap 50, Nifty Smallcap 100, Nifty Smallcap 250, Nifty Microcap 250, Nifty Total Market.<br/>
+                                <b>• Key Sectoral Indices:</b> Nifty Bank, Nifty Private Bank, Nifty PSU Bank, Nifty Financial Services (FINNIFTY) &amp; 25/50, Nifty IT, Nifty Auto, Nifty FMCG, Nifty Pharma, Nifty Healthcare, Nifty Metal, Nifty Realty, Nifty Energy, Nifty Oil &amp; Gas, Nifty Consumer Durables, Nifty Media, Nifty Capital Goods, Nifty Chemicals, Nifty Construction.<br/>
+                                <b>• Thematic &amp; Strategy Indices:</b> Nifty India Consumption, Nifty Infrastructure, Nifty CPSE, Nifty PSE, Nifty MNC, Nifty India Manufacturing, Nifty India Defence, Nifty Commodities, Nifty Mobility, Nifty High Beta 50, Nifty Low Volatility 50, Nifty Alpha 50, Nifty Dividend Opportunities 50.
+                            </div>
                         </div>
                         <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:12px;">
-                            <b style="color:#059669;font-size:13px;">🏦 NSE Sectoral Indices</b>
-                            <p style="font-size:12px;color:#475569;margin-top:4px;">Bank Nifty, Nifty IT, Nifty Auto, Nifty Pharma, Nifty FMCG, Nifty Metal, Nifty Energy, Nifty Financial Services.</p>
+                            <b style="color:#059669;font-size:12.5px;">🏛️ Bombay Stock Exchange (BSE)</b>
+                            <div style="font-size:11.5px;color:#334155;margin-top:6px;line-height:1.5;">
+                                <b>• Flagship Benchmark Indices:</b> S&amp;P BSE SENSEX, SENSEX 50, BSE 100, BSE 200, BSE 500, BSE AllCap, BSE MidCap, BSE SmallCap, BSE LargeCap, BSE MicroCap.<br/>
+                                <b>• Key Sectoral Indices:</b> BSE Bankex, BSE Finance, BSE Information Technology (BSE IT), BSE TECk (Tech, Media &amp; Telecom), BSE Auto, BSE FMCG, BSE Healthcare, BSE Metal, BSE Realty, BSE Oil &amp; Gas, BSE Power, BSE Energy, BSE Capital Goods, BSE Consumer Durables, BSE Industrials, BSE Basic Materials, BSE Utilities, BSE Telecom.<br/>
+                                <b>• Thematic Indices:</b> BSE India Infrastructure, BSE PSU, BSE CPSE, BSE Bharat 22, BSE IPO, BSE SME IPO.
+                            </div>
                         </div>
                         <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:12px;">
-                            <b style="color:#D97706;font-size:13px;">⛽ MCX Commodities & Indices</b>
-                            <p style="font-size:12px;color:#475569;margin-top:4px;">Gold, Silver, Crude Oil, Natural Gas, Copper, Aluminium, Zinc, MCX Bulldex, MCX Metaldex, MCX Energy.</p>
-                        </div>
-                        <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:12px;">
-                            <b style="color:#7C3AED;font-size:13px;">🇺🇸 US Market Benchmarks</b>
-                            <p style="font-size:12px;color:#475569;margin-top:4px;">Dow Jones Industrial Average (DJIA), Nasdaq 100 (NDX), S&P 500 (SPX).</p>
+                            <b style="color:#D97706;font-size:12.5px;">⛽ Multi Commodity Exchange of India (MCX iCOMDEX Family)</b>
+                            <div style="font-size:11.5px;color:#334155;margin-top:6px;line-height:1.5;">
+                                <b>• Composite Benchmark Index:</b> MCX iCOMDEX Composite Index (<code>MCXCOMPDEX</code> — diversified energy, base metals &amp; bullion).<br/>
+                                <b>• Sectoral Commodity Indices:</b><br/>
+                                &nbsp;&nbsp;– <b>BULLDEX:</b> MCX iCOMDEX Bullion Index (Gold &amp; Silver futures).<br/>
+                                &nbsp;&nbsp;– <b>METLDEX:</b> MCX iCOMDEX Base Metal Index (Copper, Zinc, Aluminium, Lead, Nickel).<br/>
+                                &nbsp;&nbsp;– <b>ENRGDEX:</b> MCX iCOMDEX Energy Index (Crude Oil &amp; Natural Gas futures).<br/>
+                                <b>• Single Commodity Sub-Indices:</b> MCX Gold Index, MCX Silver Index, MCX Crude Oil Index, MCX Copper Index.
+                            </div>
                         </div>
                     </div>
+                </div>
+
+                <!-- 2. US Stock Markets (S&P Dow Jones, FTSE Russell & Nasdaq) -->
+                <div style="margin-top:14px;background:#FFFFFF;border:1px solid #CBD5E1;border-radius:12px;padding:16px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                        <span style="font-weight:800;font-size:13.5px;color:#7C3AED;">2. 🇺🇸 US Capital Markets &amp; Benchmarks (S&amp;P Dow Jones • FTSE Russell • Nasdaq — Regulated by SEC, Fed &amp; CFTC)</span>
+                        <span class="epm-tier-badge tier-exchange">09:30–16:00 EST • 23h Futures (ES, NQ, RTY)</span>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:12px;">
+                        <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:12px;">
+                            <b style="color:#7C3AED;font-size:12.5px;">🇺🇸 S&amp;P Dow Jones Broad Market Indices</b>
+                            <div style="font-size:11.5px;color:#334155;margin-top:6px;line-height:1.5;">
+                                <b>• S&amp;P 500 (<code>SPX</code> / <code>ES</code>):</b> 500 leading large-cap US companies.<br/>
+                                <b>• Dow Jones Industrial Average (<code>DJIA</code> / <code>DJI</code>):</b> 30 prominent blue-chip US industrial &amp; corporate leaders.<br/>
+                                <b>• S&amp;P MidCap 400 &amp; S&amp;P SmallCap 600:</b> Mid and small-cap US corporate benchmarks.<br/>
+                                <b>• S&amp;P Composite 1500:</b> Combines S&amp;P 500, MidCap 400, and SmallCap 600 (~90% of US market capitalization).
+                            </div>
+                        </div>
+                        <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:12px;">
+                            <b style="color:#0284C7;font-size:12.5px;">🇺🇸 FTSE Russell Small &amp; All-Cap Indices</b>
+                            <div style="font-size:11.5px;color:#334155;margin-top:6px;line-height:1.5;">
+                                <b>• Russell 2000 (<code>RUT</code> / <code>RTY</code> Futures):</b> Standard benchmark for US small-cap equities.<br/>
+                                <b>• Russell 1000 (<code>RUI</code>) &amp; Russell 3000 (<code>RUA</code>):</b> Large-cap and broad total US market benchmarks.<br/>
+                                <b>• Style &amp; Sub-Indices:</b> Russell 2000 Value, Russell 2000 Growth, Russell Midcap, Russell Top 200, Russell Microcap Index.
+                            </div>
+                        </div>
+                        <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:12px;">
+                            <b style="color:#0F172A;font-size:12.5px;">🇺🇸 Nasdaq Flagship &amp; Sector Sub-Indices</b>
+                            <div style="font-size:11.5px;color:#334155;margin-top:6px;line-height:1.5;">
+                                <b>• Flagship Benchmarks:</b> Nasdaq Composite (<code>COMP</code>, &gt;3,000 listed firms), Nasdaq-100 (<code>NDX</code> / <code>NQ</code>, top 100 non-financials), Nasdaq Next Generation 100 (<code>NGX</code>).<br/>
+                                <b>• Sector &amp; Sub-Market Indices:</b><br/>
+                                &nbsp;&nbsp;– <b>PHLX Semiconductor Sector Index (<code>SOX</code>):</b> Global semiconductor design &amp; fabrication.<br/>
+                                &nbsp;&nbsp;– <b>Nasdaq Biotechnology Index (<code>NBI</code>):</b> Biotech &amp; pharmaceutical companies.<br/>
+                                &nbsp;&nbsp;– <b>Nasdaq Financial-100 (<code>IXF</code>) &amp; Nasdaq Bank Index:</b> Financial &amp; commercial banking.<br/>
+                                &nbsp;&nbsp;– <b>Nasdaq Computer &amp; Telecom Indices:</b> Hardware, cloud &amp; network operators.<br/>
+                                &nbsp;&nbsp;– <b>Nasdaq Clean Edge Green Energy Index (<code>CELS</code>):</b> Solar, clean energy &amp; EV infrastructure.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. US 11 Official GICS Select Sector Reference Table -->
+                <div style="margin-top:14px;background:#FFFFFF;border:1px solid #CBD5E1;border-radius:12px;padding:16px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                        <span style="font-weight:800;font-size:13.5px;color:#0F172A;">3. 🏛️ US 11 Official GICS Select Sector Reference (Standard SPDR ETF &amp; Sub-Sector Tickers)</span>
+                        <span class="epm-tier-badge tier-sovereign">S&amp;P 500 GICS Taxonomy</span>
+                    </div>
+                    <div style="overflow-x:auto;">
+                        <table class="epm-dir-table" style="width:100%;font-size:12px;border-collapse:collapse;">
+                            <thead>
+                                <tr style="background:#F8FAFC;border-bottom:1px solid #CBD5E1;">
+                                    <th style="padding:8px 10px;text-align:left;width:24%;">GICS Sector</th>
+                                    <th style="padding:8px 10px;text-align:left;width:12%;">SPDR Ticker</th>
+                                    <th style="padding:8px 10px;text-align:left;width:64%;">Representative Industries &amp; Focus</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr style="border-bottom:1px solid #E2E8F0;"><td style="padding:8px 10px;font-weight:700;">Information Technology</td><td style="padding:8px 10px;"><code>XLK</code></td><td style="padding:8px 10px;">Enterprise software, cloud infrastructure, semiconductors, IT consulting, hardware manufacturing.</td></tr>
+                                <tr style="border-bottom:1px solid #E2E8F0;"><td style="padding:8px 10px;font-weight:700;">Financials</td><td style="padding:8px 10px;"><code>XLF</code></td><td style="padding:8px 10px;">Diversified banks, investment banking, asset management, brokerage platforms, consumer finance, insurance.</td></tr>
+                                <tr style="border-bottom:1px solid #E2E8F0;"><td style="padding:8px 10px;font-weight:700;">Health Care</td><td style="padding:8px 10px;"><code>XLV</code></td><td style="padding:8px 10px;">Pharmaceuticals, medical equipment, healthcare providers, biotechnology, life sciences tools.</td></tr>
+                                <tr style="border-bottom:1px solid #E2E8F0;"><td style="padding:8px 10px;font-weight:700;">Consumer Discretionary</td><td style="padding:8px 10px;"><code>XLY</code></td><td style="padding:8px 10px;">Automotive, retail, e-commerce platforms, hotel &amp; leisure chains, apparel, residential construction.</td></tr>
+                                <tr style="border-bottom:1px solid #E2E8F0;"><td style="padding:8px 10px;font-weight:700;">Communication Services</td><td style="padding:8px 10px;"><code>XLC</code></td><td style="padding:8px 10px;">Interactive media &amp; services, search platforms, telecommunications, cable, entertainment &amp; streaming.</td></tr>
+                                <tr style="border-bottom:1px solid #E2E8F0;"><td style="padding:8px 10px;font-weight:700;">Industrials</td><td style="padding:8px 10px;"><code>XLI</code></td><td style="padding:8px 10px;">Aerospace &amp; defense, industrial machinery, railroad transportation, freight logistics, construction engineering.</td></tr>
+                                <tr style="border-bottom:1px solid #E2E8F0;"><td style="padding:8px 10px;font-weight:700;">Consumer Staples</td><td style="padding:8px 10px;"><code>XLP</code></td><td style="padding:8px 10px;">Packaged food &amp; meats, household consumer products, hypermarkets, soft drinks, agricultural products.</td></tr>
+                                <tr style="border-bottom:1px solid #E2E8F0;"><td style="padding:8px 10px;font-weight:700;">Energy</td><td style="padding:8px 10px;"><code>XLE</code></td><td style="padding:8px 10px;">Upstream oil &amp; gas exploration, oilfield services, integrated petroleum conglomerates, pipeline transport.</td></tr>
+                                <tr style="border-bottom:1px solid #E2E8F0;"><td style="padding:8px 10px;font-weight:700;">Materials</td><td style="padding:8px 10px;"><code>XLB</code></td><td style="padding:8px 10px;">Specialty chemicals, metals &amp; mining, container packaging, construction materials, paper products.</td></tr>
+                                <tr style="border-bottom:1px solid #E2E8F0;"><td style="padding:8px 10px;font-weight:700;">Real Estate</td><td style="padding:8px 10px;"><code>XLRE</code></td><td style="padding:8px 10px;">Equity Real Estate Investment Trusts (REITs), data centers, industrial warehouses, commercial property managers.</td></tr>
+                                <tr><td style="padding:8px 10px;font-weight:700;">Utilities</td><td style="padding:8px 10px;"><code>XLU</code></td><td style="padding:8px 10px;">Electric power generation, regulated gas utilities, renewable energy infrastructure, water utilities.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 4. Disaster Management, War & Force Majeure Catalyst Surveillance (India, US & Global) -->
+                <div style="margin-top:14px;background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;padding:16px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <span style="font-weight:800;font-size:13.5px;color:#DC2626;">4. 🚨 Disaster Management, War &amp; Force Majeure Catalyst Surveillance (India • US • Global)</span>
+                        <span class="epm-tier-badge" style="background:#DC2626;color:#fff;">News Filter: disaster</span>
+                    </div>
+                    <p style="font-size:11.5px;color:#7F1D1D;margin:0 0 8px 0;line-height:1.5;">
+                        Real-time classification of high-impact market catalysts announced by <b>NDMA, IMD &amp; INCOIS (India)</b>, <b>FEMA, NOAA/NHC, USGS &amp; DoD AARO (US)</b>, and <b>GDACS, UNDRR &amp; WMO (Global)</b>:
+                        <b>Tsunami, Flooding, Cyclones/Hurricanes, Landslides, Earthquakes, Wildfires, Extreme Rain/Cloudbursts, War/Geopolitical Escalation, and Alien Intrusion / UAP Aerospace Anomalies</b>.
+                    </p>
                 </div>
             </div>
             
@@ -4638,6 +4893,84 @@ def render_settings_hub_html() -> str:
 
 
 BASELINE_BREAKING_CATALYSTS = [
+    {
+        "title": "🚨 NDMA & IMD Red Alert: Severe Cyclonic Storm & Coastal Flooding Advisory for East Coast Ports; Shipping & Logistics on High Alert",
+        "link": "https://ndma.gov.in",
+        "source": "NDMA / IMD India",
+        "image_url": "/api/news-thumb?topic=disaster&cat=disaster&s=ndma",
+        "ai_score": 9.2,
+        "ai_sentiment": "BEARISH",
+        "ai_impact": "HIGH",
+        "relevance": 95,
+        "ai_sectors": ["PORTS & SHIPPING", "INSURANCE", "POWER & INFRA"],
+        "ai_reasoning": "IMD & NDMA issue cyclone, heavy rain, and flash-flood force majeure advisories across eastern coastal logistics corridors; temporary port berth suspensions monitored.",
+        "timestamp": "Today 01:15:00 PM"
+    },
+    {
+        "title": "🚨 USGS & INCOIS Tsunami Watch: 7.4 Magnitude Subsea Earthquake Recorded in Indo-Pacific Trench; Maritime & Subsea Cable Alert",
+        "link": "https://www.usgs.gov",
+        "source": "USGS / INCOIS",
+        "image_url": "/api/news-thumb?topic=tsunami&cat=disaster&s=usgs",
+        "ai_score": 9.4,
+        "ai_sentiment": "BEARISH",
+        "ai_impact": "HIGH",
+        "relevance": 96,
+        "ai_sectors": ["REINSURANCE", "MARITIME TRADE", "SEMICONDUCTOR SUPPLY"],
+        "ai_reasoning": "Seismic event triggers precautionary tsunami buoy telemetry across Pacific and Indian Ocean rims; marine hull insurers and shipping lines activate contingency routing.",
+        "timestamp": "Today 01:08:00 PM"
+    },
+    {
+        "title": "🚨 FEMA & NOAA Hurricane / Wildfire Force Majeure Bulletin: Gulf of Mexico Offshore Oil Rigs Evacuated Amid Severe Storm & Western Fire Contained",
+        "link": "https://www.fema.gov",
+        "source": "FEMA / NOAA US",
+        "image_url": "/api/news-thumb?topic=hurricane&cat=disaster&s=fema",
+        "ai_score": 9.0,
+        "ai_sentiment": "BULLISH",
+        "ai_impact": "HIGH",
+        "relevance": 93,
+        "ai_sectors": ["CRUDE OIL", "NATURAL GAS", "US UTILITIES (XLU)"],
+        "ai_reasoning": "Precautionary shut-in of 18% of US Gulf offshore crude and natural gas production tightens prompt energy supply while western utility grid wildfire protocols activate.",
+        "timestamp": "Today 01:02:00 PM"
+    },
+    {
+        "title": "🚨 NDMA Landslide & Extreme Monsoon Cloudburst Bulletin: Himalayan Hydro-Power & National Highway Freight Corridors Under Watch",
+        "link": "https://mausam.imd.gov.in",
+        "source": "IMD / NDMA India",
+        "image_url": "/api/news-thumb?topic=landslide&cat=disaster&s=imd",
+        "ai_score": 8.4,
+        "ai_sentiment": "BEARISH",
+        "ai_impact": "HIGH",
+        "relevance": 89,
+        "ai_sectors": ["HYDRO POWER", "CEMENT & INFRA", "FMCG LOGISTICS"],
+        "ai_reasoning": "Intense rainfall and landslide alerts trigger silt-flushing protocols at northern hydro-electric dams and temporary freight rerouting.",
+        "timestamp": "Today 12:58:00 PM"
+    },
+    {
+        "title": "🚨 Global War & Geopolitical Escalation Alert (GDACS): Red Sea & Middle East Maritime Airspace Missile Advisory Drives Bullion & Defense Surge",
+        "link": "https://www.gdacs.org",
+        "source": "GDACS / Defense Wire",
+        "image_url": "/api/news-thumb?topic=war_alert&cat=disaster&s=gdacs",
+        "ai_score": 9.6,
+        "ai_sentiment": "BULLISH",
+        "ai_impact": "HIGH",
+        "relevance": 98,
+        "ai_sectors": ["DEFENCE (HAL/BA)", "MCX GOLD (BULLDEX)", "CRUDE OIL"],
+        "ai_reasoning": "Heightened military strike and war-risk insurance premiums trigger safe-haven inflows into MCX Gold, Silver, and Nifty India Defence / US Aerospace stocks.",
+        "timestamp": "Today 12:55:00 PM"
+    },
+    {
+        "title": "🚨 US DoD AARO & NORAD Aerospace Anomaly Bulletin: Unidentified Anomalous Phenomena (UAP / Alien Intrusion) High-Altitude Airspace Tracking Directive",
+        "link": "https://www.aaro.mil",
+        "source": "DoD AARO / NORAD",
+        "image_url": "/api/news-thumb?topic=uap_anomaly&cat=disaster&s=aaro",
+        "ai_score": 8.9,
+        "ai_sentiment": "BULLISH",
+        "ai_impact": "HIGH",
+        "relevance": 91,
+        "ai_sectors": ["AEROSPACE & DEFENSE (XLI)", "SATELLITE & RADAR", "CYBERSECURITY"],
+        "ai_reasoning": "Pentagon All-domain Anomaly Resolution Office (AARO) and aerospace defense command issue sensor-fusion surveillance update on high-altitude non-conventional airspace intrusion.",
+        "timestamp": "Today 12:52:00 PM"
+    },
     {
         "title": "Fed Holds Rates Steady Despite Lack of Progress on Inflation, stubborn price pressures persist",
         "link": "https://www.federalreserve.gov",
@@ -13608,21 +13941,28 @@ TERMINAL_CLIENT_JS = r"""
             return;
         }
         drawer.style.display = 'block';
-        drawer.innerHTML = '<div style="padding:12px;text-align:center;font-size:11px;color:#64748B;">⚡ Loading 5 distinct historical milestones for ' + ticker + '...</div>';
+        drawer.innerHTML = '<div style="padding:12px;text-align:center;font-size:11px;color:#64748B;">⚡ Loading 5 separate preceding historical milestones for ' + ticker + '...</div>';
         try {
+            const cardEl = drawer.closest('.epm-stock-card');
+            const primaryHeadline = cardEl && cardEl.querySelector('.epm-stock-title')
+                ? cardEl.querySelector('.epm-stock-title').innerText.trim().toUpperCase()
+                : '';
             const res = await fetch('/api/stock/' + encodeURIComponent(ticker) + '/events?limit=5');
             const data = await res.json();
-            if (data.events && data.events.length > 0) {
+            const rawEvents = (data.events || []).filter(ev => {
+                if (!ev || !ev.title) return false;
+                if (primaryHeadline && ev.title.trim().toUpperCase() === primaryHeadline) return false;
+                return true;
+            });
+            if (rawEvents.length > 0) {
                 let html = '<div class="epm-hist-timeline-box" style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:12px;margin-top:10px;">' +
                     '<div class="epm-hist-hdr" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid #E2E8F0;">' +
-                        '<span style="font-weight:800;font-size:12px;color:#0F172A;">📜 ' + ticker + ' · Verified 5-Event Chronological Catalyst History</span>' +
+                        '<span style="font-weight:800;font-size:12px;color:#0F172A;">📜 ' + ticker + ' · 5 Separate Preceding Historical Milestones (Excluding Card Headline)</span>' +
                         '<button type="button" onclick="window.epmCloseStockHistory(\'' + ticker + '\')" style="background:#FFFFFF;border:1px solid #CBD5E1;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:11px;color:#475569;font-weight:700;">✕ Close</button>' +
                     '</div>';
-                data.events.forEach((ev, idx) => {
-                    const badge = idx === 0 
-                        ? '<span class="epm-stock-tag" style="background:#FEF2F2;color:#DC2626;font-weight:800;border:1px solid #FECACA;">🔴 Latest Catalyst</span>' 
-                        : '<span class="epm-stock-tag" style="background:#F0FDF4;color:#16A34A;font-weight:700;border:1px solid #BBF7D0;">⏱️ Preceding Milestone #' + (idx + 1) + '</span>';
-                    html += '<div class="epm-hist-item" style="border-left: 2px solid ' + (idx === 0 ? '#DC2626' : '#94A3B8') + '; padding-left: 10px; margin-bottom: 10px;">' +
+                rawEvents.slice(0, 5).forEach((ev, idx) => {
+                    const badge = '<span class="epm-stock-tag" style="background:#F0FDF4;color:#16A34A;font-weight:700;border:1px solid #BBF7D0;">⏱️ Preceding Milestone #' + (idx + 1) + '</span>';
+                    html += '<div class="epm-hist-item" style="border-left: 2px solid #0052FF; padding-left: 10px; margin-bottom: 10px;">' +
                         '<div class="epm-hist-ts" style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">' +
                             badge +
                             '<span style="color:#64748B;font-size:10px;">⏱️ ' + ev.timestamp + ' · 🏛️ ' + ev.source + '</span>' +
@@ -13651,18 +13991,20 @@ TERMINAL_CLIENT_JS = r"""
         });
         const indexSel = document.getElementById('epm-stock-index-filter');
         const mktSel = document.getElementById('epm-stock-market-filter');
+        const secSel = document.getElementById('epm-stock-sector-filter');
+        if (secSel) secSel.value = 'ALL';
         if (filterVal === 'MCX') {
             if (mktSel) mktSel.value = 'MCX';
             if (indexSel) indexSel.value = 'ALL';
         } else if (filterVal === 'ALL') {
             if (mktSel) mktSel.value = 'ALL';
             if (indexSel) indexSel.value = 'ALL';
-        } else if (filterVal === 'DJIA') {
+        } else if (filterVal === 'DJIA' || filterVal === 'SPX' || filterVal === 'RUT') {
             if (mktSel) mktSel.value = 'NYSE';
-            if (indexSel) indexSel.value = 'DJIA';
-        } else if (filterVal === 'NDX') {
+            if (indexSel) indexSel.value = filterVal;
+        } else if (filterVal === 'NDX' || filterVal === 'SOX') {
             if (mktSel) mktSel.value = 'NASDAQ';
-            if (indexSel) indexSel.value = 'NDX';
+            if (indexSel) indexSel.value = filterVal;
         } else {
             if (mktSel) mktSel.value = 'ALL';
             if (indexSel) indexSel.value = filterVal;
@@ -13686,17 +14028,23 @@ TERMINAL_CLIENT_JS = r"""
             let match = true;
             if (mkt !== 'ALL') {
                 if (mkt === 'NYSE') {
-                    if (cardMkt !== 'NYSE' && cardMkt !== 'US' && !cardTags.includes('DJIA') && !cardTags.includes('SPX')) match = false;
+                    if (cardMkt !== 'NYSE' && cardMkt !== 'US' && !cardTags.includes('DJIA') && !cardTags.includes('SPX') && !cardTags.includes('RUT')) match = false;
                 } else if (mkt === 'NASDAQ') {
-                    if (cardMkt !== 'NASDAQ' && cardMkt !== 'US' && !cardTags.includes('NDX')) match = false;
+                    if (cardMkt !== 'NASDAQ' && cardMkt !== 'US' && !cardTags.includes('NDX') && !cardTags.includes('COMP') && !cardTags.includes('SOX') && !cardTags.includes('NBI')) match = false;
                 } else if (mkt === 'US') {
-                    if (cardMkt !== 'NYSE' && cardMkt !== 'NASDAQ' && cardMkt !== 'US' && !cardTags.includes('DJIA') && !cardTags.includes('NDX') && !cardTags.includes('SPX')) match = false;
+                    if (cardMkt !== 'NYSE' && cardMkt !== 'NASDAQ' && cardMkt !== 'US' && !cardTags.includes('DJIA') && !cardTags.includes('NDX') && !cardTags.includes('SPX') && !cardTags.includes('RUT')) match = false;
+                } else if (mkt === 'BSE') {
+                    if (cardMkt !== 'BSE' && cardMkt !== 'NSE' && !cardTags.includes('SENSEX') && !cardTags.includes('BSE')) match = false;
                 } else if (cardMkt !== mkt) {
                     match = false;
                 }
             }
-            if (idx !== 'ALL' && !cardTags.includes(idx)) match = false;
-            if (sec !== 'ALL' && cardSec !== sec) match = false;
+            if (idx !== 'ALL') {
+                if (!cardTags.includes(idx) && !(idx.startsWith('NIFTY') && cardMkt === 'NSE' && cardTags.includes('NIFTY500')) && !(idx.startsWith('BSE') && cardTags.includes('SENSEX'))) {
+                    match = false;
+                }
+            }
+            if (sec !== 'ALL' && !cardSec.includes(sec) && !sec.includes(cardSec)) match = false;
             if (q && !cardText.includes(q) && !cardTicker.includes(q)) match = false;
 
             card.style.display = match ? 'block' : 'none';
