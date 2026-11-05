@@ -1706,7 +1706,8 @@ def render_news_feed_html(items: List[Dict]) -> str:
                     <div class="epm-chron-headline">{html.escape(it['title'])}</div>
                 </div>
                 <div class="epm-chron-actions">
-                    <a href="{html.escape(it['link'])}" target="_blank" rel="noopener" class="epm-chron-analyze-btn" style="text-decoration:none;background:#EFF6FF;color:#0052FF;border-color:#BFDBFE;font-weight:700;" title="Source: {html.escape(it['source'])}" onclick="event.stopPropagation()">
+                    <span class="epm-chron-src-pill" style="font-size:11px;font-weight:700;color:#334155;background:#F8FAFC;border:1px solid #CBD5E1;padding:3px 8px;border-radius:6px;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;">🏛️ {html.escape(it['source'])}</span>
+                    <a href="{html.escape(it['link'])}" target="_blank" rel="noopener" class="epm-chron-analyze-btn" style="text-decoration:none;background:#EFF6FF;color:#0052FF;border-color:#BFDBFE;font-weight:700;" title="Open Original Source: {html.escape(it['source'])}" onclick="event.stopPropagation()">
                         Source ↗
                     </a>
                     <button type="button" class="epm-chron-analyze-btn" onclick="event.stopPropagation(); window.epmToggleDeskRowExpand({i})">
@@ -1737,6 +1738,7 @@ def render_news_feed_html(items: List[Dict]) -> str:
                         {f'<div class="epm-inline-ai-block"><span class="epm-inline-ai-label">AI REASONING & TAKEAWAYS</span><ul class="epm-inline-ai-list">{bullets_html}</ul></div>' if bullets_html else ''}
                     </div>
                     <div class="epm-inline-card-ftr">
+                        <span style="font-size:11px;font-weight:700;color:#334155;background:#F8FAFC;border:1px solid #CBD5E1;padding:3px 8px;border-radius:5px;">🏛️ {html.escape(it['source'])}</span>
                         <a href="{html.escape(it['link'])}" target="_blank" rel="noopener" class="epm-inline-src-link" onclick="event.stopPropagation()">
                             Source ↗
                         </a>
@@ -2341,7 +2343,10 @@ def render_mobile_news_feed_html(pool: List[Dict]) -> str:
                 <div class="epm-pc-actions">
                     <span class="epm-pc-sent">{sk.upper()}</span>
                     {story_btn}
-                    <a class="epm-pc-link" href="{link}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Source ↗</a>
+                    <span style="display:inline-flex;align-items:center;gap:6px;margin-left:auto;">
+                        <span style="font-size:10.5px;font-weight:700;color:#334155;background:#F8FAFC;border:1px solid #CBD5E1;padding:2px 6px;border-radius:4px;">🏛️ {src[:18]}</span>
+                        <a class="epm-pc-link" href="{link}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="margin-left:0;">Source ↗</a>
+                    </span>
                 </div>
             </div>
         </div>""")
