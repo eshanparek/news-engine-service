@@ -1989,6 +1989,42 @@ def build_story_items(kind: str = "news", limit: int = 100) -> List[Dict]:
                 "link": "",
                 "image_url": f"/api/holiday-thumb/{d}?title={urllib.parse.quote(desc)}",
             })
+    elif kind == "stocks":
+        try:
+            st_items = stock_engine.fetch_latest_stock_cards()[:limit]
+        except Exception:
+            st_items = []
+        for st in st_items:
+            tk = clean_table_text(str(st.get("ticker", "STK")))
+            co = clean_table_text(str(st.get("company", tk)))
+            exch = clean_table_text(str(st.get("exchange", "NSE")))
+            sec = clean_table_text(str(st.get("sector", "Equities")))
+            sent = str(st.get("sentiment", "NEUTRAL")).upper()
+            imp = str(st.get("impact", "HIGH")).upper()
+            summ = clean_table_text(str(st.get("summary", "")))
+            out.append({
+                "kind": "stocks",
+                "title": f"{tk}: {clean_table_text(str(st.get('title', '')))}",
+                "emblem": tk[:10],
+                "tag": f"{exch} · {sec}",
+                "sentiment": sent,
+                "score": 9.0 if imp == "HIGH" else 7.8,
+                "metric1": tk,
+                "metric1_label": "Ticker",
+                "metric2": exch,
+                "metric2_label": "Exchange",
+                "impact": f"{imp.title()} Filing Catalyst",
+                "bullets": [
+                    summ or f"Corporate disclosure filed by {co} ({tk}) on {exch}.",
+                    f"Sector Classification: {sec}.",
+                    f"Disclosure Type: {clean_table_text(str(st.get('disclosure_type', 'FILING')).replace('_', ' '))}."
+                ],
+                "takeaway": f"Monitor institutional volume and price discovery in {tk} ({co}) across {exch} order books.",
+                "source": exch,
+                "time": clean_table_text(str(st.get("timestamp", ""))[:16]) or now_str,
+                "link": st.get("filing_url", "#"),
+                "image_url": f"/api/news-thumb?topic={urllib.parse.quote(tk)}&cat=local&s={urllib.parse.quote(exch.lower())}",
+            })
     else:
         for it in get_merged_news_pool()[:limit]:
             sectors = it.get("ai_sectors") or []
@@ -2171,7 +2207,29 @@ def render_story_strip_html(stories: List[Dict], kind: str, is_desktop: bool = F
             f'  </div>'
             f'</div>'
         )
-    return f'<div class="{cls}" translate="no" data-auto-center="true">{"".join(thumbs)}</div>'
+    page_titles = {
+        "news": "📰 Live Breaking News Stories",
+        "calendar": "📅 Market Outlook Catalyst Stories",
+        "stocks": "📈 Stock & Commodity Filing Stories",
+        "circulars": "🏛️ Regulatory Directive Stories",
+        "holidays": "🏖️ 2026 Market Holiday Stories",
+    }
+    hdr_lbl = page_titles.get(kind, "📸 Visual Stories")
+    story_data_attr = f'data-stories-{kind}="{_story_attr(stories)}"'
+    return (
+        f'<div class="epm-story-section-wrap" data-story-wrap="{kind}">'
+        f'  <div class="epm-story-strip-ctrl-bar" data-story-ctrl="{kind}">'
+        f'    <div class="epm-story-ctrl-left">'
+        f'      <span class="epm-story-ctrl-title">{hdr_lbl}</span>'
+        f'    </div>'
+        f'    <button type="button" class="epm-story-inline-toggle is-on" data-story-btn="{kind}" onclick="window.epmTogglePageStories(\'{kind}\')" title="Turn Visual Stories On or Off for this page">'
+        f'      <span class="epm-story-toggle-dot"></span>'
+        f'      <span class="epm-story-toggle-lbl">Stories: ON</span>'
+        f'    </button>'
+        f'  </div>'
+        f'  <div class="{cls}" translate="no" data-auto-center="true" data-story-page="{kind}" {story_data_attr}>{"".join(thumbs)}</div>'
+        f'</div>'
+    )
 
 
 def _story_attr(items: List[Dict]) -> str:
@@ -3573,8 +3631,11 @@ def render_desktop_holidays_html(holidays: List[Dict]) -> str:
         </div>
         ''')
 
+    hol_stories = build_story_items("holidays", limit=len(holidays))
+    desktop_hol_stories_strip = render_story_strip_html(hol_stories, "holidays", is_desktop=True)
     return f'''
-    <div class="epm-hol-desktop-container">
+    <div class="epm-hol-desktop-container" data-stories-holidays="{_story_attr(hol_stories)}">
+        {desktop_hol_stories_strip}
         <div class="epm-hol-header-strip" style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:#FFFFFF;border:1px solid #E2E8F0;border-radius:12px;margin-bottom:12px;flex-wrap:wrap;gap:12px;">
             <div class="epm-hol-title-wrap">
                 <span class="epm-hol-title" style="font-size:14px;font-weight:800;color:#0F172A;">2026 AUTHORITATIVE TRADING HOLIDAYS & CLOSURES</span>
@@ -3867,9 +3928,12 @@ def render_stock_news_feed_html(stock_items: Optional[List[Dict]] = None, is_mob
     </div>
     """
 
+    stock_stories = build_story_items("stocks", limit=18)
+    stock_stories_strip = render_story_strip_html(stock_stories, "stocks", is_desktop=not is_mobile)
     disclaimer = render_site_disclaimer_html(is_mobile=is_mobile)
     return f"""
-    <div class="epm-stock-workspace">
+    <div class="epm-stock-workspace" data-stories-stocks="{_story_attr(stock_stories)}">
+        {stock_stories_strip}
         {filter_bar_html}
         <div class="epm-stock-grid" id="epm-stock-grid-container">
             {"".join(cards_html)}
@@ -6007,6 +6071,103 @@ CUSTOM_CSS = """
 body { top: 0px !important; }
 .goog-te-banner-frame.skiptranslate { display: none !important; }
 .notranslate { translate: no; }
+
+/* Per-Page & Global Visual Stories On/Off Toggle Controls (Desktop & Mobile) */
+.epm-story-section-wrap {
+    margin-bottom: 6px;
+}
+.epm-story-strip-ctrl-bar {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 4px 8px !important;
+    margin-bottom: 4px !important;
+    background: #F8FAFC !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 8px !important;
+}
+.epm-story-ctrl-title {
+    font-size: 11px !important;
+    font-weight: 800 !important;
+    color: #334155 !important;
+    letter-spacing: 0.02em !important;
+}
+.epm-story-inline-toggle {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    padding: 3px 9px !important;
+    border-radius: 999px !important;
+    font-size: 10.5px !important;
+    font-weight: 700 !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
+    background: #DCFCE7 !important;
+    color: #166534 !important;
+    border: 1px solid #86EFAC !important;
+}
+.epm-story-inline-toggle .epm-story-toggle-dot {
+    width: 6px !important;
+    height: 6px !important;
+    border-radius: 50% !important;
+    background: #16A34A !important;
+    display: inline-block !important;
+}
+.epm-story-inline-toggle.is-off {
+    background: #F1F5F9 !important;
+    color: #64748B !important;
+    border-color: #CBD5E1 !important;
+}
+.epm-story-inline-toggle.is-off .epm-story-toggle-dot {
+    background: #94A3B8 !important;
+}
+.epm-side-story-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 6px !important;
+    margin-top: 8px !important;
+}
+.epm-side-story-pill {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 5px 8px !important;
+    border-radius: 6px !important;
+    font-size: 10.5px !important;
+    font-weight: 700 !important;
+    background: #FFFFFF !important;
+    border: 1px solid #CBD5E1 !important;
+    color: #0F172A !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
+}
+.epm-side-story-pill.is-on {
+    background: #F0FDF4 !important;
+    border-color: #86EFAC !important;
+    color: #166534 !important;
+}
+.epm-side-story-pill.is-off {
+    background: #F8FAFC !important;
+    border-color: #E2E8F0 !important;
+    color: #64748B !important;
+}
+
+/* Instant Zero-Flicker Hide Rules per Page on Both Desktop & Mobile */
+body.epm-hide-stories-all .epm-story-strip,
+body.epm-hide-stories-news .epm-story-strip[data-story-page="news"],
+body.epm-hide-stories-calendar .epm-story-strip[data-story-page="calendar"],
+body.epm-hide-stories-stocks .epm-story-strip[data-story-page="stocks"],
+body.epm-hide-stories-circulars .epm-story-strip[data-story-page="circulars"],
+body.epm-hide-stories-holidays .epm-story-strip[data-story-page="holidays"] {
+    display: none !important;
+}
+body.epm-hide-stories-all .epm-pc-story-btn,
+body.epm-hide-stories-news #mobile_news_feed .epm-pc-story-btn,
+body.epm-hide-stories-calendar #mobile_cal_feed .epm-pc-story-btn,
+body.epm-hide-stories-circulars #mobile_circ_feed .epm-pc-story-btn,
+body.epm-hide-stories-holidays #mobile_holidays_feed .epm-pc-story-btn {
+    display: none !important;
+}
 
 
 /* Stock 5-Event History Drawer */
@@ -11675,7 +11836,7 @@ TOP_NAVBAR_HTML = f"""
         </div>
 
         <div class="epm-side-section-label">SYSTEM & AUDIO CONTROLS</div>
-        <div class="epm-side-audio-card" onclick="window.epmToggleAudio()" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;margin-bottom:12px;cursor:pointer;">
+        <div class="epm-side-audio-card" onclick="window.epmToggleAudio()" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;margin-bottom:10px;cursor:pointer;">
             <div style="display:flex;align-items:center;gap:10px;">
                 <span style="font-size:18px;">🔔</span>
                 <div>
@@ -11684,6 +11845,44 @@ TOP_NAVBAR_HTML = f"""
                 </div>
             </div>
             <span id="epm-side-audio-status" class="epm-side-audio-badge" style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;background:#DCFCE7;color:#166534;border:1px solid #86EFAC;">Audio ON</span>
+        </div>
+
+        <div class="epm-side-stories-ctrl-card" style="padding:10px 12px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;margin-bottom:12px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="window.epmTogglePageStories('all')">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span style="font-size:16px;">📸</span>
+                    <div>
+                        <div style="font-weight:700;font-size:12px;color:#0F172A;">Page Visual Stories</div>
+                        <div style="font-size:10px;color:#64748B;">Toggle stories strip per page or all</div>
+                    </div>
+                </div>
+                <button type="button" id="epm-side-story-master-btn" class="epm-story-inline-toggle is-on" data-story-btn="all" onclick="event.stopPropagation();window.epmTogglePageStories('all')">
+                    <span class="epm-story-toggle-dot"></span>
+                    <span class="epm-story-toggle-lbl">All: ON</span>
+                </button>
+            </div>
+            <div class="epm-side-story-grid">
+                <button type="button" class="epm-side-story-pill is-on" data-story-side-pill="news" onclick="window.epmTogglePageStories('news')">
+                    <span>📰 News</span>
+                    <span class="epm-pill-st">ON</span>
+                </button>
+                <button type="button" class="epm-side-story-pill is-on" data-story-side-pill="calendar" onclick="window.epmTogglePageStories('calendar')">
+                    <span>📅 Calendar</span>
+                    <span class="epm-pill-st">ON</span>
+                </button>
+                <button type="button" class="epm-side-story-pill is-on" data-story-side-pill="stocks" onclick="window.epmTogglePageStories('stocks')">
+                    <span>📈 Stocks</span>
+                    <span class="epm-pill-st">ON</span>
+                </button>
+                <button type="button" class="epm-side-story-pill is-on" data-story-side-pill="circulars" onclick="window.epmTogglePageStories('circulars')">
+                    <span>🏛️ Circulars</span>
+                    <span class="epm-pill-st">ON</span>
+                </button>
+                <button type="button" class="epm-side-story-pill is-on" data-story-side-pill="holidays" onclick="window.epmTogglePageStories('holidays')" style="grid-column: span 2;">
+                    <span>🏖️ Trading Holidays Page</span>
+                    <span class="epm-pill-st">ON</span>
+                </button>
+            </div>
         </div>
 
         <div class="epm-side-section-label">COMMUNITY & SOCIAL CHANNELS</div>
@@ -12242,6 +12441,7 @@ TERMINAL_CLIENT_JS = r"""
             window._epmTerminalInitialized = true;
         }
         epmUpdateAudioUI();
+        if (window.epmSyncStoriesVisibilityUI) window.epmSyncStoriesVisibilityUI();
         updateISTClock();
         syncTelemetryFromStatusBox();
         initTerminalStream();
@@ -13984,6 +14184,86 @@ TERMINAL_CLIENT_JS = r"""
         window.epmApplyHolidayFilters();
     };
 
+    // ═══ Per-Page & Master Visual Stories On/Off Toggle Controller (Mobile & Desktop) ═══
+    const EPM_STORY_PAGES = ['news', 'calendar', 'stocks', 'circulars', 'holidays'];
+
+    window.epmIsPageStoryEnabled = function(kind) {
+        if (localStorage.getItem('epm_stories_vis_all') === 'off') return false;
+        return localStorage.getItem('epm_stories_vis_' + kind) !== 'off';
+    };
+
+    window.epmSyncStoriesVisibilityUI = function() {
+        const masterOff = localStorage.getItem('epm_stories_vis_all') === 'off';
+        if (masterOff) {
+            document.body.classList.add('epm-hide-stories-all');
+        } else {
+            document.body.classList.remove('epm-hide-stories-all');
+        }
+
+        let anyOn = false;
+        EPM_STORY_PAGES.forEach(k => {
+            const isOn = !masterOff && (localStorage.getItem('epm_stories_vis_' + k) !== 'off');
+            if (isOn) {
+                anyOn = true;
+                document.body.classList.remove('epm-hide-stories-' + k);
+            } else {
+                document.body.classList.add('epm-hide-stories-' + k);
+            }
+
+            // Update inline buttons on pages
+            document.querySelectorAll(`.epm-story-inline-toggle[data-story-btn="${k}"]`).forEach(btn => {
+                btn.classList.toggle('is-on', isOn);
+                btn.classList.toggle('is-off', !isOn);
+                const lbl = btn.querySelector('.epm-story-toggle-lbl');
+                if (lbl) lbl.textContent = isOn ? 'Stories: ON' : 'Stories: OFF';
+            });
+
+            // Update side menu pills
+            document.querySelectorAll(`.epm-side-story-pill[data-story-side-pill="${k}"]`).forEach(pill => {
+                pill.classList.toggle('is-on', isOn);
+                pill.classList.toggle('is-off', !isOn);
+                const st = pill.querySelector('.epm-pill-st');
+                if (st) st.textContent = isOn ? 'ON' : 'OFF';
+            });
+        });
+
+        // Update master toggle button in side menu
+        const masterBtns = document.querySelectorAll('.epm-story-inline-toggle[data-story-btn="all"], #epm-side-story-master-btn');
+        masterBtns.forEach(mBtn => {
+            const masterActive = !masterOff && anyOn;
+            mBtn.classList.toggle('is-on', masterActive);
+            mBtn.classList.toggle('is-off', !masterActive);
+            const lbl = mBtn.querySelector('.epm-story-toggle-lbl');
+            if (lbl) lbl.textContent = masterActive ? 'All: ON' : 'All: OFF';
+        });
+    };
+
+    window.epmTogglePageStories = function(kind) {
+        const k = String(kind || 'all').toLowerCase();
+        if (k === 'all') {
+            const curMasterOff = localStorage.getItem('epm_stories_vis_all') === 'off';
+            const nextState = curMasterOff ? 'on' : 'off';
+            localStorage.setItem('epm_stories_vis_all', nextState);
+            if (nextState === 'on') {
+                EPM_STORY_PAGES.forEach(p => localStorage.setItem('epm_stories_vis_' + p, 'on'));
+            }
+        } else {
+            // If master was off and user turns a specific page on, un-off master and set other pages explicitly
+            if (localStorage.getItem('epm_stories_vis_all') === 'off') {
+                localStorage.setItem('epm_stories_vis_all', 'on');
+                EPM_STORY_PAGES.forEach(p => {
+                    if (p !== k) localStorage.setItem('epm_stories_vis_' + p, 'off');
+                });
+                localStorage.setItem('epm_stories_vis_' + k, 'on');
+            } else {
+                const cur = localStorage.getItem('epm_stories_vis_' + k) !== 'off';
+                localStorage.setItem('epm_stories_vis_' + k, cur ? 'off' : 'on');
+            }
+        }
+        window.epmSyncStoriesVisibilityUI();
+    };
+    setInterval(window.epmSyncStoriesVisibilityUI, 1000);
+
     // ═══ Horizontal Story Timeline Auto-Centering & Scroll ═══
     window.epmScrollStoryStripToStart = function(btn) {
         if (!btn) return;
@@ -15262,9 +15542,43 @@ with gr.Blocks(
                 <div class="epm-card-hdr">
                     <div class="epm-card-hdr-left">
                         <span class="epm-card-hdr-icon">📸</span>
-                        <span class="epm-card-hdr-title">INSTAGRAM SWIPEABLE STORIES FLASHCARD PUBLISHER</span>
+                        <span class="epm-card-hdr-title">VISUAL STORIES DISPLAY &amp; FLASHCARD PUBLISHER</span>
                     </div>
-                    <span class="epm-card-hdr-tag">1080×1920 Story Frames</span>
+                    <span class="epm-card-hdr-tag">Desktop &amp; Mobile Stories Control</span>
+                </div>
+                <div style="padding:12px 14px;background:#F8FAFC;border:1px solid #CBD5E1;border-radius:10px;margin-bottom:14px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+                        <div>
+                            <div style="font-weight:800;font-size:13px;color:#0F172A;">📸 Page-by-Page Visual Stories Strip Visibility (Mobile &amp; Desktop)</div>
+                            <div style="font-size:11.5px;color:#64748B;">Turn the horizontal Visual Stories strip ON or OFF across all pages or individually per workspace page.</div>
+                        </div>
+                        <button type="button" class="epm-story-inline-toggle is-on" data-story-btn="all" onclick="window.epmTogglePageStories('all')" style="padding:5px 12px !important;font-size:11.5px !important;">
+                            <span class="epm-story-toggle-dot"></span>
+                            <span class="epm-story-toggle-lbl">All: ON</span>
+                        </button>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));gap:8px;">
+                        <button type="button" class="epm-side-story-pill is-on" data-story-side-pill="news" onclick="window.epmTogglePageStories('news')">
+                            <span>📰 Live News Page</span>
+                            <span class="epm-pill-st">ON</span>
+                        </button>
+                        <button type="button" class="epm-side-story-pill is-on" data-story-side-pill="calendar" onclick="window.epmTogglePageStories('calendar')">
+                            <span>📅 Market Outlook</span>
+                            <span class="epm-pill-st">ON</span>
+                        </button>
+                        <button type="button" class="epm-side-story-pill is-on" data-story-side-pill="stocks" onclick="window.epmTogglePageStories('stocks')">
+                            <span>📈 Stock News Page</span>
+                            <span class="epm-pill-st">ON</span>
+                        </button>
+                        <button type="button" class="epm-side-story-pill is-on" data-story-side-pill="circulars" onclick="window.epmTogglePageStories('circulars')">
+                            <span>🏛️ Circulars Page</span>
+                            <span class="epm-pill-st">ON</span>
+                        </button>
+                        <button type="button" class="epm-side-story-pill is-on" data-story-side-pill="holidays" onclick="window.epmTogglePageStories('holidays')">
+                            <span>🏖️ Holidays Page</span>
+                            <span class="epm-pill-st">ON</span>
+                        </button>
+                    </div>
                 </div>
                 <div style="font-size:12px; color:#64748B; margin-bottom:12px;">
                     Publishes a sequence of 1080×1920 story flashcards (one catalyst per frame) to the connected Instagram Business/Creator account. Followers swipe through them as one continuous story.
@@ -15453,7 +15767,7 @@ app = gr.mount_gradio_app(
         '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
         '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">'
         f"<style>{CUSTOM_CSS}</style>"
-        '<script src="/api/terminal-client.js?v=20261105_v38"></script>'
+        '<script src="/api/terminal-client.js?v=20261105_v39"></script>'
     ),
     js=TERMINAL_CLIENT_JS
 )
