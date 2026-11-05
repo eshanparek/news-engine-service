@@ -1698,20 +1698,17 @@ def render_news_feed_html(items: List[Dict]) -> str:
         return f'''
         <div class="epm-chron-item-group" id="epm-chron-group-{i}" data-scope="{it['scope']}">
             <div class="epm-chron-row {'is-institutional' if is_inst else ''}" data-idx="{i}" data-scope="{it['scope']}" onclick="window.epmToggleDeskRowExpand({i})">
-                <div class="epm-chron-left-rail">
+                <div class="epm-chron-left-rail" style="min-width:98px;max-width:110px;">
                     <span class="epm-chron-time">{it['time_str']}</span>
                     <span class="epm-chron-dot {dot_class}"></span>
-                    <div class="epm-chron-source-box">
-                        <a href="{html.escape(it['link'])}" target="_blank" rel="noopener" class="epm-chron-source-name" onclick="event.stopPropagation()">
-                            {html.escape(it['source'])} ↗
-                        </a>
-                        <span class="epm-chron-source-type">{html.escape(it['source_type'])}</span>
-                    </div>
                 </div>
                 <div class="epm-chron-content">
                     <div class="epm-chron-headline">{html.escape(it['title'])}</div>
                 </div>
                 <div class="epm-chron-actions">
+                    <a href="{html.escape(it['link'])}" target="_blank" rel="noopener" class="epm-chron-analyze-btn" style="text-decoration:none;background:#EFF6FF;color:#0052FF;border-color:#BFDBFE;font-weight:700;" title="Source: {html.escape(it['source'])}" onclick="event.stopPropagation()">
+                        Source ↗
+                    </a>
                     <button type="button" class="epm-chron-analyze-btn" onclick="event.stopPropagation(); window.epmToggleDeskRowExpand({i})">
                         Analyze Impact ✧
                     </button>
@@ -1727,6 +1724,7 @@ def render_news_feed_html(items: List[Dict]) -> str:
                             <span class="epm-inline-impact-pill sent-{s_class}">● {it['sentiment']}</span>
                             <span class="epm-inline-score-badge">Impact: {it['score']}/10 ({it['impact']})</span>
                             <span class="epm-inline-horizon-badge">Horizon: {it['horizon']}</span>
+                            <span class="epm-inline-sec-badge">🏛️ {html.escape(it['source'])}</span>
                             {f'<span class="epm-inline-sec-badge">{html.escape(sec_chip)}</span>' if sec_chip else ''}
                         </div>
                         <button type="button" class="epm-inline-collapse-btn" onclick="event.stopPropagation(); window.epmToggleDeskRowExpand({i})" title="Collapse details">▲ Collapse</button>
@@ -1740,7 +1738,7 @@ def render_news_feed_html(items: List[Dict]) -> str:
                     </div>
                     <div class="epm-inline-card-ftr">
                         <a href="{html.escape(it['link'])}" target="_blank" rel="noopener" class="epm-inline-src-link" onclick="event.stopPropagation()">
-                            Read Full Story at {html.escape(it['source'])} ↗
+                            Source ↗
                         </a>
                         <button type="button" class="epm-inline-story-snap-btn" onclick="event.stopPropagation(); window.epmOpenStory('news', {i})">
                             📱 View Story Snap
@@ -2043,8 +2041,7 @@ def render_site_disclaimer_html(is_mobile: bool = False) -> str:
             <div class="epm-disclaimer-hdr">
                 <span class="epm-disclaimer-shield">🛡️ REGULATORY & COMPLIANCE NOTICE</span>
             </div>
-            <p class="epm-disclaimer-p1">This site is created for educational purpose, any information is not a direct or indirect investment advise, any loss incurred by you out of using this site is not entirely your look out.</p>
-            <p class="epm-disclaimer-p2">This entire site is for knowledge and information purpose only.</p>
+            <p class="epm-disclaimer-p1">We are a digital financial news aggregator and educational technology platform, not a SEBI-registered Investment Adviser or Research Analyst. Sentiment tags and AI summaries represent automated natural language processing of public text and do not constitute financial, legal, or investment advice.</p>
         </div>
     </div>
     """
@@ -2286,7 +2283,7 @@ def render_mobile_news_feed_html(pool: List[Dict]) -> str:
                 <div class="epm-pc-actions">
                     <span class="epm-pc-sent">{sk.upper()}</span>
                     {story_btn}
-                    <a class="epm-pc-link" href="{link}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Read ↗</a>
+                    <a class="epm-pc-link" href="{link}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Source ↗</a>
                 </div>
             </div>
         </div>""")
@@ -2384,8 +2381,10 @@ def render_calendar_timeline_html(events: List[Dict]) -> str:
                     <span class="epm-tl-reg">{html.escape(reg)}</span>
                 </div>
                 <div class="epm-tl-name">{html.escape(name)}</div>
-                <div class="epm-tl-badges">
+                <div class="epm-tl-badges" style="flex-wrap:wrap;gap:6px;">
                     <span class="epm-tl-sent tone-{sk}">● {html.escape(sent_text.title())}</span>
+                    <span style="background:#EFF6FF;color:#1E40AF;border:1px solid #BFDBFE;padding:1.5px 6px;border-radius:4px;font-size:10.5px;font-weight:700;">📊 Prev: {html.escape(prev)}</span>
+                    <span style="background:#F8FAFC;color:#475569;border:1px solid #E2E8F0;padding:1.5px 6px;border-radius:4px;font-size:10.5px;font-weight:600;">🎯 Fcst: {html.escape(fore)}</span>
                     <span class="epm-signal-pips tier-{stars}">{pips}</span>
                 </div>
                 <div class="epm-pc-body">
@@ -3127,8 +3126,11 @@ def render_desktop_calendar_html(events: List[Dict]) -> str:
             cat_chip = "Corp. Board Meet"
             
         flag = "🇮🇳" if mkt in ["NSE", "BSE", "MCX"] else ("🇺🇸" if mkt in ["NYSE", "SEC", "FOMC"] else "🌐")
-        prev = ev.get("previous", "—")
-        fcast = ev.get("forecast", "—")
+        prev = str(ev.get("previous") or "—").strip() or "—"
+        fcast = str(ev.get("forecast") or "—").strip() or "—"
+        actual = str(ev.get("actual") or "⏳ Pending").strip() or "⏳ Pending"
+        if actual in ("—", "None"):
+            actual = "⏳ Pending"
         sent = "BULLISH" if "BULL" in str(ev.get("outcome_sentiment", "")).upper() else ("BEARISH" if "BEAR" in str(ev.get("outcome_sentiment", "")).upper() else "NEUTRAL")
         title = ev.get("event") or ev.get("symbol") or "Market Catalyst"
         
@@ -3148,6 +3150,9 @@ def render_desktop_calendar_html(events: List[Dict]) -> str:
             "score": "4.8/5" if ev.get("impact") == "HIGH" else "3.5/5",
             "impact": "HIGH" if ev.get("impact") == "HIGH" else "MEDIUM",
             "sentiment": sent,
+            "previous": prev,
+            "forecast": fcast,
+            "actual": actual,
             "bullets": bullets[:3],
             "horizon": "Short-Term",
             "cat_tab": cat_tab,
@@ -3173,9 +3178,10 @@ def render_desktop_calendar_html(events: List[Dict]) -> str:
                     </div>
                 </div>
                 <div class="epm-chron-content">
-                    <div class="epm-chron-headline">
+                    <div class="epm-chron-headline" style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;">
                         <b>{html.escape(title)}</b>
-                        <span style="display:inline-block; margin-left:8px; font-size:11px; color:#64748B; font-weight:normal;">(Prev: {html.escape(str(prev)[:10])} • Fcast: {html.escape(str(fcast)[:10])})</span>
+                        <span style="display:inline-flex;align-items:center;gap:4px;background:#EFF6FF;color:#1E40AF;border:1px solid #BFDBFE;padding:1.5px 7px;border-radius:5px;font-size:11px;font-weight:700;">📊 Previous: {html.escape(prev)}</span>
+                        <span style="display:inline-flex;align-items:center;gap:4px;background:#F8FAFC;color:#475569;border:1px solid #E2E8F0;padding:1.5px 7px;border-radius:5px;font-size:11px;font-weight:600;">🎯 Forecast: {html.escape(fcast)}</span>
                     </div>
                 </div>
                 <div class="epm-chron-actions">
@@ -3193,9 +3199,23 @@ def render_desktop_calendar_html(events: List[Dict]) -> str:
                         <div class="epm-inline-badge-cluster">
                             <span class="epm-inline-impact-pill sent-{s_class}">● {sent}</span>
                             <span class="epm-inline-score-badge">{flag} {mkt} · {cat_chip}</span>
-                            <span class="epm-inline-horizon-badge">Consensus: Prev {html.escape(str(prev))} | Fcast {html.escape(str(fcast))}</span>
+                            <span class="epm-inline-horizon-badge">📊 Previous Data: {html.escape(prev)} | 🎯 Forecast: {html.escape(fcast)} | ⚡ Actual: {html.escape(actual)}</span>
                         </div>
                         <button type="button" class="epm-inline-collapse-btn" onclick="event.stopPropagation(); window.epmToggleDeskCalExpand({idx})" title="Collapse details">▲ Collapse</button>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:8px;margin:8px 0 10px 0;padding:8px 10px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;">
+                        <div>
+                            <div style="font-size:9.5px;font-weight:800;color:#64748B;letter-spacing:0.04em;">PREVIOUS DATA / RELEASE</div>
+                            <div style="font-size:12.5px;font-weight:800;color:#0F172A;margin-top:2px;">{html.escape(prev)}</div>
+                        </div>
+                        <div>
+                            <div style="font-size:9.5px;font-weight:800;color:#64748B;letter-spacing:0.04em;">CONSENSUS FORECAST</div>
+                            <div style="font-size:12.5px;font-weight:800;color:#0052FF;margin-top:2px;">{html.escape(fcast)}</div>
+                        </div>
+                        <div>
+                            <div style="font-size:9.5px;font-weight:800;color:#64748B;letter-spacing:0.04em;">ACTUAL / OUTCOME</div>
+                            <div style="font-size:12.5px;font-weight:800;color:#059669;margin-top:2px;">{html.escape(actual)}</div>
+                        </div>
                     </div>
                     <div class="epm-inline-card-body">
                         <div class="epm-inline-story-block">
@@ -3723,9 +3743,9 @@ def render_stock_news_feed_html(stock_items: Optional[List[Dict]] = None, is_mob
             <div class="epm-stock-ftr">
                 <div style="display:flex;align-items:center;gap:8px;">
                     <span>🏛️ {source} · {ts} IST</span>
-                    <button type="button" class="epm-stock-history-btn" onclick="window.epmViewStockHistory('{ticker}')">📜 5-Event History ▾</button>
+                    <button type="button" class="epm-stock-history-btn" onclick="window.epmViewStockHistory('{ticker}')">📜 Histroy ▾</button>
                 </div>
-                <a href="{filing_url}" target="_blank" class="epm-stock-link">Official Filing Document ↗</a>
+                <a href="{filing_url}" target="_blank" class="epm-stock-link">Source ↗</a>
             </div>
             <div id="epm-stock-hist-{ticker}" class="epm-stock-hist-drawer" style="display:none;"></div>
         </div>
@@ -11563,9 +11583,6 @@ TOP_NAVBAR_HTML = f"""
                 </div>
             </div>
 
-            <!-- Circulars Page with Submenu -->
-            <div class="epm-side-nav-group">
-                
             <!-- Stock News Page with Submenu -->
             <div class="epm-side-nav-group">
                 <div class="epm-side-nav-item" data-tab="2" onclick="window.epmSwitchTab(2);window.epmCloseSideMenu()">
@@ -11590,8 +11607,10 @@ TOP_NAVBAR_HTML = f"""
                     </a>
                 </div>
             </div>
-            
-            <div class="epm-side-nav-item" data-tab="5" onclick="window.epmSwitchTab(5);window.epmCloseSideMenu()">
+
+            <!-- Circulars Page with Submenu -->
+            <div class="epm-side-nav-group">
+                <div class="epm-side-nav-item" data-tab="3" onclick="window.epmSwitchTab(3);window.epmCloseSideMenu()">
                     <span class="epm-side-item-icon">🏛️</span>
                     <div class="epm-side-item-info">
                         <span class="epm-side-item-name">Regulatory Circulars</span>
@@ -11610,7 +11629,7 @@ TOP_NAVBAR_HTML = f"""
 
             <!-- Holidays Page with Submenu -->
             <div class="epm-side-nav-group">
-                <div class="epm-side-nav-item" data-tab="5" onclick="window.epmSwitchTab(5);window.epmCloseSideMenu()">
+                <div class="epm-side-nav-item" data-tab="4" onclick="window.epmSwitchTab(4);window.epmCloseSideMenu()">
                     <span class="epm-side-item-icon">🏖️</span>
                     <div class="epm-side-item-info">
                         <span class="epm-side-item-name">Trading Holidays & Closures</span>
@@ -11862,6 +11881,7 @@ TERMINAL_CLIENT_JS = r"""
     const TAB_NAMES = [
         "📰 LIVE BREAKING NEWS",
         "📅 MARKET OUTLOOK",
+        "📈 STOCK NEWS",
         "📜 REGULATORY CIRCULARS & PDFS",
         "🏖️ TRADING HOLIDAYS & CLOSURES",
         "⚙️ SETTINGS"
@@ -11875,12 +11895,12 @@ TERMINAL_CLIENT_JS = r"""
         }
         localStorage.setItem('epm_active_tab', String(tabIdx));
         let h = '#tab=' + tabIdx;
-        if (tabIdx === 4) {
+        if (tabIdx === 5) {
             const p = localStorage.getItem('epm_active_settings_pane') || 'pane_in_reg';
             h += '&pane=' + p;
         }
         try { history.replaceState(null, '', h); } catch(e) { window.location.hash = h; }
-        if (tabIdx === 3 && window.epmApplyHolidayFilters) {
+        if (tabIdx === 4 && window.epmApplyHolidayFilters) {
             setTimeout(window.epmApplyHolidayFilters, 50);
         }
     };
@@ -11901,7 +11921,7 @@ TERMINAL_CLIENT_JS = r"""
         if (badge && TAB_NAMES[tabIdx]) {
             badge.textContent = TAB_NAMES[tabIdx];
         }
-        if (tabIdx === 4 && window.epmCheckAdminLock) {
+        if (tabIdx === 5 && window.epmCheckAdminLock) {
             window.epmCheckAdminLock();
         }
     }
@@ -12224,10 +12244,10 @@ TERMINAL_CLIENT_JS = r"""
             if (savedTab !== null && savedTab !== '') activeTabIdx = parseInt(savedTab, 10);
         }
 
-        if (activeTabIdx > 0 && activeTabIdx < 5) {
+        if (activeTabIdx > 0 && activeTabIdx < 6) {
             setTimeout(() => {
                 window.epmSwitchTab(activeTabIdx);
-                if (activeTabIdx === 4) {
+                if (activeTabIdx === 5) {
                     const hashPaneMatch = window.location.hash.match(/pane=([a-zA-Z0-9_]+)/);
                     const savedPane = (hashPaneMatch && hashPaneMatch[1]) || localStorage.getItem('epm_active_settings_pane') || 'pane_in_reg';
                     if (window.epmShowSettingsPane) window.epmShowSettingsPane(savedPane);
@@ -12573,7 +12593,7 @@ TERMINAL_CLIENT_JS = r"""
             <div class="epm-sv-content" id="epm-sv-content"></div>
             <div class="epm-sv-foot">
               <div class="epm-sv-foot-disclaimer">
-                Educational & knowledge purpose only; not an investment advice. We are not responsible for your actions or loss.
+                We are a digital financial news aggregator and educational technology platform, not a SEBI-registered Investment Adviser or Research Analyst. Sentiment tags and AI summaries represent automated natural language processing of public text and do not constitute financial, legal, or investment advice.
               </div>
               <div class="epm-sv-foot-actions">
                 <button type="button" class="epm-sv-dots-btn epm-sv-dots-bottom" id="epm-sv-dots-btn" aria-label="Story actions" onclick="window.epmToggleStoryMenu(event)" title="Options">⋮</button>
@@ -14080,7 +14100,7 @@ TERMINAL_CLIENT_JS = r"""
                         '<div class="epm-hist-summary" style="font-size:11px;color:#475569;margin-top:2px;">' + ev.summary + '</div>' +
                         '<div class="epm-hist-meta" style="margin-top:4px;display:flex;gap:8px;align-items:center;">' +
                             '<span class="epm-stock-tag" style="background:#EFF6FF;color:#0052FF;font-weight:700;">📂 ' + (ev.disclosure_type || 'FILING').replace('_', ' ') + '</span>' +
-                            '<a href="' + (ev.filing_url || '#') + '" target="_blank" class="epm-stock-link" style="color:#0052FF;font-size:10px;text-decoration:none;font-weight:600;">Official Filing ↗</a>' +
+                            '<a href="' + (ev.filing_url || '#') + '" target="_blank" class="epm-stock-link" style="color:#0052FF;font-size:10px;text-decoration:none;font-weight:600;">Source ↗</a>' +
                         '</div>' +
                     '</div>';
                 });
