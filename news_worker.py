@@ -868,6 +868,13 @@ class NewsEngineWorker:
         newly_arrived, all_scraped = self.fetch_all_sources()
 
         if all_scraped:
+            # Cross-index scraped news into StockNewsEngine for real-time Stock News Page updates
+            try:
+                from stock_engine import stock_engine
+                stock_engine.ingest_live_news_items(newly_arrived if self.is_initialized and newly_arrived else all_scraped)
+            except Exception as e:
+                logger.debug(f"Stock engine cross-indexing error: {e}")
+
             # Deduplicate by unique hash
             seen = set()
             combined = []

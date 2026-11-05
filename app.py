@@ -293,10 +293,22 @@ async def api_stock_events(ticker: str, limit: int = 5):
     return {"status": "ok", "ticker": ticker.upper(), "count": len(history), "events": history}
 
 @app.get("/api/stock-news")
-async def api_stock_news(market: str = "ALL", index_tag: str = "ALL", sector: str = "ALL", search: str = ""):
+async def api_stock_news(market: str = "ALL", index_tag: str = "ALL", sector: str = "ALL", search: str = "", mode: str = "cards", poll: bool = False):
     from starlette.concurrency import run_in_threadpool
-    items = await run_in_threadpool(stock_engine.fetch_stock_news, market, index_tag, sector, search)
-    return {"status": "ok", "count": len(items), "items": items}
+    if poll:
+        await run_in_threadpool(stock_engine.poll_live_stock_rss)
+    if news_worker.news_cache:
+        await run_in_threadpool(stock_engine.ingest_live_news_items, news_worker.news_cache)
+    if mode == "cards":
+        items = await run_in_threadpool(stock_engine.fetch_latest_stock_cards, market, index_tag, sector, search)
+    else:
+        items = await run_in_threadpool(stock_engine.fetch_stock_news, market, index_tag, sector, search)
+    return {
+        "status": "ok",
+        "count": len(items),
+        "as_of_ist": now_ist().strftime("%d %b %Y · %H:%M:%S IST"),
+        "items": items
+    }
 
 @app.get("/api/media/{filename}")
 async def serve_media(filename: str):
@@ -3738,6 +3750,11 @@ INSTITUTIONAL_DIRECTORY = [
 def render_stock_news_feed_html(stock_items: Optional[List[Dict]] = None, is_mobile: bool = False) -> str:
     """Renders the Stock News & Corporate Disclosures workspace with multi-tier filters and rich disclosure cards."""
     if stock_items is None:
+        try:
+            if news_worker.news_cache:
+                stock_engine.ingest_live_news_items(news_worker.news_cache)
+        except Exception:
+            pass
         stock_items = stock_engine.fetch_latest_stock_cards()
     
     quick_filters = [
@@ -3817,12 +3834,24 @@ def render_stock_news_feed_html(stock_items: Optional[List[Dict]] = None, is_mob
         </div>
         """)
 
+    live_ist_str = now_ist().strftime("%d %b %Y · %H:%M IST")
     filter_bar_html = f"""
     <div class="epm-table-header-integrated" style="margin-bottom:12px;padding:12px 14px;border-radius:12px;">
-        <div class="epm-tbl-hdr-title-group" style="margin-bottom:8px;">
-            <span class="epm-ribbon-bullet">●</span>
-            <span class="epm-tbl-hdr-title">MULTI-ASSET EQUITIES, REGULATED SECTORS & COMMODITIES INTELLIGENCE</span>
-            <span class="epm-tbl-hdr-badge">NSE · BSE · MCX iCOMDEX · S&amp;P / DJIA · RUSSELL · NASDAQ · 11 GICS</span>
+        <div class="epm-tbl-hdr-title-group" style="margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;width:100%;">
+            <div style="display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <span class="epm-ribbon-bullet">●</span>
+                <span class="epm-tbl-hdr-title">MULTI-ASSET EQUITIES, REGULATED SECTORS & COMMODITIES INTELLIGENCE</span>
+                <span class="epm-tbl-hdr-badge">NSE · BSE · MCX iCOMDEX · S&amp;P / DJIA · RUSSELL · NASDAQ · 11 GICS</span>
+            </div>
+            <div style="display:inline-flex;align-items:center;gap:8px;margin-left:auto;">
+                <span id="epm-stock-live-status" style="display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:800;color:#059669;background:#ECFDF5;border:1px solid #A7F3D0;padding:3px 9px;border-radius:999px;">
+                    <span style="width:6px;height:6px;border-radius:50%;background:#10B981;display:inline-block;"></span>
+                    <span id="epm-stock-live-ts">LIVE · {live_ist_str}</span>
+                </span>
+                <button type="button" id="epm-stock-live-refresh-btn" onclick="window.epmRefreshStockNewsLive(true)" style="background:#EFF6FF;color:#0052FF;border:1px solid #BFDBFE;border-radius:6px;padding:3px 9px;font-size:11px;font-weight:800;cursor:pointer;">
+                    🔄 Sync Live
+                </button>
+            </div>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(135px, 1fr));gap:8px;margin-top:4px;align-items:center;">
             <select id="epm-stock-market-filter" class="epm-news-scope-select" style="padding:7px 10px;font-size:12px;font-weight:700;" onchange="window.epmFilterStockCards()">
@@ -12147,6 +12176,11 @@ TERMINAL_CLIENT_JS = r"""
         try { history.replaceState(null, '', h); } catch(e) { window.location.hash = h; }
         try { window.scrollTo({ top: 0, behavior: 'instant' }); } catch(e) { window.scrollTo(0, 0); }
 
+        if (tabIdx === 2) {
+            setTimeout(() => {
+                if (window.epmRefreshStockNewsLive) window.epmRefreshStockNewsLive(false);
+            }, 80);
+        }
         if (tabIdx === 3) {
             setTimeout(() => {
                 if (window.innerWidth <= 820) {
@@ -14538,6 +14572,118 @@ TERMINAL_CLIENT_JS = r"""
             card.style.display = match ? 'block' : 'none';
         });
     };
+
+    window.epmEscapeHtml = function(str) {
+        return String(str || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    };
+
+    window.epmRenderSingleStockCardHTML = function(s, existingDrawerHtml, isDrawerOpen) {
+        const esc = window.epmEscapeHtml;
+        const ticker = esc(s.ticker || 'STK');
+        const company = esc(s.company || '');
+        const exchange = esc(s.exchange || 'NSE');
+        const sector = esc(s.sector || 'Equities');
+        const market = esc(s.market || 'NSE');
+        const title = esc(s.title || '');
+        const summary = esc(s.summary || '');
+        const sent = esc(s.sentiment || 'NEUTRAL');
+        const impact = esc(s.impact || 'MEDIUM');
+        const ts = esc(String(s.timestamp || '').slice(0, 16));
+        const discType = esc(String(s.disclosure_type || 'FILING').replace(/_/g, ' '));
+        const filingUrl = esc(s.filing_url || '#');
+        const source = esc(s.source || exchange);
+        const indexTags = Array.isArray(s.index_tags) ? s.index_tags : [];
+        const tagsStr = esc(indexTags.join(' '));
+        const tagBadges = indexTags.slice(0, 6).map(t => `<span class="epm-stock-tag">#${esc(t)}</span>`).join('');
+        const sentClass = sent === 'BULLISH' ? 'pill-bullish' : (sent === 'BEARISH' ? 'pill-bearish' : 'pill-neutral');
+        const impactBadge = impact === 'HIGH'
+            ? `<span class="epm-pc-impact is-high">⚡ ${impact}</span>`
+            : `<span class="epm-pc-impact">● ${impact}</span>`;
+        const drawerStyle = isDrawerOpen ? 'display:block;' : 'display:none;';
+        const drawerContent = existingDrawerHtml || '';
+
+        return `
+        <div class="epm-stock-card" data-market="${market}" data-tags="${tagsStr}" data-sector="${sector}" data-ticker="${ticker}">
+            <div class="epm-stock-hdr">
+                <div class="epm-stock-ticker-group">
+                    <span class="epm-stock-ticker">${ticker}</span>
+                    <span class="epm-stock-co">${company}</span>
+                    <span class="epm-inst-chip" style="font-size:9px;">${exchange}</span>
+                </div>
+                <div class="epm-stock-tags">
+                    ${impactBadge}
+                    <span class="epm-tile-pill ${sentClass}" style="position:static;padding:2px 6px;">${sent}</span>
+                </div>
+            </div>
+            <div class="epm-stock-title">${title}</div>
+            <div class="epm-stock-summary">${summary}</div>
+            <div class="epm-stock-tags" style="margin-bottom:8px;">
+                <span class="epm-stock-tag" style="background:#EFF6FF;color:#0052FF;font-weight:800;">📂 ${discType}</span>
+                <span class="epm-stock-tag" style="background:#F8FAFC;">🏭 ${sector}</span>
+                ${tagBadges}
+            </div>
+            <div class="epm-stock-ftr">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span>🏛️ ${source} · ${ts} IST</span>
+                    <button type="button" class="epm-stock-history-btn" onclick="window.epmViewStockHistory('${ticker}')">📜 Histroy ▾</button>
+                </div>
+                <a href="${filingUrl}" target="_blank" class="epm-stock-link">Source ↗</a>
+            </div>
+            <div id="epm-stock-hist-${ticker}" class="epm-stock-hist-drawer" style="${drawerStyle}">${drawerContent}</div>
+        </div>`;
+    };
+
+    window.epmRefreshStockNewsLive = async function(forcePoll) {
+        const grid = document.getElementById('epm-stock-grid-container');
+        if (!grid) return;
+        const btn = document.getElementById('epm-stock-live-refresh-btn');
+        const tsEl = document.getElementById('epm-stock-live-ts');
+        if (forcePoll && btn) {
+            btn.textContent = '⏳ Syncing...';
+            btn.disabled = true;
+        }
+        try {
+            const url = '/api/stock-news?mode=cards' + (forcePoll ? '&poll=true' : '');
+            const res = await fetch(url);
+            const data = await res.json();
+            if (data && data.status === 'ok' && Array.isArray(data.items) && data.items.length > 0) {
+                // Preserve any currently open history drawers so user interaction is never interrupted
+                const openDrawers = {};
+                grid.querySelectorAll('.epm-stock-hist-drawer').forEach(d => {
+                    if (d.style.display !== 'none' && d.id) {
+                        const tk = d.id.replace('epm-stock-hist-', '');
+                        openDrawers[tk] = d.innerHTML;
+                    }
+                });
+                grid.innerHTML = data.items.map(s => {
+                    const tk = s.ticker || '';
+                    return window.epmRenderSingleStockCardHTML(s, openDrawers[tk] || '', Boolean(openDrawers[tk]));
+                }).join('');
+                if (tsEl && data.as_of_ist) {
+                    tsEl.textContent = 'LIVE · ' + data.as_of_ist;
+                }
+                window.epmFilterStockCards();
+            }
+        } catch (err) {
+            console.warn('Live stock news refresh error:', err);
+        } finally {
+            if (forcePoll && btn) {
+                btn.textContent = '🔄 Sync Live';
+                btn.disabled = false;
+            }
+        }
+    };
+
+    setInterval(function() {
+        if (localStorage.getItem('epm_active_tab') === '2') {
+            window.epmRefreshStockNewsLive(false);
+        }
+    }, 45000);
 
     // ═══ Gatekeeper Authentication Engine ═══
     window.epmGateSwitchTab = function(tab) {
