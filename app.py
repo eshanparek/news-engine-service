@@ -265,12 +265,16 @@ async def api_admin_member_delete(request: Request):
 
 @app.get("/api/stock/{ticker}/events")
 async def api_stock_events(ticker: str, limit: int = 5):
-    history = stock_engine.fetch_stock_history(ticker, limit=limit)
+    print(f"[API_STOCK_EVENTS] Called for {ticker} with limit={limit}", flush=True)
+    from starlette.concurrency import run_in_threadpool
+    history = await run_in_threadpool(stock_engine.fetch_stock_history, ticker, limit=limit)
+    print(f"[API_STOCK_EVENTS] Done for {ticker}, returning {len(history)} items", flush=True)
     return {"status": "ok", "ticker": ticker.upper(), "count": len(history), "events": history}
 
 @app.get("/api/stock-news")
 async def api_stock_news(market: str = "ALL", index_tag: str = "ALL", sector: str = "ALL", search: str = ""):
-    items = stock_engine.fetch_stock_news(market=market, index_tag=index_tag, sector=sector, search=search)
+    from starlette.concurrency import run_in_threadpool
+    items = await run_in_threadpool(stock_engine.fetch_stock_news, market, index_tag, sector, search)
     return {"status": "ok", "count": len(items), "items": items}
 
 @app.get("/api/media/{filename}")
@@ -3578,7 +3582,7 @@ INSTITUTIONAL_DIRECTORY = [
 def render_stock_news_feed_html(stock_items: Optional[List[Dict]] = None, is_mobile: bool = False) -> str:
     """Renders the Stock News & Corporate Disclosures workspace with multi-tier filters and rich disclosure cards."""
     if stock_items is None:
-        stock_items = stock_engine.fetch_stock_news()
+        stock_items = stock_engine.fetch_latest_stock_cards()
     
     quick_filters = [
         ("ALL", "All Assets"),
@@ -5504,6 +5508,65 @@ def render_table_ribbon(
 
 
 CUSTOM_CSS = """
+/* Interactive Google Translate Language Picker Modal */
+.epm-lang-modal-box {
+    position: fixed !important;
+    top: 50px !important;
+    right: 68px !important;
+    width: 330px !important;
+    max-width: 92vw !important;
+    background: #FFFFFF !important;
+    border: 1px solid #CBD5E1 !important;
+    border-radius: 12px !important;
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.22) !important;
+    z-index: 100002 !important;
+    overflow: hidden !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+}
+@media (max-width: 768px) {
+    .epm-lang-modal-box {
+        top: 48px !important;
+        right: 10px !important;
+        left: 10px !important;
+        width: auto !important;
+    }
+}
+.epm-lang-modal-header {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 10px 14px !important;
+    background: #F8FAFC !important;
+    border-bottom: 1px solid #E2E8F0 !important;
+}
+.epm-lang-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 6px !important;
+    padding: 6px 14px 10px !important;
+}
+.epm-lang-opt {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    padding: 7px 10px !important;
+    background: #FFFFFF !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    color: #1E293B !important;
+    text-align: left !important;
+    transition: all 0.12s ease !important;
+}
+.epm-lang-opt:hover {
+    background: #EFF6FF !important;
+    border-color: #0052FF !important;
+    color: #0052FF !important;
+    transform: translateY(-1px) !important;
+}
+
 /* Google Translate Minimal Logo Button */
 .epm-translate-btn-wrapper {
     position: relative !important;
@@ -11002,7 +11065,7 @@ TOP_NAVBAR_HTML = f"""
 
         <!-- Right: Google Translate Logo Button + Prominent Menu Button -->
         <div class="epm-nav-controls">
-            <div class="epm-translate-btn-wrapper" title="Google Translate">
+            <div class="epm-translate-btn-wrapper" title="Change Language / भाषा बदलें" onclick="window.epmOpenLanguageModal()">
                 <button type="button" class="epm-translate-icon-btn" aria-label="Google Translate">
                     <img src="/api/translate-logo" class="epm-translate-img-icon" alt="Google Translate" />
                 </button>
@@ -11013,6 +11076,47 @@ TOP_NAVBAR_HTML = f"""
                 <span class="epm-menu-btn-text">Menu ▾</span>
             </button>
         </div>
+    </div>
+</div>
+
+<!-- Interactive Google Translate Language Picker Modal -->
+<div id="epm-lang-modal-backdrop" style="position:fixed;inset:0;background:rgba(15,23,42,0.3);backdrop-filter:blur(2px);z-index:100001;display:none;pointer-events:auto;" onclick="window.epmCloseLanguageModal()"></div>
+<div id="epm-lang-modal" class="epm-lang-modal-box" style="display:none;">
+    <div class="epm-lang-modal-header">
+        <div style="display:flex;align-items:center;gap:8px;">
+            <img src="/api/translate-logo" style="width:22px;height:22px;object-fit:contain;" alt="Translate" />
+            <div>
+                <div style="font-weight:800;font-size:13px;color:#0F172A;line-height:1.2;">Select Language / भाषा चुनें</div>
+                <div style="font-size:10px;color:#64748B;">Instant Google Neural Translation across full site</div>
+            </div>
+        </div>
+        <button type="button" onclick="window.epmCloseLanguageModal()" style="background:#F1F5F9;border:1px solid #CBD5E1;border-radius:6px;width:24px;height:24px;cursor:pointer;font-weight:700;display:flex;align-items:center;justify-content:center;color:#475569;">✕</button>
+    </div>
+    <div style="padding:10px 14px 4px;font-size:10px;font-weight:800;color:#94A3B8;letter-spacing:0.5px;">INDIAN LANGUAGES</div>
+    <div class="epm-lang-grid">
+        <button type="button" class="epm-lang-opt" onclick="window.epmSelectLanguage('hi')"><span>🇮🇳</span> <span>हिन्दी (Hindi)</span></button>
+        <button type="button" class="epm-lang-opt" onclick="window.epmSelectLanguage('gu')"><span>🇮🇳</span> <span>ગુજરાતી (Gujarati)</span></button>
+        <button type="button" class="epm-lang-opt" onclick="window.epmSelectLanguage('mr')"><span>🇮🇳</span> <span>मराठी (Marathi)</span></button>
+        <button type="button" class="epm-lang-opt" onclick="window.epmSelectLanguage('ta')"><span>🇮🇳</span> <span>தமிழ் (Tamil)</span></button>
+        <button type="button" class="epm-lang-opt" onclick="window.epmSelectLanguage('te')"><span>🇮🇳</span> <span>తెలుగు (Telugu)</span></button>
+        <button type="button" class="epm-lang-opt" onclick="window.epmSelectLanguage('bn')"><span>🇮🇳</span> <span>বাংলা (Bengali)</span></button>
+        <button type="button" class="epm-lang-opt" onclick="window.epmSelectLanguage('kn')"><span>🇮🇳</span> <span>ಕನ್ನಡ (Kannada)</span></button>
+        <button type="button" class="epm-lang-opt" onclick="window.epmSelectLanguage('pa')"><span>🇮🇳</span> <span>ਪੰਜਾਬੀ (Punjabi)</span></button>
+    </div>
+    <div style="padding:8px 14px 4px;font-size:10px;font-weight:800;color:#94A3B8;letter-spacing:0.5px;">INTERNATIONAL LANGUAGES</div>
+    <div class="epm-lang-grid">
+        <button type="button" class="epm-lang-opt" onclick="window.epmSelectLanguage('en')"><span>🇬🇧</span> <span>English (Original)</span></button>
+        <button type="button" class="epm-lang-opt" onclick="window.epmSelectLanguage('es')"><span>🇪🇸</span> <span>Español (Spanish)</span></button>
+        <button type="button" class="epm-lang-opt" onclick="window.epmSelectLanguage('fr')"><span>🇫🇷</span> <span>Français (French)</span></button>
+        <button type="button" class="epm-lang-opt" onclick="window.epmSelectLanguage('de')"><span>🇩🇪</span> <span>Deutsch (German)</span></button>
+        <button type="button" class="epm-lang-opt" onclick="window.epmSelectLanguage('ar')"><span>🇸🇦</span> <span>العربية (Arabic)</span></button>
+        <button type="button" class="epm-lang-opt" onclick="window.epmSelectLanguage('zh-CN')"><span>🇨🇳</span> <span>简体中文 (Chinese)</span></button>
+        <button type="button" class="epm-lang-opt" onclick="window.epmSelectLanguage('ja')"><span>🇯🇵</span> <span>日本語 (Japanese)</span></button>
+        <button type="button" class="epm-lang-opt" onclick="window.epmSelectLanguage('ru')"><span>🇷🇺</span> <span>Русский (Russian)</span></button>
+    </div>
+    <div style="padding:10px 14px;background:#F8FAFC;border-top:1px solid #E2E8F0;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:11px;color:#64748B;">Active: <strong id="epm-active-lang-display" style="color:#0052FF;">EN</strong></span>
+        <button type="button" onclick="window.epmSelectLanguage('en')" style="background:none;border:none;color:#0052FF;font-weight:700;font-size:11px;cursor:pointer;">↺ Reset to English</button>
     </div>
 </div>
 
@@ -11935,12 +12039,14 @@ TERMINAL_CLIENT_JS = r"""
         });
     };
 
-    // 11. Fast Server-Sent Events (SSE) Delta Stream
+    // 11. Fast Server-Sent Events (SSE) Delta Stream (Strict Singleton)
+    let _epmTerminalStream = null;
     function initTerminalStream() {
+        if (_epmTerminalStream) return;
         if (!window.EventSource) return;
         try {
-            const es = new EventSource('/api/stream/terminal');
-            es.addEventListener('telemetry', function(e) {
+            _epmTerminalStream = new EventSource('/api/stream/terminal');
+            _epmTerminalStream.addEventListener('telemetry', function(e) {
                 try {
                     const data = JSON.parse(e.data);
                     if (data.news_count !== undefined) {
@@ -11961,7 +12067,13 @@ TERMINAL_CLIENT_JS = r"""
                     }
                 } catch(err) {}
             });
-        } catch(err) {}
+            _epmTerminalStream.onerror = function() {
+                try { _epmTerminalStream.close(); } catch(e) {}
+                _epmTerminalStream = null;
+            };
+        } catch(err) {
+            _epmTerminalStream = null;
+        }
     }
 
     // In-Table Column Filter Focus
@@ -13441,6 +13553,53 @@ TERMINAL_CLIENT_JS = r"""
     }
     setInterval(epmFormatGoogleTranslateBtn, 400);
 
+    window.epmOpenLanguageModal = function() {
+        const m = document.getElementById('epm-lang-modal');
+        const b = document.getElementById('epm-lang-modal-backdrop');
+        if (m) m.style.display = 'block';
+        if (b) {
+            b.style.display = 'block';
+            b.style.pointerEvents = 'auto';
+        }
+        const cur = localStorage.getItem('epm_selected_lang') || 'en';
+        const disp = document.getElementById('epm-active-lang-display');
+        if (disp) disp.innerText = cur.toUpperCase();
+    };
+
+    window.epmCloseLanguageModal = function() {
+        const m = document.getElementById('epm-lang-modal');
+        const b = document.getElementById('epm-lang-modal-backdrop');
+        if (m) m.style.display = 'none';
+        if (b) b.style.display = 'none';
+    };
+
+    window.epmSelectLanguage = function(langCode) {
+        window.epmCloseLanguageModal();
+        const host = window.location.hostname;
+        document.cookie = 'googtrans=/en/' + langCode + '; path=/;';
+        if (host) {
+            document.cookie = 'googtrans=/en/' + langCode + '; path=/; domain=' + host + ';';
+            const parts = host.split('.');
+            if (parts.length > 2) {
+                document.cookie = 'googtrans=/en/' + langCode + '; path=/; domain=.' + parts.slice(-2).join('.') + ';';
+            }
+        }
+        localStorage.setItem('epm_selected_lang', langCode);
+
+        const combo = document.querySelector('.goog-te-combo');
+        if (combo) {
+            combo.value = langCode;
+            combo.dispatchEvent(new Event('change'));
+        } else {
+            window.location.reload();
+        }
+    };
+
+    window.epmCloseStockHistory = function(ticker) {
+        const drawer = document.getElementById('epm-stock-hist-' + ticker);
+        if (drawer) drawer.style.display = 'none';
+    };
+
     window.epmViewStockHistory = async function(ticker) {
         const drawer = document.getElementById('epm-stock-hist-' + ticker);
         if (!drawer) return;
@@ -13449,18 +13608,31 @@ TERMINAL_CLIENT_JS = r"""
             return;
         }
         drawer.style.display = 'block';
-        drawer.innerHTML = '<div style="padding:10px;text-align:center;font-size:11px;color:#64748B;">⚡ Loading 5-event historical dossier for ' + ticker + '...</div>';
+        drawer.innerHTML = '<div style="padding:12px;text-align:center;font-size:11px;color:#64748B;">⚡ Loading 5 distinct historical milestones for ' + ticker + '...</div>';
         try {
             const res = await fetch('/api/stock/' + encodeURIComponent(ticker) + '/events?limit=5');
             const data = await res.json();
             if (data.events && data.events.length > 0) {
-                let html = '<div class="epm-hist-timeline-box"><div class="epm-hist-hdr"><span>📜 ' + ticker + ' · Recent 5 Catalysts & Disclosures</span><button type="button" onclick="document.getElementById(\'epm-stock-hist-' + ticker + '\').style.display=\'none\'" style="background:none;border:none;cursor:pointer;font-size:12px;color:#64748B;">✕</button></div>';
-                data.events.forEach(ev => {
-                    html += '<div class="epm-hist-item">' +
-                        '<div class="epm-hist-ts">⏱️ ' + ev.timestamp + ' · 🏛️ ' + ev.source + '</div>' +
-                        '<div class="epm-hist-title">' + ev.title + '</div>' +
-                        '<div class="epm-hist-summary">' + ev.summary + '</div>' +
-                        '<div class="epm-hist-meta"><span class="epm-stock-tag" style="background:#EFF6FF;color:#0052FF;font-weight:700;">📂 ' + (ev.disclosure_type || 'FILING').replace('_', ' ') + '</span> <a href="' + (ev.filing_url || '#') + '" target="_blank" class="epm-stock-link">Official Filing ↗</a></div>' +
+                let html = '<div class="epm-hist-timeline-box" style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:12px;margin-top:10px;">' +
+                    '<div class="epm-hist-hdr" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid #E2E8F0;">' +
+                        '<span style="font-weight:800;font-size:12px;color:#0F172A;">📜 ' + ticker + ' · Verified 5-Event Chronological Catalyst History</span>' +
+                        '<button type="button" onclick="window.epmCloseStockHistory(\'' + ticker + '\')" style="background:#FFFFFF;border:1px solid #CBD5E1;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:11px;color:#475569;font-weight:700;">✕ Close</button>' +
+                    '</div>';
+                data.events.forEach((ev, idx) => {
+                    const badge = idx === 0 
+                        ? '<span class="epm-stock-tag" style="background:#FEF2F2;color:#DC2626;font-weight:800;border:1px solid #FECACA;">🔴 Latest Catalyst</span>' 
+                        : '<span class="epm-stock-tag" style="background:#F0FDF4;color:#16A34A;font-weight:700;border:1px solid #BBF7D0;">⏱️ Preceding Milestone #' + (idx + 1) + '</span>';
+                    html += '<div class="epm-hist-item" style="border-left: 2px solid ' + (idx === 0 ? '#DC2626' : '#94A3B8') + '; padding-left: 10px; margin-bottom: 10px;">' +
+                        '<div class="epm-hist-ts" style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">' +
+                            badge +
+                            '<span style="color:#64748B;font-size:10px;">⏱️ ' + ev.timestamp + ' · 🏛️ ' + ev.source + '</span>' +
+                        '</div>' +
+                        '<div class="epm-hist-title" style="font-weight:700;font-size:12px;color:#0F172A;line-height:1.4;">' + ev.title + '</div>' +
+                        '<div class="epm-hist-summary" style="font-size:11px;color:#475569;margin-top:2px;">' + ev.summary + '</div>' +
+                        '<div class="epm-hist-meta" style="margin-top:4px;display:flex;gap:8px;align-items:center;">' +
+                            '<span class="epm-stock-tag" style="background:#EFF6FF;color:#0052FF;font-weight:700;">📂 ' + (ev.disclosure_type || 'FILING').replace('_', ' ') + '</span>' +
+                            '<a href="' + (ev.filing_url || '#') + '" target="_blank" class="epm-stock-link" style="color:#0052FF;font-size:10px;text-decoration:none;font-weight:600;">Official Filing ↗</a>' +
+                        '</div>' +
                     '</div>';
                 });
                 html += '</div>';
@@ -13485,6 +13657,12 @@ TERMINAL_CLIENT_JS = r"""
         } else if (filterVal === 'ALL') {
             if (mktSel) mktSel.value = 'ALL';
             if (indexSel) indexSel.value = 'ALL';
+        } else if (filterVal === 'DJIA') {
+            if (mktSel) mktSel.value = 'NYSE';
+            if (indexSel) indexSel.value = 'DJIA';
+        } else if (filterVal === 'NDX') {
+            if (mktSel) mktSel.value = 'NASDAQ';
+            if (indexSel) indexSel.value = 'NDX';
         } else {
             if (mktSel) mktSel.value = 'ALL';
             if (indexSel) indexSel.value = filterVal;
@@ -13506,7 +13684,17 @@ TERMINAL_CLIENT_JS = r"""
             const cardText = card.innerText.toUpperCase();
 
             let match = true;
-            if (mkt !== 'ALL' && cardMkt !== mkt) match = false;
+            if (mkt !== 'ALL') {
+                if (mkt === 'NYSE') {
+                    if (cardMkt !== 'NYSE' && cardMkt !== 'US' && !cardTags.includes('DJIA') && !cardTags.includes('SPX')) match = false;
+                } else if (mkt === 'NASDAQ') {
+                    if (cardMkt !== 'NASDAQ' && cardMkt !== 'US' && !cardTags.includes('NDX')) match = false;
+                } else if (mkt === 'US') {
+                    if (cardMkt !== 'NYSE' && cardMkt !== 'NASDAQ' && cardMkt !== 'US' && !cardTags.includes('DJIA') && !cardTags.includes('NDX') && !cardTags.includes('SPX')) match = false;
+                } else if (cardMkt !== mkt) {
+                    match = false;
+                }
+            }
             if (idx !== 'ALL' && !cardTags.includes(idx)) match = false;
             if (sec !== 'ALL' && cardSec !== sec) match = false;
             if (q && !cardText.includes(q) && !cardTicker.includes(q)) match = false;
