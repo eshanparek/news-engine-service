@@ -1,4 +1,5 @@
 import os
+import gc
 import io
 import time
 import requests
