@@ -76,6 +76,7 @@ app.add_middleware(
 )
 
 
+
 @app.middleware("http")
 async def visitor_telemetry_middleware(request: Request, call_next):
     path = request.url.path
@@ -136,7 +137,7 @@ class TerminalSecurityAndMetaMiddleware(BaseHTTPMiddleware):
                 '<meta property="og:image:height" content="512" />\n'
                 '<meta property="og:url" content="https://p01--news-engine-service--dkhqtlpvx6bh.code.run/" />\n'
                 '<meta property="og:type" content="website" />\n'
-                '<meta property="og:site_name" content="Global News and Calender" />\n'
+                '<meta property="og:site_name" content="Global News and Calender" /><link rel="manifest" href="/manifest.json" /><meta name="mobile-web-app-capable" content="yes" /><meta name="apple-mobile-web-app-capable" content="yes" /><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" /><meta name="apple-mobile-web-app-title" content="GNC Terminal" /><meta name="application-name" content="GNC Terminal" /><link rel="apple-touch-icon" href="/apple-touch-icon.png" /><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" /><link rel="icon" type="image/png" sizes="192x192" href="/pwa-icon-192.png" /><link rel="icon" type="image/png" sizes="512x512" href="/pwa-icon-512.png" /><meta name="theme-color" content="#0052FF" />\n'
                 '<meta name="twitter:card" content="summary" />\n'
                 '<meta name="twitter:title" content="Global News and Calender" />\n'
                 '<meta name="twitter:description" content="US and Indian Economic and Financial Market News and Calender" />\n'
@@ -5978,6 +5979,123 @@ def render_table_ribbon(
 
 
 CUSTOM_CSS = """
+
+/* ─── PWA & Native Mobile App Styles ─── */
+.epm-install-app-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    padding: 4px 10px !important;
+    height: 28px !important;
+    background: linear-gradient(135deg, #0052FF 0%, #1D4ED8 100%) !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    border-radius: 6px !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    cursor: pointer !important;
+    box-shadow: 0 1px 3px rgba(0,82,255,0.3) !important;
+    transition: all 0.15s ease !important;
+    flex-shrink: 0 !important;
+}
+.epm-install-app-btn:hover {
+    background: linear-gradient(135deg, #0045D8 0%, #1738A0 100%) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 3px 8px rgba(0,82,255,0.4) !important;
+}
+@media (max-width: 640px) {
+    .epm-install-app-btn .epm-install-btn-text {
+        display: none !important;
+    }
+    .epm-install-app-btn {
+        padding: 4px 7px !important;
+    }
+}
+
+.epm-install-modal-box {
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    width: 480px !important;
+    max-width: 92vw !important;
+    max-height: 88vh !important;
+    background: #FFFFFF !important;
+    border: 1px solid #CBD5E1 !important;
+    border-radius: 16px !important;
+    box-shadow: 0 20px 48px rgba(15, 23, 42, 0.35) !important;
+    z-index: 100003 !important;
+    overflow-y: auto !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+}
+.epm-install-modal-hdr {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 12px 18px !important;
+    background: #0B0F19 !important;
+    color: #FFFFFF !important;
+    border-top-left-radius: 15px !important;
+    border-top-right-radius: 15px !important;
+}
+.epm-install-tabs {
+    display: flex !important;
+    background: #F1F5F9 !important;
+    padding: 4px !important;
+    border-bottom: 1px solid #E2E8F0 !important;
+}
+.epm-install-tab-btn {
+    flex: 1 !important;
+    padding: 8px 12px !important;
+    border: none !important;
+    background: transparent !important;
+    color: #475569 !important;
+    font-weight: 700 !important;
+    font-size: 12px !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    transition: all 0.15s ease !important;
+}
+.epm-install-tab-btn.active {
+    background: #FFFFFF !important;
+    color: #0052FF !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+}
+.epm-install-step-card {
+    display: flex !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+    padding: 10px 14px !important;
+    background: #F8FAFC !important;
+    border: 1px solid #E2E8F0 !important;
+    border-radius: 10px !important;
+    margin-bottom: 8px !important;
+}
+.epm-install-step-num {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 24px !important;
+    height: 24px !important;
+    border-radius: 999px !important;
+    background: #0052FF !important;
+    color: #FFFFFF !important;
+    font-size: 11px !important;
+    font-weight: 800 !important;
+    flex-shrink: 0 !important;
+}
+
+@supports (padding-top: env(safe-area-inset-top)) {
+    body {
+        padding-top: env(safe-area-inset-top) !important;
+        padding-bottom: env(safe-area-inset-bottom) !important;
+    }
+}
+
 /* Interactive Google Translate Language Picker Modal */
 .epm-lang-modal-box {
     position: fixed !important;
@@ -11650,6 +11768,87 @@ TOP_NAVBAR_HTML = f"""
     </div>
 </div>
 
+
+<!-- Universal Interactive App Installation Modal (iOS & Android) -->
+<div id="epm-app-install-backdrop" style="position:fixed;inset:0;background:rgba(15,23,42,0.45);backdrop-filter:blur(3px);z-index:100002;display:none;pointer-events:auto;" onclick="window.epmCloseAppInstallModal()"></div>
+<div id="epm-app-install-modal" class="epm-install-modal-box" style="display:none;">
+    <div class="epm-install-modal-hdr">
+        <div style="display:flex;align-items:center;gap:8px;">
+            <img src="/api/logo" style="height:24px;width:auto;" alt="GNC" />
+            <span style="font-weight:800;font-size:14px;letter-spacing:0.3px;">Install GNC Terminal App</span>
+        </div>
+        <button type="button" onclick="window.epmCloseAppInstallModal()" style="background:rgba(255,255,255,0.15);border:none;border-radius:6px;width:24px;height:24px;cursor:pointer;color:#FFFFFF;font-weight:700;display:flex;align-items:center;justify-content:center;">✕</button>
+    </div>
+    <div class="epm-install-tabs">
+        <button type="button" class="epm-install-tab-btn active" data-install-tab="ios" onclick="window.epmSwitchAppInstallTab('ios')">
+            <span>🍎</span> Apple iPhone &amp; iPad
+        </button>
+        <button type="button" class="epm-install-tab-btn" data-install-tab="android" onclick="window.epmSwitchAppInstallTab('android')">
+            <span>🤖</span> Android (Chrome / APK)
+        </button>
+    </div>
+    
+    <!-- Tab 1: iOS iPhone Instructions -->
+    <div id="epm-install-pane-ios" class="epm-install-pane" style="padding:16px;">
+        <div style="font-size:12px;color:#475569;margin-bottom:14px;line-height:1.4;">
+            Install directly to your iPhone / iPad Home Screen in 3 quick steps for full-screen standalone mode:
+        </div>
+        <div class="epm-install-step-card">
+            <span class="epm-install-step-num">1</span>
+            <div>
+                <div style="font-weight:700;font-size:12.5px;color:#0F172A;">Open in Safari</div>
+                <div style="font-size:11px;color:#64748B;">Make sure you are viewing this terminal in the standard iOS Safari browser.</div>
+            </div>
+        </div>
+        <div class="epm-install-step-card">
+            <span class="epm-install-step-num">2</span>
+            <div>
+                <div style="font-weight:700;font-size:12.5px;color:#0F172A;">Tap the Share Button <span style="display:inline-block;border:1px solid #CBD5E1;border-radius:4px;padding:1px 5px;background:#FFFFFF;color:#0052FF;">[↑]</span></div>
+                <div style="font-size:11px;color:#64748B;">Tap the Share button at the bottom center of your Safari screen.</div>
+            </div>
+        </div>
+        <div class="epm-install-step-card">
+            <span class="epm-install-step-num">3</span>
+            <div>
+                <div style="font-weight:700;font-size:12.5px;color:#0F172A;">Select 'Add to Home Screen' <span style="display:inline-block;border:1px solid #CBD5E1;border-radius:4px;padding:1px 5px;background:#FFFFFF;color:#0052FF;">[+]</span></div>
+                <div style="font-size:11px;color:#64748B;">Scroll down and tap <b>Add to Home Screen</b>, then tap <b>Add</b> in the top right corner.</div>
+            </div>
+        </div>
+        <div style="margin-top:14px;padding:10px 12px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;font-size:11px;color:#1E40AF;line-height:1.4;">
+            ✨ <b>Native Experience:</b> GNC Terminal will launch from your home screen in dedicated full-screen mode without any browser URL bars, with real-time updates and lightning-fast speed!
+        </div>
+    </div>
+
+    <!-- Tab 2: Android Instructions -->
+    <div id="epm-install-pane-android" class="epm-install-pane" style="display:none;padding:16px;">
+        <div style="font-size:12px;color:#475569;margin-bottom:14px;line-height:1.4;">
+            Install directly on any Android device with 1-tap Google WebAPK, or download the direct APK bundle:
+        </div>
+        <button type="button" onclick="window.epmTriggerNativeInstallPrompt()" style="width:100%;padding:12px;background:#0052FF;color:#FFFFFF;border:none;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 2px 6px rgba(0,82,255,0.3);">
+            <span>📲</span> 1-Tap Quick Install (WebAPK)
+        </button>
+        <div class="epm-install-step-card">
+            <span class="epm-install-step-num">1</span>
+            <div>
+                <div style="font-weight:700;font-size:12.5px;color:#0F172A;">Chrome Menu Installation</div>
+                <div style="font-size:11px;color:#64748B;">Tap <b>⋮</b> (three dots) in top-right of Chrome ➔ Tap <b>Install App</b> or <b>Add to Home screen</b>.</div>
+            </div>
+        </div>
+        <div class="epm-install-step-card">
+            <span class="epm-install-step-num">2</span>
+            <div>
+                <div style="font-weight:700;font-size:12.5px;color:#0F172A;">Direct Android Package (APK / Studio)</div>
+                <div style="font-size:11px;color:#64748B;">Prefer an offline file? Download the standalone Android package:</div>
+                <div style="margin-top:6px;">
+                    <a href="/api/download/android-apk" download="GNC-Terminal-Mobile-App.zip" style="display:inline-flex;align-items:center;gap:6px;background:#1E293B;color:#FFFFFF;padding:6px 12px;border-radius:6px;font-size:11px;font-weight:700;text-decoration:none;">
+                        <span>📥</span> Download Android Package (.zip)
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div id="epm-top-navbar" class="epm-top-navbar">
     <div class="epm-nav-single-row">
         <!-- Left: Brand Identity Logo + GNC / Global News Feed Room -->
@@ -11671,6 +11870,11 @@ TOP_NAVBAR_HTML = f"""
 
         <!-- Right: Google Translate Logo Button + Prominent Menu Button -->
         <div class="epm-nav-controls">
+            
+            <button type="button" class="epm-install-app-btn" onclick="window.epmTriggerPWAInstall()" title="Install GNC App on iPhone / Android">
+                <span style="font-size:13px;">📲</span>
+                <span class="epm-install-btn-text">Install App</span>
+            </button>
             <div class="epm-translate-btn-wrapper" title="Change Language / भाषा बदलें" onclick="window.epmOpenLanguageModal()">
                 <button type="button" class="epm-translate-icon-btn" aria-label="Google Translate">
                     <img src="/api/translate-logo" class="epm-translate-img-icon" alt="Google Translate" />
@@ -11932,6 +12136,31 @@ TOP_NAVBAR_HTML = f"""
             </div>
         </div>
 
+        
+        <div class="epm-side-section-label">📱 MOBILE APPS & INSTALLATION</div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">
+            <button type="button" class="epm-side-app-btn" onclick="window.epmTriggerPWAInstall();window.epmCloseSideMenu();" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:linear-gradient(135deg, #0052FF 0%, #1E40AF 100%);color:#FFFFFF;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12.5px;box-shadow:0 2px 5px rgba(0,82,255,0.25);">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <span style="font-size:18px;">📲</span>
+                    <div style="text-align:left;">
+                        <div style="line-height:1.2;">Install GNC App</div>
+                        <div style="font-size:10px;opacity:0.88;font-weight:500;">Apple iPhone (iOS) &amp; Android 1-Tap</div>
+                    </div>
+                </div>
+                <span style="font-size:10px;background:rgba(255,255,255,0.22);padding:2px 7px;border-radius:999px;">FREE $0</span>
+            </button>
+            <a href="/api/download/android-apk" download="GNC-Terminal-Mobile-App.zip" class="epm-side-app-btn" style="text-decoration:none;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#F8FAFC;border:1px solid #CBD5E1;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;color:#0F172A;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <span style="font-size:18px;">🤖</span>
+                    <div style="text-align:left;">
+                        <div style="line-height:1.2;">Download Android Package</div>
+                        <div style="font-size:10px;color:#64748B;font-weight:500;">Ready-to-run APK &amp; Webview package</div>
+                    </div>
+                </div>
+                <span style="font-size:10px;background:#E2E8F0;color:#334155;padding:2px 7px;border-radius:999px;">📥 APK</span>
+            </a>
+        </div>
+
         <div class="epm-side-section-label">COMMUNITY & SOCIAL CHANNELS</div>
         <div class="epm-side-social-grid">
             <a id="epm-side-social-fb" href="{_initial_social_links.get('facebook', 'https://www.facebook.com')}" target="_blank" rel="noopener noreferrer" class="epm-side-social-btn epm-social-fb" title="Official Facebook Page">
@@ -12044,6 +12273,114 @@ TOP_NAVBAR_HTML = f"""
 TERMINAL_CLIENT_JS = r"""
 // EPM PRO INSTITUTIONAL CLIENT ENGINE 3.0
 (function() {
+    // ═══════════════════════════════════════════════════════════════════════
+    // PWA & MOBILE HARDWARE INTEGRATION (ServiceWorker, Install, Haptics)
+    // ═══════════════════════════════════════════════════════════════════════
+    window.deferredPWAInstallPrompt = null;
+
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+            navigator.serviceWorker.register('/sw.js', { scope: '/' })
+                .then(function(reg) {
+                    console.log('GNC Terminal Service Worker active:', reg.scope);
+                })
+                .catch(function(err) {
+                    console.warn('GNC Service Worker registration error:', err);
+                });
+        });
+    }
+
+    window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        window.deferredPWAInstallPrompt = e;
+        console.log('PWA beforeinstallprompt captured and ready');
+    });
+
+    window.addEventListener('appinstalled', function() {
+        window.deferredPWAInstallPrompt = null;
+        console.log('GNC Terminal installed to home screen successfully');
+    });
+
+    window.epmTriggerHaptic = function(pattern = 12) {
+        try {
+            if ('vibrate' in navigator) {
+                navigator.vibrate(pattern);
+            }
+        } catch (e) {}
+    };
+
+    window.epmTriggerPWAInstall = function() {
+        window.epmTriggerHaptic([15, 30, 15]);
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+
+        if (isStandalone) {
+            alert('GNC Terminal is already installed and running in native standalone mode!');
+            return;
+        }
+
+        if (window.deferredPWAInstallPrompt) {
+            window.deferredPWAInstallPrompt.prompt();
+            window.deferredPWAInstallPrompt.userChoice.then(function(choice) {
+                if (choice.outcome === 'accepted') {
+                    console.log('User installed GNC Terminal WebAPK');
+                }
+                window.deferredPWAInstallPrompt = null;
+            });
+        } else {
+            window.epmOpenAppInstallModal();
+            if (isIOS) {
+                window.epmSwitchAppInstallTab('ios');
+            } else {
+                window.epmSwitchAppInstallTab('android');
+            }
+        }
+    };
+
+    window.epmTriggerNativeInstallPrompt = function() {
+        if (window.deferredPWAInstallPrompt) {
+            window.deferredPWAInstallPrompt.prompt();
+            window.deferredPWAInstallPrompt.userChoice.then(function(choice) {
+                window.deferredPWAInstallPrompt = null;
+            });
+        } else {
+            alert('Tap the Chrome menu (⋮) in the top-right corner of your browser and select "Install App" or "Add to Home Screen".');
+        }
+    };
+
+    window.epmOpenAppInstallModal = function() {
+        window.epmTriggerHaptic(10);
+        const modal = document.getElementById('epm-app-install-modal');
+        const backdrop = document.getElementById('epm-app-install-backdrop');
+        if (modal && backdrop) {
+            modal.style.display = 'block';
+            backdrop.style.display = 'block';
+        }
+    };
+
+    window.epmCloseAppInstallModal = function() {
+        window.epmTriggerHaptic(8);
+        const modal = document.getElementById('epm-app-install-modal');
+        const backdrop = document.getElementById('epm-app-install-backdrop');
+        if (modal && backdrop) {
+            modal.style.display = 'none';
+            backdrop.style.display = 'none';
+        }
+    };
+
+    window.epmSwitchAppInstallTab = function(platform) {
+        window.epmTriggerHaptic(10);
+        const tabs = document.querySelectorAll('.epm-install-tab-btn');
+        tabs.forEach(function(t) { t.classList.remove('active'); });
+        const targetTab = document.querySelector('.epm-install-tab-btn[data-install-tab="' + platform + '"]');
+        if (targetTab) targetTab.classList.add('active');
+
+        const panes = document.querySelectorAll('.epm-install-pane');
+        panes.forEach(function(p) { p.style.display = 'none'; });
+        const targetPane = document.getElementById('epm-install-pane-' + platform);
+        if (targetPane) targetPane.style.display = 'block';
+    };
+
     // 1. Audio Engine (Dual-tone Harmonic 880Hz -> 1320Hz Sine Wave)
     let audioCtx = null;
     let audioMuted = localStorage.getItem("epm_audio_muted") === "true";
@@ -15177,7 +15514,7 @@ with gr.Blocks(
         '<meta property="og:image:height" content="512" />'
         '<meta property="og:url" content="https://p01--news-engine-service--dkhqtlpvx6bh.code.run/" />'
         '<meta property="og:type" content="website" />'
-        '<meta property="og:site_name" content="Global News and Calender" />'
+        '<meta property="og:site_name" content="Global News and Calender" /><link rel="manifest" href="/manifest.json" /><meta name="mobile-web-app-capable" content="yes" /><meta name="apple-mobile-web-app-capable" content="yes" /><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" /><meta name="apple-mobile-web-app-title" content="GNC Terminal" /><meta name="application-name" content="GNC Terminal" /><link rel="apple-touch-icon" href="/apple-touch-icon.png" /><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" /><link rel="icon" type="image/png" sizes="192x192" href="/pwa-icon-192.png" /><link rel="icon" type="image/png" sizes="512x512" href="/pwa-icon-512.png" /><meta name="theme-color" content="#0052FF" />'
         '<meta name="twitter:card" content="summary" />'
         '<meta name="twitter:title" content="Global News and Calender" />'
         '<meta name="twitter:description" content="US and Indian Economic and Financial Market News and Calender" />'
@@ -15883,6 +16220,134 @@ with gr.Blocks(
 
 demo.queue(default_concurrency_limit=20)
 
+
+# ═══════════════════════════════════════════════════════════════════════════
+# PWA & MOBILE APP ENGINE ROUTES (100% Free Dual Distribution)
+# ═══════════════════════════════════════════════════════════════════════════
+@app.get("/manifest.json")
+async def serve_pwa_manifest():
+    manifest_data = {
+        "name": "GNC Global News & Calendars",
+        "short_name": "GNC Terminal",
+        "description": "Institutional Multi-Market Financial Intelligence, Calendars, Filings & Regulatory Directives",
+        "start_url": "/?standalone=true",
+        "scope": "/",
+        "display": "standalone",
+        "orientation": "any",
+        "background_color": "#0B0F19",
+        "theme_color": "#0052FF",
+        "categories": ["finance", "business", "news"],
+        "icons": [
+            {
+                "src": "/pwa-icon-192.png",
+                "sizes": "192x192",
+                "type": "image/png",
+                "purpose": "any maskable"
+            },
+            {
+                "src": "/pwa-icon-512.png",
+                "sizes": "512x512",
+                "type": "image/png",
+                "purpose": "any maskable"
+            },
+            {
+                "src": "/apple-touch-icon.png",
+                "sizes": "180x180",
+                "type": "image/png"
+            }
+        ]
+    }
+    return JSONResponse(
+        content=manifest_data,
+        media_type="application/manifest+json",
+        headers={"Cache-Control": "public, max-age=3600"}
+    )
+
+@app.get("/sw.js")
+async def serve_service_worker():
+    sw_code = """
+const CACHE_NAME = 'gnc-terminal-v2026';
+const STATIC_ASSETS = [
+    '/',
+    '/manifest.json',
+    '/pwa-icon-192.png',
+    '/pwa-icon-512.png',
+    '/apple-touch-icon.png',
+    '/api/logo',
+    '/api/translate-logo'
+];
+
+self.addEventListener('install', (event) => {
+    self.skipWaiting();
+    event.waitUntil(
+        caches.open(CACHE_NAME).then((cache) => {
+            return cache.addAll(STATIC_ASSETS).catch(() => {});
+        })
+    );
+});
+
+self.addEventListener('activate', (event) => {
+    event.waitUntil(
+        caches.keys().then((keys) => {
+            return Promise.all(
+                keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+            );
+        }).then(() => self.clients.claim())
+    );
+});
+
+self.addEventListener('fetch', (event) => {
+    const url = new URL(event.request.url);
+    if (event.request.method !== 'GET' || url.pathname.startsWith('/api/stream') || url.pathname.startsWith('/queue/join')) {
+        return;
+    }
+    event.respondWith(
+        fetch(event.request).catch(() => caches.match(event.request))
+    );
+});
+"""
+    return Response(
+        content=sw_code.strip(),
+        media_type="application/javascript",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Service-Worker-Allowed": "/"
+        }
+    )
+
+@app.get("/pwa-icon-192.png")
+async def serve_pwa_icon_192():
+    path = os.path.join(os.path.dirname(__file__), "assets", "pwa_icon_192.png")
+    if os.path.exists(path):
+        return FileResponse(path, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+    return Response(status_code=404)
+
+@app.get("/pwa-icon-512.png")
+async def serve_pwa_icon_512():
+    path = os.path.join(os.path.dirname(__file__), "assets", "pwa_icon_512.png")
+    if os.path.exists(path):
+        return FileResponse(path, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+    return Response(status_code=404)
+
+@app.get("/apple-touch-icon.png")
+async def serve_apple_touch_icon():
+    path = os.path.join(os.path.dirname(__file__), "assets", "apple-touch-icon.png")
+    if os.path.exists(path):
+        return FileResponse(path, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+    return Response(status_code=404)
+
+@app.get("/api/download/android-apk")
+async def download_android_apk():
+    zip_path = os.path.join(os.path.dirname(__file__), "assets", "GNC-Terminal-Mobile-App.zip")
+    if os.path.exists(zip_path):
+        return FileResponse(
+            zip_path,
+            filename="GNC-Terminal-Mobile-App.zip",
+            media_type="application/zip",
+            headers={"Content-Disposition": "attachment; filename=GNC-Terminal-Mobile-App.zip"}
+        )
+    return Response(content="Android package building, please try again in 5 seconds.", status_code=503)
+
 @app.api_route("/api/terminal-client.js", methods=["GET", "HEAD"])
 async def serve_terminal_client_js():
     """Serves pure client-side reactive navigation and interactive JS bundle with strict anti-caching."""
@@ -15922,7 +16387,7 @@ app = gr.mount_gradio_app(
         '<meta property="og:image:height" content="512" />'
         '<meta property="og:url" content="https://p01--news-engine-service--dkhqtlpvx6bh.code.run/" />'
         '<meta property="og:type" content="website" />'
-        '<meta property="og:site_name" content="Global News and Calender" />'
+        '<meta property="og:site_name" content="Global News and Calender" /><link rel="manifest" href="/manifest.json" /><meta name="mobile-web-app-capable" content="yes" /><meta name="apple-mobile-web-app-capable" content="yes" /><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" /><meta name="apple-mobile-web-app-title" content="GNC Terminal" /><meta name="application-name" content="GNC Terminal" /><link rel="apple-touch-icon" href="/apple-touch-icon.png" /><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" /><link rel="icon" type="image/png" sizes="192x192" href="/pwa-icon-192.png" /><link rel="icon" type="image/png" sizes="512x512" href="/pwa-icon-512.png" /><meta name="theme-color" content="#0052FF" />'
         '<meta name="twitter:card" content="summary" />'
         '<meta name="twitter:title" content="Global News and Calender" />'
         '<meta name="twitter:description" content="US and Indian Economic and Financial Market News and Calender" />'

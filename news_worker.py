@@ -912,8 +912,6 @@ class NewsEngineWorker:
                     self.dispatch_executor.submit(self.process_and_dispatch_single_item, item)
 
         self.last_fetch_time = datetime.now()
-        import gc
-        gc.collect()
 
     def get_adaptive_interval(self) -> float:
         """
