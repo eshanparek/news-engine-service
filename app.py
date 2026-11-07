@@ -5981,6 +5981,35 @@ def render_table_ribbon(
 
 CUSTOM_CSS = """
 
+
+/* ─── Force Desktop / Landscape Mode on Any Device (Mobile, Tablet, TV, iPad) ─── */
+body.epm-force-desktop-layout {
+    min-width: 1080px !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+}
+body.epm-force-desktop-layout .epm-mobile-only {
+    display: none !important;
+}
+body.epm-force-desktop-layout .epm-desktop-only,
+body.epm-force-desktop-layout #news_visual_feed,
+body.epm-force-desktop-layout #sec_holidays_page {
+    display: block !important;
+}
+body.epm-force-desktop-layout .epm-nav-single-row {
+    min-width: 1080px !important;
+}
+body.epm-force-desktop-layout .epm-brand-mobile {
+    display: none !important;
+}
+body.epm-force-desktop-layout .epm-brand-desktop {
+    display: inline-block !important;
+}
+body.epm-force-desktop-layout .epm-time-rail,
+body.epm-force-desktop-layout .epm-time-axis {
+    display: block !important;
+}
+
 /* ─── PWA & Native Mobile App Styles ─── */
 .epm-install-app-btn {
     display: inline-flex !important;
@@ -12088,6 +12117,36 @@ TOP_NAVBAR_HTML = f"""
         </div>
 
         <div class="epm-side-section-label">SYSTEM & AUDIO CONTROLS</div>
+        
+        <div class="epm-side-audio-card" onclick="window.epmToggleDeviceNotifications()" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;margin-bottom:10px;cursor:pointer;">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <span style="font-size:18px;">🔔</span>
+                <div>
+                    <div style="font-weight:700;font-size:12.5px;color:#0F172A;">Device Push Alerts</div>
+                    <div style="font-size:10.5px;color:#64748B;">Pop-up banner on phone / lock screen</div>
+                </div>
+            </div>
+            <span id="epm-side-push-status" class="epm-side-audio-badge" style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;background:#E2E8F0;color:#475569;border:1px solid #CBD5E1;">Enable</span>
+        </div>
+
+        <div class="epm-side-audio-card" style="padding:10px 14px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;margin-bottom:10px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span style="font-size:16px;">🖥️</span>
+                    <div>
+                        <div style="font-weight:700;font-size:12px;color:#0F172A;">Screen View Layout</div>
+                        <div style="font-size:10px;color:#64748B;">Mobile card or Full Desktop terminal</div>
+                    </div>
+                </div>
+                <button type="button" id="epm-view-mode-toggle-btn" onclick="window.epmToggleViewMode()" style="padding:4px 9px;border-radius:6px;font-size:11px;font-weight:700;background:#0052FF;color:#FFFFFF;border:none;cursor:pointer;box-shadow:0 1px 3px rgba(0,82,255,0.25);">
+                    <span id="epm-view-mode-label">Mobile</span>
+                </button>
+            </div>
+            <button type="button" onclick="window.epmToggleLandscapeFullscreen()" style="width:100%;padding:6px 10px;background:#FFFFFF;border:1px solid #CBD5E1;border-radius:6px;font-size:11px;font-weight:700;color:#0F172A;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+                <span>⛶</span> Landscape Desktop View
+            </button>
+        </div>
+
         <div class="epm-side-audio-card" onclick="window.epmToggleAudio()" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;margin-bottom:10px;cursor:pointer;">
             <div style="display:flex;align-items:center;gap:10px;">
                 <span style="font-size:18px;">🔔</span>
@@ -12380,6 +12439,126 @@ TERMINAL_CLIENT_JS = r"""
         panes.forEach(function(p) { p.style.display = 'none'; });
         const targetPane = document.getElementById('epm-install-pane-' + platform);
         if (targetPane) targetPane.style.display = 'block';
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // DEVICE OS NOTIFICATIONS & VIEW MODE TOGGLE (Mobile vs Desktop)
+    // ═══════════════════════════════════════════════════════════════════════
+    let _lastNotifiedHeadline = "";
+
+    window.epmUpdatePushBadge = function() {
+        const badge = document.getElementById('epm-side-push-status');
+        if (!badge) return;
+        const enabled = localStorage.getItem('epm_device_notifications') === 'true';
+        if (enabled && Notification.permission === 'granted') {
+            badge.textContent = 'Alerts ON';
+            badge.style.background = '#DCFCE7';
+            badge.style.color = '#166534';
+            badge.style.borderColor = '#86EFAC';
+        } else if (Notification.permission === 'denied') {
+            badge.textContent = 'Blocked';
+            badge.style.background = '#FEE2E2';
+            badge.style.color = '#991B1B';
+            badge.style.borderColor = '#FCA5A5';
+        } else {
+            badge.textContent = 'Enable';
+            badge.style.background = '#E2E8F0';
+            badge.style.color = '#475569';
+            badge.style.borderColor = '#CBD5E1';
+        }
+    };
+
+    window.epmToggleDeviceNotifications = function() {
+        window.epmTriggerHaptic(12);
+        if (!('Notification' in window)) {
+            alert('Push notifications are not supported on this browser or platform.');
+            return;
+        }
+
+        if (Notification.permission === 'granted') {
+            const current = localStorage.getItem('epm_device_notifications') === 'true';
+            localStorage.setItem('epm_device_notifications', (!current).toString());
+            window.epmUpdatePushBadge();
+            if (!current) {
+                window.epmShowDeviceNotification('🔔 GNC Alerts Activated', 'You will receive real-time device notifications for breaking news & calendar outcomes.');
+            }
+        } else if (Notification.permission !== 'denied') {
+            Notification.requestPermission().then(function(perm) {
+                if (perm === 'granted') {
+                    localStorage.setItem('epm_device_notifications', 'true');
+                    window.epmUpdatePushBadge();
+                    window.epmShowDeviceNotification('🔔 GNC Alerts Activated', 'You will receive real-time device notifications for breaking news & calendar outcomes.');
+                } else {
+                    localStorage.setItem('epm_device_notifications', 'false');
+                    window.epmUpdatePushBadge();
+                }
+            });
+        } else {
+            alert('Notifications are blocked in your device/browser settings. Please allow notifications for GNC Terminal in your browser permissions.');
+        }
+    };
+
+    window.epmShowDeviceNotification = function(title, body, url = '/') {
+        if (!('Notification' in window) || Notification.permission !== 'granted') return;
+        if (localStorage.getItem('epm_device_notifications') !== 'true') return;
+        try {
+            if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                navigator.serviceWorker.ready.then(function(reg) {
+                    reg.showNotification(title, {
+                        body: body,
+                        icon: '/pwa-icon-192.png',
+                        badge: '/pwa-icon-192.png',
+                        vibrate: [100, 50, 100],
+                        tag: 'gnc-event-' + Date.now(),
+                        data: { url: url }
+                    });
+                });
+            } else {
+                new Notification(title, {
+                    body: body,
+                    icon: '/pwa-icon-192.png'
+                });
+            }
+        } catch (e) {
+            console.warn('Device notification error:', e);
+        }
+    };
+
+    // View Mode Layout Switcher (Mobile vs Full Desktop Terminal)
+    window.epmApplyViewMode = function(mode) {
+        const lbl = document.getElementById('epm-view-mode-label');
+        if (mode === 'desktop') {
+            document.body.classList.add('epm-force-desktop-layout');
+            if (lbl) lbl.textContent = 'Desktop';
+        } else {
+            document.body.classList.remove('epm-force-desktop-layout');
+            if (lbl) lbl.textContent = 'Mobile';
+        }
+        localStorage.setItem('epm_view_mode', mode);
+    };
+
+    window.epmToggleViewMode = function() {
+        window.epmTriggerHaptic(12);
+        const current = localStorage.getItem('epm_view_mode') || 'mobile';
+        const next = (current === 'desktop') ? 'mobile' : 'desktop';
+        window.epmApplyViewMode(next);
+    };
+
+    window.epmToggleLandscapeFullscreen = function() {
+        window.epmTriggerHaptic([15, 30, 15]);
+        window.epmApplyViewMode('desktop');
+
+        if (!document.fullscreenElement) {
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch(function() {});
+            } else if (document.documentElement.webkitRequestFullscreen) {
+                document.documentElement.webkitRequestFullscreen();
+            }
+        }
+
+        if (screen.orientation && screen.orientation.lock) {
+            screen.orientation.lock('landscape').catch(function() {});
+        }
     };
 
     // 1. Audio Engine (Dual-tone Harmonic 880Hz -> 1320Hz Sine Wave)
@@ -15484,6 +15663,15 @@ TERMINAL_CLIENT_JS = r"""
             window.epmInitPasswordToggles();
         }
 
+        
+        const savedViewMode = localStorage.getItem('epm_view_mode') || 'mobile';
+        if (window.epmApplyViewMode) {
+            window.epmApplyViewMode(savedViewMode);
+        }
+        if (window.epmUpdatePushBadge) {
+            window.epmUpdatePushBadge();
+        }
+
         if (window.epmMountSettingsPanes) {
             window.epmMountSettingsPanes();
         }
@@ -16294,6 +16482,43 @@ self.addEventListener('activate', (event) => {
                 keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
             );
         }).then(() => self.clients.claim())
+    );
+});
+
+
+self.addEventListener('push', (event) => {
+    let data = { title: 'GNC Breaking News Alert', body: 'New market catalyst has unfolded.', url: '/' };
+    if (event.data) {
+        try {
+            data = event.data.json();
+        } catch (e) {
+            data.body = event.data.text();
+        }
+    }
+    const options = {
+        body: data.body,
+        icon: '/pwa-icon-192.png',
+        badge: '/pwa-icon-192.png',
+        vibrate: [100, 50, 100],
+        data: { url: data.url || '/' }
+    };
+    event.waitUntil(self.registration.showNotification(data.title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+    const targetUrl = (event.notification.data && event.notification.data.url) ? event.notification.data.url : '/';
+    event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+            for (let client of windowClients) {
+                if (client.url === targetUrl && 'focus' in client) {
+                    return client.focus();
+                }
+            }
+            if (clients.openWindow) {
+                return clients.openWindow(targetUrl);
+            }
+        })
     );
 });
 
